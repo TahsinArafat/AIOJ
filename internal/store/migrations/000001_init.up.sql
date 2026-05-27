@@ -145,3 +145,7 @@ CREATE TABLE bot_accounts (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (user_id, platform)
 );
+
+CREATE INDEX idx_submissions_user ON submissions(user_id);
+CREATE INDEX idx_contest_problems_contest ON contest_problems(contest_id);
+CREATE INDEX idx_contest_submissions_contest_user ON contest_submissions(contest_id, user_id);
