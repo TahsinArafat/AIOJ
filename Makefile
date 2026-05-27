@@ -12,3 +12,12 @@ migrate-up:
 migrate-down:
 	DB_DSN="postgres://aioj:aioj_dev@localhost:5432/aioj?sslmode=disable" \
 	go run ./cmd/migrate -dir internal/store/migrations down
+
+docker-build:
+	docker compose build
+docker-up:
+	docker compose up -d
+docker-down:
+	docker compose down
+docker-logs:
+	docker compose logs -f backend

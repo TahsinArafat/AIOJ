@@ -1,0 +1,16 @@
+.git
+.omo
+docs
+web/node_modules
+web/dist
+*.md
+__pycache__
+*.pyc
+.env
+.env.local
+.idea
+.vscode
+*.swp
+.DS_Store
+pgdata
+aioj
