@@ -1,0 +1,71 @@
+import { BrowserRouter, Routes, Route, Link, useNavigate } from 'react-router-dom'
+import { getAccessToken, clearTokens } from './lib/api'
+import './global.css'
+
+function Navbar() {
+    const navigate = useNavigate()
+    const loggedIn = !!getAccessToken()
+
+    const handleLogout = () => {
+        clearTokens()
+        navigate('/login')
+    }
+
+    return (
+        <nav className="border-b border-gray-200 px-6 py-3 flex items-center justify-between bg-white sticky top-0 z-10">
+            <div className="flex gap-6 items-center">
+                <Link to="/" className="font-bold text-blue-600 text-lg">AIOJ</Link>
+                <Link to="/problems" className="text-sm text-gray-600 hover:text-black transition-colors">Problems</Link>
+                <Link to="/contests" className="text-sm text-gray-600 hover:text-black transition-colors">Contests</Link>
+            </div>
+            <div className="flex gap-3 items-center">
+                {loggedIn ? (
+                    <>
+                        <Link to="/submissions" className="text-sm text-gray-600 hover:text-black">My Submissions</Link>
+                        <button onClick={handleLogout} className="text-sm text-gray-500 hover:text-black">Logout</button>
+                    </>
+                ) : (
+                    <>
+                        <Link to="/login" className="text-sm text-gray-600 hover:text-black">Login</Link>
+                        <Link to="/register" className="text-sm bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 transition-colors">Register</Link>
+                    </>
+                )}
+            </div>
+        </nav>
+    )
+}
+
+function Home() {
+    return (
+        <div className="text-center py-24">
+            <h1 className="text-4xl font-bold mb-3">AIOJ</h1>
+            <p className="text-gray-500">Lightweight Online Judge for Competitive Programming</p>
+            <div className="mt-8 flex justify-center gap-4">
+                <Link to="/problems" className="bg-blue-600 text-white px-6 py-2.5 rounded hover:bg-blue-700 transition-colors">Browse Problems</Link>
+                <Link to="/contests" className="border border-gray-300 px-6 py-2.5 rounded hover:bg-gray-50 transition-colors">View Contests</Link>
+            </div>
+        </div>
+    )
+}
+
+export default function App() {
+    return (
+        <BrowserRouter>
+            <div className="min-h-screen bg-white">
+                <Navbar />
+                <main className="max-w-5xl mx-auto px-4 py-6">
+                    <Routes>
+                        <Route path="/" element={<Home />} />
+                        <Route path="/problems" element={<div className="text-gray-400 text-center py-20">Problems — coming in Task 13</div>} />
+                        <Route path="/problems/:slug" element={<div className="text-gray-400 text-center py-20">Problem detail — coming in Task 13</div>} />
+                        <Route path="/login" element={<div className="text-gray-400 text-center py-20">Login — coming in Task 13</div>} />
+                        <Route path="/register" element={<div className="text-gray-400 text-center py-20">Register — coming in Task 13</div>} />
+                        <Route path="/contests" element={<div className="text-gray-400 text-center py-20">Contests — coming in Task 15</div>} />
+                        <Route path="/submissions" element={<div className="text-gray-400 text-center py-20">Submissions — coming in Task 13</div>} />
+                        <Route path="*" element={<div className="text-center py-20 text-gray-400">404 Not Found</div>} />
+                    </Routes>
+                </main>
+            </div>
+        </BrowserRouter>
+    )
+}
