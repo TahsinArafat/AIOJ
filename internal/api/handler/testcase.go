@@ -1,11 +1,13 @@
 package handler
 
 import (
+	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
@@ -80,19 +82,30 @@ func (h *TestcaseHandler) Upload(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TestcaseHandler) saveFile(dir string, fileHeader *multipart.FileHeader) error {
+	filename := fileHeader.Filename
+	if strings.Contains(filename, "..") || strings.ContainsAny(filename, "/\\") {
+		return fmt.Errorf("invalid filename")
+	}
+	baseName := filepath.Base(filename)
+
 	src, err := fileHeader.Open()
 	if err != nil {
 		return err
 	}
 	defer src.Close()
 
-	dstPath := filepath.Join(dir, fileHeader.Filename)
+	dstPath := filepath.Join(dir, baseName)
 	dst, err := os.Create(dstPath)
 	if err != nil {
 		return err
 	}
-	defer dst.Close()
 
 	_, err = io.Copy(dst, src)
+	dst.Close()
+
+	if err != nil {
+		os.Remove(dstPath)
+	}
+
 	return err
 }
