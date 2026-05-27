@@ -64,7 +64,11 @@ func (h *ContestHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ContestHandler) GetByID(w http.ResponseWriter, r *http.Request) {
-	c, _ := h.store.GetByID(r.Context(), chi.URLParam(r, "id"))
+	c, err := h.store.GetByID(r.Context(), chi.URLParam(r, "id"))
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
 	if c == nil {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
@@ -93,7 +97,11 @@ func (h *ContestHandler) List(w http.ResponseWriter, r *http.Request) {
 
 func (h *ContestHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	contest, _ := h.store.GetByID(r.Context(), id)
+	contest, err := h.store.GetByID(r.Context(), id)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
 	if contest == nil {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
@@ -245,7 +253,11 @@ func (h *ContestHandler) AddPermission(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
-	c, _ := h.store.GetByID(r.Context(), chi.URLParam(r, "id"))
+	c, err := h.store.GetByID(r.Context(), chi.URLParam(r, "id"))
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
 	if c == nil {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
@@ -262,7 +274,10 @@ func (h *ContestHandler) AddPermission(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid body", http.StatusBadRequest)
 		return
 	}
-	h.store.AddPermission(r.Context(), c.ID, req.UserID, req.Level)
+	if err := h.store.AddPermission(r.Context(), c.ID, req.UserID, req.Level); err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -272,7 +287,11 @@ func (h *ContestHandler) RemovePermission(w http.ResponseWriter, r *http.Request
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
-	c, _ := h.store.GetByID(r.Context(), chi.URLParam(r, "id"))
+	c, err := h.store.GetByID(r.Context(), chi.URLParam(r, "id"))
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
 	if c == nil {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
@@ -282,6 +301,9 @@ func (h *ContestHandler) RemovePermission(w http.ResponseWriter, r *http.Request
 		return
 	}
 	targetUserID := chi.URLParam(r, "userId")
-	h.store.RemovePermission(r.Context(), c.ID, targetUserID)
+	if err := h.store.RemovePermission(r.Context(), c.ID, targetUserID); err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
 	w.WriteHeader(http.StatusOK)
 }
