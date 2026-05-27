@@ -49,7 +49,63 @@ func (h *ProblemHandler) GetBySlug(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
+	// Privacy guard: private problems only visible to admin, owner, co_author, tester
+	if !p.Visible {
+		claims := middleware.GetUserClaims(r)
+		if claims == nil || (claims.Role != "admin" && !h.store.HasAccess(r.Context(), p.ID, claims.UserID, "owner", "co_author", "tester")) {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+	}
 	respondJSON(w, http.StatusOK, p)
+}
+
+func (h *ProblemHandler) Update(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r)
+	slug := chi.URLParam(r, "slug")
+	p, _ := h.store.GetBySlug(r.Context(), slug)
+	if p == nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if claims.Role != "admin" && !h.store.HasAccess(r.Context(), p.ID, claims.UserID, "owner", "co_author") {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	var req model.CreateProblemRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	p.Title = req.Title
+	p.Description = req.Description
+	p.TimeLimit = req.TimeLimit
+	p.MemoryLimit = req.MemoryLimit
+	p.Difficulty = req.Difficulty
+	p.InputFormat = req.InputFormat
+	p.OutputFormat = req.OutputFormat
+	p.Hint = req.Hint
+	p.SampleCases = req.SampleCases
+	p.TestCaseScore = req.TestCaseScore
+	p.Tags = req.Tags
+	h.store.Update(r.Context(), p.ID, p)
+	w.WriteHeader(http.StatusOK)
+}
+
+func (h *ProblemHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r)
+	slug := chi.URLParam(r, "slug")
+	p, _ := h.store.GetBySlug(r.Context(), slug)
+	if p == nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if claims.Role != "admin" && !h.store.HasAccess(r.Context(), p.ID, claims.UserID, "owner") {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	h.store.Delete(r.Context(), p.ID)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *ProblemHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -101,4 +157,56 @@ func (h *ProblemHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	respondJSON(w, http.StatusCreated, prob)
+}
+
+func (h *ProblemHandler) ListPermissions(w http.ResponseWriter, r *http.Request) {
+	p, _ := h.store.GetBySlug(r.Context(), chi.URLParam(r, "slug"))
+	if p == nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	perms, _ := h.store.GetPermissions(r.Context(), p.ID)
+	if perms == nil {
+		perms = []model.ProblemPermission{}
+	}
+	respondJSON(w, http.StatusOK, map[string]interface{}{"data": perms})
+}
+
+func (h *ProblemHandler) AddPermission(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r)
+	p, _ := h.store.GetBySlug(r.Context(), chi.URLParam(r, "slug"))
+	if p == nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if claims.Role != "admin" && !h.store.HasAccess(r.Context(), p.ID, claims.UserID, "owner") {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	var req struct {
+		UserID string `json:"user_id"`
+		Level  string `json:"access_level"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	h.store.AddPermission(r.Context(), p.ID, req.UserID, req.Level)
+	w.WriteHeader(http.StatusOK)
+}
+
+func (h *ProblemHandler) RemovePermission(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r)
+	p, _ := h.store.GetBySlug(r.Context(), chi.URLParam(r, "slug"))
+	if p == nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if claims.Role != "admin" && !h.store.HasAccess(r.Context(), p.ID, claims.UserID, "owner") {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	targetUserID := chi.URLParam(r, "userId")
+	h.store.RemovePermission(r.Context(), p.ID, targetUserID)
+	w.WriteHeader(http.StatusOK)
 }

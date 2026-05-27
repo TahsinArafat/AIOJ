@@ -31,11 +31,16 @@ func NewRouter(
 
 	r.Route("/api/problems", func(r chi.Router) {
 		r.Get("/", problemH.List)
-		r.Get("/{slug}", problemH.GetBySlug)
+		r.With(middleware.OptionalAuthMiddleware(jwtManager)).Get("/{slug}", problemH.GetBySlug)
 		r.Get("/{slug}/submissions", submissionH.ListByProblem)
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.AuthMiddleware(jwtManager))
 			r.Post("/", problemH.Create)
+			r.Put("/{slug}", problemH.Update)
+			r.Delete("/{slug}", problemH.Delete)
+			r.Get("/{slug}/permissions", problemH.ListPermissions)
+			r.Post("/{slug}/permissions", problemH.AddPermission)
+			r.Delete("/{slug}/permissions/{userId}", problemH.RemovePermission)
 		})
 	})
 

@@ -31,6 +31,23 @@ func AuthMiddleware(jwtManager *auth.JWTManager) func(http.Handler) http.Handler
 	}
 }
 
+func OptionalAuthMiddleware(jwtManager *auth.JWTManager) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			header := r.Header.Get("Authorization")
+			if strings.HasPrefix(header, "Bearer ") {
+				claims, err := jwtManager.ValidateToken(strings.TrimPrefix(header, "Bearer "))
+				if err == nil {
+					ctx := context.WithValue(r.Context(), UserContextKey, claims)
+					next.ServeHTTP(w, r.WithContext(ctx))
+					return
+				}
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 func GetUserClaims(r *http.Request) *auth.Claims {
 	c, _ := r.Context().Value(UserContextKey).(*auth.Claims)
 	return c
