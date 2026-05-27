@@ -1,5 +1,9 @@
 import { BrowserRouter, Routes, Route, Link, useNavigate } from 'react-router-dom'
 import { getAccessToken, clearTokens } from './lib/api'
+import Login from './pages/Login'
+import Register from './pages/Register'
+import ProblemList from './pages/ProblemList'
+import ProblemDetail from './pages/ProblemDetail'
 import './global.css'
 
 function Navbar() {
@@ -56,12 +60,12 @@ export default function App() {
                 <main className="max-w-5xl mx-auto px-4 py-6">
                     <Routes>
                         <Route path="/" element={<Home />} />
-                        <Route path="/problems" element={<div className="text-gray-400 text-center py-20">Problems — coming in Task 13</div>} />
-                        <Route path="/problems/:slug" element={<div className="text-gray-400 text-center py-20">Problem detail — coming in Task 13</div>} />
-                        <Route path="/login" element={<div className="text-gray-400 text-center py-20">Login — coming in Task 13</div>} />
-                        <Route path="/register" element={<div className="text-gray-400 text-center py-20">Register — coming in Task 13</div>} />
+                        <Route path="/problems" element={<ProblemList />} />
+                        <Route path="/problems/:slug" element={<ProblemDetail />} />
+                        <Route path="/login" element={<Login />} />
+                        <Route path="/register" element={<Register />} />
                         <Route path="/contests" element={<div className="text-gray-400 text-center py-20">Contests — coming in Task 15</div>} />
-                        <Route path="/submissions" element={<div className="text-gray-400 text-center py-20">Submissions — coming in Task 13</div>} />
+                        <Route path="/submissions" element={<div className="text-gray-400 text-center py-20">Submissions — coming soon</div>} />
                         <Route path="*" element={<div className="text-center py-20 text-gray-400">404 Not Found</div>} />
                     </Routes>
                 </main>

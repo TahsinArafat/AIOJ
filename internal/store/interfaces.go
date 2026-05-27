@@ -36,3 +36,13 @@ type RefreshTokenStore interface {
 	Create(ctx context.Context, userID, tokenHash string, expiresAt time.Time) error
 	Validate(ctx context.Context, tokenHash string) (string, error)
 }
+
+type ContestStore interface {
+	Create(ctx context.Context, c *model.Contest) error
+	GetByID(ctx context.Context, id string) (*model.Contest, error)
+	List(ctx context.Context, offset, limit int) ([]model.Contest, int, error)
+	AddProblem(ctx context.Context, contestID, problemID, index string, score, sortOrder int) error
+	GetProblems(ctx context.Context, contestID string) ([]model.ContestProblem, error)
+	GetParticipants(ctx context.Context, contestID string) ([]string, error)
+	GetUsername(ctx context.Context, userID string) string
+}
