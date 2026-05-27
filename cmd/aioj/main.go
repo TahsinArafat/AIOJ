@@ -21,6 +21,10 @@ import (
 	"github.com/tahsinarafat/aioj/internal/queue"
 	"github.com/tahsinarafat/aioj/internal/store/postgres"
 	"github.com/tahsinarafat/aioj/internal/vjudge"
+
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
 func main() {
@@ -40,6 +44,17 @@ func main() {
 		log.Fatalf("db: %v", err)
 	}
 	defer db.Close()
+
+	slog.Info("running database migrations...")
+	m, err := migrate.New("file://internal/store/migrations", fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
+		cfg.Database.User, cfg.Database.Password, cfg.Database.Host, cfg.Database.Port, cfg.Database.Name))
+	if err != nil {
+		log.Fatalf("failed to initialize migrations: %v", err)
+	}
+	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+		log.Fatalf("failed to apply migrations: %v", err)
+	}
+	slog.Info("database migrations applied successfully")
 
 	accessTTL, _ := time.ParseDuration(cfg.Auth.AccessTTL)
 	refreshTTL, _ := time.ParseDuration(cfg.Auth.RefreshTTL)

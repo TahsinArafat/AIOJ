@@ -15,6 +15,7 @@ WORKDIR /app
 COPY --from=builder /app/aioj .
 COPY --from=builder /app/config.yaml .
 COPY --from=builder /app/lang ./lang
+COPY --from=builder /app/internal/store/migrations ./internal/store/migrations
 RUN chown -R aioj:aioj /app
 USER aioj
 EXPOSE 8080
