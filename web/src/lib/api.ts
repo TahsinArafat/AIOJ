@@ -77,4 +77,17 @@ export const api = {
         list: (offset = 0, limit = 20) =>
             request<{ data: any[]; total: number }>(`/submissions?offset=${offset}&limit=${limit}`),
     },
+    admin: {
+        listUsers: (offset = 0, limit = 20) =>
+            request<{ data: any[]; total: number }>(`/admin/users?offset=${offset}&limit=${limit}`),
+        updateRole: (userId: string, role: string) =>
+            request(`/admin/users/${userId}/role`, { method: 'PUT', body: JSON.stringify({ role }) }),
+        listApps: () => request<{ data: any[] }>('/admin/setter-applications'),
+        reviewApp: (userId: string, status: string) =>
+            request(`/admin/setter-applications/${userId}/review`, { method: 'POST', body: JSON.stringify({ status }) }),
+    },
+    setter: {
+        apply: (reason: string) => request('/auth/setter-apply', { method: 'POST', body: JSON.stringify({ reason }) }),
+        status: () => request<any>('/auth/setter-status'),
+    },
 }
