@@ -17,6 +17,7 @@ func NewRouter(
 	contestH *handler.ContestHandler,
 	vjudgeH *handler.VJudgeHandler,
 	adminH *handler.AdminHandler,
+	testcaseH *handler.TestcaseHandler,
 	wsManager *handler.WSManager,
 	jwtManager *auth.JWTManager,
 ) http.Handler {
@@ -41,6 +42,7 @@ func NewRouter(
 			r.Get("/{slug}/permissions", problemH.ListPermissions)
 			r.Post("/{slug}/permissions", problemH.AddPermission)
 			r.Delete("/{slug}/permissions/{userId}", problemH.RemovePermission)
+			r.Post("/{slug}/testcases", testcaseH.Upload)
 		})
 	})
 

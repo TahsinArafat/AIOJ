@@ -86,7 +86,9 @@ func main() {
 	setterStore := postgres.NewSetterStore(db)
 	adminH := handler.NewAdminHandler(userStore, setterStore)
 
-	router := api.NewRouter(authH, problemH, submissionH, contestH, vjH, adminH, wsManager, jwtManager)
+	testcaseH := handler.NewTestcaseHandler(problemStore, "./testdata")
+
+	router := api.NewRouter(authH, problemH, submissionH, contestH, vjH, adminH, testcaseH, wsManager, jwtManager)
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),
