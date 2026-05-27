@@ -12,6 +12,8 @@ type UserStore interface {
 	GetByID(ctx context.Context, id string) (*model.User, error)
 	GetByUsername(ctx context.Context, username string) (*model.User, error)
 	GetByEmail(ctx context.Context, email string) (*model.User, error)
+	ListUsers(ctx context.Context, offset, limit int) ([]model.User, int, error)
+	UpdateRole(ctx context.Context, id, role string) error
 }
 
 type ProblemStore interface {
@@ -45,4 +47,11 @@ type ContestStore interface {
 	GetProblems(ctx context.Context, contestID string) ([]model.ContestProblem, error)
 	GetParticipants(ctx context.Context, contestID string) ([]string, error)
 	GetUsername(ctx context.Context, userID string) string
+}
+
+type SetterStore interface {
+	CreateApplication(ctx context.Context, userID, reason string) error
+	ListApplications(ctx context.Context) ([]model.SetterApplication, error)
+	UpdateApplicationStatus(ctx context.Context, userID, status string) error
+	GetApplication(ctx context.Context, userID string) (*model.SetterApplication, error)
 }

@@ -45,3 +45,34 @@ func (s *UserStore) getBy(ctx context.Context, field, value string) (*model.User
 	}
 	return &u, nil
 }
+
+func (s *UserStore) ListUsers(ctx context.Context, offset, limit int) ([]model.User, int, error) {
+	var total int
+	if err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM users").Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	rows, err := s.db.QueryContext(ctx,
+		"SELECT id,username,email,role,is_bot,created_at FROM users ORDER BY created_at DESC OFFSET $1 LIMIT $2",
+		offset, limit)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	var items []model.User
+	for rows.Next() {
+		var u model.User
+		if err := rows.Scan(&u.ID, &u.Username, &u.Email, &u.Role, &u.IsBot, &u.CreatedAt); err != nil {
+			return nil, 0, err
+		}
+		items = append(items, u)
+	}
+	if items == nil {
+		items = []model.User{}
+	}
+	return items, total, nil
+}
+
+func (s *UserStore) UpdateRole(ctx context.Context, id, role string) error {
+	_, err := s.db.ExecContext(ctx, "UPDATE users SET role=$1, updated_at=NOW() WHERE id=$2", role, id)
+	return err
+}

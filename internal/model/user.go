@@ -38,3 +38,10 @@ type AuthResponse struct {
 	RefreshToken string `json:"refresh_token"`
 	User         *User  `json:"user"`
 }
+
+type SetterApplication struct {
+	UserID    string    `json:"user_id"`
+	Status    string    `json:"status"`
+	Reason    string    `json:"reason"`
+	CreatedAt time.Time `json:"created_at"`
+}
