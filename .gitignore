@@ -1,4 +1,5 @@
-/aioj
+aioj
+!cmd/aioj/
 *.exe
 vendor/
 web/node_modules/

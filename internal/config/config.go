@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"strconv"
 
 	"gopkg.in/yaml.v3"
 )
@@ -50,8 +51,17 @@ func Load(path string) (*Config, error) {
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, err
 	}
+	if v := os.Getenv("SERVER_PORT"); v != "" {
+		cfg.Server.Port = atoi(v)
+	}
 	if v := os.Getenv("DB_HOST"); v != "" {
 		cfg.Database.Host = v
+	}
+	if v := os.Getenv("DB_USER"); v != "" {
+		cfg.Database.User = v
+	}
+	if v := os.Getenv("DB_NAME"); v != "" {
+		cfg.Database.Name = v
 	}
 	if v := os.Getenv("DB_PASSWORD"); v != "" {
 		cfg.Database.Password = v
@@ -59,8 +69,16 @@ func Load(path string) (*Config, error) {
 	if v := os.Getenv("JUDGE_ENDPOINT"); v != "" {
 		cfg.Judge.Endpoint = v
 	}
+	if v := os.Getenv("JUDGE_CONCURRENCY"); v != "" {
+		cfg.Judge.Concurrency = atoi(v)
+	}
 	if v := os.Getenv("JWT_SECRET"); v != "" {
 		cfg.Auth.JWTSecret = v
 	}
 	return &cfg, nil
+}
+
+func atoi(s string) int {
+	n, _ := strconv.Atoi(s)
+	return n
 }
