@@ -1,0 +1,99 @@
+package postgres
+
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+	"fmt"
+
+	"github.com/lib/pq"
+	"github.com/tahsinarafat/aioj/internal/model"
+)
+
+type ProblemStore struct {
+	db *sql.DB
+}
+
+func NewProblemStore(db *sql.DB) *ProblemStore {
+	return &ProblemStore{db: db}
+}
+
+func (s *ProblemStore) Create(ctx context.Context, p *model.Problem) error {
+	samples, _ := json.Marshal(p.SampleCases)
+	scores, _ := json.Marshal(p.TestCaseScore)
+	return s.db.QueryRowContext(ctx, `INSERT INTO problems
+		(id,slug,title,description,input_format,output_format,hint,sample_cases,
+		 time_limit,memory_limit,difficulty,tags,visible,testdata_path,testcase_score,
+		 spj,spj_language,spj_source_code,spj_version,source,remote_id,created_by)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
+		RETURNING created_at,updated_at`,
+		p.ID, p.Slug, p.Title, p.Description, p.InputFormat, p.OutputFormat, p.Hint, samples,
+		p.TimeLimit, p.MemoryLimit, p.Difficulty, pq.Array(p.Tags), p.Visible, p.TestdataPath, scores,
+		p.SPJ, p.SPJLanguage, p.SPJSourceCode, p.SPJVersion, p.Source, p.RemoteID, p.CreatedBy,
+	).Scan(&p.CreatedAt, &p.UpdatedAt)
+}
+
+func (s *ProblemStore) GetByID(ctx context.Context, id string) (*model.Problem, error) {
+	return s.getBy(ctx, "id", id)
+}
+
+func (s *ProblemStore) GetBySlug(ctx context.Context, slug string) (*model.Problem, error) {
+	return s.getBy(ctx, "slug", slug)
+}
+
+func (s *ProblemStore) getBy(ctx context.Context, field, value string) (*model.Problem, error) {
+	var p model.Problem
+	var samples, scores []byte
+	var tags []string
+	err := s.db.QueryRowContext(ctx, fmt.Sprintf(`SELECT
+		id,slug,title,description,input_format,output_format,hint,sample_cases,
+		time_limit,memory_limit,difficulty,tags,visible,testdata_path,testcase_score,
+		spj,spj_language,spj_source_code,spj_version,submission_count,accepted_count,
+		source,remote_id,created_by,created_at,updated_at FROM problems WHERE %s=$1`, field), value).Scan(
+		&p.ID, &p.Slug, &p.Title, &p.Description, &p.InputFormat, &p.OutputFormat, &p.Hint, &samples,
+		&p.TimeLimit, &p.MemoryLimit, &p.Difficulty, pq.Array(&tags), &p.Visible, &p.TestdataPath, &scores,
+		&p.SPJ, &p.SPJLanguage, &p.SPJSourceCode, &p.SPJVersion, &p.SubmissionCount, &p.AcceptedCount,
+		&p.Source, &p.RemoteID, &p.CreatedBy, &p.CreatedAt, &p.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	json.Unmarshal(samples, &p.SampleCases)
+	json.Unmarshal(scores, &p.TestCaseScore)
+	p.Tags = tags
+	return &p, nil
+}
+
+func (s *ProblemStore) List(ctx context.Context, offset, limit int) ([]model.ProblemListItem, int, error) {
+	var total int
+	s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM problems WHERE visible=true`).Scan(&total)
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id,slug,title,difficulty,tags,submission_count,accepted_count,source
+		 FROM problems WHERE visible=true ORDER BY created_at DESC OFFSET $1 LIMIT $2`, offset, limit)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	var items []model.ProblemListItem
+	for rows.Next() {
+		var item model.ProblemListItem
+		var tags []string
+		rows.Scan(&item.ID, &item.Slug, &item.Title, &item.Difficulty, pq.Array(&tags),
+			&item.SubmissionCount, &item.AcceptedCount, &item.Source)
+		item.Tags = tags
+		items = append(items, item)
+	}
+	if items == nil {
+		items = []model.ProblemListItem{}
+	}
+	return items, total, nil
+}
+
+func (s *ProblemStore) UpdateCounts(ctx context.Context, id string, addSubmission, addAccepted int) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE problems SET submission_count=submission_count+$2, accepted_count=accepted_count+$3 WHERE id=$1`,
+		id, addSubmission, addAccepted)
+	return err
+}
