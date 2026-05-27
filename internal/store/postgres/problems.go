@@ -19,9 +19,22 @@ func NewProblemStore(db *sql.DB) *ProblemStore {
 }
 
 func (s *ProblemStore) Create(ctx context.Context, p *model.Problem) error {
-	samples, _ := json.Marshal(p.SampleCases)
-	scores, _ := json.Marshal(p.TestCaseScore)
-	err := s.db.QueryRowContext(ctx, `INSERT INTO problems
+	samples, err := json.Marshal(p.SampleCases)
+	if err != nil {
+		return fmt.Errorf("marshal sample_cases: %w", err)
+	}
+	scores, err := json.Marshal(p.TestCaseScore)
+	if err != nil {
+		return fmt.Errorf("marshal testcase_score: %w", err)
+	}
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	err = tx.QueryRowContext(ctx, `INSERT INTO problems
 		(id,slug,title,description,input_format,output_format,hint,sample_cases,
 		 time_limit,memory_limit,difficulty,tags,visible,testdata_path,testcase_score,
 		 spj,spj_language,spj_source_code,spj_version,source,remote_id,created_by)
@@ -32,12 +45,20 @@ func (s *ProblemStore) Create(ctx context.Context, p *model.Problem) error {
 		p.SPJ, p.SPJLanguage, p.SPJSourceCode, p.SPJVersion, p.Source, p.RemoteID, p.CreatedBy,
 	).Scan(&p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
-		return err
+		return fmt.Errorf("insert problem: %w", err)
 	}
+
 	if p.CreatedBy != "" {
-		return s.AddPermission(ctx, p.ID, p.CreatedBy, "owner")
+		_, err = tx.ExecContext(ctx,
+			`INSERT INTO problem_permissions(problem_id, user_id, access_level) VALUES($1,$2,$3)
+			 ON CONFLICT(problem_id, user_id) DO UPDATE SET access_level=$3`,
+			p.ID, p.CreatedBy, "owner")
+		if err != nil {
+			return fmt.Errorf("add owner permission: %w", err)
+		}
 	}
-	return nil
+
+	return tx.Commit()
 }
 
 func (s *ProblemStore) GetByID(ctx context.Context, id string) (*model.Problem, error) {
@@ -106,14 +127,21 @@ func (s *ProblemStore) UpdateCounts(ctx context.Context, id string, addSubmissio
 }
 
 func (s *ProblemStore) Update(ctx context.Context, id string, p *model.Problem) error {
-	samples, _ := json.Marshal(p.SampleCases)
-	_, err := s.db.ExecContext(ctx, `UPDATE problems SET
+	samples, err := json.Marshal(p.SampleCases)
+	if err != nil {
+		return fmt.Errorf("marshal sample_cases: %w", err)
+	}
+	scores, err := json.Marshal(p.TestCaseScore)
+	if err != nil {
+		return fmt.Errorf("marshal testcase_score: %w", err)
+	}
+	_, err = s.db.ExecContext(ctx, `UPDATE problems SET
 		title=$2, description=$3, input_format=$4, output_format=$5, hint=$6, sample_cases=$7,
 		time_limit=$8, memory_limit=$9, difficulty=$10, tags=$11, visible=$12,
-		spj=$13, spj_language=$14, spj_source_code=$15, updated_at=NOW() WHERE id=$1`,
+		testcase_score=$13, spj=$14, spj_language=$15, spj_source_code=$16, updated_at=NOW() WHERE id=$1`,
 		id, p.Title, p.Description, p.InputFormat, p.OutputFormat, p.Hint, samples,
 		p.TimeLimit, p.MemoryLimit, p.Difficulty, pq.Array(p.Tags), p.Visible,
-		p.SPJ, p.SPJLanguage, p.SPJSourceCode)
+		scores, p.SPJ, p.SPJLanguage, p.SPJSourceCode)
 	return err
 }
 
