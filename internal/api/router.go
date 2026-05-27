@@ -16,6 +16,7 @@ func NewRouter(
 	submissionH *handler.SubmissionHandler,
 	contestH *handler.ContestHandler,
 	vjudgeH *handler.VJudgeHandler,
+	adminH *handler.AdminHandler,
 	wsManager *handler.WSManager,
 	jwtManager *auth.JWTManager,
 ) http.Handler {
@@ -59,6 +60,21 @@ func NewRouter(
 		r.Use(middleware.AuthMiddleware(jwtManager))
 		r.Get("/bots", vjudgeH.ListBots)
 		r.Post("/submit", vjudgeH.Submit)
+	})
+
+	r.Route("/api/admin", func(r chi.Router) {
+		r.Use(middleware.AuthMiddleware(jwtManager))
+		r.Use(middleware.RequireRole("admin"))
+		r.Get("/users", adminH.ListUsers)
+		r.Put("/users/{id}/role", adminH.UpdateUserRole)
+		r.Get("/setter-applications", adminH.ListSetterApps)
+		r.Post("/setter-applications/{id}/review", adminH.ReviewSetterApp)
+	})
+
+	r.Group(func(r chi.Router) {
+		r.Use(middleware.AuthMiddleware(jwtManager))
+		r.Post("/api/auth/setter-apply", adminH.ApplySetter)
+		r.Get("/api/auth/setter-status", adminH.GetSetterStatus)
 	})
 
 	r.Get("/api/ws", wsManager.Handle)

@@ -83,7 +83,10 @@ func main() {
 	vjService := vjudge.NewService(submissionStore)
 	vjH := handler.NewVJudgeHandler(vjService)
 
-	router := api.NewRouter(authH, problemH, submissionH, contestH, vjH, wsManager, jwtManager)
+	setterStore := postgres.NewSetterStore(db)
+	adminH := handler.NewAdminHandler(userStore, setterStore)
+
+	router := api.NewRouter(authH, problemH, submissionH, contestH, vjH, adminH, wsManager, jwtManager)
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),
