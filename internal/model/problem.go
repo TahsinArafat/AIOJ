@@ -54,6 +54,13 @@ type ProblemListItem struct {
 	Source          string   `json:"source"`
 }
 
+type ProblemPermission struct {
+	ProblemID   string `json:"problem_id"`
+	UserID      string `json:"user_id"`
+	Username    string `json:"username,omitempty"`
+	AccessLevel string `json:"access_level"`
+}
+
 type CreateProblemRequest struct {
 	Slug          string          `json:"slug"`
 	Title         string          `json:"title"`

@@ -21,7 +21,7 @@ func NewProblemStore(db *sql.DB) *ProblemStore {
 func (s *ProblemStore) Create(ctx context.Context, p *model.Problem) error {
 	samples, _ := json.Marshal(p.SampleCases)
 	scores, _ := json.Marshal(p.TestCaseScore)
-	return s.db.QueryRowContext(ctx, `INSERT INTO problems
+	err := s.db.QueryRowContext(ctx, `INSERT INTO problems
 		(id,slug,title,description,input_format,output_format,hint,sample_cases,
 		 time_limit,memory_limit,difficulty,tags,visible,testdata_path,testcase_score,
 		 spj,spj_language,spj_source_code,spj_version,source,remote_id,created_by)
@@ -31,6 +31,13 @@ func (s *ProblemStore) Create(ctx context.Context, p *model.Problem) error {
 		p.TimeLimit, p.MemoryLimit, p.Difficulty, pq.Array(p.Tags), p.Visible, p.TestdataPath, scores,
 		p.SPJ, p.SPJLanguage, p.SPJSourceCode, p.SPJVersion, p.Source, p.RemoteID, p.CreatedBy,
 	).Scan(&p.CreatedAt, &p.UpdatedAt)
+	if err != nil {
+		return err
+	}
+	if p.CreatedBy != "" {
+		return s.AddPermission(ctx, p.ID, p.CreatedBy, "owner")
+	}
+	return nil
 }
 
 func (s *ProblemStore) GetByID(ctx context.Context, id string) (*model.Problem, error) {
@@ -96,4 +103,67 @@ func (s *ProblemStore) UpdateCounts(ctx context.Context, id string, addSubmissio
 		`UPDATE problems SET submission_count=submission_count+$2, accepted_count=accepted_count+$3 WHERE id=$1`,
 		id, addSubmission, addAccepted)
 	return err
+}
+
+func (s *ProblemStore) Update(ctx context.Context, id string, p *model.Problem) error {
+	samples, _ := json.Marshal(p.SampleCases)
+	_, err := s.db.ExecContext(ctx, `UPDATE problems SET
+		title=$2, description=$3, input_format=$4, output_format=$5, hint=$6, sample_cases=$7,
+		time_limit=$8, memory_limit=$9, difficulty=$10, tags=$11, visible=$12,
+		spj=$13, spj_language=$14, spj_source_code=$15, updated_at=NOW() WHERE id=$1`,
+		id, p.Title, p.Description, p.InputFormat, p.OutputFormat, p.Hint, samples,
+		p.TimeLimit, p.MemoryLimit, p.Difficulty, pq.Array(p.Tags), p.Visible,
+		p.SPJ, p.SPJLanguage, p.SPJSourceCode)
+	return err
+}
+
+func (s *ProblemStore) Delete(ctx context.Context, id string) error {
+	_, err := s.db.ExecContext(ctx, "DELETE FROM problems WHERE id=$1", id)
+	return err
+}
+
+func (s *ProblemStore) AddPermission(ctx context.Context, problemID, userID, accessLevel string) error {
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO problem_permissions(problem_id, user_id, access_level) VALUES($1,$2,$3)
+		 ON CONFLICT(problem_id, user_id) DO UPDATE SET access_level=$3`, problemID, userID, accessLevel)
+	return err
+}
+
+func (s *ProblemStore) RemovePermission(ctx context.Context, problemID, userID string) error {
+	_, err := s.db.ExecContext(ctx, "DELETE FROM problem_permissions WHERE problem_id=$1 AND user_id=$2", problemID, userID)
+	return err
+}
+
+func (s *ProblemStore) GetPermissions(ctx context.Context, problemID string) ([]model.ProblemPermission, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT p.problem_id, p.user_id, p.access_level, u.username 
+		 FROM problem_permissions p JOIN users u ON p.user_id = u.id WHERE p.problem_id=$1`, problemID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []model.ProblemPermission
+	for rows.Next() {
+		var pp model.ProblemPermission
+		rows.Scan(&pp.ProblemID, &pp.UserID, &pp.AccessLevel, &pp.Username)
+		items = append(items, pp)
+	}
+	if items == nil {
+		items = []model.ProblemPermission{}
+	}
+	return items, nil
+}
+
+func (s *ProblemStore) HasAccess(ctx context.Context, problemID, userID string, requiredLevels ...string) bool {
+	var level string
+	err := s.db.QueryRowContext(ctx, "SELECT access_level FROM problem_permissions WHERE problem_id=$1 AND user_id=$2", problemID, userID).Scan(&level)
+	if err != nil {
+		return false
+	}
+	for _, req := range requiredLevels {
+		if level == req {
+			return true
+		}
+	}
+	return false
 }

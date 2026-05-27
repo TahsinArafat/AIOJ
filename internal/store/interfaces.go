@@ -22,6 +22,12 @@ type ProblemStore interface {
 	GetBySlug(ctx context.Context, slug string) (*model.Problem, error)
 	List(ctx context.Context, offset, limit int) ([]model.ProblemListItem, int, error)
 	UpdateCounts(ctx context.Context, id string, addSubmission, addAccepted int) error
+	Update(ctx context.Context, id string, p *model.Problem) error
+	Delete(ctx context.Context, id string) error
+	AddPermission(ctx context.Context, problemID, userID, accessLevel string) error
+	RemovePermission(ctx context.Context, problemID, userID string) error
+	GetPermissions(ctx context.Context, problemID string) ([]model.ProblemPermission, error)
+	HasAccess(ctx context.Context, problemID, userID string, requiredLevels ...string) bool
 }
 
 type SubmissionStore interface {
