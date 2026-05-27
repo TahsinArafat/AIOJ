@@ -7,11 +7,27 @@ import ProblemDetail from './pages/ProblemDetail'
 import ContestList from './pages/ContestList'
 import ContestDetail from './pages/ContestDetail'
 import ContestScoreboard from './pages/ContestScoreboard'
+import AdminDashboard from './pages/AdminDashboard'
+import SetterPanel from './pages/SetterPanel'
 import './global.css'
+
+function decodeRole(): string | null {
+    const token = localStorage.getItem('access_token')
+    if (!token) return null
+    try {
+        const payload = JSON.parse(atob(token.split('.')[1]))
+        return payload.role ?? null
+    } catch {
+        return null
+    }
+}
 
 function Navbar() {
     const navigate = useNavigate()
     const loggedIn = !!getAccessToken()
+    const role = decodeRole()
+    const isAdmin = role === 'admin'
+    const isSetter = role === 'teacher' || isAdmin
 
     const handleLogout = () => {
         clearTokens()
@@ -24,6 +40,8 @@ function Navbar() {
                 <Link to="/" className="font-bold text-blue-600 text-lg">AIOJ</Link>
                 <Link to="/problems" className="text-sm text-gray-600 hover:text-black transition-colors">Problems</Link>
                 <Link to="/contests" className="text-sm text-gray-600 hover:text-black transition-colors">Contests</Link>
+                {isAdmin && <Link to="/admin" className="text-sm font-medium text-purple-600 hover:text-purple-800 transition-colors">Admin</Link>}
+                {isSetter && <Link to="/setter" className="text-sm font-medium text-orange-600 hover:text-orange-800 transition-colors">Setter Workspace</Link>}
             </div>
             <div className="flex gap-3 items-center">
                 {loggedIn ? (
@@ -71,6 +89,8 @@ export default function App() {
                         <Route path="/contests/:id" element={<ContestDetail />} />
                         <Route path="/contests/:id/scoreboard" element={<ContestScoreboard />} />
                         <Route path="/submissions" element={<div className="text-gray-400 text-center py-20">Submissions — coming soon</div>} />
+                        <Route path="/admin" element={<AdminDashboard />} />
+                        <Route path="/setter" element={<SetterPanel />} />
                         <Route path="*" element={<div className="text-center py-20 text-gray-400">404 Not Found</div>} />
                     </Routes>
                 </main>
