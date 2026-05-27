@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { api } from '../lib/api'
 
 export default function ContestScoreboard() {
     const { id } = useParams<{ id: string }>()
@@ -8,8 +9,8 @@ export default function ContestScoreboard() {
 
     useEffect(() => {
         if (!id) return
-        fetch(`/api/contests/${id}/scoreboard`)
-            .then(r => r.json()).then(setData).catch(() => {}).finally(() => setLoading(false))
+        api.contests.scoreboard(id)
+            .then(setData).catch(() => {}).finally(() => setLoading(false))
     }, [id])
 
     if (loading) return <div className="text-center py-20 text-gray-400">Loading scoreboard...</div>

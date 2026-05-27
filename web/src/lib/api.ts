@@ -90,4 +90,12 @@ export const api = {
         apply: (reason: string) => request('/auth/setter-apply', { method: 'POST', body: JSON.stringify({ reason }) }),
         status: () => request<any>('/auth/setter-status'),
     },
+    contests: {
+        list: (offset = 0, limit = 20) =>
+            request<{ data: any[]; total: number }>(`/contests?offset=${offset}&limit=${limit}`),
+        get: (id: string) => request<any>(`/contests/${id}`),
+        scoreboard: (id: string) => request<any>(`/contests/${id}/scoreboard`),
+        register: (id: string) => request(`/contests/${id}/register`, { method: 'POST' }),
+        checkRegistration: (id: string) => request<{ registered: boolean }>(`/contests/${id}/register`),
+    },
 }

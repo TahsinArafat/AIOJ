@@ -9,6 +9,7 @@ import ContestDetail from './pages/ContestDetail'
 import ContestScoreboard from './pages/ContestScoreboard'
 import AdminDashboard from './pages/AdminDashboard'
 import SetterPanel from './pages/SetterPanel'
+import Profile from './pages/Profile'
 import ProblemCreate from './pages/ProblemCreate'
 import Submissions from './pages/Submissions'
 import './global.css'
@@ -49,6 +50,7 @@ function Navbar() {
             <div className="flex gap-3 items-center">
                 {loggedIn ? (
                     <>
+                        <Link to="/profile" className="text-sm text-gray-600 hover:text-black">Profile</Link>
                         <Link to="/submissions" className="text-sm text-gray-600 hover:text-black">My Submissions</Link>
                         <button onClick={handleLogout} className="text-sm text-gray-500 hover:text-black">Logout</button>
                     </>
@@ -95,6 +97,7 @@ export default function App() {
                         <Route path="/admin" element={<AdminDashboard />} />
                         <Route path="/setter" element={<SetterPanel />} />
                         <Route path="/setter/create" element={<ProblemCreate />} />
+                        <Route path="/profile" element={<Profile />} />
                         <Route path="*" element={<div className="text-center py-20 text-gray-400">404 Not Found</div>} />
                     </Routes>
                 </main>

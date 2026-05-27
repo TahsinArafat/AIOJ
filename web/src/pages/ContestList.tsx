@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { api } from '../lib/api'
 
 export default function ContestList() {
     const [contests, setContests] = useState<any[]>([])
     const [total, setTotal] = useState(0)
 
     useEffect(() => {
-        fetch('/api/contests').then(r => r.json()).then(d => {
+        api.contests.list().then(d => {
             setContests(d.data || [])
             setTotal(d.total || 0)
         }).catch(() => {})
