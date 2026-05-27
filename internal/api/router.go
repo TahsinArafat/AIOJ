@@ -15,6 +15,7 @@ func NewRouter(
 	problemH *handler.ProblemHandler,
 	submissionH *handler.SubmissionHandler,
 	contestH *handler.ContestHandler,
+	vjudgeH *handler.VJudgeHandler,
 	wsManager *handler.WSManager,
 	jwtManager *auth.JWTManager,
 ) http.Handler {
@@ -52,6 +53,12 @@ func NewRouter(
 			r.Use(middleware.AuthMiddleware(jwtManager))
 			r.Post("/", contestH.Create)
 		})
+	})
+
+	r.Route("/api/vjudge", func(r chi.Router) {
+		r.Use(middleware.AuthMiddleware(jwtManager))
+		r.Get("/bots", vjudgeH.ListBots)
+		r.Post("/submit", vjudgeH.Submit)
 	})
 
 	r.Get("/api/ws", wsManager.Handle)

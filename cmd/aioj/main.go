@@ -20,6 +20,7 @@ import (
 	"github.com/tahsinarafat/aioj/internal/judge/executor"
 	"github.com/tahsinarafat/aioj/internal/queue"
 	"github.com/tahsinarafat/aioj/internal/store/postgres"
+	"github.com/tahsinarafat/aioj/internal/vjudge"
 )
 
 func main() {
@@ -64,7 +65,10 @@ func main() {
 	submissionH := handler.NewSubmissionHandler(submissionStore, problemStore, judgeQueue, wsManager)
 	contestH := handler.NewContestHandler(contestStore)
 
-	router := api.NewRouter(authH, problemH, submissionH, contestH, wsManager, jwtManager)
+	vjService := vjudge.NewService(submissionStore)
+	vjH := handler.NewVJudgeHandler(vjService)
+
+	router := api.NewRouter(authH, problemH, submissionH, contestH, vjH, wsManager, jwtManager)
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),
