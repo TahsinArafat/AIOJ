@@ -48,6 +48,7 @@ func main() {
 	refreshTokenStore := postgres.NewRefreshTokenStore(db)
 	problemStore := postgres.NewProblemStore(db)
 	submissionStore := postgres.NewSubmissionStore(db)
+	contestStore := postgres.NewContestStore(db)
 
 	judgeQueue := queue.NewMemory()
 	execClient := executor.NewClient(cfg.Judge.Endpoint)
@@ -61,8 +62,9 @@ func main() {
 	authH := handler.NewAuthHandler(userStore, refreshTokenStore, jwtManager)
 	problemH := handler.NewProblemHandler(problemStore)
 	submissionH := handler.NewSubmissionHandler(submissionStore, problemStore, judgeQueue, wsManager)
+	contestH := handler.NewContestHandler(contestStore)
 
-	router := api.NewRouter(authH, problemH, submissionH, wsManager, jwtManager)
+	router := api.NewRouter(authH, problemH, submissionH, contestH, wsManager, jwtManager)
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),

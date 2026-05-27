@@ -14,6 +14,7 @@ func NewRouter(
 	authH *handler.AuthHandler,
 	problemH *handler.ProblemHandler,
 	submissionH *handler.SubmissionHandler,
+	contestH *handler.ContestHandler,
 	wsManager *handler.WSManager,
 	jwtManager *auth.JWTManager,
 ) http.Handler {
@@ -41,6 +42,16 @@ func NewRouter(
 		r.Post("/", submissionH.Create)
 		r.Get("/", submissionH.ListByUser)
 		r.Get("/{id}", submissionH.GetByID)
+	})
+
+	r.Route("/api/contests", func(r chi.Router) {
+		r.Get("/", contestH.List)
+		r.Get("/{id}", contestH.GetByID)
+		r.Get("/{id}/scoreboard", contestH.Scoreboard)
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.AuthMiddleware(jwtManager))
+			r.Post("/", contestH.Create)
+		})
 	})
 
 	r.Get("/api/ws", wsManager.Handle)
