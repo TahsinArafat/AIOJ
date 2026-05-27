@@ -1,6 +1,16 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { api } from '../lib/api'
 
 export default function SetterPanel() {
+    const [problems, setProblems] = useState<any[]>([])
+
+    const loadData = () => {
+        api.problems.list().then(d => setProblems(d.data || [])).catch(console.error)
+    }
+
+    useEffect(() => { loadData() }, [])
+
     return (
         <div>
             <div className="flex items-center justify-between mb-6">
@@ -13,25 +23,41 @@ export default function SetterPanel() {
                 </Link>
             </div>
 
-            {/* My Problems List */}
             <section>
-                <h2 className="text-lg font-semibold mb-3">My Problems</h2>
+                <h2 className="text-lg font-semibold mb-3">Problems (Public List)</h2>
                 <div className="border border-gray-200 rounded-lg overflow-hidden">
                     <table className="w-full text-sm">
                         <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
                             <tr>
                                 <th className="px-4 py-3 text-left">Title</th>
                                 <th className="px-4 py-3 text-left">Difficulty</th>
-                                <th className="px-4 py-3 text-left">Status</th>
                                 <th className="px-4 py-3 text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
-                            <tr>
-                                <td colSpan={4} className="px-4 py-8 text-center text-gray-400">
-                                    No problems created yet. Click "Create Problem" to get started.
-                                </td>
-                            </tr>
+                            {problems.map(p => (
+                                <tr key={p.id}>
+                                    <td className="px-4 py-3 font-medium">{p.title}</td>
+                                    <td className="px-4 py-3">
+                                        <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                            p.difficulty === 'easy' ? 'bg-green-100 text-green-800' :
+                                            p.difficulty === 'medium' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
+                                        }`}>
+                                            {p.difficulty}
+                                        </span>
+                                    </td>
+                                    <td className="px-4 py-3 text-right flex gap-3 justify-end">
+                                        <Link to={`/problems/${p.slug}`} className="text-blue-600 hover:underline">View</Link>
+                                    </td>
+                                </tr>
+                            ))}
+                            {problems.length === 0 && (
+                                <tr>
+                                    <td colSpan={3} className="px-4 py-8 text-center text-gray-400">
+                                        No problems found. Click "Create Problem" to get started.
+                                    </td>
+                                </tr>
+                            )}
                         </tbody>
                     </table>
                 </div>
