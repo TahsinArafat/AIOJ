@@ -1,0 +1,20 @@
+server:
+  host: "0.0.0.0"
+  port: 8080
+database:
+  host: "localhost"
+  port: 5432
+  user: "aioj"
+  password: "aioj_dev"
+  name: "aioj"
+  max_open: 25
+  max_idle: 5
+auth:
+  jwt_secret: "change-me-in-production"
+  access_ttl: 15m
+  refresh_ttl: 168h
+judge:
+  endpoint: "http://localhost:5050"
+  concurrency: 4
+  max_code_size: 262144
+lang_dir: "./lang"

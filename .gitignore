@@ -1,0 +1,12 @@
+/aioj
+*.exe
+vendor/
+web/node_modules/
+web/dist/
+.env
+.env.local
+.idea/
+.vscode/
+*.swp
+.DS_Store
+pgdata/
