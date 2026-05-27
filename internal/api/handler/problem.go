@@ -62,8 +62,16 @@ func (h *ProblemHandler) GetBySlug(w http.ResponseWriter, r *http.Request) {
 
 func (h *ProblemHandler) Update(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetUserClaims(r)
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 	slug := chi.URLParam(r, "slug")
-	p, _ := h.store.GetBySlug(r.Context(), slug)
+	p, err := h.store.GetBySlug(r.Context(), slug)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
 	if p == nil {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
@@ -94,8 +102,16 @@ func (h *ProblemHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 func (h *ProblemHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetUserClaims(r)
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 	slug := chi.URLParam(r, "slug")
-	p, _ := h.store.GetBySlug(r.Context(), slug)
+	p, err := h.store.GetBySlug(r.Context(), slug)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
 	if p == nil {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
@@ -160,7 +176,11 @@ func (h *ProblemHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ProblemHandler) ListPermissions(w http.ResponseWriter, r *http.Request) {
-	p, _ := h.store.GetBySlug(r.Context(), chi.URLParam(r, "slug"))
+	p, err := h.store.GetBySlug(r.Context(), chi.URLParam(r, "slug"))
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
 	if p == nil {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
@@ -174,7 +194,15 @@ func (h *ProblemHandler) ListPermissions(w http.ResponseWriter, r *http.Request)
 
 func (h *ProblemHandler) AddPermission(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetUserClaims(r)
-	p, _ := h.store.GetBySlug(r.Context(), chi.URLParam(r, "slug"))
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	p, err := h.store.GetBySlug(r.Context(), chi.URLParam(r, "slug"))
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
 	if p == nil {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
@@ -197,7 +225,15 @@ func (h *ProblemHandler) AddPermission(w http.ResponseWriter, r *http.Request) {
 
 func (h *ProblemHandler) RemovePermission(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetUserClaims(r)
-	p, _ := h.store.GetBySlug(r.Context(), chi.URLParam(r, "slug"))
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	p, err := h.store.GetBySlug(r.Context(), chi.URLParam(r, "slug"))
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
 	if p == nil {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
