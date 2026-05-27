@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Link, useNavigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom'
 import { getAccessToken, clearTokens } from './lib/api'
 import Login from './pages/Login'
 import Register from './pages/Register'
@@ -24,6 +24,7 @@ function decodeRole(): string | null {
 
 function Navbar() {
     const navigate = useNavigate()
+    useLocation() // force re-render on route change so auth state updates
     const loggedIn = !!getAccessToken()
     const role = decodeRole()
     const isAdmin = role === 'admin'
