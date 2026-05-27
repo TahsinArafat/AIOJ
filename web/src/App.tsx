@@ -4,6 +4,9 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import ProblemList from './pages/ProblemList'
 import ProblemDetail from './pages/ProblemDetail'
+import ContestList from './pages/ContestList'
+import ContestDetail from './pages/ContestDetail'
+import ContestScoreboard from './pages/ContestScoreboard'
 import './global.css'
 
 function Navbar() {
@@ -64,7 +67,9 @@ export default function App() {
                         <Route path="/problems/:slug" element={<ProblemDetail />} />
                         <Route path="/login" element={<Login />} />
                         <Route path="/register" element={<Register />} />
-                        <Route path="/contests" element={<div className="text-gray-400 text-center py-20">Contests — coming in Task 15</div>} />
+                        <Route path="/contests" element={<ContestList />} />
+                        <Route path="/contests/:id" element={<ContestDetail />} />
+                        <Route path="/contests/:id/scoreboard" element={<ContestScoreboard />} />
                         <Route path="/submissions" element={<div className="text-gray-400 text-center py-20">Submissions — coming soon</div>} />
                         <Route path="*" element={<div className="text-center py-20 text-gray-400">404 Not Found</div>} />
                     </Routes>
