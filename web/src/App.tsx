@@ -9,6 +9,8 @@ import ContestDetail from './pages/ContestDetail'
 import ContestScoreboard from './pages/ContestScoreboard'
 import AdminDashboard from './pages/AdminDashboard'
 import SetterPanel from './pages/SetterPanel'
+import ProblemCreate from './pages/ProblemCreate'
+import Submissions from './pages/Submissions'
 import './global.css'
 
 function decodeRole(): string | null {
@@ -89,9 +91,10 @@ export default function App() {
                         <Route path="/contests" element={<ContestList />} />
                         <Route path="/contests/:id" element={<ContestDetail />} />
                         <Route path="/contests/:id/scoreboard" element={<ContestScoreboard />} />
-                        <Route path="/submissions" element={<div className="text-gray-400 text-center py-20">Submissions — coming soon</div>} />
+                        <Route path="/submissions" element={<Submissions />} />
                         <Route path="/admin" element={<AdminDashboard />} />
                         <Route path="/setter" element={<SetterPanel />} />
+                        <Route path="/setter/create" element={<ProblemCreate />} />
                         <Route path="*" element={<div className="text-center py-20 text-gray-400">404 Not Found</div>} />
                     </Routes>
                 </main>
