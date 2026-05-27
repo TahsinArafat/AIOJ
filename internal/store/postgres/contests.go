@@ -13,11 +13,26 @@ type ContestStore struct{ db *sql.DB }
 func NewContestStore(db *sql.DB) *ContestStore { return &ContestStore{db: db} }
 
 func (s *ContestStore) Create(ctx context.Context, c *model.Contest) error {
-	return s.db.QueryRowContext(ctx,
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	err = tx.QueryRowContext(ctx,
 		`INSERT INTO contests(id,title,type,start_time,end_time,freeze_time,password,visible,description,created_by)
 		 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING created_at`,
 		c.ID, c.Title, c.Type, c.StartTime, c.EndTime, c.FreezeTime, c.Password, c.Visible, c.Description, c.CreatedBy,
 	).Scan(&c.CreatedAt)
+	if err != nil {
+		return err
+	}
+	_, err = tx.ExecContext(ctx,
+		`INSERT INTO contest_permissions(contest_id, user_id, access_level) VALUES($1,$2,'manager')`,
+		c.ID, c.CreatedBy)
+	if err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (s *ContestStore) GetByID(ctx context.Context, id string) (*model.Contest, error) {
@@ -133,4 +148,50 @@ type ScoreboardRow struct {
 	Status    string
 	Score     int
 	CreatedAt time.Time
+}
+
+func (s *ContestStore) AddPermission(ctx context.Context, contestID, userID, accessLevel string) error {
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO contest_permissions(contest_id, user_id, access_level) VALUES($1,$2,$3)
+		 ON CONFLICT(contest_id, user_id) DO UPDATE SET access_level=$3`, contestID, userID, accessLevel)
+	return err
+}
+
+func (s *ContestStore) RemovePermission(ctx context.Context, contestID, userID string) error {
+	_, err := s.db.ExecContext(ctx, "DELETE FROM contest_permissions WHERE contest_id=$1 AND user_id=$2", contestID, userID)
+	return err
+}
+
+func (s *ContestStore) GetPermissions(ctx context.Context, contestID string) ([]model.ContestPermission, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT p.contest_id, p.user_id, p.access_level, u.username 
+		 FROM contest_permissions p JOIN users u ON p.user_id = u.id WHERE p.contest_id=$1`, contestID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []model.ContestPermission
+	for rows.Next() {
+		var cp model.ContestPermission
+		rows.Scan(&cp.ContestID, &cp.UserID, &cp.AccessLevel, &cp.Username)
+		items = append(items, cp)
+	}
+	if items == nil {
+		items = []model.ContestPermission{}
+	}
+	return items, nil
+}
+
+func (s *ContestStore) HasAccess(ctx context.Context, contestID, userID string, requiredLevels ...string) bool {
+	var level string
+	err := s.db.QueryRowContext(ctx, "SELECT access_level FROM contest_permissions WHERE contest_id=$1 AND user_id=$2", contestID, userID).Scan(&level)
+	if err != nil {
+		return false
+	}
+	for _, req := range requiredLevels {
+		if level == req {
+			return true
+		}
+	}
+	return false
 }

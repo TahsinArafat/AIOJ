@@ -55,11 +55,14 @@ func NewRouter(
 
 	r.Route("/api/contests", func(r chi.Router) {
 		r.Get("/", contestH.List)
-		r.Get("/{id}", contestH.GetByID)
-		r.Get("/{id}/scoreboard", contestH.Scoreboard)
+		r.With(middleware.OptionalAuthMiddleware(jwtManager)).Get("/{id}", contestH.GetByID)
+		r.With(middleware.OptionalAuthMiddleware(jwtManager)).Get("/{id}/scoreboard", contestH.Scoreboard)
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.AuthMiddleware(jwtManager))
 			r.Post("/", contestH.Create)
+			r.Get("/{id}/permissions", contestH.ListPermissions)
+			r.Post("/{id}/permissions", contestH.AddPermission)
+			r.Delete("/{id}/permissions/{userId}", contestH.RemovePermission)
 		})
 	})
 

@@ -53,6 +53,10 @@ type ContestStore interface {
 	GetProblems(ctx context.Context, contestID string) ([]model.ContestProblem, error)
 	GetParticipants(ctx context.Context, contestID string) ([]string, error)
 	GetUsername(ctx context.Context, userID string) string
+	AddPermission(ctx context.Context, contestID, userID, accessLevel string) error
+	RemovePermission(ctx context.Context, contestID, userID string) error
+	GetPermissions(ctx context.Context, contestID string) ([]model.ContestPermission, error)
+	HasAccess(ctx context.Context, contestID, userID string, requiredLevels ...string) bool
 }
 
 type SetterStore interface {

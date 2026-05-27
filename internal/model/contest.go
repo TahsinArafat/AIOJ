@@ -42,6 +42,13 @@ type ContestRankEntry struct {
 	LastACTime   *time.Time               `json:"last_ac_time,omitempty"`
 }
 
+type ContestPermission struct {
+	ContestID   string `json:"contest_id"`
+	UserID      string `json:"user_id"`
+	Username    string `json:"username,omitempty"`
+	AccessLevel string `json:"access_level"`
+}
+
 type CreateContestRequest struct {
 	Title       string     `json:"title"`
 	Type        string     `json:"type"`

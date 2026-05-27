@@ -69,6 +69,14 @@ func (h *ContestHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
+	now := time.Now()
+	if !c.Visible || now.Before(c.StartTime) {
+		claims := middleware.GetUserClaims(r)
+		if claims == nil || (claims.Role != "admin" && !h.store.HasAccess(r.Context(), c.ID, claims.UserID, "manager", "tester")) {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+	}
 	problems, _ := h.store.GetProblems(r.Context(), c.ID)
 	respondJSON(w, http.StatusOK, map[string]interface{}{"contest": c, "problems": problems})
 }
@@ -90,10 +98,17 @@ func (h *ContestHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
+	now := time.Now()
+	if !contest.Visible || now.Before(contest.StartTime) {
+		claims := middleware.GetUserClaims(r)
+		if claims == nil || (claims.Role != "admin" && !h.store.HasAccess(r.Context(), contest.ID, claims.UserID, "manager", "tester")) {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+	}
 
 	problems, _ := h.store.GetProblems(r.Context(), id)
 
-	now := time.Now()
 	frozen := contest.FreezeTime != nil && now.After(*contest.FreezeTime) && now.Before(contest.EndTime)
 
 	var beforeTime *time.Time
@@ -209,4 +224,64 @@ func (h *ContestHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 		"entries": entries, "problems": problems,
 		"frozen": frozen, "contest": contest,
 	})
+}
+
+func (h *ContestHandler) ListPermissions(w http.ResponseWriter, r *http.Request) {
+	c, _ := h.store.GetByID(r.Context(), chi.URLParam(r, "id"))
+	if c == nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	perms, _ := h.store.GetPermissions(r.Context(), c.ID)
+	if perms == nil {
+		perms = []model.ContestPermission{}
+	}
+	respondJSON(w, http.StatusOK, map[string]interface{}{"data": perms})
+}
+
+func (h *ContestHandler) AddPermission(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r)
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	c, _ := h.store.GetByID(r.Context(), chi.URLParam(r, "id"))
+	if c == nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if claims.Role != "admin" && !h.store.HasAccess(r.Context(), c.ID, claims.UserID, "manager") {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	var req struct {
+		UserID string `json:"user_id"`
+		Level  string `json:"access_level"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	h.store.AddPermission(r.Context(), c.ID, req.UserID, req.Level)
+	w.WriteHeader(http.StatusOK)
+}
+
+func (h *ContestHandler) RemovePermission(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r)
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	c, _ := h.store.GetByID(r.Context(), chi.URLParam(r, "id"))
+	if c == nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if claims.Role != "admin" && !h.store.HasAccess(r.Context(), c.ID, claims.UserID, "manager") {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	targetUserID := chi.URLParam(r, "userId")
+	h.store.RemovePermission(r.Context(), c.ID, targetUserID)
+	w.WriteHeader(http.StatusOK)
 }
