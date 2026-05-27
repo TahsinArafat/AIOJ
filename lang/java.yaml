@@ -1,0 +1,9 @@
+name: "Java"
+key: "java"
+compile: "/usr/bin/javac -d {{dir}} {{src}}"
+copy_in: {}
+time_limit_multiplier: 2.0
+memory_limit_multiplier: 2.0
+seccomp_rule: "general"
+extensions: [".java"]
+runtime: "/usr/bin/java -cp {{dir}} Main"

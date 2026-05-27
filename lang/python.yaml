@@ -1,0 +1,9 @@
+name: "Python 3"
+key: "python"
+compile: ""
+copy_in: {}
+time_limit_multiplier: 3.0
+memory_limit_multiplier: 2.0
+seccomp_rule: "general"
+extensions: [".py"]
+runtime: "/usr/bin/python3"

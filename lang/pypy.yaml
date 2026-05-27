@@ -1,0 +1,9 @@
+name: "PyPy 3"
+key: "pypy"
+compile: ""
+copy_in: {}
+time_limit_multiplier: 2.5
+memory_limit_multiplier: 2.0
+seccomp_rule: "general"
+extensions: [".py"]
+runtime: "/usr/bin/pypy3"

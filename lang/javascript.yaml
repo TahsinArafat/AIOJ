@@ -1,0 +1,9 @@
+name: "JavaScript"
+key: "javascript"
+compile: ""
+copy_in: {}
+time_limit_multiplier: 2.0
+memory_limit_multiplier: 1.5
+seccomp_rule: "general"
+extensions: [".js"]
+runtime: "/usr/bin/js"

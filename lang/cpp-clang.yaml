@@ -1,0 +1,8 @@
+name: "C++ (Clang)"
+key: "cpp-clang"
+compile: "/usr/bin/clang++ -O2 -std=c++17 -o {{exe}} {{src}}"
+copy_in: {}
+time_limit_multiplier: 1.0
+memory_limit_multiplier: 1.0
+seccomp_rule: "c_cpp"
+extensions: [".cpp", ".cxx", ".cc"]

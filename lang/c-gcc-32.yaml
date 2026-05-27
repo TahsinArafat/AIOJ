@@ -1,0 +1,8 @@
+name: "C (GCC 32-bit)"
+key: "c-gcc-32"
+compile: "/usr/bin/gcc -m32 -O2 -std=c11 -o {{exe}} {{src}}"
+copy_in: {}
+time_limit_multiplier: 1.0
+memory_limit_multiplier: 1.0
+seccomp_rule: "c_cpp"
+extensions: [".c"]
