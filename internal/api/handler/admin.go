@@ -39,7 +39,15 @@ func (h *AdminHandler) UpdateUserRole(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid body", http.StatusBadRequest)
 		return
 	}
-	h.userStore.UpdateRole(r.Context(), userID, req.Role)
+	validRoles := map[string]bool{"admin": true, "teacher": true, "user": true, "bot": true}
+	if !validRoles[req.Role] {
+		http.Error(w, "invalid role: must be admin, teacher, user, or bot", http.StatusBadRequest)
+		return
+	}
+	if err := h.userStore.UpdateRole(r.Context(), userID, req.Role); err != nil {
+		http.Error(w, "failed to update role", http.StatusInternalServerError)
+		return
+	}
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -60,9 +68,19 @@ func (h *AdminHandler) ReviewSetterApp(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid body", http.StatusBadRequest)
 		return
 	}
-	h.setterStore.UpdateApplicationStatus(r.Context(), userID, req.Status)
+	if req.Status != "approved" && req.Status != "rejected" {
+		http.Error(w, "invalid status: must be approved or rejected", http.StatusBadRequest)
+		return
+	}
+	if err := h.setterStore.UpdateApplicationStatus(r.Context(), userID, req.Status); err != nil {
+		http.Error(w, "failed to update application", http.StatusInternalServerError)
+		return
+	}
 	if req.Status == "approved" {
-		h.userStore.UpdateRole(r.Context(), userID, "teacher")
+		if err := h.userStore.UpdateRole(r.Context(), userID, "teacher"); err != nil {
+			http.Error(w, "failed to update user role", http.StatusInternalServerError)
+			return
+		}
 	}
 	w.WriteHeader(http.StatusOK)
 }
@@ -76,12 +94,19 @@ func (h *AdminHandler) ApplySetter(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid body", http.StatusBadRequest)
 		return
 	}
-	h.setterStore.CreateApplication(r.Context(), claims.UserID, req.Reason)
+	if err := h.setterStore.CreateApplication(r.Context(), claims.UserID, req.Reason); err != nil {
+		http.Error(w, "failed to submit application", http.StatusInternalServerError)
+		return
+	}
 	w.WriteHeader(http.StatusOK)
 }
 
 func (h *AdminHandler) GetSetterStatus(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetUserClaims(r)
-	app, _ := h.setterStore.GetApplication(r.Context(), claims.UserID)
+	app, err := h.setterStore.GetApplication(r.Context(), claims.UserID)
+	if err != nil {
+		http.Error(w, "failed to get application status", http.StatusInternalServerError)
+		return
+	}
 	respondJSON(w, http.StatusOK, app)
 }
