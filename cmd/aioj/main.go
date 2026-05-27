@@ -16,6 +16,9 @@ import (
 	"github.com/tahsinarafat/aioj/internal/api/handler"
 	"github.com/tahsinarafat/aioj/internal/auth"
 	"github.com/tahsinarafat/aioj/internal/config"
+	"github.com/tahsinarafat/aioj/internal/judge"
+	"github.com/tahsinarafat/aioj/internal/judge/executor"
+	"github.com/tahsinarafat/aioj/internal/queue"
 	"github.com/tahsinarafat/aioj/internal/store/postgres"
 )
 
@@ -25,7 +28,7 @@ func main() {
 
 	cfg, err := config.Load(*cfgPath)
 	if err != nil {
-		log.Fatalf("failed to load config: %v", err)
+		log.Fatalf("config: %v", err)
 	}
 
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
@@ -33,7 +36,7 @@ func main() {
 
 	db, err := postgres.Connect(cfg.Database)
 	if err != nil {
-		log.Fatalf("failed to connect to db: %v", err)
+		log.Fatalf("db: %v", err)
 	}
 	defer db.Close()
 
@@ -44,11 +47,22 @@ func main() {
 	userStore := postgres.NewUserStore(db)
 	refreshTokenStore := postgres.NewRefreshTokenStore(db)
 	problemStore := postgres.NewProblemStore(db)
+	submissionStore := postgres.NewSubmissionStore(db)
 
+	judgeQueue := queue.NewMemory()
+	execClient := executor.NewClient(cfg.Judge.Endpoint)
+	workerPool := judge.NewWorkerPool(judgeQueue, execClient, cfg.LangDir, cfg.Judge.Concurrency, submissionStore, problemStore)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go workerPool.Start(ctx)
+
+	wsManager := handler.NewWSManager()
 	authH := handler.NewAuthHandler(userStore, refreshTokenStore, jwtManager)
 	problemH := handler.NewProblemHandler(problemStore)
+	submissionH := handler.NewSubmissionHandler(submissionStore, problemStore, judgeQueue, wsManager)
 
-	router := api.NewRouter(authH, problemH, jwtManager)
+	router := api.NewRouter(authH, problemH, submissionH, wsManager, jwtManager)
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),
@@ -70,7 +84,8 @@ func main() {
 	<-quit
 
 	slog.Info("shutting down")
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	srv.Shutdown(ctx)
+	shutCtx, shutCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutCancel()
+	srv.Shutdown(shutCtx)
+	judgeQueue.Close()
 }
