@@ -89,6 +89,7 @@ func NewRouter(
 
 	r.Route("/api/contests", func(r chi.Router) {
 		r.Get("/", contestH.List)
+		r.Get("/formats", contestH.ListAvailableFormats)
 		r.With(middleware.OptionalAuthMiddleware(jwtManager)).Get("/{id}", contestH.GetByID)
 		r.With(middleware.OptionalAuthMiddleware(jwtManager)).Get("/{id}/scoreboard", contestH.Scoreboard)
 		r.Group(func(r chi.Router) {

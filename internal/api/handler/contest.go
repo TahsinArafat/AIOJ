@@ -557,3 +557,10 @@ func (h *ContestHandler) ListTeamRegistrations(w http.ResponseWriter, r *http.Re
 	}
 	respondJSON(w, http.StatusOK, map[string]interface{}{"data": teams})
 }
+
+func (h *ContestHandler) ListAvailableFormats(w http.ResponseWriter, r *http.Request) {
+	formats := format.List()
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"formats": formats,
+	})
+}
