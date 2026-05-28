@@ -83,10 +83,10 @@ func TestCodeforcesFormat_ScoreProblem(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			f := &CodeforcesFormat{config: tt.config}
 			ctx := format.ScoringContext{
-				ContestID:           1,
+				ContestID:           "1",
 				ContestDuration:     contestDuration,
 				SubmissionStartTime: start,
-				Problem:            format.Problem{ID: 1, Index: tt.problemIdx},
+				Problem:            format.Problem{ID: "1", Index: tt.problemIdx},
 				Submissions:        tt.submissions,
 			}
 
@@ -111,21 +111,21 @@ func TestCodeforcesFormat_ScoreProblem(t *testing.T) {
 func TestCodeforcesFormat_RankParticipants(t *testing.T) {
 	f := &CodeforcesFormat{config: DefaultConfig()}
 	participants := []format.ParticipantScore{
-		{UserID: 1, TotalScore: 1500, TotalPenalty: 200},
-		{UserID: 2, TotalScore: 2000, TotalPenalty: 300},
-		{UserID: 3, TotalScore: 1500, TotalPenalty: 100},
+		{UserID: "1", TotalScore: 1500, TotalPenalty: 200},
+		{UserID: "2", TotalScore: 2000, TotalPenalty: 300},
+		{UserID: "3", TotalScore: 1500, TotalPenalty: 100},
 	}
 
 	ranks := f.RankParticipants(participants)
 
-	if ranks[0].Score.UserID != 2 {
-		t.Errorf("first place = %d, want 2", ranks[0].Score.UserID)
+	if ranks[0].Score.UserID != "2" {
+		t.Errorf("first place = %s, want 2", ranks[0].Score.UserID)
 	}
-	if ranks[1].Score.UserID != 3 {
-		t.Errorf("second place = %d, want 3", ranks[1].Score.UserID)
+	if ranks[1].Score.UserID != "3" {
+		t.Errorf("second place = %s, want 3", ranks[1].Score.UserID)
 	}
-	if ranks[2].Score.UserID != 1 {
-		t.Errorf("third place = %d, want 1", ranks[2].Score.UserID)
+	if ranks[2].Score.UserID != "1" {
+		t.Errorf("third place = %s, want 1", ranks[2].Score.UserID)
 	}
 }
 
