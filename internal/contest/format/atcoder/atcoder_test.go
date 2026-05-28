@@ -53,7 +53,7 @@ func TestAtCoderFormat_ScoreProblem(t *testing.T) {
 			f := &AtCoderFormat{config: DefaultConfig()}
 			ctx := format.ScoringContext{
 				SubmissionStartTime: start,
-				Problem:             format.Problem{ID: 1, Index: "A"},
+				Problem:             format.Problem{ID: "1", Index: "A"},
 				Submissions:         tt.submissions,
 			}
 
