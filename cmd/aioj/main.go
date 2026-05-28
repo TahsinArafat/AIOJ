@@ -112,8 +112,10 @@ func main() {
 	blogH := handler.NewBlogHandler(blogStore)
 	editorialStore := postgres.NewEditorialStore(db)
 	editorialH := handler.NewEditorialHandler(editorialStore)
+	apiKeyStore := postgres.NewAPIKeyStore(db)
+	apiKeyH := handler.NewAPIKeyHandler(apiKeyStore)
 
-	router := api.NewRouter(authH, problemH, submissionH, contestH, vjH, adminH, testcaseH, wsManager, jwtManager, ratingH, registrationH, virtualH, gymH, hackH, statsH, notifH, groupH, teamH, blogH, editorialH)
+	router := api.NewRouter(authH, problemH, submissionH, contestH, vjH, adminH, testcaseH, wsManager, jwtManager, ratingH, registrationH, virtualH, gymH, hackH, statsH, notifH, groupH, teamH, blogH, editorialH, apiKeyH)
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),

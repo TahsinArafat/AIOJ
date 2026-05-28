@@ -169,3 +169,13 @@ type EditorialStore interface {
 	GetByProblem(ctx context.Context, problemID string) ([]model.Editorial, error)
 	List(ctx context.Context, offset, limit int) ([]model.Editorial, int, error)
 }
+
+type APIKeyStore interface {
+	Create(ctx context.Context, k *model.APIKey) error
+	GetByHash(ctx context.Context, keyHash string) (*model.APIKey, error)
+	GetByUser(ctx context.Context, userID string) ([]model.APIKey, error)
+	Delete(ctx context.Context, id string) error
+	UpdateLastUsed(ctx context.Context, id string) error
+	IncrementRequestCount(ctx context.Context, keyID string, windowStart time.Time) error
+	GetRequestCount(ctx context.Context, keyID string, windowStart time.Time) (int, error)
+}

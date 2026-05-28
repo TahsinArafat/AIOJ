@@ -31,6 +31,7 @@ func NewRouter(
 	teamH *handler.TeamHandler,
 	blogH *handler.BlogHandler,
 	editorialH *handler.EditorialHandler,
+	apiKeyH *handler.APIKeyHandler,
 ) http.Handler {
 	r := chi.NewRouter()
 	r.Use(chiMiddleware.RequestID, chiMiddleware.RealIP, middleware.Logging, chiMiddleware.Recoverer)
@@ -202,6 +203,13 @@ func NewRouter(
 			r.Use(middleware.AuthMiddleware(jwtManager))
 			r.Post("/", editorialH.Create)
 		})
+	})
+
+	r.Route("/api/keys", func(r chi.Router) {
+		r.Use(middleware.AuthMiddleware(jwtManager))
+		r.Get("/", apiKeyH.List)
+		r.Post("/", apiKeyH.Create)
+		r.Delete("/{id}", apiKeyH.Delete)
 	})
 
 	return r
