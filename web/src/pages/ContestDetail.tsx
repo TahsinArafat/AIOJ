@@ -1,16 +1,40 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { api } from '../lib/api'
+import { api, getAccessToken } from '../lib/api'
 
 export default function ContestDetail() {
     const { id } = useParams<{ id: string }>()
     const [data, setData] = useState<any>(null)
     const [loading, setLoading] = useState(true)
+    const [registered, setRegistered] = useState(false)
+    const [registrationCount, setRegistrationCount] = useState(0)
 
     useEffect(() => {
         if (!id) return
         api.contests.get(id).then(setData).catch(() => {}).finally(() => setLoading(false))
+        if (getAccessToken()) {
+            api.contests.checkRegistration(id).then(d => setRegistered(d.registered)).catch(() => {})
+        }
+        api.contests.listRegistrations(id).then(d => setRegistrationCount(d.count)).catch(() => {})
     }, [id])
+
+    const handleRegister = async () => {
+        if (!id) return
+        try {
+            await api.contests.register(id)
+            setRegistered(true)
+            setRegistrationCount(c => c + 1)
+        } catch (e: any) { alert('Registration failed: ' + e.message) }
+    }
+
+    const handleUnregister = async () => {
+        if (!id) return
+        try {
+            await api.contests.unregister(id)
+            setRegistered(false)
+            setRegistrationCount(c => Math.max(0, c - 1))
+        } catch (e: any) { alert('Unregister failed: ' + e.message) }
+    }
 
     if (loading) return <div className="text-center py-20 text-gray-400">Loading...</div>
     if (!data) return <div className="text-center py-20 text-gray-400">Contest not found.</div>
@@ -44,6 +68,29 @@ export default function ContestDetail() {
                     {isEnded && <span className="text-gray-500 bg-gray-100 px-3 py-1 rounded font-medium text-sm">Ended</span>}
                 </div>
             </div>
+
+            {contest.registration_required && (
+                <div className="border border-gray-200 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-gray-600">
+                            {registrationCount} / {contest.max_participants || '∞'} registered
+                        </span>
+                        {registered && <span className="text-green-600 text-sm">✓ Registered</span>}
+                    </div>
+                    {isUpcoming && getAccessToken() && (
+                        <button
+                            onClick={() => registered ? handleUnregister() : handleRegister()}
+                            className={`w-full py-2 rounded text-sm font-medium ${
+                                registered
+                                    ? 'bg-red-50 text-red-600 hover:bg-red-100'
+                                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                            }`}
+                        >
+                            {registered ? 'Unregister' : 'Register'}
+                        </button>
+                    )}
+                </div>
+            )}
 
             <div>
                 <h2 className="text-lg font-semibold mb-3">Problems</h2>

@@ -96,6 +96,8 @@ export const api = {
         get: (id: string) => request<any>(`/contests/${id}`),
         scoreboard: (id: string) => request<any>(`/contests/${id}/scoreboard`),
         register: (id: string) => request(`/contests/${id}/register`, { method: 'POST' }),
+        unregister: (id: string) => request(`/contests/${id}/register`, { method: 'DELETE' }),
         checkRegistration: (id: string) => request<{ registered: boolean }>(`/contests/${id}/register`),
+        listRegistrations: (id: string) => request<{ data: any[]; count: number }>(`/contests/${id}/registrations`),
     },
 }
