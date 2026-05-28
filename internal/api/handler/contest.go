@@ -3,13 +3,19 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
-	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
+	"github.com/tahsinarafat/aioj/internal/contest/format"
+	_ "github.com/tahsinarafat/aioj/internal/contest/format/acm"
+	_ "github.com/tahsinarafat/aioj/internal/contest/format/atcoder"
+	_ "github.com/tahsinarafat/aioj/internal/contest/format/codeforces"
+	_ "github.com/tahsinarafat/aioj/internal/contest/format/ioi"
+	_ "github.com/tahsinarafat/aioj/internal/contest/format/oi"
 	"github.com/tahsinarafat/aioj/internal/model"
 	"github.com/tahsinarafat/aioj/internal/rating"
 	"github.com/tahsinarafat/aioj/internal/store/postgres"
@@ -46,17 +52,43 @@ func (h *ContestHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if req.Type == "" {
 		req.Type = "acm"
 	}
+
+	fmtName := req.Format
+	if fmtName == "" {
+		fmtName = "acm"
+	}
+	var formatConfigJSON []byte
+	if len(req.FormatConfig) > 0 {
+		cf, err := format.Create(fmtName, req.FormatConfig)
+		if err != nil {
+			http.Error(w, "invalid format config: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		formatConfigJSON = req.FormatConfig
+		_ = cf
+	} else {
+		factory, ok := format.Get(fmtName)
+		if !ok {
+			http.Error(w, "unknown format: "+fmtName, http.StatusBadRequest)
+			return
+		}
+		f, _ := factory(nil)
+		formatConfigJSON = f.DefaultConfig()
+	}
+
 	c := &model.Contest{
-		ID:          uuid.New().String(),
-		Title:       req.Title,
-		Type:        req.Type,
-		StartTime:   req.StartTime,
-		EndTime:     req.EndTime,
-		FreezeTime:  req.FreezeTime,
-		Password:    req.Password,
-		Description: req.Description,
-		Visible:     true,
-		CreatedBy:   claims.UserID,
+		ID:           uuid.New().String(),
+		Title:        req.Title,
+		Type:         req.Type,
+		Format:       fmtName,
+		FormatConfig: formatConfigJSON,
+		StartTime:    req.StartTime,
+		EndTime:      req.EndTime,
+		FreezeTime:   req.FreezeTime,
+		Password:     req.Password,
+		Description:  req.Description,
+		Visible:      true,
+		CreatedBy:    claims.UserID,
 	}
 	if err := h.store.Create(r.Context(), c); err != nil {
 		http.Error(w, "create failed", http.StatusInternalServerError)
@@ -209,69 +241,82 @@ func (h *ContestHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 	rows, _ := h.store.GetScoreboardRows(r.Context(), id, beforeTime)
 	participants, _ := h.store.GetParticipants(r.Context(), id)
 
-	// Build problem index map
-	problemIdx := make(map[string]string) // problemID → index label
-	for _, p := range problems {
-		problemIdx[p.ProblemID] = p.Index
+	fmtName := contest.Format
+	if fmtName == "" {
+		fmtName = "acm"
+	}
+	contestFormat, err := format.Create(fmtName, contest.FormatConfig)
+	if err != nil {
+		http.Error(w, "invalid contest format: "+err.Error(), http.StatusInternalServerError)
+		return
 	}
 
-	type probStat struct {
-		solved   bool
-		attempts int
-		penalty  int // minutes
-		time     int
-		score    int
+	type userProblemKey struct {
+		UserID    string
+		ProblemID string
+	}
+	submissionsByUserProblem := make(map[userProblemKey][]format.Submission)
+	for _, row := range rows {
+		key := userProblemKey{UserID: row.UserID, ProblemID: row.ProblemID}
+		sub := format.Submission{
+			ID:        "",
+			UserID:    row.UserID,
+			ProblemID: row.ProblemID,
+			Status:    strings.ToUpper(row.Status),
+			Score:     float64(row.Score),
+			CreatedAt: row.CreatedAt,
+		}
+		submissionsByUserProblem[key] = append(submissionsByUserProblem[key], sub)
 	}
 
-	type userStat struct {
-		userID   string
-		username string
-		probs    map[string]*probStat
+	formatProblems := make([]format.Problem, len(problems))
+	for i, p := range problems {
+		formatProblems[i] = format.Problem{
+			ID:    p.ProblemID,
+			Index: p.Index,
+		}
 	}
 
-	userMap := make(map[string]*userStat)
+	participantsScores := make([]format.ParticipantScore, 0, len(participants))
 	for _, uid := range participants {
 		uname := h.store.GetUsername(r.Context(), uid)
-		userMap[uid] = &userStat{
-			userID:   uid,
-			username: uname,
-			probs:    make(map[string]*probStat),
+		ps := format.ParticipantScore{
+			UserID:   uid,
+			Username: uname,
+			Problems: make([]format.ProblemResult, 0, len(problems)),
 		}
+
+		for _, problem := range formatProblems {
+			key := userProblemKey{UserID: uid, ProblemID: problem.ID}
+			subs := submissionsByUserProblem[key]
+
+			ctx := format.ScoringContext{
+				ContestID:           contest.ID,
+				ContestDuration:     contest.EndTime.Sub(contest.StartTime),
+				SubmissionStartTime: contest.StartTime,
+				Problem:             problem,
+				Submissions:         subs,
+				FormatConfig:        contest.FormatConfig,
+			}
+
+			result, err := contestFormat.ScoreProblem(ctx)
+			if err != nil {
+				http.Error(w, "scoring error: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			ps.Problems = append(ps.Problems, result)
+			if result.Solved {
+				ps.TotalSolved++
+			}
+			ps.TotalScore += result.Score
+			ps.TotalPenalty += result.Penalty
+		}
+
+		participantsScores = append(participantsScores, ps)
 	}
 
-	for _, row := range rows {
-		u, ok := userMap[row.UserID]
-		if !ok {
-			continue
-		}
-		idx, ok2 := problemIdx[row.ProblemID]
-		if !ok2 {
-			continue
-		}
-		ps := u.probs[idx]
-		if ps == nil {
-			ps = &probStat{}
-			u.probs[idx] = ps
-		}
-		minutes := int(row.CreatedAt.Sub(contest.StartTime).Minutes())
-		if contest.Type == "acm" {
-			if ps.solved {
-				continue
-			}
-			if row.Status == "ac" {
-				ps.solved = true
-				ps.penalty = ps.attempts*20 + minutes
-				ps.time = minutes
-			} else if row.Status == "wa" || row.Status == "tle" || row.Status == "re" {
-				ps.attempts++
-			}
-		} else {
-			if row.Score > ps.score {
-				ps.score = row.Score
-			}
-			ps.solved = ps.score >= 100
-		}
-	}
+	ranks := contestFormat.RankParticipants(participantsScores)
 
 	type Entry struct {
 		Rank         int                           `json:"rank"`
@@ -283,31 +328,28 @@ func (h *ContestHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 		Problems     map[string]model.ProblemResult `json:"problems"`
 	}
 
-	entries := make([]*Entry, 0, len(userMap))
-	for _, u := range userMap {
-		e := &Entry{UserID: u.userID, Username: u.username, Problems: make(map[string]model.ProblemResult)}
-		for idx, ps := range u.probs {
-			e.Problems[idx] = model.ProblemResult{
-				Solved: ps.solved, Attempts: ps.attempts, Time: ps.time,
-				Score: ps.score, Pending: 0,
+	entries := make([]*Entry, len(ranks))
+	for i, rank := range ranks {
+		probMap := make(map[string]model.ProblemResult)
+		for _, pResult := range rank.Score.Problems {
+			probMap[pResult.ProblemIndex] = model.ProblemResult{
+				Solved:   pResult.Solved,
+				Attempts: pResult.Attempts,
+				Time:     pResult.Penalty,
+				Score:    int(pResult.Score),
+				Pending:  0,
 			}
-			if ps.solved {
-				e.TotalSolved++
-				e.TotalPenalty += ps.penalty
-			}
-			e.TotalScore += ps.score
 		}
-		entries = append(entries, e)
-	}
 
-	sort.Slice(entries, func(i, j int) bool {
-		if entries[i].TotalSolved != entries[j].TotalSolved {
-			return entries[i].TotalSolved > entries[j].TotalSolved
+		entries[i] = &Entry{
+			Rank:         rank.Position,
+			UserID:       rank.Score.UserID,
+			Username:     rank.Score.Username,
+			TotalSolved:  rank.Score.TotalSolved,
+			TotalPenalty: rank.Score.TotalPenalty,
+			TotalScore:   int(rank.Score.TotalScore),
+			Problems:     probMap,
 		}
-		return entries[i].TotalPenalty < entries[j].TotalPenalty
-	})
-	for i := range entries {
-		entries[i].Rank = i + 1
 	}
 
 	respondJSON(w, http.StatusOK, map[string]interface{}{
