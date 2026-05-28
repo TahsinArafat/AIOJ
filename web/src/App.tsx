@@ -12,6 +12,8 @@ import SetterPanel from './pages/SetterPanel'
 import Profile from './pages/Profile'
 import ProblemCreate from './pages/ProblemCreate'
 import Submissions from './pages/Submissions'
+import GymList from './pages/GymList'
+import GymDetail from './pages/GymDetail'
 import './global.css'
 
 function decodeRole(): string | null {
@@ -44,6 +46,7 @@ function Navbar() {
                 <Link to="/" className="font-bold text-blue-600 text-lg">AIOJ</Link>
                 <Link to="/problems" className="text-sm text-gray-600 hover:text-black transition-colors">Problems</Link>
                 <Link to="/contests" className="text-sm text-gray-600 hover:text-black transition-colors">Contests</Link>
+                <Link to="/gym" className="text-sm text-gray-600 hover:text-black transition-colors">Gym</Link>
                 {isAdmin && <Link to="/admin" className="text-sm font-medium text-purple-600 hover:text-purple-800 transition-colors">Admin</Link>}
                 {isSetter && <Link to="/setter" className="text-sm font-medium text-orange-600 hover:text-orange-800 transition-colors">Setter Workspace</Link>}
             </div>
@@ -93,6 +96,8 @@ export default function App() {
                         <Route path="/contests" element={<ContestList />} />
                         <Route path="/contests/:id" element={<ContestDetail />} />
                         <Route path="/contests/:id/scoreboard" element={<ContestScoreboard />} />
+                        <Route path="/gym" element={<GymList />} />
+                        <Route path="/gym/:id" element={<GymDetail />} />
                         <Route path="/submissions" element={<Submissions />} />
                         <Route path="/admin" element={<AdminDashboard />} />
                         <Route path="/setter" element={<SetterPanel />} />

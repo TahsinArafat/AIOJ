@@ -115,4 +115,15 @@ export const api = {
         status: () => request<any>('/virtual/status'),
         complete: (id: string) => request(`/virtual/${id}/complete`, { method: 'POST' }),
     },
+    gym: {
+        list: (offset = 0, limit = 20, filters?: { category?: string; search?: string }) => {
+            let url = `/gym?offset=${offset}&limit=${limit}`;
+            if (filters?.category) url += `&category=${filters.category}`;
+            if (filters?.search) url += `&search=${encodeURIComponent(filters.search)}`;
+            return request<{ data: any[]; total: number }>(url);
+        },
+        get: (id: string) => request<any>(`/gym/${id}`),
+        create: (d: any) => request<any>('/gym', { method: 'POST', body: JSON.stringify(d) }),
+        markSolved: (id: string) => request(`/gym/${id}/solve`, { method: 'POST' }),
+    },
 }
