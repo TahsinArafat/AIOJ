@@ -158,4 +158,13 @@ export const api = {
         addContest: (id: string, contestId: string) =>
             request(`/groups/${id}/contests`, { method: 'POST', body: JSON.stringify({ contest_id: contestId }) }),
     },
+    teams: {
+        list: (offset = 0, limit = 20) =>
+            request<{ data: any[]; total: number }>(`/teams?offset=${offset}&limit=${limit}`),
+        get: (id: string) => request<any>(`/teams/${id}`),
+        create: (d: any) => request<any>('/teams', { method: 'POST', body: JSON.stringify(d) }),
+        join: (id: string) => request(`/teams/${id}/join`, { method: 'POST' }),
+        leave: (id: string) => request(`/teams/${id}/leave`, { method: 'POST' }),
+        members: (id: string) => request<any>(`/teams/${id}/members`),
+    },
 }
