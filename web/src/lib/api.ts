@@ -66,8 +66,14 @@ export const api = {
             }),
     },
     problems: {
-        list: (offset = 0, limit = 20) =>
-            request<{ data: any[]; total: number }>(`/problems?offset=${offset}&limit=${limit}`),
+        list: (offset = 0, limit = 20, filters?: { difficulty?: string; tags?: string[]; search?: string }) => {
+            let url = `/problems?offset=${offset}&limit=${limit}`;
+            if (filters?.difficulty) url += `&difficulty=${filters.difficulty}`;
+            if (filters?.tags?.length) url += `&tags=${filters.tags.join(',')}`;
+            if (filters?.search) url += `&search=${encodeURIComponent(filters.search)}`;
+            return request<{ data: any[]; total: number }>(url);
+        },
+        listTags: () => request<{ data: string[] }>('/problems/tags'),
         get: (slug: string) => request<any>(`/problems/${slug}`),
         create: (d: any) => request<any>('/problems', { method: 'POST', body: JSON.stringify(d) }),
     },

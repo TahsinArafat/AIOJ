@@ -12,18 +12,58 @@ export default function ProblemList() {
     const [problems, setProblems] = useState<any[]>([])
     const [total, setTotal] = useState(0)
     const [offset, setOffset] = useState(0)
+    const [difficulty, setDifficulty] = useState('')
+    const [selectedTags, setSelectedTags] = useState<string[]>([])
+    const [search, setSearch] = useState('')
+    const [availableTags, setAvailableTags] = useState<string[]>([])
     const limit = 20
 
     useEffect(() => {
-        api.problems.list(offset, limit).then(d => {
-            setProblems(d.data)
-            setTotal(d.total)
+        api.problems.listTags().then(d => setAvailableTags(d.data || [])).catch(() => {})
+    }, [])
+
+    useEffect(() => {
+        setOffset(0)
+        api.problems.list(0, limit, { difficulty: difficulty || undefined, tags: selectedTags.length > 0 ? selectedTags : undefined, search: search || undefined }).then(d => {
+            setProblems(d.data || [])
+            setTotal(d.total || 0)
+        }).catch(() => {})
+    }, [difficulty, selectedTags, search])
+
+    useEffect(() => {
+        api.problems.list(offset, limit, { difficulty: difficulty || undefined, tags: selectedTags.length > 0 ? selectedTags : undefined, search: search || undefined }).then(d => {
+            setProblems(d.data || [])
+            setTotal(d.total || 0)
         }).catch(() => {})
     }, [offset])
+
+    const toggleTag = (tag: string) => {
+        setSelectedTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag])
+    }
 
     return (
         <div>
             <h1 className="text-2xl font-bold mb-4">Problems</h1>
+
+            <div className="flex flex-wrap gap-3 mb-4">
+                <input type="text" value={search} onChange={e => setSearch(e.target.value)}
+                    placeholder="Search..." className="border rounded px-3 py-1.5 text-sm w-48" />
+
+                {['', 'easy', 'medium', 'hard'].map(d => (
+                    <button key={d} onClick={() => setDifficulty(d)}
+                        className={`px-3 py-1.5 rounded text-sm ${difficulty === d ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+                        {d || 'All'}
+                    </button>
+                ))}
+
+                {availableTags.slice(0, 8).map(tag => (
+                    <button key={tag} onClick={() => toggleTag(tag)}
+                        className={`px-3 py-1.5 rounded text-sm ${selectedTags.includes(tag) ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+                        {tag}
+                    </button>
+                ))}
+            </div>
+
             <div className="border border-gray-200 rounded-lg overflow-hidden">
                 <table className="w-full text-sm">
                     <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
@@ -56,7 +96,7 @@ export default function ProblemList() {
                             </tr>
                         ))}
                         {problems.length === 0 && (
-                            <tr><td colSpan={4} className="px-4 py-8 text-center text-gray-400">No problems yet.</td></tr>
+                            <tr><td colSpan={4} className="px-4 py-8 text-center text-gray-400">No problems found.</td></tr>
                         )}
                     </tbody>
                 </table>
