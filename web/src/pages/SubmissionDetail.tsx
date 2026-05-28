@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { api } from '../lib/api'
+import { api, type TestCaseResult } from '../lib/api'
+import { resolveProblemSlug, resolveProblemTitle } from '../lib/problemSlugResolver'
 
 const STATUS_LABEL: Record<string, string> = {
     ac: 'Accepted', wa: 'Wrong Answer', tle: 'Time Limit Exceeded',
@@ -22,10 +23,22 @@ const CASE_COLOR: Record<string, string> = {
     mle: 'text-orange-600', re: 'text-red-600', se: 'text-gray-600',
 }
 
+function groupBySubtask(results: TestCaseResult[]): Map<number, TestCaseResult[]> {
+    const groups = new Map<number, TestCaseResult[]>()
+    for (const r of results) {
+        const id = r.subtask_id ?? 0
+        if (!groups.has(id)) groups.set(id, [])
+        groups.get(id)!.push(r)
+    }
+    return groups
+}
+
 export default function SubmissionDetail() {
     const { id } = useParams<{ id: string }>()
     const [sub, setSub] = useState<any>(null)
     const [loading, setLoading] = useState(true)
+    const [problemSlug, setProblemSlug] = useState<string | null>(null)
+    const [problemTitle, setProblemTitle] = useState<string | null>(null)
     const [activeTab, setActiveTab] = useState<'overview' | 'code' | 'tests'>('overview')
 
     useEffect(() => {
@@ -35,6 +48,10 @@ export default function SubmissionDetail() {
                 const d = await api.submissions.get(id)
                 setSub(d)
                 setLoading(false)
+                if (d.problem_id) {
+                    resolveProblemSlug(d.problem_id).then(setProblemSlug)
+                    resolveProblemTitle(d.problem_id).then(setProblemTitle)
+                }
                 if (d.status === 'pending' || d.status === 'judging') {
                     setTimeout(poll, 1500)
                 }
@@ -56,8 +73,8 @@ export default function SubmissionDetail() {
                 <div>
                     <h1 className="text-2xl font-bold">Submission {sub.id.substring(0, 8)}</h1>
                     <p className="text-sm text-gray-500 mt-1">
-                        <Link to={`/problems/${sub.problem_id}`} className="text-blue-600 hover:underline">
-                            Problem {sub.problem_id?.substring(0, 8)}
+                        <Link to={problemSlug ? `/problems/${problemSlug}` : '#'} className="text-blue-600 hover:underline">
+                            Problem {problemTitle || sub.problem_id?.substring(0, 8)}
                         </Link>
                         {' · '}{sub.language}
                         {' · '}{new Date(sub.created_at).toLocaleString()}
@@ -115,16 +132,74 @@ export default function SubmissionDetail() {
                 </div>
             )}
 
-            {activeTab === 'tests' && (
-                <div className="space-y-3">
-                    {judgeResult.length === 0 ? (
-                        <p className="text-gray-400 text-center py-8">
-                            {sub.status === 'pending' || sub.status === 'judging'
-                                ? 'Waiting for judging results...'
-                                : 'No test case details available.'}
-                        </p>
-                    ) : (
-                        judgeResult.map((r: any, i: number) => (
+            {activeTab === 'tests' && (() => {
+                if (judgeResult.length === 0) {
+                    return (
+                        <div className="space-y-3">
+                            <p className="text-gray-400 text-center py-8">
+                                {sub.status === 'pending' || sub.status === 'judging'
+                                    ? 'Waiting for judging results...'
+                                    : 'No test case details available.'}
+                            </p>
+                        </div>
+                    )
+                }
+
+                const hasSubtasks = judgeResult.some((r: any) => (r.subtask_id ?? 0) > 0)
+
+                if (hasSubtasks) {
+                    const subtaskMap = groupBySubtask(judgeResult)
+                    const subtaskIds = [...subtaskMap.keys()].filter(id => id > 0).sort((a, b) => a - b)
+
+                    return (
+                        <div className="space-y-3">
+                            {subtaskIds.map(id => {
+                                const cases = subtaskMap.get(id)!
+                                const allPassed = cases.every(c => c.status === 'ac')
+                                const earnedScore = cases.reduce((s, c) => s + (c.status === 'ac' ? (c.score ?? 0) : 0), 0)
+                                const maxScore = cases.reduce((s, c) => s + (c.score ?? 0), 0)
+
+                                return (
+                                    <div key={id} className={`rounded-lg border p-4 ${allPassed ? 'border-green-200 bg-green-50/30' : 'border-red-200 bg-red-50/30'}`}>
+                                        <div className="flex justify-between items-center mb-3">
+                                            <span className="font-semibold text-sm text-gray-700">Subtask {id}</span>
+                                            <span className={`text-xs font-bold px-2 py-0.5 rounded ${allPassed ? 'text-green-700 bg-green-100' : 'text-red-700 bg-red-100'}`}>
+                                                {earnedScore}/{maxScore} pts
+                                            </span>
+                                        </div>
+                                        <div className="space-y-2">
+                                            {cases.map((c, i) => (
+                                                <div key={i} className={`border rounded p-3 ${c.status === 'ac' ? 'bg-green-50/50 border-green-100' : 'bg-red-50/50 border-red-100'}`}>
+                                                    <div className="flex items-center justify-between mb-1">
+                                                        <span className="text-xs font-medium text-gray-600">{c.case_name || `Case ${i + 1}`}</span>
+                                                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${CASE_COLOR[c.status] || ''} bg-white`}>
+                                                            {STATUS_LABEL[c.status] || c.status}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex gap-4 text-xs text-gray-500">
+                                                        {c.time !== undefined && <span>Time: {c.time > 0 ? `${c.time}ms` : '—'}</span>}
+                                                        {c.memory !== undefined && <span>Memory: {c.memory > 0 ? `${Math.round(c.memory / 1024)}MB` : '—'}</span>}
+                                                        {(c.score ?? 0) > 0 && <span>Score: {c.score}pts</span>}
+                                                    </div>
+                                                    {c.detail && (
+                                                        <div className="mt-1.5 text-xs text-red-600 bg-red-50 p-1.5 rounded">
+                                                            {c.detail}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    )
+                }
+
+                // Fallback: non-subtask rendering
+                return (
+                    <div className="space-y-3">
+                        {judgeResult.map((r: any, i: number) => (
                             <div key={i} className={`border rounded-lg p-4 ${r.status === 'ac' ? 'bg-green-50/30 border-green-200' : 'bg-red-50/30 border-red-200'}`}>
                                 <div className="flex items-center justify-between mb-2">
                                     <span className="font-semibold text-sm">Test Case {i + 1}: {r.case_name || `#${i + 1}`}</span>
@@ -143,10 +218,10 @@ export default function SubmissionDetail() {
                                     </div>
                                 )}
                             </div>
-                        ))
-                    )}
-                </div>
-            )}
+                        ))}
+                    </div>
+                )
+            })()}
         </div>
     )
 }
