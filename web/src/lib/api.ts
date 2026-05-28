@@ -109,4 +109,10 @@ export const api = {
         checkRegistration: (id: string) => request<{ registered: boolean }>(`/contests/${id}/register`),
         listRegistrations: (id: string) => request<{ data: any[]; count: number }>(`/contests/${id}/registrations`),
     },
+    virtual: {
+        start: (contestId: string, durationMinutes?: number) =>
+            request<any>('/virtual/start', { method: 'POST', body: JSON.stringify({ contest_id: contestId, duration_minutes: durationMinutes }) }),
+        status: () => request<any>('/virtual/status'),
+        complete: (id: string) => request(`/virtual/${id}/complete`, { method: 'POST' }),
+    },
 }

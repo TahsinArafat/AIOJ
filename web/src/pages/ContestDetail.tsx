@@ -125,11 +125,25 @@ export default function ContestDetail() {
             </div>
 
             {(isRunning || isEnded) && (
-                <div>
+                <div className="flex gap-4 items-center">
                     <Link to={`/contests/${id}/scoreboard`}
                         className="inline-flex items-center gap-1 text-blue-600 hover:underline text-sm">
                         View Scoreboard →
                     </Link>
+                </div>
+            )}
+
+            {isEnded && getAccessToken() && (
+                <div className="border border-gray-200 rounded-lg p-4">
+                    <h3 className="font-semibold mb-2">Virtual Contest</h3>
+                    <p className="text-sm text-gray-600 mb-3">Simulate this contest as if it were live.</p>
+                    <button onClick={async () => {
+                        if (!id) return
+                        try { await api.virtual.start(id); alert('Virtual contest started!') }
+                        catch (e: any) { alert('Failed: ' + e.message) }
+                    }} className="bg-purple-600 text-white px-4 py-2 rounded text-sm hover:bg-purple-700">
+                        Start Virtual Contest
+                    </button>
                 </div>
             )}
         </div>
