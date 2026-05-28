@@ -78,3 +78,21 @@ type CreateProblemRequest struct {
 	SPJLanguage   string          `json:"spj_language,omitempty"`
 	SPJSourceCode string          `json:"spj_source_code,omitempty"`
 }
+
+type ProblemStats struct {
+	TotalSubmissions    int            `json:"total_submissions"`
+	AcceptedSubmissions int            `json:"accepted_submissions"`
+	AcceptanceRate      float64        `json:"acceptance_rate"`
+	UniqueSolvers       int            `json:"unique_solvers"`
+	AverageAttempts     float64        `json:"average_attempts"`
+	LanguageDistribution map[string]int `json:"language_distribution"`
+	DifficultyEstimate  float64        `json:"difficulty_estimate"`
+}
+
+type UserProblemStats struct {
+	ProblemsSolved   int     `json:"problems_solved"`
+	TotalSubmissions int     `json:"total_submissions"`
+	AcceptanceRate   float64 `json:"acceptance_rate"`
+	FavoriteLanguage string  `json:"favorite_language"`
+	StreakDays       int     `json:"streak_days"`
+}

@@ -101,8 +101,9 @@ func main() {
 	hackStore := postgres.NewHackStore(db)
 	hackService := hack.NewService(hackStore, contestStore, submissionStore)
 	hackH := handler.NewHackHandler(hackService, hackStore)
+	statsH := handler.NewStatsHandler(submissionStore)
 
-	router := api.NewRouter(authH, problemH, submissionH, contestH, vjH, adminH, testcaseH, wsManager, jwtManager, ratingH, registrationH, virtualH, gymH, hackH)
+	router := api.NewRouter(authH, problemH, submissionH, contestH, vjH, adminH, testcaseH, wsManager, jwtManager, ratingH, registrationH, virtualH, gymH, hackH, statsH)
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),

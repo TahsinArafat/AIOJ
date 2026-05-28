@@ -40,6 +40,8 @@ type SubmissionStore interface {
 	UpdateStatus(ctx context.Context, id string, status model.SubmissionStatus)
 	UpdateResult(ctx context.Context, id string, status model.SubmissionStatus, score, timeUsed, memoryUsed int, compileOutput string, results []model.TestCaseResult) error
 	ListPending(ctx context.Context, limit int) ([]string, error)
+	GetProblemStats(ctx context.Context, problemID string) (*model.ProblemStats, error)
+	GetUserStats(ctx context.Context, userID string) (*model.UserProblemStats, error)
 }
 
 type RefreshTokenStore interface {

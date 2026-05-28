@@ -124,3 +124,53 @@ func (s *SubmissionStore) ListPending(_ context.Context, limit int) ([]string, e
 	}
 	return ids, nil
 }
+
+func (s *SubmissionStore) GetProblemStats(ctx context.Context, problemID string) (*model.ProblemStats, error) {
+	stats := &model.ProblemStats{
+		LanguageDistribution: make(map[string]int),
+	}
+
+	s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM submissions WHERE problem_id = $1", problemID).Scan(&stats.TotalSubmissions)
+	s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM submissions WHERE problem_id = $1 AND status = 'ac'", problemID).Scan(&stats.AcceptedSubmissions)
+
+	if stats.TotalSubmissions > 0 {
+		stats.AcceptanceRate = float64(stats.AcceptedSubmissions) / float64(stats.TotalSubmissions) * 100
+	}
+
+	s.db.QueryRowContext(ctx, "SELECT COUNT(DISTINCT user_id) FROM submissions WHERE problem_id = $1 AND status = 'ac'", problemID).Scan(&stats.UniqueSolvers)
+
+	rows, err := s.db.QueryContext(ctx, `SELECT language, COUNT(*) FROM submissions WHERE problem_id = $1 GROUP BY language ORDER BY COUNT(*) DESC`, problemID)
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var lang string
+			var count int
+			rows.Scan(&lang, &count)
+			stats.LanguageDistribution[lang] = count
+		}
+	}
+
+	s.db.QueryRowContext(ctx, `SELECT COALESCE(AVG(attempts), 0) FROM (
+		SELECT user_id, COUNT(*) as attempts FROM submissions WHERE problem_id = $1 GROUP BY user_id
+		HAVING COUNT(CASE WHEN status = 'ac' THEN 1 END) > 0
+	) t`, problemID).Scan(&stats.AverageAttempts)
+
+	return stats, nil
+}
+
+func (s *SubmissionStore) GetUserStats(ctx context.Context, userID string) (*model.UserProblemStats, error) {
+	stats := &model.UserProblemStats{}
+
+	s.db.QueryRowContext(ctx, "SELECT problems_solved FROM user_profiles WHERE user_id = $1", userID).Scan(&stats.ProblemsSolved)
+	s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM submissions WHERE user_id = $1", userID).Scan(&stats.TotalSubmissions)
+
+	var accepted int
+	s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM submissions WHERE user_id = $1 AND status = 'ac'", userID).Scan(&accepted)
+	if stats.TotalSubmissions > 0 {
+		stats.AcceptanceRate = float64(accepted) / float64(stats.TotalSubmissions) * 100
+	}
+
+	s.db.QueryRowContext(ctx, `SELECT language FROM submissions WHERE user_id = $1 GROUP BY language ORDER BY COUNT(*) DESC LIMIT 1`, userID).Scan(&stats.FavoriteLanguage)
+
+	return stats, nil
+}
