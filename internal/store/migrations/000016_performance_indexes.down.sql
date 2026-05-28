@@ -1,0 +1,9 @@
+DROP INDEX IF EXISTS idx_problems_slug;
+DROP INDEX IF EXISTS idx_problems_difficulty;
+DROP INDEX IF EXISTS idx_problems_created;
+DROP INDEX IF EXISTS idx_submissions_user_status;
+DROP INDEX IF EXISTS idx_submissions_problem_user;
+DROP INDEX IF EXISTS idx_submissions_contest;
+DROP INDEX IF EXISTS idx_contests_start;
+DROP INDEX IF EXISTS idx_user_profiles_rating;
+DROP INDEX IF EXISTS idx_contest_ranks_contest;
