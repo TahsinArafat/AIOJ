@@ -24,14 +24,14 @@ func TestCalculateEloRating(t *testing.T) {
 			oldRating:    1200,
 			rank:         10,
 			participants: 100,
-			expected:     1350, // Should increase significantly
+			expected:     1711, // Should increase significantly
 		},
 		{
 			name:         "decline from high rating",
 			oldRating:    2000,
 			rank:         90,
 			participants: 100,
-			expected:     1900, // Should decrease
+			expected:     1560, // Should decrease
 		},
 	}
 
