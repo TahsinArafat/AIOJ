@@ -1,0 +1,80 @@
+{
+  "common": {
+    "loading": "লোড হচ্ছে...",
+    "error": "ত্রুটি",
+    "save": "সংরক্ষণ",
+    "cancel": "বাতিল",
+    "delete": "মুছুন",
+    "edit": "সম্পাদনা",
+    "create": "তৈরি করুন",
+    "search": "অনুসন্ধান...",
+    "noResults": "কোনো ফলাফল পাওয়া যায়নি",
+    "submit": "জমা দিন",
+    "back": "পিছনে",
+    "next": "পরবর্তী",
+    "prev": "পূর্ববর্তী"
+  },
+  "nav": {
+    "home": "হোম",
+    "problems": "সমস্যা",
+    "contests": "প্রতিযোগিতা",
+    "gym": "জিম",
+    "groups": "গ্রুপ",
+    "teams": "দল",
+    "blog": "ব্লগ",
+    "profile": "প্রোফাইল",
+    "submissions": "আমার সাবমিশন",
+    "apiKeys": "API কী",
+    "login": "লগইন",
+    "register": "নিবন্ধন",
+    "logout": "লগআউট"
+  },
+  "home": {
+    "title": "AIOJ",
+    "subtitle": "প্রতিযোগিতামূলক প্রোগ্রামিংয়ের জন্য হালকা অনলাইন জজ",
+    "browseProblems": "সমস্যা ব্রাউজ করুন",
+    "viewContests": "প্রতিযোগিতা দেখুন"
+  },
+  "problems": {
+    "title": "সমস্যা",
+    "difficulty": "কঠিনতা",
+    "tags": "ট্যাগ",
+    "timeLimit": "সময় সীমা",
+    "memoryLimit": "মেমরি সীমা",
+    "solved": "সমাধান হয়েছে",
+    "submissions": "সাবমিশন",
+    "acceptance": "গ্রহণযোগ্যতা",
+    "verdict": "রায়",
+    "language": "ভাষা"
+  },
+  "contests": {
+    "title": "প্রতিযোগিতা",
+    "startTime": "শুরুর সময়",
+    "endTime": "শেষের সময়",
+    "duration": "সময়কাল",
+    "register": "নিবন্ধন",
+    "registered": "নিবন্ধিত",
+    "scoreboard": "স্কোরবোর্ড",
+    "problems": "সমস্যা",
+    "running": "চলছে",
+    "upcoming": "আসন্ন",
+    "ended": "শেষ হয়েছে"
+  },
+  "auth": {
+    "login": "লগইন",
+    "register": "নিবন্ধন",
+    "username": "ব্যবহারকারীর নাম",
+    "email": "ইমেইল",
+    "password": "পাসওয়ার্ড",
+    "confirmPassword": "পাসওয়ার্ড নিশ্চিত করুন",
+    "forgotPassword": "পাসওয়ার্ড ভুলে গেছেন?",
+    "noAccount": "অ্যাকাউন্ট নেই?",
+    "hasAccount": "ইতিমধ্যে অ্যাকাউন্ট আছে?"
+  },
+  "errors": {
+    "notFound": "পৃষ্ঠা পাওয়া যায়নি",
+    "unauthorized": "অনুগ্রহ করে প্রথমে লগইন করুন",
+    "forbidden": "আপনার অনুমতি নেই",
+    "serverError": "সার্ভার ত্রুটি, আবার চেষ্টা করুন"
+  }
+}

@@ -1,0 +1,80 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "search": "Search...",
+    "noResults": "No results found",
+    "submit": "Submit",
+    "back": "Back",
+    "next": "Next",
+    "prev": "Previous"
+  },
+  "nav": {
+    "home": "Home",
+    "problems": "Problems",
+    "contests": "Contests",
+    "gym": "Gym",
+    "groups": "Groups",
+    "teams": "Teams",
+    "blog": "Blog",
+    "profile": "Profile",
+    "submissions": "My Submissions",
+    "apiKeys": "API Keys",
+    "login": "Login",
+    "register": "Register",
+    "logout": "Logout"
+  },
+  "home": {
+    "title": "AIOJ",
+    "subtitle": "Lightweight Online Judge for Competitive Programming",
+    "browseProblems": "Browse Problems",
+    "viewContests": "View Contests"
+  },
+  "problems": {
+    "title": "Problems",
+    "difficulty": "Difficulty",
+    "tags": "Tags",
+    "timeLimit": "Time Limit",
+    "memoryLimit": "Memory Limit",
+    "solved": "Solved",
+    "submissions": "Submissions",
+    "acceptance": "Acceptance",
+    "verdict": "Verdict",
+    "language": "Language"
+  },
+  "contests": {
+    "title": "Contests",
+    "startTime": "Start Time",
+    "endTime": "End Time",
+    "duration": "Duration",
+    "register": "Register",
+    "registered": "Registered",
+    "scoreboard": "Scoreboard",
+    "problems": "Problems",
+    "running": "Running",
+    "upcoming": "Upcoming",
+    "ended": "Ended"
+  },
+  "auth": {
+    "login": "Login",
+    "register": "Register",
+    "username": "Username",
+    "email": "Email",
+    "password": "Password",
+    "confirmPassword": "Confirm Password",
+    "forgotPassword": "Forgot Password?",
+    "noAccount": "Don't have an account?",
+    "hasAccount": "Already have an account?"
+  },
+  "errors": {
+    "notFound": "Page not found",
+    "unauthorized": "Please login first",
+    "forbidden": "You don't have permission",
+    "serverError": "Server error, please try again"
+  }
+}

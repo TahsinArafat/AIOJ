@@ -16,6 +16,7 @@ import GymList from './pages/GymList'
 import GymDetail from './pages/GymDetail'
 import HackPanel from './pages/HackPanel'
 import NotificationBell from './components/NotificationBell'
+import LanguageSwitcher from './components/LanguageSwitcher'
 import GroupList from './pages/GroupList'
 import GroupCreate from './pages/GroupCreate'
 import GroupDetail from './pages/GroupDetail'
@@ -68,6 +69,7 @@ function Navbar() {
                 {isSetter && <Link to="/setter" className="text-sm font-medium text-orange-600 hover:text-orange-800 transition-colors">Setter Workspace</Link>}
             </div>
             <div className="flex gap-3 items-center">
+                <LanguageSwitcher />
                 {loggedIn ? (
                     <>
                         <NotificationBell />
