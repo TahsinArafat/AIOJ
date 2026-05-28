@@ -36,11 +36,7 @@ type CmdResult struct {
 	Time       uint64             `json:"time"`
 	Memory     uint64             `json:"memory"`
 	RunDir     string             `json:"runDir"`
-	Files      map[string]CmdFile `json:"files,omitempty"`
-}
-
-type ExecResponse struct {
-	Results []CmdResult `json:"results"`
+	Files      map[string]string  `json:"files,omitempty"`
 }
 
 type Client struct {
@@ -52,7 +48,7 @@ func NewClient(endpoint string) *Client {
 	return &Client{endpoint: endpoint, http: &http.Client{Timeout: 30 * time.Second}}
 }
 
-func (c *Client) Run(req *ExecRequest) (*ExecResponse, error) {
+func (c *Client) Run(req *ExecRequest) ([]CmdResult, error) {
 	body, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("marshal: %w", err)
@@ -62,9 +58,9 @@ func (c *Client) Run(req *ExecRequest) (*ExecResponse, error) {
 		return nil, fmt.Errorf("request: %w", err)
 	}
 	defer resp.Body.Close()
-	var execResp ExecResponse
-	if err := json.NewDecoder(resp.Body).Decode(&execResp); err != nil {
+	var results []CmdResult
+	if err := json.NewDecoder(resp.Body).Decode(&results); err != nil {
 		return nil, fmt.Errorf("decode: %w", err)
 	}
-	return &execResp, nil
+	return results, nil
 }

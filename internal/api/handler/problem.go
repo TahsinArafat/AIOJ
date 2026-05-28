@@ -189,6 +189,7 @@ func (h *ProblemHandler) Create(w http.ResponseWriter, r *http.Request) {
 		SPJLanguage:   req.SPJLanguage,
 		SPJSourceCode: req.SPJSourceCode,
 		Source:        "local",
+		Visible:       true,
 		CreatedBy:     claims.UserID,
 	}
 	if err := h.store.Create(r.Context(), prob); err != nil {

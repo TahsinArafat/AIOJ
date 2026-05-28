@@ -9,7 +9,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /app/aioj ./cmd/aioj
 
 # Stage 2: Run
 FROM alpine:3.19
-RUN apk add --no-cache ca-certificates tzdata
+RUN apk add --no-cache ca-certificates tzdata \
+    g++ gcc make musl-dev python3 openjdk21-jdk rust cargo nodejs npm bash
 RUN addgroup -S aioj && adduser -S aioj -G aioj
 WORKDIR /app
 COPY --from=builder /app/aioj .

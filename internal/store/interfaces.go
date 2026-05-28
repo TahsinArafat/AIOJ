@@ -30,6 +30,7 @@ type ProblemStore interface {
 	RemovePermission(ctx context.Context, problemID, userID string) error
 	GetPermissions(ctx context.Context, problemID string) ([]model.ProblemPermission, error)
 	HasAccess(ctx context.Context, problemID, userID string, requiredLevels ...string) bool
+	GetRecommendations(ctx context.Context, userID string, currentRating int) (*model.RecommendationsResponse, error)
 }
 
 type SubmissionStore interface {

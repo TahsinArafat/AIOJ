@@ -107,15 +107,22 @@ func (wp *WorkerPool) judge(ctx context.Context, submissionID string) {
 			wp.subStore.UpdateResult(ctx, submissionID, model.StatusCE, 0, 0, 0, err.Error(), nil)
 			return
 		}
-		if len(resp.Results) == 0 || resp.Results[0].Status != "Accepted" {
-			ce := "compile error"
-			if len(resp.Results) > 0 {
-				ce = resp.Results[0].Error
+		compiledStatus := resp[0].Status
+		if len(resp) == 0 || (compiledStatus != "Accepted" && compiledStatus != "Nonzero Exit Status") {
+			ce := "compile error: unexpected status: " + compiledStatus
+			if resp[0].Error != "" {
+				ce = resp[0].Error
 			}
 			wp.subStore.UpdateResult(ctx, submissionID, model.StatusCE, 0, 0, 0, ce, nil)
 			return
 		}
-		compiledExeDir = resp.Results[0].RunDir
+		if compiledStatus == "Nonzero Exit Status" {
+			if resp[0].Error != "" {
+				wp.subStore.UpdateResult(ctx, submissionID, model.StatusCE, 0, 0, 0, resp[0].Error, nil)
+				return
+			}
+		}
+		compiledExeDir = resp[0].RunDir
 	}
 
 	// Run test cases
@@ -163,17 +170,17 @@ func (wp *WorkerPool) judge(ctx context.Context, submissionID string) {
 		if err != nil {
 			r.Status = model.StatusSE
 			r.Detail = err.Error()
-		} else if len(resp.Results) == 0 {
+		} else if len(resp) == 0 {
 			r.Status = model.StatusSE
 			r.Detail = "no result"
 		} else {
-			cr := resp.Results[0]
+			cr := resp[0]
 			r.Memory = int(cr.Memory / 1024)
 			switch cr.Status {
 			case "Accepted":
 				output := ""
 				if f, ok := cr.Files["stdout"]; ok {
-					output = f.Content
+					output = f
 				}
 				expected := loadFile(filepath.Join(prob.TestdataPath, tc.OutputName))
 				chk := checker.GetChecker("exact")
