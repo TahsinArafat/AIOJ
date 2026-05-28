@@ -8,6 +8,7 @@ import { python } from '@codemirror/lang-python'
 import { java } from '@codemirror/lang-java'
 import { rust } from '@codemirror/lang-rust'
 import { api, getAccessToken } from '../lib/api'
+import ProblemStats from '../components/ProblemStats'
 
 const LANGS = [
     { value: 'cpp-gpp-64', label: 'C++ (G++ 64-bit)' },
@@ -51,6 +52,7 @@ export default function ProblemDetail() {
     const [lang, setLang] = useState('cpp-gpp-64')
     const [result, setResult] = useState<any>(null)
     const [submitting, setSubmitting] = useState(false)
+    const [tab, setTab] = useState<'statement' | 'stats'>('statement')
     const editorRef = useRef<HTMLDivElement>(null)
     const viewRef = useRef<EditorView | null>(null)
 
@@ -127,37 +129,53 @@ export default function ProblemDetail() {
                         }`}>{problem.difficulty}</span>
                     </div>
                 </div>
-                <div className="prose prose-sm max-w-none">
-                    <p className="whitespace-pre-wrap text-gray-800">{problem.description}</p>
+
+                <div className="flex border-b border-gray-200">
+                    <button onClick={() => setTab('statement')} className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${tab === 'statement' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+                        Statement
+                    </button>
+                    <button onClick={() => setTab('stats')} className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${tab === 'stats' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+                        Statistics
+                    </button>
                 </div>
-                {problem.input_format && (
-                    <div>
-                        <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide mb-1">Input Format</h3>
-                        <p className="text-sm text-gray-700 whitespace-pre-wrap">{problem.input_format}</p>
-                    </div>
-                )}
-                {problem.output_format && (
-                    <div>
-                        <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide mb-1">Output Format</h3>
-                        <p className="text-sm text-gray-700 whitespace-pre-wrap">{problem.output_format}</p>
-                    </div>
-                )}
-                {problem.sample_cases?.length > 0 && problem.sample_cases.map((sc: any, i: number) => (
-                    <div key={i}>
-                        <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide mb-1">Sample {i + 1}</h3>
-                        <div className="grid grid-cols-2 gap-2">
-                            <div>
-                                <div className="text-xs text-gray-400 mb-1">Input</div>
-                                <pre className="bg-gray-100 rounded p-2 text-xs overflow-x-auto">{sc.input}</pre>
-                            </div>
-                            <div>
-                                <div className="text-xs text-gray-400 mb-1">Output</div>
-                                <pre className="bg-gray-100 rounded p-2 text-xs overflow-x-auto">{sc.output}</pre>
-                            </div>
+
+                {tab === 'statement' ? (
+                    <>
+                        <div className="prose prose-sm max-w-none">
+                            <p className="whitespace-pre-wrap text-gray-800">{problem.description}</p>
                         </div>
-                        {sc.explanation && <p className="text-xs text-gray-500 mt-1">{sc.explanation}</p>}
-                    </div>
-                ))}
+                        {problem.input_format && (
+                            <div>
+                                <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide mb-1">Input Format</h3>
+                                <p className="text-sm text-gray-700 whitespace-pre-wrap">{problem.input_format}</p>
+                            </div>
+                        )}
+                        {problem.output_format && (
+                            <div>
+                                <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide mb-1">Output Format</h3>
+                                <p className="text-sm text-gray-700 whitespace-pre-wrap">{problem.output_format}</p>
+                            </div>
+                        )}
+                        {problem.sample_cases?.length > 0 && problem.sample_cases.map((sc: any, i: number) => (
+                            <div key={i}>
+                                <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide mb-1">Sample {i + 1}</h3>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <div className="text-xs text-gray-400 mb-1">Input</div>
+                                        <pre className="bg-gray-100 rounded p-2 text-xs overflow-x-auto">{sc.input}</pre>
+                                    </div>
+                                    <div>
+                                        <div className="text-xs text-gray-400 mb-1">Output</div>
+                                        <pre className="bg-gray-100 rounded p-2 text-xs overflow-x-auto">{sc.output}</pre>
+                                    </div>
+                                </div>
+                                {sc.explanation && <p className="text-xs text-gray-500 mt-1">{sc.explanation}</p>}
+                            </div>
+                        ))}
+                    </>
+                ) : (
+                    <ProblemStats problemId={problem.id} />
+                )}
             </div>
 
             {/* Editor */}

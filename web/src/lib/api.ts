@@ -134,4 +134,8 @@ export const api = {
         listByContest: (contestId: string) => request<any>(`/hacks/contest/${contestId}`),
         listHackable: (contestId: string, problemId: string) => request<any>(`/hacks/hackable/${contestId}/${problemId}`),
     },
+    stats: {
+        getProblemStats: (problemId: string) => request<any>(`/stats/problems/${problemId}`),
+        getMyStats: () => request<any>('/stats/me'),
+    },
 }
