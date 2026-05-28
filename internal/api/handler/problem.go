@@ -1,14 +1,19 @@
 package handler
 
 import (
+	"archive/zip"
+	"bytes"
 	"encoding/json"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
+	"github.com/tahsinarafat/aioj/internal/fps"
 	"github.com/tahsinarafat/aioj/internal/model"
 	"github.com/tahsinarafat/aioj/internal/store"
 )
@@ -119,6 +124,14 @@ func (h *ProblemHandler) Update(w http.ResponseWriter, r *http.Request) {
 	p.SampleCases = req.SampleCases
 	p.TestCaseScore = req.TestCaseScore
 	p.Tags = req.Tags
+	p.SPJ = req.SPJ
+	p.SPJLanguage = req.SPJLanguage
+	p.SPJSourceCode = req.SPJSourceCode
+	p.CheckerType = req.CheckerType
+	p.FloatEpsilon = req.FloatEpsilon
+	p.Interactive = req.Interactive
+	p.InteractorLanguage = req.InteractorLanguage
+	p.InteractorSourceCode = req.InteractorSourceCode
 	h.store.Update(r.Context(), p.ID, p)
 	w.WriteHeader(http.StatusOK)
 }
@@ -143,8 +156,74 @@ func (h *ProblemHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
+	if p.TestdataPath != "" {
+		os.RemoveAll(p.TestdataPath)
+	}
 	h.store.Delete(r.Context(), p.ID)
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *ProblemHandler) Export(w http.ResponseWriter, r *http.Request) {
+	slug := chi.URLParam(r, "slug")
+
+	prob, err := h.store.GetBySlug(r.Context(), slug)
+	if err != nil {
+		http.Error(w, "problem not found", http.StatusNotFound)
+		return
+	}
+
+	xmlBytes, err := fps.GenerateXML([]*model.Problem{prob})
+	if err != nil {
+		http.Error(w, "failed to generate FPS XML: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	zipBuf := new(bytes.Buffer)
+	zipWriter := zip.NewWriter(zipBuf)
+
+	xmlFile, err := zipWriter.Create("problem.xml")
+	if err != nil {
+		http.Error(w, "failed to create XML in ZIP: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if _, err := xmlFile.Write(xmlBytes); err != nil {
+		http.Error(w, "failed to write XML to ZIP: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if prob.TestdataPath != "" {
+		files, err := os.ReadDir(prob.TestdataPath)
+		if err == nil {
+			for _, f := range files {
+				if f.IsDir() {
+					continue
+				}
+
+				fPath := filepath.Join(prob.TestdataPath, f.Name())
+				data, err := os.ReadFile(fPath)
+				if err != nil {
+					continue
+				}
+
+				zf, err := zipWriter.Create(f.Name())
+				if err != nil {
+					continue
+				}
+				if _, err := zf.Write(data); err != nil {
+					continue
+				}
+			}
+		}
+	}
+
+	if err := zipWriter.Close(); err != nil {
+		http.Error(w, "failed to close ZIP writer: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/zip")
+	w.Header().Set("Content-Disposition", "attachment; filename=\""+prob.Slug+".zip\"")
+	w.Write(zipBuf.Bytes())
 }
 
 func (h *ProblemHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -171,6 +250,12 @@ func (h *ProblemHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if req.Difficulty == "" {
 		req.Difficulty = "easy"
 	}
+	if req.CheckerType == "" {
+		req.CheckerType = "exact"
+	}
+	if req.FloatEpsilon == 0 {
+		req.FloatEpsilon = 1e-6
+	}
 	prob := &model.Problem{
 		ID:            uuid.New().String(),
 		Slug:          req.Slug,
@@ -188,6 +273,11 @@ func (h *ProblemHandler) Create(w http.ResponseWriter, r *http.Request) {
 		SPJ:           req.SPJ,
 		SPJLanguage:   req.SPJLanguage,
 		SPJSourceCode: req.SPJSourceCode,
+		CheckerType:   req.CheckerType,
+		FloatEpsilon:  req.FloatEpsilon,
+		Interactive:          req.Interactive,
+		InteractorLanguage:   req.InteractorLanguage,
+		InteractorSourceCode: req.InteractorSourceCode,
 		Source:        "local",
 		Visible:       true,
 		CreatedBy:     claims.UserID,

@@ -73,6 +73,7 @@ func NewRouter(
 			r.Post("/{slug}/testcases", testcaseH.Upload)
 			r.Post("/{slug}/language-limits", langLimitH.Set)
 			r.Delete("/{slug}/language-limits/{lang}", langLimitH.Delete)
+			r.Get("/{slug}/export", problemH.Export)
 			r.Post("/import", importH.Import)
 		})
 	})
