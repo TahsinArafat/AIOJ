@@ -1,0 +1,65 @@
+{
+  "dashboard": {
+    "title": "AIOJ Overview",
+    "panels": [
+      {
+        "title": "HTTP Request Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(aioj_http_requests_total[5m])",
+            "legendFormat": "{{method}} {{path}}"
+          }
+        ],
+        "gridPos": {"x": 0, "y": 0, "w": 12, "h": 8}
+      },
+      {
+        "title": "Response Time (p95)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(aioj_http_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "{{method}} {{path}}"
+          }
+        ],
+        "gridPos": {"x": 12, "y": 0, "w": 12, "h": 8}
+      },
+      {
+        "title": "Active Contests",
+        "type": "stat",
+        "targets": [{"expr": "aioj_active_contests"}],
+        "gridPos": {"x": 0, "y": 8, "w": 6, "h": 4}
+      },
+      {
+        "title": "Online Users",
+        "type": "stat",
+        "targets": [{"expr": "aioj_online_users"}],
+        "gridPos": {"x": 6, "y": 8, "w": 6, "h": 4}
+      },
+      {
+        "title": "Submissions per Minute",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(aioj_submissions_total[5m])",
+            "legendFormat": "{{status}}"
+          }
+        ],
+        "gridPos": {"x": 12, "y": 8, "w": 12, "h": 4}
+      },
+      {
+        "title": "Database Connections",
+        "type": "gauge",
+        "targets": [{"expr": "aioj_database_connections"}],
+        "gridPos": {"x": 0, "y": 12, "w": 6, "h": 4}
+      },
+      {
+        "title": "Cache Hit Rate",
+        "type": "gauge",
+        "targets": [{"expr": "aioj_cache_hit_rate"}],
+        "gridPos": {"x": 6, "y": 12, "w": 6, "h": 4}
+      }
+    ],
+    "schemaVersion": 16
+  }
+}
