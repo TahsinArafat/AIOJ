@@ -33,6 +33,7 @@ func NewRouter(
 	editorialH *handler.EditorialHandler,
 	apiKeyH *handler.APIKeyHandler,
 	webhookH *handler.WebhookHandler,
+	recommendationH *handler.RecommendationHandler,
 ) http.Handler {
 	r := chi.NewRouter()
 	r.Use(chiMiddleware.RequestID, chiMiddleware.RealIP, middleware.Logging, chiMiddleware.Recoverer)
@@ -218,6 +219,11 @@ func NewRouter(
 		r.Get("/", webhookH.List)
 		r.Post("/", webhookH.Create)
 		r.Delete("/{id}", webhookH.Delete)
+	})
+
+	r.Route("/api/recommendations", func(r chi.Router) {
+		r.Use(middleware.AuthMiddleware(jwtManager))
+		r.Get("/", recommendationH.GetRecommendations)
 	})
 
 	return r
