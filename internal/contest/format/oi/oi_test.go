@@ -50,7 +50,7 @@ func TestOIFormat_ScoreProblem(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			f := &OIFormat{config: Config{MaxScorePerProblem: 100}}
 			ctx := format.ScoringContext{
-				Problem:     format.Problem{ID: 1, Index: "A"},
+				Problem:     format.Problem{ID: "1", Index: "A"},
 				Submissions: tt.submissions,
 			}
 
@@ -73,24 +73,24 @@ func TestOIFormat_RankParticipants(t *testing.T) {
 	tests := []struct {
 		name         string
 		participants []format.ParticipantScore
-		wantFirst    int64
+		wantFirst    string
 	}{
 		{
 			name: "rank by total score",
 			participants: []format.ParticipantScore{
-				{UserID: 1, TotalScore: 200},
-				{UserID: 2, TotalScore: 300},
-				{UserID: 3, TotalScore: 150},
+				{UserID: "1", TotalScore: 200},
+				{UserID: "2", TotalScore: 300},
+				{UserID: "3", TotalScore: 150},
 			},
-			wantFirst: 2,
+			wantFirst: "2",
 		},
 		{
 			name: "tiebreak by penalty",
 			participants: []format.ParticipantScore{
-				{UserID: 1, TotalScore: 200, TotalPenalty: 50},
-				{UserID: 2, TotalScore: 200, TotalPenalty: 30},
+				{UserID: "1", TotalScore: 200, TotalPenalty: 50},
+				{UserID: "2", TotalScore: 200, TotalPenalty: 30},
 			},
-			wantFirst: 2,
+			wantFirst: "2",
 		},
 	}
 
@@ -100,7 +100,7 @@ func TestOIFormat_RankParticipants(t *testing.T) {
 			ranks := f.RankParticipants(tt.participants)
 
 			if ranks[0].Score.UserID != tt.wantFirst {
-				t.Errorf("first place = %d, want %d", ranks[0].Score.UserID, tt.wantFirst)
+				t.Errorf("first place = %s, want %s", ranks[0].Score.UserID, tt.wantFirst)
 			}
 		})
 	}
