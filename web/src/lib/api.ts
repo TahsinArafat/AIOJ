@@ -180,4 +180,11 @@ export const api = {
         vote: (d: { target_type: string; target_id: string; value: number }) =>
             request('/blog/vote', { method: 'POST', body: JSON.stringify(d) }),
     },
+    editorials: {
+        list: (offset = 0, limit = 20) =>
+            request<{ data: any[]; total: number }>(`/editorials?offset=${offset}&limit=${limit}`),
+        get: (id: string) => request<any>(`/editorials/${id}`),
+        getByProblem: (problemId: string) => request<{ data: any[] }>(`/editorials/problem/${problemId}`),
+        create: (d: any) => request<any>('/editorials', { method: 'POST', body: JSON.stringify(d) }),
+    },
 }

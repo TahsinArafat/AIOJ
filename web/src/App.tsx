@@ -25,6 +25,8 @@ import TeamDetail from './pages/TeamDetail'
 import BlogList from './pages/BlogList'
 import BlogCreate from './pages/BlogCreate'
 import BlogDetail from './pages/BlogDetail'
+import EditorialList from './pages/EditorialList'
+import EditorialDetail from './pages/EditorialDetail'
 import './global.css'
 
 function decodeRole(): string | null {
@@ -123,6 +125,8 @@ export default function App() {
                         <Route path="/blog" element={<BlogList />} />
                         <Route path="/blog/create" element={<BlogCreate />} />
                         <Route path="/blog/:id" element={<BlogDetail />} />
+                        <Route path="/editorials" element={<EditorialList />} />
+                        <Route path="/editorials/:id" element={<EditorialDetail />} />
                         <Route path="/submissions" element={<Submissions />} />
                         <Route path="/admin" element={<AdminDashboard />} />
                         <Route path="/setter" element={<SetterPanel />} />

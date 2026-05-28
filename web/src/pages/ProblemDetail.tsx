@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useParams, useSearchParams } from 'react-router-dom'
+import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { EditorView, basicSetup } from 'codemirror'
 import { EditorState } from '@codemirror/state'
 import { oneDark } from '@codemirror/theme-one-dark'
@@ -52,13 +52,18 @@ export default function ProblemDetail() {
     const [lang, setLang] = useState('cpp-gpp-64')
     const [result, setResult] = useState<any>(null)
     const [submitting, setSubmitting] = useState(false)
-    const [tab, setTab] = useState<'statement' | 'stats'>('statement')
+    const [tab, setTab] = useState<'statement' | 'stats' | 'editorials'>('statement')
+    const [editorials, setEditorials] = useState<any[]>([])
     const editorRef = useRef<HTMLDivElement>(null)
     const viewRef = useRef<EditorView | null>(null)
 
     useEffect(() => {
         if (slug) api.problems.get(slug).then(setProblem).catch(() => {})
     }, [slug])
+
+    useEffect(() => {
+        if (problem?.id) api.editorials.getByProblem(problem.id).then(d => setEditorials(d.data || [])).catch(() => {})
+    }, [problem?.id])
 
     useEffect(() => {
         if (!editorRef.current) return
@@ -137,6 +142,9 @@ export default function ProblemDetail() {
                     <button onClick={() => setTab('stats')} className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${tab === 'stats' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
                         Statistics
                     </button>
+                    <button onClick={() => setTab('editorials')} className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${tab === 'editorials' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+                        Editorials
+                    </button>
                 </div>
 
                 {tab === 'statement' ? (
@@ -173,8 +181,28 @@ export default function ProblemDetail() {
                             </div>
                         ))}
                     </>
-                ) : (
+                ) : tab === 'stats' ? (
                     <ProblemStats problemId={problem.id} />
+                ) : (
+                    <div className="space-y-4">
+                        {editorials.length === 0 ? (
+                            <p className="text-gray-400 text-sm">No editorials yet for this problem.</p>
+                        ) : (
+                            editorials.map(e => (
+                                <Link key={e.id} to={`/editorials/${e.id}`} className="block border rounded p-4 hover:bg-gray-50">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        {e.is_official && <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded font-medium">Official</span>}
+                                        <h4 className="font-medium">{e.title}</h4>
+                                    </div>
+                                    <div className="flex gap-4 text-xs text-gray-400">
+                                        <span>{e.username}</span>
+                                        {e.time_complexity && <span>Time: {e.time_complexity}</span>}
+                                        <span>{e.upvotes} upvotes</span>
+                                    </div>
+                                </Link>
+                            ))
+                        )}
+                    </div>
                 )}
             </div>
 
