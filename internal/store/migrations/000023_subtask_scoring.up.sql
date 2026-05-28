@@ -1,6 +1,6 @@
 ALTER TABLE problems 
-    ADD COLUMN scoring_mode VARCHAR(16) NOT NULL DEFAULT 'complete',
-    ADD COLUMN subtask_aggregation VARCHAR(8) NOT NULL DEFAULT 'min';
+    ADD COLUMN IF NOT EXISTS scoring_mode VARCHAR(16) NOT NULL DEFAULT 'complete',
+    ADD COLUMN IF NOT EXISTS subtask_aggregation VARCHAR(8) NOT NULL DEFAULT 'min';
 
 ALTER TABLE problems 
     ADD CONSTRAINT problems_scoring_mode_check 

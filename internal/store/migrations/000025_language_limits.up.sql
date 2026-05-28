@@ -6,4 +6,4 @@ CREATE TABLE IF NOT EXISTS language_limits (
     PRIMARY KEY (problem_id, language_id)
 );
 
-CREATE INDEX idx_language_limits_problem ON language_limits(problem_id);
+CREATE INDEX IF NOT EXISTS idx_language_limits_problem ON language_limits(problem_id);
