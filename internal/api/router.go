@@ -28,6 +28,7 @@ func NewRouter(
 	statsH *handler.StatsHandler,
 	notifH *handler.NotificationHandler,
 	groupH *handler.GroupHandler,
+	teamH *handler.TeamHandler,
 ) http.Handler {
 	r := chi.NewRouter()
 	r.Use(chiMiddleware.RequestID, chiMiddleware.RealIP, middleware.Logging, chiMiddleware.Recoverer)
@@ -164,6 +165,18 @@ func NewRouter(
 			r.Post("/{id}/join", groupH.Join)
 			r.Post("/{id}/leave", groupH.Leave)
 			r.Post("/{id}/contests", groupH.AddContest)
+		})
+	})
+
+	r.Route("/api/teams", func(r chi.Router) {
+		r.Get("/", teamH.List)
+		r.Get("/{id}", teamH.GetByID)
+		r.Get("/{id}/members", teamH.GetMembers)
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.AuthMiddleware(jwtManager))
+			r.Post("/", teamH.Create)
+			r.Post("/{id}/join", teamH.Join)
+			r.Post("/{id}/leave", teamH.Leave)
 		})
 	})
 

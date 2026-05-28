@@ -135,3 +135,17 @@ type GroupStore interface {
 	RemoveContest(ctx context.Context, groupID, contestID string) error
 	GetContests(ctx context.Context, groupID string) ([]model.Contest, error)
 }
+
+type TeamStore interface {
+	Create(ctx context.Context, t *model.Team) error
+	GetByID(ctx context.Context, id string) (*model.Team, error)
+	List(ctx context.Context, offset, limit int) ([]model.TeamListItem, int, error)
+	Update(ctx context.Context, id string, t *model.Team) error
+	Delete(ctx context.Context, id string) error
+	AddMember(ctx context.Context, teamID, userID, role string) error
+	RemoveMember(ctx context.Context, teamID, userID string) error
+	GetMembers(ctx context.Context, teamID string) ([]model.TeamMember, error)
+	IsMember(ctx context.Context, teamID, userID string) (bool, error)
+	GetUserTeams(ctx context.Context, userID string) ([]model.TeamListItem, error)
+	UpdateRating(ctx context.Context, teamID string, newRating int) error
+}
