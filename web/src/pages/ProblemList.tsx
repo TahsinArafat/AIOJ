@@ -1,6 +1,17 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
+
+function decodeRole(): string | null {
+    const token = localStorage.getItem('access_token')
+    if (!token) return null
+    try {
+        const payload = JSON.parse(atob(token.split('.')[1]))
+        return payload.role ?? null
+    } catch {
+        return null
+    }
+}
 
 const difficultyColor: Record<string, string> = {
     easy: 'text-green-600 bg-green-50',
@@ -41,9 +52,32 @@ export default function ProblemList() {
         setSelectedTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag])
     }
 
+    const role = decodeRole()
+    const canImport = role === 'admin' || role === 'teacher'
+
+    const handleImport = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+
+        try {
+            const res = await api.problems.importProblem(file)
+            window.location.href = `/problems/${res.slug}`
+        } catch (err: any) {
+            alert('Failed to import problem: ' + (err.message || err))
+        }
+    }, [])
+
     return (
         <div>
-            <h1 className="text-2xl font-bold mb-4">Problems</h1>
+            <div className="flex items-center justify-between mb-4">
+                <h1 className="text-2xl font-bold">Problems</h1>
+                {canImport && (
+                    <label className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 cursor-pointer">
+                        Import Problem (XML/ZIP)
+                        <input type="file" accept=".xml,.zip" className="hidden" onChange={handleImport} />
+                    </label>
+                )}
+            </div>
 
             <div className="flex flex-wrap gap-3 mb-4">
                 <input type="text" value={search} onChange={e => setSearch(e.target.value)}

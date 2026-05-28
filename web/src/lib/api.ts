@@ -1,3 +1,32 @@
+export interface TestCaseResult {
+    case_name?: string
+    status: string
+    time?: number
+    memory?: number
+    score?: number
+    subtask_id?: number
+    detail?: string
+}
+
+export interface ProblemDetail {
+    id: string
+    title: string
+    slug: string
+    description: string
+    input_format?: string
+    output_format?: string
+    hint?: string
+    difficulty: string
+    time_limit: number
+    memory_limit: number
+    tags?: string[]
+    source?: string
+    interactive?: boolean
+    scoring_mode?: string
+    problem_type?: string
+    sample_cases?: { input: string; output: string; explanation?: string }[]
+}
+
 const BASE = '/api'
 
 let accessToken: string | null = localStorage.getItem('access_token')
@@ -64,6 +93,16 @@ export const api = {
                 method: 'POST',
                 body: JSON.stringify(d),
             }),
+        forgotPassword: (d: { email: string }) =>
+            request<{ message: string; token?: string }>('/auth/forgot-password', {
+                method: 'POST',
+                body: JSON.stringify(d),
+            }),
+        resetPassword: (d: { token: string; new_password: string }) =>
+            request<{ message: string }>('/auth/reset-password', {
+                method: 'POST',
+                body: JSON.stringify(d),
+            }),
     },
     problems: {
         list: (offset = 0, limit = 20, filters?: { difficulty?: string; tags?: string[]; search?: string }) => {
@@ -76,13 +115,71 @@ export const api = {
         listTags: () => request<{ data: string[] }>('/problems/tags'),
         get: (slug: string) => request<any>(`/problems/${slug}`),
         create: (d: any) => request<any>('/problems', { method: 'POST', body: JSON.stringify(d) }),
+        update: (slug: string, d: any) => request<any>(`/problems/${slug}`, { method: 'PUT', body: JSON.stringify(d) }),
+        delete: (slug: string) => request<any>(`/problems/${slug}`, { method: 'DELETE' }),
+        getPermissions: (slug: string) => request<{ data: any[] }>(`/problems/${slug}/permissions`),
+        addPermission: (slug: string, username: string, accessLevel: string) => 
+            request<any>(`/problems/${slug}/permissions`, { 
+                method: 'POST', 
+                body: JSON.stringify({ username, access_level: accessLevel }) 
+            }),
+        removePermission: (slug: string, userId: string) => 
+            request<any>(`/problems/${slug}/permissions/${userId}`, { method: 'DELETE' }),
+        uploadTestcases: async (slug: string, file: File) => {
+            const formData = new FormData()
+            formData.append('file', file)
+            const headers: Record<string, string> = {}
+            const token = getAccessToken()
+            if (token) headers['Authorization'] = `Bearer ${token}`
+            const res = await fetch(BASE + `/problems/${slug}/testcases`, {
+                method: 'POST',
+                headers,
+                body: formData
+            })
+            if (!res.ok) {
+                const text = await res.text()
+                throw new Error(text || `HTTP ${res.status}`)
+            }
+            return res.json()
+        },
+        importProblem: async (file: File) => {
+            const formData = new FormData()
+            formData.append('file', file)
+            const headers: Record<string, string> = {}
+            const token = getAccessToken()
+            if (token) headers['Authorization'] = `Bearer ${token}`
+            const res = await fetch(BASE + '/problems/import', {
+                method: 'POST',
+                headers,
+                body: formData
+            })
+            if (!res.ok) {
+                const text = await res.text()
+                throw new Error(text || `HTTP ${res.status}`)
+            }
+            return res.json() as Promise<{ status: string; problem_id: string; slug: string }>
+        },
+        exportProblemUrl: (slug: string) => BASE + `/problems/${slug}/export`,
     },
     submissions: {
         create: (d: any) => request<any>('/submissions', { method: 'POST', body: JSON.stringify(d) }),
         createUpsolving: (d: any) => request<any>('/submissions/upsolving', { method: 'POST', body: JSON.stringify(d) }),
+        run: (d: { source_code: string; language: string; input: string }) => 
+            request<{
+                status: string;
+                stdout: string;
+                stderr: string;
+                time_used: number;
+                memory_used: number;
+                compile_output: string;
+            }>('/submissions/run', { method: 'POST', body: JSON.stringify(d) }),
         get: (id: string) => request<any>(`/submissions/${id}`),
-        list: (offset = 0, limit = 20) =>
-            request<{ data: any[]; total: number }>(`/submissions?offset=${offset}&limit=${limit}`),
+        list: (offset = 0, limit = 20, problemId?: string, contestId?: string) => {
+            let url = `/submissions?offset=${offset}&limit=${limit}`;
+            if (problemId) url += `&problem_id=${problemId}`;
+            if (contestId) url += `&contest_id=${contestId}`;
+            return request<{ data: any[]; total: number }>(url);
+        },
     },
     admin: {
         listUsers: (offset = 0, limit = 20) =>
@@ -104,6 +201,7 @@ export const api = {
             return request<{ data: any[]; total: number }>(url);
         },
         get: (id: string) => request<any>(`/contests/${id}`),
+        create: (d: any) => request<any>('/contests', { method: 'POST', body: JSON.stringify(d) }),
         scoreboard: (id: string) => request<any>(`/contests/${id}/scoreboard`),
         register: (id: string) => request(`/contests/${id}/register`, { method: 'POST' }),
         unregister: (id: string) => request(`/contests/${id}/register`, { method: 'DELETE' }),
@@ -135,8 +233,10 @@ export const api = {
         listHackable: (contestId: string, problemId: string) => request<any>(`/hacks/hackable/${contestId}/${problemId}`),
     },
     stats: {
+        getPlatform: () => request<{ problems: number; users: number; submissions: number }>('/stats/platform'),
         getProblemStats: (problemId: string) => request<any>(`/stats/problems/${problemId}`),
         getMyStats: () => request<any>('/stats/me'),
+        getUserStats: (userId: string) => request<any>(`/stats/user/${userId}`),
     },
     notifications: {
         list: (unreadOnly = false, limit = 50) =>
@@ -206,5 +306,23 @@ export const api = {
                 weak_tags: { tags: string[]; problems: any[] };
                 hybrid: any[];
             }>(rating !== undefined ? `/recommendations?rating=${rating}` : '/recommendations'),
+    },
+    ratings: {
+        getByUser: (userId: string, limit = 50) =>
+            request<{ data: any[] }>(`/rating/user/${userId}?limit=${limit}`),
+        getByContest: (contestId: string) =>
+            request<{ data: any[] }>(`/rating/contest/${contestId}`),
+    },
+    rankings: {
+        list: (offset = 0, limit = 50) =>
+            request<{ data: any[]; total: number }>(`/rankings?offset=${offset}&limit=${limit}`),
+    },
+    users: {
+        getByUsername: (username: string) =>
+            request<any>(`/users/${encodeURIComponent(username)}`),
+    },
+    search: {
+        global: (q: string, limit = 10) =>
+            request<{ problems: any[]; users: any[]; contests: any[] }>(`/search?q=${encodeURIComponent(q)}&limit=${limit}`),
     },
 }

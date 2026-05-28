@@ -8,6 +8,17 @@ import { api, getAccessToken } from '../lib/api'
 import ProblemStats from '../components/ProblemStats'
 import CodeEditor from '../components/CodeEditor'
 
+function decodeRole(): string | null {
+    const token = localStorage.getItem('access_token')
+    if (!token) return null
+    try {
+        const payload = JSON.parse(atob(token.split('.')[1]))
+        return payload.role ?? null
+    } catch {
+        return null
+    }
+}
+
 const LANGS = [
     { value: 'cpp-gpp-64', label: 'C++ (G++ 64-bit)' },
     { value: 'cpp-gpp-32', label: 'C++ (G++ 32-bit)' },
@@ -295,6 +306,9 @@ export default function ProblemDetail() {
         }
     }
 
+    const role = decodeRole()
+    const canExport = role === 'admin' || role === 'teacher'
+
     if (!problem) {
         return <div className="text-center py-20 text-gray-400">Loading...</div>
     }
@@ -322,6 +336,17 @@ export default function ProblemDetail() {
                             </span>
                         )}
                     </h1>
+                    {canExport && (
+                        <div className="mt-2">
+                            <a
+                                href={api.problems.exportProblemUrl(problem.slug)}
+                                download
+                                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                            >
+                                Export (FPS ZIP)
+                            </a>
+                        </div>
+                    )}
                 </div>
 
                 <div className="flex border-b border-gray-200">
