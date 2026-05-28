@@ -79,6 +79,7 @@ export const api = {
     },
     submissions: {
         create: (d: any) => request<any>('/submissions', { method: 'POST', body: JSON.stringify(d) }),
+        createUpsolving: (d: any) => request<any>('/submissions/upsolving', { method: 'POST', body: JSON.stringify(d) }),
         get: (id: string) => request<any>(`/submissions/${id}`),
         list: (offset = 0, limit = 20) =>
             request<{ data: any[]; total: number }>(`/submissions?offset=${offset}&limit=${limit}`),

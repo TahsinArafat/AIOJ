@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { EditorView, basicSetup } from 'codemirror'
 import { EditorState } from '@codemirror/state'
 import { oneDark } from '@codemirror/theme-one-dark'
@@ -44,6 +44,9 @@ const STATUS_LABELS: Record<string, string> = {
 
 export default function ProblemDetail() {
     const { slug } = useParams<{ slug: string }>()
+    const [searchParams] = useSearchParams()
+    const isUpsolving = searchParams.get('upsolving') === 'true'
+    const contestId = searchParams.get('contest')
     const [problem, setProblem] = useState<any>(null)
     const [lang, setLang] = useState('cpp-gpp-64')
     const [result, setResult] = useState<any>(null)
@@ -74,11 +77,19 @@ export default function ProblemDetail() {
         setSubmitting(true)
         setResult(null)
         try {
-            const res = await api.submissions.create({
-                problem_id: problem.id,
-                language: lang,
-                source_code: code,
-            })
+            const apiCall = isUpsolving 
+                ? api.submissions.createUpsolving({
+                    problem_id: problem.id,
+                    language: lang,
+                    source_code: code,
+                    contest_id: contestId || undefined,
+                  })
+                : api.submissions.create({
+                    problem_id: problem.id,
+                    language: lang,
+                    source_code: code,
+                  })
+            const res = await apiCall
             setResult(res)
             // Poll for result
             const poll = async () => {

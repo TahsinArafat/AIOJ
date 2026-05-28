@@ -123,10 +123,13 @@ export default function ContestDetail() {
                                 {problems.map((p: any) => (
                                     <tr key={p.problem_id} className="hover:bg-gray-50">
                                         <td className="px-4 py-2.5 font-bold text-blue-600">{p.index}</td>
-                                        <td className="px-4 py-2.5">
-                                            <Link to={`/problems/${p.problem_id}`} className="hover:underline text-blue-600">
+                                        <td className="px-4 py-2.5 flex items-center justify-between">
+                                            <Link to={`/problems/${p.problem_id}`} className="hover:underline text-blue-600 font-medium">
                                                 {p.problem_id}
                                             </Link>
+                                            {isEnded && (
+                                                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">Upsolving Mode</span>
+                                            )}
                                         </td>
                                     </tr>
                                 ))}
