@@ -27,6 +27,7 @@ import BlogCreate from './pages/BlogCreate'
 import BlogDetail from './pages/BlogDetail'
 import EditorialList from './pages/EditorialList'
 import EditorialDetail from './pages/EditorialDetail'
+import APISettings from './pages/APISettings'
 import './global.css'
 
 function decodeRole(): string | null {
@@ -71,6 +72,7 @@ function Navbar() {
                     <>
                         <NotificationBell />
                         <Link to="/profile" className="text-sm text-gray-600 hover:text-black">Profile</Link>
+                        <Link to="/settings/api" className="text-sm text-gray-600 hover:text-black">API Keys</Link>
                         <Link to="/submissions" className="text-sm text-gray-600 hover:text-black">My Submissions</Link>
                         <button onClick={handleLogout} className="text-sm text-gray-500 hover:text-black">Logout</button>
                     </>
@@ -127,6 +129,7 @@ export default function App() {
                         <Route path="/blog/:id" element={<BlogDetail />} />
                         <Route path="/editorials" element={<EditorialList />} />
                         <Route path="/editorials/:id" element={<EditorialDetail />} />
+                        <Route path="/settings/api" element={<APISettings />} />
                         <Route path="/submissions" element={<Submissions />} />
                         <Route path="/admin" element={<AdminDashboard />} />
                         <Route path="/setter" element={<SetterPanel />} />

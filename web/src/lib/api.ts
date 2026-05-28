@@ -187,4 +187,10 @@ export const api = {
         getByProblem: (problemId: string) => request<{ data: any[] }>(`/editorials/problem/${problemId}`),
         create: (d: any) => request<any>('/editorials', { method: 'POST', body: JSON.stringify(d) }),
     },
+    apiKeys: {
+        list: () => request<{ data: any[] }>('/keys'),
+        create: (d: { name: string; description?: string }) =>
+            request<{ api_key: any; secret: string }>('/keys', { method: 'POST', body: JSON.stringify(d) }),
+        delete: (id: string) => request(`/keys/${id}`, { method: 'DELETE' }),
+    },
 }
