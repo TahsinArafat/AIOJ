@@ -46,7 +46,7 @@ func (s *Service) StartVirtualContest(ctx context.Context, userID, contestID str
 
 func (s *Service) GetStatus(v *model.VirtualContest, now time.Time) model.VirtualStatus {
 	endsAt := v.StartedAt.Add(time.Duration(v.DurationMinutes) * time.Minute)
-	remaining := int(time.Until(endsAt).Minutes())
+	remaining := int(endsAt.Sub(now).Minutes())
 	if remaining < 0 {
 		remaining = 0
 	}
