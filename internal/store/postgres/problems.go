@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/lib/pq"
 	"github.com/tahsinarafat/aioj/internal/model"
@@ -194,4 +195,77 @@ func (s *ProblemStore) HasAccess(ctx context.Context, problemID, userID string, 
 		}
 	}
 	return false
+}
+
+func (s *ProblemStore) ListWithFilter(ctx context.Context, offset, limit int, difficulty string, tags []string, search string) ([]model.ProblemListItem, int, error) {
+	where := []string{"p.visible = true"}
+	args := []interface{}{}
+	argIdx := 1
+
+	if difficulty != "" {
+		where = append(where, fmt.Sprintf("p.difficulty = $%d", argIdx))
+		args = append(args, difficulty)
+		argIdx++
+	}
+
+	if len(tags) > 0 {
+		where = append(where, fmt.Sprintf("p.tags && $%d", argIdx))
+		args = append(args, pq.Array(tags))
+		argIdx++
+	}
+
+	if search != "" {
+		where = append(where, fmt.Sprintf("(p.title ILIKE $%d OR p.slug ILIKE $%d)", argIdx, argIdx))
+		args = append(args, "%"+search+"%")
+		argIdx++
+	}
+
+	whereClause := strings.Join(where, " AND ")
+
+	var total int
+	countQuery := "SELECT COUNT(*) FROM problems p WHERE " + whereClause
+	s.db.QueryRowContext(ctx, countQuery, args...).Scan(&total)
+
+	selectQuery := fmt.Sprintf(`SELECT p.id, p.slug, p.title, p.difficulty, p.tags, p.submission_count, p.accepted_count, p.source
+		FROM problems p WHERE %s ORDER BY p.created_at DESC OFFSET $%d LIMIT $%d`, whereClause, argIdx, argIdx+1)
+	args = append(args, offset, limit)
+
+	rows, err := s.db.QueryContext(ctx, selectQuery, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var items []model.ProblemListItem
+	for rows.Next() {
+		var item model.ProblemListItem
+		var tagArr []string
+		rows.Scan(&item.ID, &item.Slug, &item.Title, &item.Difficulty, pq.Array(&tagArr),
+			&item.SubmissionCount, &item.AcceptedCount, &item.Source)
+		item.Tags = tagArr
+		items = append(items, item)
+	}
+	if items == nil {
+		items = []model.ProblemListItem{}
+	}
+	return items, total, nil
+}
+
+func (s *ProblemStore) GetAllTags(ctx context.Context) ([]string, error) {
+	rows, err := s.db.QueryContext(ctx, "SELECT DISTINCT unnest(tags) FROM problems ORDER BY 1")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var tags []string
+	for rows.Next() {
+		var tag string
+		rows.Scan(&tag)
+		tags = append(tags, tag)
+	}
+	if tags == nil {
+		tags = []string{}
+	}
+	return tags, nil
 }

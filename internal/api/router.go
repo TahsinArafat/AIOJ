@@ -34,6 +34,7 @@ func NewRouter(
 
 	r.Route("/api/problems", func(r chi.Router) {
 		r.Get("/", problemH.List)
+		r.Get("/tags", problemH.ListTags)
 		r.With(middleware.OptionalAuthMiddleware(jwtManager)).Get("/{slug}", problemH.GetBySlug)
 		r.Get("/{slug}/submissions", submissionH.ListByProblem)
 		r.Group(func(r chi.Router) {

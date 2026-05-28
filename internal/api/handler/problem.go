@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -26,7 +27,24 @@ func (h *ProblemHandler) List(w http.ResponseWriter, r *http.Request) {
 	if limit <= 0 || limit > 100 {
 		limit = 20
 	}
-	items, total, err := h.store.List(r.Context(), offset, limit)
+
+	difficulty := r.URL.Query().Get("difficulty")
+	search := r.URL.Query().Get("search")
+	var filterTags []string
+	if tagsStr := r.URL.Query().Get("tags"); tagsStr != "" {
+		filterTags = strings.Split(tagsStr, ",")
+	}
+
+	var items []model.ProblemListItem
+	var total int
+	var err error
+
+	if difficulty != "" || len(filterTags) > 0 || search != "" {
+		items, total, err = h.store.ListWithFilter(r.Context(), offset, limit, difficulty, filterTags, search)
+	} else {
+		items, total, err = h.store.List(r.Context(), offset, limit)
+	}
+
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
@@ -37,6 +55,11 @@ func (h *ProblemHandler) List(w http.ResponseWriter, r *http.Request) {
 		"offset": offset,
 		"limit":  limit,
 	})
+}
+
+func (h *ProblemHandler) ListTags(w http.ResponseWriter, r *http.Request) {
+	tags, _ := h.store.GetAllTags(r.Context())
+	respondJSON(w, http.StatusOK, map[string]interface{}{"data": tags})
 }
 
 func (h *ProblemHandler) GetBySlug(w http.ResponseWriter, r *http.Request) {

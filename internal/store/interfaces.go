@@ -21,6 +21,8 @@ type ProblemStore interface {
 	GetByID(ctx context.Context, id string) (*model.Problem, error)
 	GetBySlug(ctx context.Context, slug string) (*model.Problem, error)
 	List(ctx context.Context, offset, limit int) ([]model.ProblemListItem, int, error)
+	ListWithFilter(ctx context.Context, offset, limit int, difficulty string, tags []string, search string) ([]model.ProblemListItem, int, error)
+	GetAllTags(ctx context.Context) ([]string, error)
 	UpdateCounts(ctx context.Context, id string, addSubmission, addAccepted int) error
 	Update(ctx context.Context, id string, p *model.Problem) error
 	Delete(ctx context.Context, id string) error
