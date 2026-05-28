@@ -38,6 +38,7 @@ func NewRouter(
 	usersH *handler.UsersHandler,
 	searchH *handler.SearchHandler,
 	langLimitH *handler.LanguageLimitHandler,
+	importH *handler.ImportHandler,
 ) http.Handler {
 	r := chi.NewRouter()
 	rl := middleware.NewRateLimiter()
@@ -72,6 +73,7 @@ func NewRouter(
 			r.Post("/{slug}/testcases", testcaseH.Upload)
 			r.Post("/{slug}/language-limits", langLimitH.Set)
 			r.Delete("/{slug}/language-limits/{lang}", langLimitH.Delete)
+			r.Post("/import", importH.Import)
 		})
 	})
 

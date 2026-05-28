@@ -93,6 +93,7 @@ func main() {
 	adminH := handler.NewAdminHandler(userStore, setterStore)
 
 	testcaseH := handler.NewTestcaseHandler(problemStore, "./testdata")
+	importH := handler.NewImportHandler(problemStore, "./testdata")
 	ratingH := handler.NewRatingHandler(ratingStore)
 	registrationStore := postgres.NewRegistrationStore(db)
 	registrationH := handler.NewRegistrationHandler(registrationStore, contestStore)
@@ -125,7 +126,7 @@ func main() {
 	searchStore := postgres.NewSearchStore(db)
 	searchH := handler.NewSearchHandler(searchStore)
 
-	router := api.NewRouter(authH, problemH, submissionH, contestH, vjH, adminH, testcaseH, wsManager, jwtManager, ratingH, registrationH, virtualH, gymH, hackH, statsH, notifH, groupH, teamH, blogH, editorialH, apiKeyH, webhookH, recommendationH, rankingsH, usersH, searchH, langLimitH)
+	router := api.NewRouter(authH, problemH, submissionH, contestH, vjH, adminH, testcaseH, wsManager, jwtManager, ratingH, registrationH, virtualH, gymH, hackH, statsH, notifH, groupH, teamH, blogH, editorialH, apiKeyH, webhookH, recommendationH, rankingsH, usersH, searchH, langLimitH, importH)
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),
