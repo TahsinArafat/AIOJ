@@ -95,9 +95,9 @@ func TestACMFormat_ScoreProblem(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			f := &ACMFormat{config: tt.config}
 			ctx := format.ScoringContext{
-				ContestID:           1,
+				ContestID:           "1",
 				SubmissionStartTime: start,
-				Problem:            format.Problem{ID: 1, Index: "A"},
+				Problem:            format.Problem{ID: "1", Index: "A"},
 				Submissions:        tt.submissions,
 			}
 
@@ -128,26 +128,26 @@ func TestACMFormat_RankParticipants(t *testing.T) {
 		{
 			name: "simple ordering",
 			participants: []format.ParticipantScore{
-				{UserID: 1, TotalSolved: 3, TotalPenalty: 300},
-				{UserID: 2, TotalSolved: 4, TotalPenalty: 400},
-				{UserID: 3, TotalSolved: 2, TotalPenalty: 200},
+				{UserID: "1", TotalSolved: 3, TotalPenalty: 300},
+				{UserID: "2", TotalSolved: 4, TotalPenalty: 400},
+				{UserID: "3", TotalSolved: 2, TotalPenalty: 200},
 			},
 			wantRanks: []int{2, 1, 3},
 		},
 		{
 			name: "tie on solved and penalty",
 			participants: []format.ParticipantScore{
-				{UserID: 1, TotalSolved: 3, TotalPenalty: 300},
-				{UserID: 2, TotalSolved: 3, TotalPenalty: 300},
+				{UserID: "1", TotalSolved: 3, TotalPenalty: 300},
+				{UserID: "2", TotalSolved: 3, TotalPenalty: 300},
 			},
 			wantRanks: []int{1, 1},
 		},
 		{
 			name: "all zero solved",
 			participants: []format.ParticipantScore{
-				{UserID: 1, TotalSolved: 0, TotalPenalty: 0},
-				{UserID: 2, TotalSolved: 0, TotalPenalty: 0},
-				{UserID: 3, TotalSolved: 5, TotalPenalty: 250},
+				{UserID: "1", TotalSolved: 0, TotalPenalty: 0},
+				{UserID: "2", TotalSolved: 0, TotalPenalty: 0},
+				{UserID: "3", TotalSolved: 5, TotalPenalty: 250},
 			},
 			wantRanks: []int{2, 2, 1},
 		},
@@ -159,9 +159,9 @@ func TestACMFormat_RankParticipants(t *testing.T) {
 			ranks := f.RankParticipants(tt.participants)
 
 			for _, r := range ranks {
-				expectedPos := tt.wantRanks[r.Score.UserID-1]
+				expectedPos := tt.wantRanks[int(r.Score.UserID[0]-'1')]
 				if r.Position != expectedPos {
-					t.Errorf("participant %d: position = %d, want %d", r.Score.UserID, r.Position, expectedPos)
+					t.Errorf("participant %s: position = %d, want %d", r.Score.UserID, r.Position, expectedPos)
 				}
 			}
 		})
