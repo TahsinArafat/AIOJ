@@ -9,9 +9,11 @@ type SampleCase struct {
 }
 
 type TestCaseScore struct {
-	InputName  string `json:"input_name"`
-	OutputName string `json:"output_name"`
-	Score      int    `json:"score"`
+	InputName    string `json:"input_name"`
+	OutputName   string `json:"output_name"`
+	Score        int    `json:"score"`
+	SubtaskID    int    `json:"subtask_id,omitempty"`    // 0 = no subtask
+	SubtaskScore int    `json:"subtask_score,omitempty"` // score within subtask
 }
 
 type Problem struct {
@@ -34,6 +36,14 @@ type Problem struct {
 	SPJLanguage     string          `json:"spj_language,omitempty"`
 	SPJSourceCode   string          `json:"spj_source_code,omitempty"`
 	SPJVersion      string          `json:"spj_version,omitempty"`
+	CheckerType     string          `json:"checker_type"`
+	FloatEpsilon    float64         `json:"float_epsilon"`
+	Interactive          bool   `json:"interactive"`
+	InteractorLanguage   string `json:"interactor_language,omitempty"`
+	InteractorSourceCode string `json:"interactor_source_code,omitempty"`
+	ScoringMode        string `json:"scoring_mode"`         // "complete" or "partial"
+	SubtaskAggregation string `json:"subtask_aggregation"`  // "min" or "sum"
+	LanguageLimits     []LanguageLimit `json:"language_limits,omitempty"`
 	SubmissionCount int             `json:"submission_count"`
 	AcceptedCount   int             `json:"accepted_count"`
 	Source          string          `json:"source"`
@@ -77,6 +87,13 @@ type CreateProblemRequest struct {
 	SPJ           bool            `json:"spj"`
 	SPJLanguage   string          `json:"spj_language,omitempty"`
 	SPJSourceCode string          `json:"spj_source_code,omitempty"`
+	CheckerType   string          `json:"checker_type,omitempty"`
+	FloatEpsilon  float64         `json:"float_epsilon,omitempty"`
+	Interactive          bool   `json:"interactive"`
+	InteractorLanguage   string `json:"interactor_language,omitempty"`
+	InteractorSourceCode string `json:"interactor_source_code,omitempty"`
+	ScoringMode        string `json:"scoring_mode,omitempty"`
+	SubtaskAggregation string `json:"subtask_aggregation,omitempty"`
 }
 
 type ProblemStats struct {
@@ -89,10 +106,38 @@ type ProblemStats struct {
 	DifficultyEstimate  float64        `json:"difficulty_estimate"`
 }
 
+// GetSubtasks returns test cases grouped by subtask_id.
+// Cases with SubtaskID == 0 are not grouped.
+func (p *Problem) GetSubtasks() map[int][]TestCaseScore {
+	subtasks := make(map[int][]TestCaseScore)
+	for _, tc := range p.TestCaseScore {
+		if tc.SubtaskID > 0 {
+			subtasks[tc.SubtaskID] = append(subtasks[tc.SubtaskID], tc)
+		}
+	}
+	return subtasks
+}
+
+// HasSubtasks returns true if any test case has SubtaskID > 0.
+func (p *Problem) HasSubtasks() bool {
+	for _, tc := range p.TestCaseScore {
+		if tc.SubtaskID > 0 {
+			return true
+		}
+	}
+	return false
+}
+
 type UserProblemStats struct {
 	ProblemsSolved   int     `json:"problems_solved"`
 	TotalSubmissions int     `json:"total_submissions"`
 	AcceptanceRate   float64 `json:"acceptance_rate"`
 	FavoriteLanguage string  `json:"favorite_language"`
 	StreakDays       int     `json:"streak_days"`
+}
+
+type PlatformStats struct {
+	Problems    int `json:"problems"`
+	Users       int `json:"users"`
+	Submissions int `json:"submissions"`
 }

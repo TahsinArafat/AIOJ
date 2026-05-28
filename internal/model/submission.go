@@ -16,6 +16,12 @@ const (
 	StatusSE      SubmissionStatus = "se"
 )
 
+// Submission types
+const (
+	SubmissionTypeCode   = "code"
+	SubmissionTypeOutput = "output"
+)
+
 // StatusAccepted is an alias for StatusAC for readability in judge code
 const StatusAccepted = StatusAC
 const StatusWrongAnswer = StatusWA
@@ -34,13 +40,14 @@ type TestCaseResult struct {
 }
 
 type Submission struct {
-	ID            string           `json:"id"`
-	ProblemID     string           `json:"problem_id"`
-	UserID        string           `json:"user_id"`
-	ContestID     string           `json:"contest_id,omitempty"`
-	Language      string           `json:"language"`
-	SourceCode    string           `json:"source_code,omitempty"`
-	CodeSize      int              `json:"code_size"`
+	ID             string           `json:"id"`
+	ProblemID      string           `json:"problem_id"`
+	UserID         string           `json:"user_id"`
+	ContestID      string           `json:"contest_id,omitempty"`
+	Language       string           `json:"language"`
+	SourceCode     string           `json:"source_code,omitempty"`
+	SubmissionType string           `json:"submission_type"` // "code" or "output"
+	CodeSize       int              `json:"code_size"`
 	Status        SubmissionStatus `json:"status"`
 	Score         int              `json:"score"`
 	TimeUsed      int              `json:"time_used"`
@@ -53,8 +60,9 @@ type Submission struct {
 }
 
 type SubmitRequest struct {
-	ProblemID  string `json:"problem_id"`
-	Language   string `json:"language"`
-	SourceCode string `json:"source_code"`
-	ContestID  string `json:"contest_id,omitempty"`
+	ProblemID      string `json:"problem_id"`
+	Language       string `json:"language"`
+	SourceCode     string `json:"source_code"`
+	SubmissionType string `json:"submission_type,omitempty"` // "code" or "output", default "code"
+	ContestID      string `json:"contest_id,omitempty"`
 }

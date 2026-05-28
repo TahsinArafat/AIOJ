@@ -146,6 +146,49 @@ func TestDefaultEducationalConfig(t *testing.T) {
 	}
 }
 
+func TestProblemHasSubtasks(t *testing.T) {
+	p := &Problem{
+		TestCaseScore: []TestCaseScore{
+			{InputName: "1.in", OutputName: "1.out", Score: 10, SubtaskID: 1},
+			{InputName: "2.in", OutputName: "2.out", Score: 10, SubtaskID: 1},
+			{InputName: "3.in", OutputName: "3.out", Score: 20, SubtaskID: 2},
+		},
+	}
+
+	if !p.HasSubtasks() {
+		t.Error("expected HasSubtasks() = true")
+	}
+
+	subtasks := p.GetSubtasks()
+	if len(subtasks) != 2 {
+		t.Errorf("expected 2 subtasks, got %d", len(subtasks))
+	}
+	if len(subtasks[1]) != 2 {
+		t.Errorf("expected 2 cases in subtask 1, got %d", len(subtasks[1]))
+	}
+	if len(subtasks[2]) != 1 {
+		t.Errorf("expected 1 case in subtask 2, got %d", len(subtasks[2]))
+	}
+}
+
+func TestProblemNoSubtasks(t *testing.T) {
+	p := &Problem{
+		TestCaseScore: []TestCaseScore{
+			{InputName: "1.in", OutputName: "1.out", Score: 10},
+			{InputName: "2.in", OutputName: "2.out", Score: 10},
+		},
+	}
+
+	if p.HasSubtasks() {
+		t.Error("expected HasSubtasks() = false")
+	}
+
+	subtasks := p.GetSubtasks()
+	if len(subtasks) != 0 {
+		t.Errorf("expected 0 subtasks, got %d", len(subtasks))
+	}
+}
+
 func TestDivisionNames(t *testing.T) {
 	tests := []struct {
 		division int
