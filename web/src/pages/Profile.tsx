@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, getAccessToken } from '../lib/api'
+import RatingBadge from '../components/RatingBadge'
 
 function decodeUser() {
     const token = getAccessToken()
@@ -72,6 +73,14 @@ export default function Profile() {
                         user.role === 'admin' ? 'bg-purple-100 text-purple-800' :
                         user.role === 'teacher' ? 'bg-orange-100 text-orange-800' : 'bg-gray-100 text-gray-800'
                     }`}>{user.role || 'user'}</span>
+                </div>
+                <div>
+                    <label className="block text-sm text-gray-500 mb-1">Rating</label>
+                    {user.rating ? (
+                        <RatingBadge rating={user.rating} showTitle />
+                    ) : (
+                        <span className="text-gray-400">Unrated</span>
+                    )}
                 </div>
                 <div>
                     <label className="block text-sm text-gray-500 mb-1">User ID</label>
