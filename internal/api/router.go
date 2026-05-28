@@ -23,6 +23,7 @@ func NewRouter(
 	ratingH *handler.RatingHandler,
 	registrationH *handler.RegistrationHandler,
 	virtualH *handler.VirtualHandler,
+	gymH *handler.GymHandler,
 ) http.Handler {
 	r := chi.NewRouter()
 	r.Use(chiMiddleware.RequestID, chiMiddleware.RealIP, middleware.Logging, chiMiddleware.Recoverer)
@@ -112,6 +113,16 @@ func NewRouter(
 		r.Post("/start", virtualH.Start)
 		r.Get("/status", virtualH.Status)
 		r.Post("/{id}/complete", virtualH.Complete)
+	})
+
+	r.Route("/api/gym", func(r chi.Router) {
+		r.Get("/", gymH.List)
+		r.Get("/{id}", gymH.GetByID)
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.AuthMiddleware(jwtManager))
+			r.Post("/", gymH.Create)
+			r.Post("/{id}/solve", gymH.MarkSolved)
+		})
 	})
 
 	return r

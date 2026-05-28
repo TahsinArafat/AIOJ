@@ -89,3 +89,11 @@ type VirtualStore interface {
 	GetActiveByUser(ctx context.Context, userID string) (*model.VirtualContest, error)
 	Complete(ctx context.Context, id string) error
 }
+
+type GymStore interface {
+	Create(ctx context.Context, g *model.GymContest) error
+	GetByID(ctx context.Context, id string) (*model.GymContest, error)
+	List(ctx context.Context, offset, limit int, filter model.GymFilter) ([]model.GymContest, int, error)
+	MarkSolved(ctx context.Context, gymID, userID string) error
+	IsSolved(ctx context.Context, gymID, userID string) (bool, error)
+}

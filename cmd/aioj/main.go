@@ -95,8 +95,10 @@ func main() {
 	virtualStore := postgres.NewVirtualStore(db)
 	virtualService := virtual.NewService(virtualStore)
 	virtualH := handler.NewVirtualHandler(virtualService, virtualStore)
+	gymStore := postgres.NewGymStore(db)
+	gymH := handler.NewGymHandler(gymStore)
 
-	router := api.NewRouter(authH, problemH, submissionH, contestH, vjH, adminH, testcaseH, wsManager, jwtManager, ratingH, registrationH, virtualH)
+	router := api.NewRouter(authH, problemH, submissionH, contestH, vjH, adminH, testcaseH, wsManager, jwtManager, ratingH, registrationH, virtualH, gymH)
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),
