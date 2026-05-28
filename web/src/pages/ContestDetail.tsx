@@ -55,6 +55,9 @@ export default function ContestDetail() {
                     <div className="flex items-center gap-3">
                         <h1 className="text-2xl font-bold">{contest.title}</h1>
                         <DivisionBadge division={contest.division ?? 0} />
+                        {contest.type === 'educational' && (
+                            <span className="bg-green-100 text-green-800 text-xs px-2 py-0.5 rounded font-medium">Educational</span>
+                        )}
                     </div>
                     {contest.description && <p className="text-gray-600 mt-1">{contest.description}</p>}
                     <div className="mt-3 text-sm text-gray-500 space-y-1">
@@ -93,6 +96,15 @@ export default function ContestDetail() {
                             {registered ? 'Unregister' : 'Register'}
                         </button>
                     )}
+                </div>
+            )}
+
+            {contest.type === 'educational' && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <h3 className="font-semibold text-green-800 mb-1">Educational Contest</h3>
+                    <p className="text-sm text-green-700">
+                        This is an educational round. After the contest ends, there will be a {contest.educational_config?.hack_phase_hours || 24}-hour open hacking phase where you can review others' code, submit counter-test cases, and contribute to the problem tests!
+                    </p>
                 </div>
             )}
 
