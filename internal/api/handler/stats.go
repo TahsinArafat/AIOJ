@@ -26,6 +26,15 @@ func (h *StatsHandler) GetProblemStats(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, stats)
 }
 
+func (h *StatsHandler) GetPlatformStats(w http.ResponseWriter, r *http.Request) {
+	stats, err := h.subStore.GetPlatformStats(r.Context())
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	respondJSON(w, http.StatusOK, stats)
+}
+
 func (h *StatsHandler) GetUserStats(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetUserClaims(r)
 	if claims == nil {

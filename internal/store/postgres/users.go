@@ -72,7 +72,83 @@ func (s *UserStore) ListUsers(ctx context.Context, offset, limit int) ([]model.U
 	return items, total, nil
 }
 
+func (s *UserStore) GetPublicProfile(ctx context.Context, username string) (*model.PublicProfile, error) {
+	var p model.PublicProfile
+	err := s.db.QueryRowContext(ctx, `
+		SELECT
+			u.id,
+			u.username,
+			COALESCE(up.rating, 0),
+			u.created_at,
+			COALESCE((
+				SELECT rh.rating_change FROM rating_history rh
+				WHERE rh.user_id = u.id
+				ORDER BY rh.created_at DESC LIMIT 1
+			), 0) AS rating_change,
+			COALESCE((
+				SELECT COUNT(DISTINCT s.contest_id) FROM submissions s
+				WHERE s.user_id = u.id AND s.contest_id IS NOT NULL
+			), 0) AS contests_played,
+			COALESCE((
+				SELECT COUNT(DISTINCT s.problem_id) FROM submissions s
+				WHERE s.user_id = u.id AND s.status = 'ac'
+			), 0) AS problems_solved
+		FROM users u
+		LEFT JOIN user_profiles up ON up.user_id = u.id
+		WHERE u.username = $1
+	`, username).Scan(
+		&p.ID, &p.Username, &p.Rating, &p.CreatedAt,
+		&p.RatingChange, &p.ContestsPlayed, &p.ProblemsSolved,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &p, nil
+}
+
 func (s *UserStore) UpdateRole(ctx context.Context, id, role string) error {
 	_, err := s.db.ExecContext(ctx, "UPDATE users SET role=$1, updated_at=NOW() WHERE id=$2", role, id)
 	return err
+}
+
+func (s *UserStore) UpdatePassword(ctx context.Context, id, passwordHash string) error {
+	_, err := s.db.ExecContext(ctx, "UPDATE users SET password_hash=$1, updated_at=NOW() WHERE id=$2", passwordHash, id)
+	return err
+}
+
+func (s *UserStore) ListUsersByRating(ctx context.Context, offset, limit int) ([]model.RankingEntry, int, error) {
+	var total int
+	if err := s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM user_profiles").Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT u.id, u.username, COALESCE(up.rating, 0), COALESCE(up.contest_count, 0),
+			COALESCE((
+				SELECT rh.rating_change FROM rating_history rh
+				WHERE rh.user_id = u.id ORDER BY rh.created_at DESC LIMIT 1
+			), 0)
+		 FROM users u
+		 JOIN user_profiles up ON up.user_id = u.id
+		 ORDER BY COALESCE(up.rating, 0) DESC, u.username ASC
+		 OFFSET $1 LIMIT $2`,
+		offset, limit)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	var items []model.RankingEntry
+	for rows.Next() {
+		var e model.RankingEntry
+		if err := rows.Scan(&e.ID, &e.Username, &e.Rating, &e.ContestsPlayed, &e.RatingChange); err != nil {
+			return nil, 0, err
+		}
+		items = append(items, e)
+	}
+	if items == nil {
+		items = []model.RankingEntry{}
+	}
+	return items, total, nil
 }

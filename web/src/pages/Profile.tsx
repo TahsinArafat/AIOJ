@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { api, getAccessToken } from '../lib/api'
 import RatingBadge from '../components/RatingBadge'
 
@@ -82,10 +83,26 @@ export default function Profile() {
                         <span className="text-gray-400">Unrated</span>
                     )}
                 </div>
+                {user.rating && (
+                    <div>
+                        <Link to="/rating-history" className="text-sm text-blue-600 hover:underline">
+                            View Rating History →
+                        </Link>
+                    </div>
+                )}
                 <div>
                     <label className="block text-sm text-gray-500 mb-1">User ID</label>
                     <p className="font-mono text-xs text-gray-400">{user.uid || '—'}</p>
                 </div>
+            </div>
+
+            <div className="flex gap-4 mb-8">
+                <Link to="/settings/notifications" className="text-sm text-blue-600 hover:underline">
+                    Notification Preferences →
+                </Link>
+                <Link to="/settings/api" className="text-sm text-blue-600 hover:underline">
+                    API Keys →
+                </Link>
             </div>
 
             {user.role === 'user' && (

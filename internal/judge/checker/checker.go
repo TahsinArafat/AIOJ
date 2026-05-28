@@ -71,12 +71,22 @@ func (f FloatChecker) Check(_, expected, actual []byte) *Result {
 	return &Result{Passed: true, Score: 100, Message: "OK"}
 }
 
-func GetChecker(name string) Checker {
+func GetChecker(name string, epsilon float64) Checker {
 	switch name {
 	case "lines":
 		return LinesChecker{}
 	case "float":
-		return FloatChecker{Epsilon: 1e-6}
+		return FloatChecker{Epsilon: epsilon}
+	case "float_absolute":
+		return NewFloatAbsoluteChecker(epsilon)
+	case "float_relative":
+		return NewFloatRelativeChecker(epsilon)
+	case "sorted":
+		return &SortedChecker{}
+	case "unordered":
+		return &UnorderedChecker{}
+	case "byte_identical":
+		return &ByteIdenticalChecker{}
 	default:
 		return ExactChecker{}
 	}

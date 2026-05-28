@@ -11,11 +11,14 @@ import (
 type CmdFile struct {
 	Content string `json:"content,omitempty"`
 	Src     string `json:"src,omitempty"`
+	Max     int64  `json:"max,omitempty"`
+	Name    string `json:"name,omitempty"`
 }
 
 type Cmd struct {
 	Args        []string           `json:"args"`
 	Env         []string           `json:"env,omitempty"`
+	Files       []CmdFile          `json:"files,omitempty"`
 	CPULimit    uint64             `json:"cpuLimit"`
 	MemoryLimit uint64             `json:"memoryLimit"`
 	ProcLimit   uint64             `json:"procLimit"`

@@ -15,12 +15,20 @@ export default function SetterPanel() {
         <div>
             <div className="flex items-center justify-between mb-6">
                 <h1 className="text-2xl font-bold">Problem Setter Workspace</h1>
-                <Link
-                    to="/setter/create"
-                    className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 transition-colors"
-                >
-                    + Create Problem
-                </Link>
+                <div className="flex gap-2">
+                    <Link
+                        to="/setter/contest/create"
+                        className="bg-green-600 text-white px-4 py-2 rounded text-sm hover:bg-green-700 transition-colors"
+                    >
+                        + Create Contest
+                    </Link>
+                    <Link
+                        to="/setter/create"
+                        className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 transition-colors"
+                    >
+                        + Create Problem
+                    </Link>
+                </div>
             </div>
 
             <section>
@@ -46,8 +54,9 @@ export default function SetterPanel() {
                                             {p.difficulty}
                                         </span>
                                     </td>
-                                    <td className="px-4 py-3 text-right flex gap-3 justify-end">
-                                        <Link to={`/problems/${p.slug}`} className="text-blue-600 hover:underline">View</Link>
+                                    <td className="px-4 py-3 text-right flex gap-2 justify-end items-center">
+                                        <Link to={`/problems/${p.slug}`} className="text-blue-600 hover:underline text-xs">View Public</Link>
+                                        <Link to={`/setter/${p.slug}`} className="bg-orange-50 hover:bg-orange-100 border border-orange-200 text-orange-700 font-medium px-2.5 py-1 rounded text-xs transition-colors">Edit Workspace</Link>
                                     </td>
                                 </tr>
                             ))}

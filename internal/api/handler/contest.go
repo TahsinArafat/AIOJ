@@ -26,7 +26,11 @@ func NewContestHandler(s *postgres.ContestStore, rs *postgres.RatingStore) *Cont
 
 func (h *ContestHandler) Create(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetUserClaims(r)
-	if claims == nil || claims.Role != "admin" {
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if claims.Role != "admin" && claims.Role != "teacher" {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
@@ -104,6 +108,73 @@ func (h *ContestHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	items, total, _ := h.store.ListWithDivision(r.Context(), offset, limit, division)
 	respondJSON(w, http.StatusOK, map[string]interface{}{"data": items, "total": total})
+}
+
+func (h *ContestHandler) Update(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r)
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	id := chi.URLParam(r, "id")
+	c, err := h.store.GetByID(r.Context(), id)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if c == nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if claims.Role != "admin" && !h.store.HasAccess(r.Context(), c.ID, claims.UserID, "manager") {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	var req model.CreateContestRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	if req.Title != "" {
+		c.Title = req.Title
+	}
+	if req.Type != "" {
+		c.Type = req.Type
+	}
+	if !req.StartTime.IsZero() {
+		c.StartTime = req.StartTime
+	}
+	if !req.EndTime.IsZero() {
+		c.EndTime = req.EndTime
+	}
+	if req.FreezeTime != nil {
+		c.FreezeTime = req.FreezeTime
+	}
+	if req.Password != "" {
+		c.Password = req.Password
+	}
+	if req.Description != "" {
+		c.Description = req.Description
+	}
+	if err := h.store.Update(r.Context(), c); err != nil {
+		http.Error(w, "update failed", http.StatusInternalServerError)
+		return
+	}
+	respondJSON(w, http.StatusOK, c)
+}
+
+func (h *ContestHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r)
+	if claims == nil || claims.Role != "admin" {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	id := chi.URLParam(r, "id")
+	if err := h.store.Delete(r.Context(), id); err != nil {
+		http.Error(w, "delete failed", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *ContestHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
@@ -362,7 +433,11 @@ func (h *ContestHandler) CalculateRatings(w http.ResponseWriter, r *http.Request
 
 func (h *ContestHandler) CreateEducational(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetUserClaims(r)
-	if claims == nil || claims.Role != "admin" {
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if claims.Role != "admin" && claims.Role != "teacher" {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
@@ -405,4 +480,38 @@ func (h *ContestHandler) CreateEducational(w http.ResponseWriter, r *http.Reques
 	}
 
 	respondJSON(w, http.StatusCreated, c)
+}
+
+func (h *ContestHandler) RegisterTeam(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r)
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	contestID := chi.URLParam(r, "id")
+	var req struct {
+		TeamID string `json:"team_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+
+	_, err := h.store.RegisterTeam(r.Context(), contestID, req.TeamID)
+	if err != nil {
+		http.Error(w, "registration failed", http.StatusInternalServerError)
+		return
+	}
+	respondJSON(w, http.StatusCreated, map[string]string{"status": "registered"})
+}
+
+func (h *ContestHandler) ListTeamRegistrations(w http.ResponseWriter, r *http.Request) {
+	contestID := chi.URLParam(r, "id")
+	teams, err := h.store.ListTeamRegistrations(r.Context(), contestID)
+	if err != nil {
+		http.Error(w, "failed to list registrations", http.StatusInternalServerError)
+		return
+	}
+	respondJSON(w, http.StatusOK, map[string]interface{}{"data": teams})
 }

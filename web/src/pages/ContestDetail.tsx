@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { api, getAccessToken } from '../lib/api'
 import DivisionBadge from '../components/DivisionBadge'
+import { resolveProblemSlug, resolveProblemTitle } from '../lib/problemSlugResolver'
 
 export default function ContestDetail() {
     const { id } = useParams<{ id: string }>()
@@ -9,10 +10,33 @@ export default function ContestDetail() {
     const [loading, setLoading] = useState(true)
     const [registered, setRegistered] = useState(false)
     const [registrationCount, setRegistrationCount] = useState(0)
+    const [problemSlugs, setProblemSlugs] = useState<Map<string, string>>(new Map())
+    const [problemTitles, setProblemTitles] = useState<Map<string, string>>(new Map())
 
     useEffect(() => {
         if (!id) return
-        api.contests.get(id).then(setData).catch(() => {}).finally(() => setLoading(false))
+        api.contests.get(id).then(d => {
+            setData(d)
+            // Resolve UUID → slug/title for each problem
+            if (d.problems?.length) {
+                Promise.all(d.problems.map(async (p: any) => {
+                    const [slug, title] = await Promise.all([
+                        resolveProblemSlug(p.problem_id),
+                        resolveProblemTitle(p.problem_id),
+                    ])
+                    return { id: p.problem_id, slug, title }
+                })).then(results => {
+                    const slugMap = new Map<string, string>()
+                    const titleMap = new Map<string, string>()
+                    for (const r of results) {
+                        if (r.slug) slugMap.set(r.id, r.slug)
+                        if (r.title) titleMap.set(r.id, r.title)
+                    }
+                    setProblemSlugs(slugMap)
+                    setProblemTitles(titleMap)
+                })
+            }
+        }).catch(() => {}).finally(() => setLoading(false))
         if (getAccessToken()) {
             api.contests.checkRegistration(id).then(d => setRegistered(d.registered)).catch(() => {})
         }
@@ -120,16 +144,19 @@ export default function ContestDetail() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
-                                {problems.map((p: any) => (
+                                {problems.map((p: any) => {
+                                    const slug = problemSlugs.get(p.problem_id)
+                                    const title = problemTitles.get(p.problem_id)
+                                    return (
                                     <tr key={p.problem_id} className="hover:bg-gray-50">
                                         <td className="px-4 py-2.5 font-bold text-blue-600">{p.index}</td>
                                         <td className="px-4 py-2.5 flex items-center justify-between">
-                                            <Link to={`/problems/${p.problem_id}`} className="hover:underline text-blue-600 font-medium">
-                                                {p.problem_id}
+                                            <Link to={slug ? `/problems/${slug}` : '#'} className="hover:underline text-blue-600 font-medium">
+                                                {title || p.problem_id}
                                             </Link>
                                             <div className="flex gap-2 items-center">
-                                                {contest.hack_phase_enabled && (
-                                                    <Link to={`/hack/${id}/${p.problem_id}`} className="text-xs text-red-600 bg-red-50 hover:bg-red-100 px-2.5 py-1 rounded font-medium">
+                                                {contest.hack_phase_enabled && slug && (
+                                                    <Link to={`/hack/${id}/${slug}`} className="text-xs text-red-600 bg-red-50 hover:bg-red-100 px-2.5 py-1 rounded font-medium">
                                                         Hack
                                                     </Link>
                                                 )}
@@ -139,7 +166,8 @@ export default function ContestDetail() {
                                             </div>
                                         </td>
                                     </tr>
-                                ))}
+                                )
+                            })}
                             </tbody>
                         </table>
                     </div>
@@ -155,18 +183,55 @@ export default function ContestDetail() {
                 </div>
             )}
 
-            {isEnded && getAccessToken() && (
-                <div className="border border-gray-200 rounded-lg p-4">
-                    <h3 className="font-semibold mb-2">Virtual Contest</h3>
-                    <p className="text-sm text-gray-600 mb-3">Simulate this contest as if it were live.</p>
+            {getAccessToken() && (
+                <VirtualContestSection contestId={id!} isEnded={isEnded} />
+            )}
+        </div>
+    )
+}
+
+function VirtualContestSection({ contestId, isEnded }: { contestId: string; isEnded: boolean }) {
+    const [activeVirtual, setActiveVirtual] = useState<any>(null)
+    const [loading, setLoading] = useState(true)
+    const [duration, setDuration] = useState(120)
+
+    useEffect(() => {
+        api.virtual.status().then(d => {
+            if (d.is_active) setActiveVirtual(d)
+        }).catch(() => {}).finally(() => setLoading(false))
+    }, [])
+
+    if (loading) return null
+
+    return (
+        <div className="border border-gray-200 rounded-lg p-4">
+            <h3 className="font-semibold mb-2">Virtual Contest</h3>
+            <p className="text-sm text-gray-600 mb-3">Simulate this contest as if it were live.</p>
+            
+            {activeVirtual ? (
+                <Link to="/virtual" className="inline-block bg-purple-600 text-white px-4 py-2 rounded text-sm hover:bg-purple-700">
+                    Continue Virtual Contest ({activeVirtual.remaining_minutes}min remaining)
+                </Link>
+            ) : isEnded ? (
+                <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                        <label className="text-sm text-gray-600">Duration:</label>
+                        <select value={duration} onChange={e => setDuration(Number(e.target.value))} className="border rounded px-2 py-1 text-sm">
+                            <option value={60}>60 min</option>
+                            <option value={120}>120 min</option>
+                            <option value={180}>180 min</option>
+                            <option value={240}>240 min</option>
+                        </select>
+                    </div>
                     <button onClick={async () => {
-                        if (!id) return
-                        try { await api.virtual.start(id); alert('Virtual contest started!') }
+                        try { await api.virtual.start(contestId, duration); window.location.href = '/virtual' }
                         catch (e: any) { alert('Failed: ' + e.message) }
                     }} className="bg-purple-600 text-white px-4 py-2 rounded text-sm hover:bg-purple-700">
                         Start Virtual Contest
                     </button>
                 </div>
+            ) : (
+                <p className="text-sm text-gray-400">Virtual contests are only available after the contest ends.</p>
             )}
         </div>
     )

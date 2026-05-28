@@ -126,6 +126,20 @@ func (s *ContestStore) ListWithDivision(ctx context.Context, offset, limit int, 
 	return items, total, nil
 }
 
+func (s *ContestStore) Update(ctx context.Context, c *model.Contest) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE contests SET title=$1, type=$2, start_time=$3, end_time=$4,
+		 freeze_time=$5, password=$6, description=$7, visible=$8, updated_at=NOW()
+		 WHERE id=$9`,
+		c.Title, c.Type, c.StartTime, c.EndTime, c.FreezeTime, c.Password, c.Description, c.Visible, c.ID)
+	return err
+}
+
+func (s *ContestStore) Delete(ctx context.Context, id string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM contests WHERE id=$1`, id)
+	return err
+}
+
 func (s *ContestStore) AddProblem(ctx context.Context, contestID, problemID, index string, score, sortOrder int) error {
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO contest_problems(contest_id,problem_id,index,score,sort_order) VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING`,
@@ -247,4 +261,42 @@ func (s *ContestStore) HasAccess(ctx context.Context, contestID, userID string, 
 		}
 	}
 	return false
+}
+
+func (s *ContestStore) RegisterTeam(ctx context.Context, contestID, teamID string) (*model.TeamRegistration, error) {
+	var reg model.TeamRegistration
+	err := s.db.QueryRowContext(ctx,
+		`INSERT INTO team_registrations(contest_id, team_id)
+		 VALUES($1, $2)
+		 ON CONFLICT(contest_id, team_id) DO NOTHING
+		 RETURNING id, contest_id, team_id, registered_at`,
+		contestID, teamID).Scan(&reg.ID, &reg.ContestID, &reg.TeamID, &reg.RegisteredAt)
+	if err != nil {
+		return nil, err
+	}
+	return &reg, nil
+}
+
+func (s *ContestStore) ListTeamRegistrations(ctx context.Context, contestID string) ([]model.TeamRegistration, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT tr.id, tr.contest_id, tr.team_id, t.name, tr.registered_at
+		 FROM team_registrations tr
+		 JOIN teams t ON tr.team_id = t.id
+		 WHERE tr.contest_id=$1
+		 ORDER BY tr.registered_at`,
+		contestID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []model.TeamRegistration
+	for rows.Next() {
+		var tr model.TeamRegistration
+		rows.Scan(&tr.ID, &tr.ContestID, &tr.TeamID, &tr.TeamName, &tr.RegisteredAt)
+		items = append(items, tr)
+	}
+	if items == nil {
+		items = []model.TeamRegistration{}
+	}
+	return items, nil
 }

@@ -19,7 +19,9 @@ services:
     restart: unless-stopped
 
   judge:
-    image: criyle/go-judge:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.judge
     privileged: true
     ports:
       - "5050:5050"

@@ -20,6 +20,8 @@ type Contest struct {
 	HackPhaseEnabled     bool       `json:"hack_phase_enabled"`
 	HackPhaseStart       *time.Time `json:"hack_phase_start,omitempty"`
 	HackPhaseEnd         *time.Time `json:"hack_phase_end,omitempty"`
+	TeamSize             int        `json:"team_size"`
+	IsTeamContest        bool       `json:"is_team_contest"`
 	CreatedBy            string     `json:"created_by"`
 	CreatedAt            time.Time  `json:"created_at"`
 }
@@ -73,6 +75,14 @@ type ContestRegistration struct {
 	ContestID    string    `json:"contest_id"`
 	UserID       string    `json:"user_id"`
 	Username     string    `json:"username,omitempty"`
+	RegisteredAt time.Time `json:"registered_at"`
+}
+
+type TeamRegistration struct {
+	ID           string    `json:"id"`
+	ContestID    string    `json:"contest_id"`
+	TeamID       string    `json:"team_id"`
+	TeamName     string    `json:"team_name,omitempty"`
 	RegisteredAt time.Time `json:"registered_at"`
 }
 

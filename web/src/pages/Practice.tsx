@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { api } from '../lib/api'
+import { api, getAccessToken } from '../lib/api'
 
 export default function Practice() {
     const [rec, setRec] = useState<any>(null)
@@ -9,6 +9,10 @@ export default function Practice() {
     const [activeTab, setActiveTab] = useState<'hybrid' | 'progression' | 'weak'>('hybrid')
 
     useEffect(() => {
+        if (!getAccessToken()) {
+            setLoading(false)
+            return
+        }
         api.recommendations.get()
             .then(data => {
                 setRec(data)
@@ -22,6 +26,18 @@ export default function Practice() {
 
     if (loading) return <div className="text-center py-12 text-gray-500">Loading recommendations...</div>
     if (error) return <div className="max-w-xl mx-auto bg-red-50 text-red-700 p-4 rounded-md border border-red-100 my-6">{error}</div>
+
+    if (!getAccessToken()) {
+        return (
+            <div className="max-w-4xl mx-auto text-center py-20">
+                <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 mb-4">Personalized Practice</h1>
+                <p className="text-gray-600 mb-6">Log in to get smart problem recommendations tailored to your rating and weak areas.</p>
+                <a href="/login" className="bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors">
+                    Log In to Practice
+                </a>
+            </div>
+        )
+    }
 
     const problems = activeTab === 'hybrid' ? rec?.hybrid : activeTab === 'progression' ? rec?.progression : rec?.weak_tags?.problems
 

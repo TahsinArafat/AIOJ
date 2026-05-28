@@ -74,7 +74,7 @@ Browser -> nginx(:80) -> React SPA (Vite + TypeScript + Tailwind)
 | Phase 2 - Contests | 05-08 | Done |
 | Phase 3 - Engagement | 09-11 | Done |
 | Phase 4 - Community | 12-14 | Done |
-| Phase 5 - Content | 15 | Done |
+| Phase 5 - Content | 15-16 | Done |
 | Phase 6 - Platform | 17-19 | Done |
 | Phase 7 - Polish | 20-23 | Done |
 
@@ -93,6 +93,7 @@ Browser -> nginx(:80) -> React SPA (Vite + TypeScript + Tailwind)
 **13** Teams - Team rating, members, join/leave
 **14** Blog/Discussions - Posts, comments, voting
 **15** Editorials - Official/community solutions with code
+**16** Problem Recommendations - Personalized progression and weak topic analysis
 **17** Public API - API key management
 **18** Rate Limiting - Infrastructure ready
 **19** Webhooks - Event delivery with secret signing
@@ -100,8 +101,6 @@ Browser -> nginx(:80) -> React SPA (Vite + TypeScript + Tailwind)
 **21** PWA - Manifest, service worker, offline page
 **22** Performance - Database indexes
 **23** Monitoring - Prometheus config, Grafana dashboards, alerts
-
-**Not done:** 16 - Problem Recommendations
 
 ---
 

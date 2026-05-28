@@ -39,9 +39,45 @@ type AuthResponse struct {
 	User         *User  `json:"user"`
 }
 
+type PublicProfile struct {
+	ID             string    `json:"id"`
+	Username       string    `json:"username"`
+	Rating         int       `json:"rating"`
+	RatingChange   int       `json:"rating_change"`
+	ContestsPlayed int       `json:"contests_played"`
+	ProblemsSolved int       `json:"problems_solved"`
+	CreatedAt      time.Time `json:"created_at"`
+}
+
 type SetterApplication struct {
 	UserID    string    `json:"user_id"`
 	Status    string    `json:"status"`
 	Reason    string    `json:"reason"`
 	CreatedAt time.Time `json:"created_at"`
+}
+
+type RankingEntry struct {
+	ID             string `json:"id"`
+	Username       string `json:"username"`
+	Rating         int    `json:"rating"`
+	RatingChange   int    `json:"rating_change"`
+	ContestsPlayed int    `json:"contests_played"`
+}
+
+type PasswordResetToken struct {
+	ID        string    `json:"id"`
+	UserID    string    `json:"user_id"`
+	TokenHash string    `json:"-"`
+	ExpiresAt time.Time `json:"expires_at"`
+	Used      bool      `json:"used"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type ForgotPasswordRequest struct {
+	Email string `json:"email"`
+}
+
+type ResetPasswordRequest struct {
+	Token       string `json:"token"`
+	NewPassword string `json:"new_password"`
 }
