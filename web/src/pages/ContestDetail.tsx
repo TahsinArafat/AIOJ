@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { api, getAccessToken } from '../lib/api'
+import DivisionBadge from '../components/DivisionBadge'
 
 export default function ContestDetail() {
     const { id } = useParams<{ id: string }>()
@@ -51,7 +52,10 @@ export default function ContestDetail() {
         <div className="space-y-6">
             <div className="flex items-start justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold">{contest.title}</h1>
+                    <div className="flex items-center gap-3">
+                        <h1 className="text-2xl font-bold">{contest.title}</h1>
+                        <DivisionBadge division={contest.division ?? 0} />
+                    </div>
                     {contest.description && <p className="text-gray-600 mt-1">{contest.description}</p>}
                     <div className="mt-3 text-sm text-gray-500 space-y-1">
                         <div>Start: <span className="text-gray-700">{new Date(contest.start_time).toLocaleString()}</span></div>
