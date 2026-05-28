@@ -1,10 +1,17 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
 
 const STATUS_COLORS: Record<string, string> = {
-    ac: 'text-green-600', wa: 'text-red-600', tle: 'text-yellow-600',
-    mle: 'text-orange-600', re: 'text-red-700', ce: 'text-purple-600',
-    pending: 'text-blue-500', judging: 'text-blue-600', se: 'text-gray-600',
+    ac: 'text-green-600 bg-green-50', wa: 'text-red-600 bg-red-50', tle: 'text-yellow-600 bg-yellow-50',
+    mle: 'text-orange-600 bg-orange-50', re: 'text-red-700 bg-red-50', ce: 'text-purple-600 bg-purple-50',
+    pending: 'text-blue-500 bg-blue-50', judging: 'text-blue-600 bg-blue-50', se: 'text-gray-600 bg-gray-50',
+}
+
+const STATUS_LABEL: Record<string, string> = {
+    ac: 'Accepted', wa: 'Wrong Answer', tle: 'Time Limit Exceeded',
+    mle: 'Memory Limit Exceeded', re: 'Runtime Error', ce: 'Compile Error',
+    pending: 'Pending', judging: 'Judging...', se: 'System Error',
 }
 
 export default function Submissions() {
@@ -37,10 +44,16 @@ export default function Submissions() {
                     <tbody className="divide-y divide-gray-100">
                         {subs.map(s => (
                             <tr key={s.id} className="hover:bg-gray-50">
-                                <td className="px-4 py-3 font-mono text-xs">{s.id?.substring(0, 8)}...</td>
+                                <td className="px-4 py-3 font-mono text-xs">
+                                    <Link to={`/submissions/${s.id}`} className="text-blue-600 hover:underline">
+                                        {s.id?.substring(0, 8)}...
+                                    </Link>
+                                </td>
                                 <td className="px-4 py-3 text-gray-500">{s.language}</td>
                                 <td className="px-4 py-3 font-semibold">
-                                    <span className={STATUS_COLORS[s.status] || ''}>{s.status}</span>
+                                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[s.status] || ''}`}>
+                                        {STATUS_LABEL[s.status] || s.status}
+                                    </span>
                                 </td>
                                 <td className="px-4 py-3 text-gray-500">{s.time_used > 0 ? `${s.time_used}ms` : '—'}</td>
                                 <td className="px-4 py-3 text-gray-500">{s.memory_used > 0 ? `${Math.round(s.memory_used / 1024)}MB` : '—'}</td>

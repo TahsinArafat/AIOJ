@@ -12,6 +12,7 @@ import SetterPanel from './pages/SetterPanel'
 import Profile from './pages/Profile'
 import ProblemCreate from './pages/ProblemCreate'
 import Submissions from './pages/Submissions'
+import SubmissionDetail from './pages/SubmissionDetail'
 import GymList from './pages/GymList'
 import GymDetail from './pages/GymDetail'
 import HackPanel from './pages/HackPanel'
@@ -133,6 +134,7 @@ export default function App() {
                         <Route path="/editorials/:id" element={<EditorialDetail />} />
                         <Route path="/settings/api" element={<APISettings />} />
                         <Route path="/submissions" element={<Submissions />} />
+                        <Route path="/submissions/:id" element={<SubmissionDetail />} />
                         <Route path="/admin" element={<AdminDashboard />} />
                         <Route path="/setter" element={<SetterPanel />} />
                         <Route path="/setter/create" element={<ProblemCreate />} />
