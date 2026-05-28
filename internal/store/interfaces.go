@@ -162,3 +162,10 @@ type BlogStore interface {
 	Vote(ctx context.Context, userID, targetType, targetID string, value int) error
 	GetUserVote(ctx context.Context, userID, targetType, targetID string) (int, error)
 }
+
+type EditorialStore interface {
+	Create(ctx context.Context, e *model.Editorial) error
+	GetByID(ctx context.Context, id string) (*model.Editorial, error)
+	GetByProblem(ctx context.Context, problemID string) ([]model.Editorial, error)
+	List(ctx context.Context, offset, limit int) ([]model.Editorial, int, error)
+}

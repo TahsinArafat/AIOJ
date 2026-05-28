@@ -110,8 +110,10 @@ func main() {
 	teamH := handler.NewTeamHandler(teamStore)
 	blogStore := postgres.NewBlogStore(db)
 	blogH := handler.NewBlogHandler(blogStore)
+	editorialStore := postgres.NewEditorialStore(db)
+	editorialH := handler.NewEditorialHandler(editorialStore)
 
-	router := api.NewRouter(authH, problemH, submissionH, contestH, vjH, adminH, testcaseH, wsManager, jwtManager, ratingH, registrationH, virtualH, gymH, hackH, statsH, notifH, groupH, teamH, blogH)
+	router := api.NewRouter(authH, problemH, submissionH, contestH, vjH, adminH, testcaseH, wsManager, jwtManager, ratingH, registrationH, virtualH, gymH, hackH, statsH, notifH, groupH, teamH, blogH, editorialH)
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),
