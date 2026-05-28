@@ -3,17 +3,20 @@ package model
 import "time"
 
 type Contest struct {
-	ID          string     `json:"id"`
-	Title       string     `json:"title"`
-	Type        string     `json:"type"`
-	StartTime   time.Time  `json:"start_time"`
-	EndTime     time.Time  `json:"end_time"`
-	FreezeTime  *time.Time `json:"freeze_time,omitempty"`
-	Password    string     `json:"-"`
-	Visible     bool       `json:"visible"`
-	Description string     `json:"description,omitempty"`
-	CreatedBy   string     `json:"created_by"`
-	CreatedAt   time.Time  `json:"created_at"`
+	ID                   string     `json:"id"`
+	Title                string     `json:"title"`
+	Type                 string     `json:"type"`
+	StartTime            time.Time  `json:"start_time"`
+	EndTime              time.Time  `json:"end_time"`
+	FreezeTime           *time.Time `json:"freeze_time,omitempty"`
+	Password             string     `json:"-"`
+	Visible              bool       `json:"visible"`
+	Description          string     `json:"description,omitempty"`
+	RegistrationRequired bool       `json:"registration_required"`
+	RegistrationDeadline *time.Time `json:"registration_deadline,omitempty"`
+	MaxParticipants      *int       `json:"max_participants,omitempty"`
+	CreatedBy            string     `json:"created_by"`
+	CreatedAt            time.Time  `json:"created_at"`
 }
 
 type ContestProblem struct {
@@ -58,4 +61,11 @@ type CreateContestRequest struct {
 	Password    string     `json:"password,omitempty"`
 	Description string     `json:"description,omitempty"`
 	ProblemIDs  []string   `json:"problem_ids"`
+}
+
+type ContestRegistration struct {
+	ContestID    string    `json:"contest_id"`
+	UserID       string    `json:"user_id"`
+	Username     string    `json:"username,omitempty"`
+	RegisteredAt time.Time `json:"registered_at"`
 }

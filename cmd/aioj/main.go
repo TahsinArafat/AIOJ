@@ -89,8 +89,10 @@ func main() {
 
 	testcaseH := handler.NewTestcaseHandler(problemStore, "./testdata")
 	ratingH := handler.NewRatingHandler(ratingStore)
+	registrationStore := postgres.NewRegistrationStore(db)
+	registrationH := handler.NewRegistrationHandler(registrationStore, contestStore)
 
-	router := api.NewRouter(authH, problemH, submissionH, contestH, vjH, adminH, testcaseH, wsManager, jwtManager, ratingH)
+	router := api.NewRouter(authH, problemH, submissionH, contestH, vjH, adminH, testcaseH, wsManager, jwtManager, ratingH, registrationH)
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),

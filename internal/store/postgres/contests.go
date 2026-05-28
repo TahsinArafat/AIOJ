@@ -19,9 +19,11 @@ func (s *ContestStore) Create(ctx context.Context, c *model.Contest) error {
 	}
 	defer tx.Rollback()
 	err = tx.QueryRowContext(ctx,
-		`INSERT INTO contests(id,title,type,start_time,end_time,freeze_time,password,visible,description,created_by)
-		 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING created_at`,
-		c.ID, c.Title, c.Type, c.StartTime, c.EndTime, c.FreezeTime, c.Password, c.Visible, c.Description, c.CreatedBy,
+		`INSERT INTO contests(id,title,type,start_time,end_time,freeze_time,password,visible,description,
+		                    registration_required,registration_deadline,max_participants,created_by)
+		 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING created_at`,
+		c.ID, c.Title, c.Type, c.StartTime, c.EndTime, c.FreezeTime, c.Password, c.Visible, c.Description,
+		c.RegistrationRequired, c.RegistrationDeadline, c.MaxParticipants, c.CreatedBy,
 	).Scan(&c.CreatedAt)
 	if err != nil {
 		return err
@@ -38,10 +40,14 @@ func (s *ContestStore) Create(ctx context.Context, c *model.Contest) error {
 func (s *ContestStore) GetByID(ctx context.Context, id string) (*model.Contest, error) {
 	var c model.Contest
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id,title,type,start_time,end_time,freeze_time,visible,description,created_by,created_at
+		`SELECT id,title,type,start_time,end_time,freeze_time,visible,description,
+		        registration_required,registration_deadline,max_participants,
+		        created_by,created_at
 		 FROM contests WHERE id=$1`, id).Scan(
 		&c.ID, &c.Title, &c.Type, &c.StartTime, &c.EndTime, &c.FreezeTime,
-		&c.Visible, &c.Description, &c.CreatedBy, &c.CreatedAt)
+		&c.Visible, &c.Description,
+		&c.RegistrationRequired, &c.RegistrationDeadline, &c.MaxParticipants,
+		&c.CreatedBy, &c.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -55,7 +61,9 @@ func (s *ContestStore) List(ctx context.Context, offset, limit int) ([]model.Con
 	var total int
 	s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM contests WHERE visible=true").Scan(&total)
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id,title,type,start_time,end_time,visible,description,created_at
+		`SELECT id,title,type,start_time,end_time,visible,description,
+		        registration_required,registration_deadline,max_participants,
+		        created_at
 		 FROM contests WHERE visible=true ORDER BY start_time DESC OFFSET $1 LIMIT $2`, offset, limit)
 	if err != nil {
 		return nil, 0, err
@@ -64,7 +72,8 @@ func (s *ContestStore) List(ctx context.Context, offset, limit int) ([]model.Con
 	var items []model.Contest
 	for rows.Next() {
 		var c model.Contest
-		rows.Scan(&c.ID, &c.Title, &c.Type, &c.StartTime, &c.EndTime, &c.Visible, &c.Description, &c.CreatedAt)
+		rows.Scan(&c.ID, &c.Title, &c.Type, &c.StartTime, &c.EndTime, &c.Visible, &c.Description,
+			&c.RegistrationRequired, &c.RegistrationDeadline, &c.MaxParticipants, &c.CreatedAt)
 		items = append(items, c)
 	}
 	if items == nil {

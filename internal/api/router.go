@@ -21,6 +21,7 @@ func NewRouter(
 	wsManager *handler.WSManager,
 	jwtManager *auth.JWTManager,
 	ratingH *handler.RatingHandler,
+	registrationH *handler.RegistrationHandler,
 ) http.Handler {
 	r := chi.NewRouter()
 	r.Use(chiMiddleware.RequestID, chiMiddleware.RealIP, middleware.Logging, chiMiddleware.Recoverer)
@@ -67,6 +68,14 @@ func NewRouter(
 		})
 		r.Post("/{id}/calculate-ratings", contestH.CalculateRatings)
 	})
+
+	r.Route("/api/contests/{id}/register", func(r chi.Router) {
+		r.Get("/", registrationH.CheckRegistration)
+		r.With(middleware.AuthMiddleware(jwtManager)).Post("/", registrationH.Register)
+		r.With(middleware.AuthMiddleware(jwtManager)).Delete("/", registrationH.Unregister)
+	})
+
+	r.Get("/api/contests/{id}/registrations", registrationH.ListRegistrations)
 
 	r.Route("/api/vjudge", func(r chi.Router) {
 		r.Use(middleware.AuthMiddleware(jwtManager))

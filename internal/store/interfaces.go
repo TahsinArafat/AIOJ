@@ -66,6 +66,14 @@ type RatingStore interface {
 	GetLatestByUser(ctx context.Context, userID string) (*model.RatingHistory, error)
 }
 
+type RegistrationStore interface {
+	Register(ctx context.Context, contestID, userID string) error
+	Unregister(ctx context.Context, contestID, userID string) error
+	IsRegistered(ctx context.Context, contestID, userID string) (bool, error)
+	GetRegistrations(ctx context.Context, contestID string) ([]model.ContestRegistration, error)
+	GetRegistrationCount(ctx context.Context, contestID string) (int, error)
+}
+
 type SetterStore interface {
 	CreateApplication(ctx context.Context, userID, reason string) error
 	ListApplications(ctx context.Context) ([]model.SetterApplication, error)
