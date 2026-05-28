@@ -54,6 +54,7 @@ func NewRouter(
 	r.Route("/api/submissions", func(r chi.Router) {
 		r.Use(middleware.AuthMiddleware(jwtManager))
 		r.Post("/", submissionH.Create)
+		r.Post("/upsolving", submissionH.CreateUpsolving)
 		r.Get("/", submissionH.ListByUser)
 		r.Get("/{id}", submissionH.GetByID)
 	})

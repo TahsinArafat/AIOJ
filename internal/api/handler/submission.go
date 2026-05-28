@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -14,14 +15,15 @@ import (
 )
 
 type SubmissionHandler struct {
-	subStore  store.SubmissionStore
-	probStore store.ProblemStore
-	queue     queue.JudgeQueue
-	ws        *WSManager
+	subStore     store.SubmissionStore
+	probStore    store.ProblemStore
+	contestStore store.ContestStore
+	queue        queue.JudgeQueue
+	ws           *WSManager
 }
 
-func NewSubmissionHandler(s store.SubmissionStore, p store.ProblemStore, q queue.JudgeQueue, ws *WSManager) *SubmissionHandler {
-	return &SubmissionHandler{subStore: s, probStore: p, queue: q, ws: ws}
+func NewSubmissionHandler(s store.SubmissionStore, p store.ProblemStore, cs store.ContestStore, q queue.JudgeQueue, ws *WSManager) *SubmissionHandler {
+	return &SubmissionHandler{subStore: s, probStore: p, contestStore: cs, queue: q, ws: ws}
 }
 
 func (h *SubmissionHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -102,4 +104,51 @@ func (h *SubmissionHandler) ListByUser(w http.ResponseWriter, r *http.Request) {
 	}
 	items, total, _ := h.subStore.ListByUser(r.Context(), claims.UserID, offset, limit)
 	respondJSON(w, http.StatusOK, map[string]interface{}{"data": items, "total": total})
+}
+
+func (h *SubmissionHandler) CreateUpsolving(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r)
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	var req model.SubmitRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+
+	if req.ContestID != "" {
+		contest, err := h.contestStore.GetByID(r.Context(), req.ContestID)
+		if err != nil || contest == nil {
+			http.Error(w, "contest not found", http.StatusNotFound)
+			return
+		}
+
+		if time.Now().Before(contest.EndTime) {
+			http.Error(w, "contest hasn't ended yet", http.StatusBadRequest)
+			return
+		}
+	}
+
+	submission := &model.Submission{
+		ID:         uuid.New().String(),
+		ProblemID:  req.ProblemID,
+		UserID:     claims.UserID,
+		ContestID:  req.ContestID,
+		Language:   req.Language,
+		SourceCode: req.SourceCode,
+		CodeSize:   len(req.SourceCode),
+		Status:     model.StatusPending,
+	}
+
+	if err := h.subStore.Create(r.Context(), submission); err != nil {
+		http.Error(w, "submit failed", http.StatusInternalServerError)
+		return
+	}
+
+	h.queue.Enqueue(r.Context(), submission.ID)
+
+	respondJSON(w, http.StatusCreated, submission)
 }

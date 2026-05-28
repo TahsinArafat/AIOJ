@@ -79,7 +79,7 @@ func main() {
 	wsManager := handler.NewWSManager()
 	authH := handler.NewAuthHandler(userStore, refreshTokenStore, jwtManager)
 	problemH := handler.NewProblemHandler(problemStore)
-	submissionH := handler.NewSubmissionHandler(submissionStore, problemStore, judgeQueue, wsManager)
+	submissionH := handler.NewSubmissionHandler(submissionStore, problemStore, contestStore, judgeQueue, wsManager)
 	contestH := handler.NewContestHandler(contestStore, ratingStore)
 
 	vjService := vjudge.NewService(submissionStore)
