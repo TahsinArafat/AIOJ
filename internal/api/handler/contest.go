@@ -93,7 +93,16 @@ func (h *ContestHandler) List(w http.ResponseWriter, r *http.Request) {
 	if limit <= 0 || limit > 50 {
 		limit = 20
 	}
-	items, total, _ := h.store.List(r.Context(), offset, limit)
+
+	var division *int
+	if divStr := r.URL.Query().Get("division"); divStr != "" {
+		d, err := strconv.Atoi(divStr)
+		if err == nil {
+			division = &d
+		}
+	}
+
+	items, total, _ := h.store.ListWithDivision(r.Context(), offset, limit, division)
 	respondJSON(w, http.StatusOK, map[string]interface{}{"data": items, "total": total})
 }
 

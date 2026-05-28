@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/tahsinarafat/aioj/internal/model"
@@ -20,10 +21,10 @@ func (s *ContestStore) Create(ctx context.Context, c *model.Contest) error {
 	defer tx.Rollback()
 	err = tx.QueryRowContext(ctx,
 		`INSERT INTO contests(id,title,type,start_time,end_time,freeze_time,password,visible,description,
-		                    registration_required,registration_deadline,max_participants,created_by)
-		 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING created_at`,
+		                    registration_required,registration_deadline,max_participants,division,created_by)
+		 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING created_at`,
 		c.ID, c.Title, c.Type, c.StartTime, c.EndTime, c.FreezeTime, c.Password, c.Visible, c.Description,
-		c.RegistrationRequired, c.RegistrationDeadline, c.MaxParticipants, c.CreatedBy,
+		c.RegistrationRequired, c.RegistrationDeadline, c.MaxParticipants, c.Division, c.CreatedBy,
 	).Scan(&c.CreatedAt)
 	if err != nil {
 		return err
@@ -41,12 +42,13 @@ func (s *ContestStore) GetByID(ctx context.Context, id string) (*model.Contest, 
 	var c model.Contest
 	err := s.db.QueryRowContext(ctx,
 		`SELECT id,title,type,start_time,end_time,freeze_time,visible,description,
-		        registration_required,registration_deadline,max_participants,
+		        registration_required,registration_deadline,max_participants,division,
 		        created_by,created_at
 		 FROM contests WHERE id=$1`, id).Scan(
 		&c.ID, &c.Title, &c.Type, &c.StartTime, &c.EndTime, &c.FreezeTime,
 		&c.Visible, &c.Description,
 		&c.RegistrationRequired, &c.RegistrationDeadline, &c.MaxParticipants,
+		&c.Division,
 		&c.CreatedBy, &c.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -58,13 +60,34 @@ func (s *ContestStore) GetByID(ctx context.Context, id string) (*model.Contest, 
 }
 
 func (s *ContestStore) List(ctx context.Context, offset, limit int) ([]model.Contest, int, error) {
+	return s.ListWithDivision(ctx, offset, limit, nil)
+}
+
+func (s *ContestStore) ListWithDivision(ctx context.Context, offset, limit int, division *int) ([]model.Contest, int, error) {
 	var total int
-	s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM contests WHERE visible=true").Scan(&total)
-	rows, err := s.db.QueryContext(ctx,
-		`SELECT id,title,type,start_time,end_time,visible,description,
-		        registration_required,registration_deadline,max_participants,
-		        created_at
-		 FROM contests WHERE visible=true ORDER BY start_time DESC OFFSET $1 LIMIT $2`, offset, limit)
+	countQuery := "SELECT COUNT(*) FROM contests WHERE visible=true"
+	args := []interface{}{}
+	argIdx := 1
+
+	if division != nil {
+		countQuery += fmt.Sprintf(" AND division = $%d", argIdx)
+		args = append(args, *division)
+		argIdx++
+	}
+	s.db.QueryRowContext(ctx, countQuery, args...).Scan(&total)
+
+	rowsQuery := `SELECT id,title,type,start_time,end_time,visible,description,
+	              registration_required,registration_deadline,max_participants,division,
+	              created_at
+	              FROM contests WHERE visible=true`
+	if division != nil {
+		rowsQuery += fmt.Sprintf(" AND division = $%d", argIdx)
+		argIdx++
+	}
+	rowsQuery += fmt.Sprintf(" ORDER BY start_time DESC OFFSET $%d LIMIT $%d", argIdx, argIdx+1)
+	args = append(args, offset, limit)
+
+	rows, err := s.db.QueryContext(ctx, rowsQuery, args...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -73,7 +96,7 @@ func (s *ContestStore) List(ctx context.Context, offset, limit int) ([]model.Con
 	for rows.Next() {
 		var c model.Contest
 		rows.Scan(&c.ID, &c.Title, &c.Type, &c.StartTime, &c.EndTime, &c.Visible, &c.Description,
-			&c.RegistrationRequired, &c.RegistrationDeadline, &c.MaxParticipants, &c.CreatedAt)
+			&c.RegistrationRequired, &c.RegistrationDeadline, &c.MaxParticipants, &c.Division, &c.CreatedAt)
 		items = append(items, c)
 	}
 	if items == nil {
