@@ -118,3 +118,20 @@ type NotificationStore interface {
 	GetPreferences(ctx context.Context, userID string) (*model.NotificationPreferences, error)
 	UpdatePreferences(ctx context.Context, userID string, prefs *model.NotificationPreferences) error
 }
+
+type GroupStore interface {
+	Create(ctx context.Context, g *model.Group) error
+	GetByID(ctx context.Context, id string) (*model.Group, error)
+	List(ctx context.Context, offset, limit int) ([]model.GroupListItem, int, error)
+	ListByUser(ctx context.Context, userID string) ([]model.GroupListItem, error)
+	Update(ctx context.Context, id string, g *model.Group) error
+	Delete(ctx context.Context, id string) error
+	AddMember(ctx context.Context, groupID, userID, role string) error
+	RemoveMember(ctx context.Context, groupID, userID string) error
+	GetMembers(ctx context.Context, groupID string) ([]model.GroupMember, error)
+	IsMember(ctx context.Context, groupID, userID string) (bool, error)
+	GetMemberCount(ctx context.Context, groupID string) (int, error)
+	AddContest(ctx context.Context, groupID, contestID string) error
+	RemoveContest(ctx context.Context, groupID, contestID string) error
+	GetContests(ctx context.Context, groupID string) ([]model.Contest, error)
+}

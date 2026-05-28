@@ -104,8 +104,10 @@ func main() {
 	statsH := handler.NewStatsHandler(submissionStore)
 	notifStore := postgres.NewNotificationStore(db)
 	notifH := handler.NewNotificationHandler(notifStore)
+	groupStore := postgres.NewGroupStore(db)
+	groupH := handler.NewGroupHandler(groupStore)
 
-	router := api.NewRouter(authH, problemH, submissionH, contestH, vjH, adminH, testcaseH, wsManager, jwtManager, ratingH, registrationH, virtualH, gymH, hackH, statsH, notifH)
+	router := api.NewRouter(authH, problemH, submissionH, contestH, vjH, adminH, testcaseH, wsManager, jwtManager, ratingH, registrationH, virtualH, gymH, hackH, statsH, notifH, groupH)
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),

@@ -27,6 +27,7 @@ func NewRouter(
 	hackH *handler.HackHandler,
 	statsH *handler.StatsHandler,
 	notifH *handler.NotificationHandler,
+	groupH *handler.GroupHandler,
 ) http.Handler {
 	r := chi.NewRouter()
 	r.Use(chiMiddleware.RequestID, chiMiddleware.RealIP, middleware.Logging, chiMiddleware.Recoverer)
@@ -151,6 +152,19 @@ func NewRouter(
 		r.Post("/read-all", notifH.MarkAllAsRead)
 		r.Get("/preferences", notifH.GetPreferences)
 		r.Put("/preferences", notifH.UpdatePreferences)
+	})
+
+	r.Route("/api/groups", func(r chi.Router) {
+		r.Get("/", groupH.List)
+		r.Get("/{id}", groupH.GetByID)
+		r.Get("/{id}/members", groupH.GetMembers)
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.AuthMiddleware(jwtManager))
+			r.Post("/", groupH.Create)
+			r.Post("/{id}/join", groupH.Join)
+			r.Post("/{id}/leave", groupH.Leave)
+			r.Post("/{id}/contests", groupH.AddContest)
+		})
 	})
 
 	return r
