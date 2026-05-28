@@ -167,4 +167,17 @@ export const api = {
         leave: (id: string) => request(`/teams/${id}/leave`, { method: 'POST' }),
         members: (id: string) => request<any>(`/teams/${id}/members`),
     },
+    blog: {
+        list: (offset = 0, limit = 20, tag?: string) => {
+            let url = `/blog?offset=${offset}&limit=${limit}`;
+            if (tag) url += `&tag=${encodeURIComponent(tag)}`;
+            return request<{ data: any[]; total: number }>(url);
+        },
+        get: (id: string) => request<any>(`/blog/${id}`),
+        create: (d: any) => request<any>('/blog', { method: 'POST', body: JSON.stringify(d) }),
+        getComments: (type: string, id: string) => request<{ data: any[] }>(`/blog/${type}/${id}/comments`),
+        createComment: (d: any) => request<any>('/blog/comments', { method: 'POST', body: JSON.stringify(d) }),
+        vote: (d: { target_type: string; target_id: string; value: number }) =>
+            request('/blog/vote', { method: 'POST', body: JSON.stringify(d) }),
+    },
 }
