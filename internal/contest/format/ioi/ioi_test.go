@@ -17,7 +17,7 @@ func TestIOIFormat_Name(t *testing.T) {
 func TestIOIFormat_ScoreProblem_NoSubtasks(t *testing.T) {
 	f := &IOIFormat{config: DefaultConfig()}
 	ctx := format.ScoringContext{
-		Problem: format.Problem{ID: 1, Index: "A"},
+		Problem: format.Problem{ID: "1", Index: "A"},
 		Submissions: []format.Submission{
 			{Score: 80},
 			{Score: 95},
@@ -49,7 +49,7 @@ func TestIOIFormat_ScoreProblem_WithSubtasks(t *testing.T) {
 
 	ctx := format.ScoringContext{
 		Problem: format.Problem{
-			ID:     1,
+			ID:     "1",
 			Index:  "A",
 			Config: cfgJSON,
 		},
