@@ -59,6 +59,13 @@ type ContestStore interface {
 	HasAccess(ctx context.Context, contestID, userID string, requiredLevels ...string) bool
 }
 
+type RatingStore interface {
+	CreateHistory(ctx context.Context, h *model.RatingHistory) error
+	GetByUser(ctx context.Context, userID string, limit int) ([]model.RatingHistory, error)
+	GetByContest(ctx context.Context, contestID string) ([]model.RatingHistory, error)
+	GetLatestByUser(ctx context.Context, userID string) (*model.RatingHistory, error)
+}
+
 type SetterStore interface {
 	CreateApplication(ctx context.Context, userID, reason string) error
 	ListApplications(ctx context.Context) ([]model.SetterApplication, error)
