@@ -19,6 +19,7 @@ import (
 	"github.com/tahsinarafat/aioj/internal/judge"
 	"github.com/tahsinarafat/aioj/internal/judge/executor"
 	"github.com/tahsinarafat/aioj/internal/queue"
+	"github.com/tahsinarafat/aioj/internal/hack"
 	"github.com/tahsinarafat/aioj/internal/store/postgres"
 	"github.com/tahsinarafat/aioj/internal/virtual"
 	"github.com/tahsinarafat/aioj/internal/vjudge"
@@ -97,8 +98,11 @@ func main() {
 	virtualH := handler.NewVirtualHandler(virtualService, virtualStore)
 	gymStore := postgres.NewGymStore(db)
 	gymH := handler.NewGymHandler(gymStore)
+	hackStore := postgres.NewHackStore(db)
+	hackService := hack.NewService(hackStore, contestStore, submissionStore)
+	hackH := handler.NewHackHandler(hackService, hackStore)
 
-	router := api.NewRouter(authH, problemH, submissionH, contestH, vjH, adminH, testcaseH, wsManager, jwtManager, ratingH, registrationH, virtualH, gymH)
+	router := api.NewRouter(authH, problemH, submissionH, contestH, vjH, adminH, testcaseH, wsManager, jwtManager, ratingH, registrationH, virtualH, gymH, hackH)
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),

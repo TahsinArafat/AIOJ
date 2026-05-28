@@ -17,6 +17,9 @@ type Contest struct {
 	MaxParticipants      *int       `json:"max_participants,omitempty"`
 	Division             int        `json:"division"`
 	EducationalConfig    *EducationalRoundConfig `json:"educational_config,omitempty"`
+	HackPhaseEnabled     bool       `json:"hack_phase_enabled"`
+	HackPhaseStart       *time.Time `json:"hack_phase_start,omitempty"`
+	HackPhaseEnd         *time.Time `json:"hack_phase_end,omitempty"`
 	CreatedBy            string     `json:"created_by"`
 	CreatedAt            time.Time  `json:"created_at"`
 }

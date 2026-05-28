@@ -24,6 +24,7 @@ func NewRouter(
 	registrationH *handler.RegistrationHandler,
 	virtualH *handler.VirtualHandler,
 	gymH *handler.GymHandler,
+	hackH *handler.HackHandler,
 ) http.Handler {
 	r := chi.NewRouter()
 	r.Use(chiMiddleware.RequestID, chiMiddleware.RealIP, middleware.Logging, chiMiddleware.Recoverer)
@@ -125,6 +126,14 @@ func NewRouter(
 			r.Post("/", gymH.Create)
 			r.Post("/{id}/solve", gymH.MarkSolved)
 		})
+	})
+
+	r.Route("/api/hacks", func(r chi.Router) {
+		r.Use(middleware.AuthMiddleware(jwtManager))
+		r.Post("/", hackH.SubmitHack)
+		r.Get("/{id}", hackH.GetHack)
+		r.Get("/contest/{contestId}", hackH.ListContestHacks)
+		r.Get("/hackable/{contestId}/{problemId}", hackH.ListHackableSubmissions)
 	})
 
 	return r

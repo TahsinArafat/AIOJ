@@ -97,3 +97,11 @@ type GymStore interface {
 	MarkSolved(ctx context.Context, gymID, userID string) error
 	IsSolved(ctx context.Context, gymID, userID string) (bool, error)
 }
+
+type HackStore interface {
+	Create(ctx context.Context, h *model.Hack) error
+	GetByID(ctx context.Context, id string) (*model.Hack, error)
+	UpdateStatus(ctx context.Context, id, status string, success bool) error
+	GetByContest(ctx context.Context, contestID string) ([]model.Hack, error)
+	GetHackableSubmissions(ctx context.Context, contestID, problemID string) ([]model.Submission, error)
+}
