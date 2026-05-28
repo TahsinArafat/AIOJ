@@ -65,6 +65,7 @@ func NewRouter(
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.AuthMiddleware(jwtManager))
 			r.Post("/", contestH.Create)
+			r.Post("/educational", contestH.CreateEducational)
 			r.Get("/{id}/permissions", contestH.ListPermissions)
 			r.Post("/{id}/permissions", contestH.AddPermission)
 			r.Delete("/{id}/permissions/{userId}", contestH.RemovePermission)

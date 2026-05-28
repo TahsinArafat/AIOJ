@@ -359,3 +359,50 @@ func (h *ContestHandler) CalculateRatings(w http.ResponseWriter, r *http.Request
 		"changes": changes,
 	})
 }
+
+func (h *ContestHandler) CreateEducational(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r)
+	if claims == nil || claims.Role != "admin" {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	var req struct {
+		Title       string    `json:"title"`
+		StartTime   time.Time `json:"start_time"`
+		EndTime     time.Time `json:"end_time"`
+		ProblemIDs  []string  `json:"problem_ids"`
+		Description string    `json:"description"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+
+	config := model.DefaultEducationalConfig()
+
+	c := &model.Contest{
+		ID:                uuid.New().String(),
+		Title:             req.Title,
+		Type:              model.ContestTypeEducational,
+		StartTime:         req.StartTime,
+		EndTime:           req.EndTime,
+		EducationalConfig: &config,
+		Description:       req.Description,
+		Visible:           true,
+		CreatedBy:         claims.UserID,
+	}
+
+	if err := h.store.Create(r.Context(), c); err != nil {
+		http.Error(w, "create failed", http.StatusInternalServerError)
+		return
+	}
+
+	for i, pid := range req.ProblemIDs {
+		idx := string(rune('A' + i))
+		h.store.AddProblem(r.Context(), c.ID, pid, idx, 100, i)
+	}
+
+	respondJSON(w, http.StatusCreated, c)
+}

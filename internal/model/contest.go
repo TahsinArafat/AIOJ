@@ -16,6 +16,7 @@ type Contest struct {
 	RegistrationDeadline *time.Time `json:"registration_deadline,omitempty"`
 	MaxParticipants      *int       `json:"max_participants,omitempty"`
 	Division             int        `json:"division"`
+	EducationalConfig    *EducationalRoundConfig `json:"educational_config,omitempty"`
 	CreatedBy            string     `json:"created_by"`
 	CreatedAt            time.Time  `json:"created_at"`
 }
@@ -73,6 +74,14 @@ type ContestRegistration struct {
 }
 
 const (
+	ContestTypeACM         = "acm"
+	ContestTypeOI          = "oi"
+	ContestTypeIOI         = "ioi"
+	ContestTypePractice    = "practice"
+	ContestTypeEducational = "educational"
+)
+
+const (
 	DivisionNone = 0
 	Division1    = 1
 	Division2    = 2
@@ -106,4 +115,20 @@ func GetDivisionRange(division int) (min, max int) {
 func IsEligibleForDivision(division, rating int) bool {
 	min, max := GetDivisionRange(division)
 	return rating >= min && rating <= max
+}
+
+type EducationalRoundConfig struct {
+	HackPhaseHours    int   `json:"hack_phase_hours"`
+	ShowSolutions     bool  `json:"show_solutions"`
+	AllowUpsolving    bool  `json:"allow_upsolving"`
+	RatedForDivisions []int `json:"rated_for_divisions"`
+}
+
+func DefaultEducationalConfig() EducationalRoundConfig {
+	return EducationalRoundConfig{
+		HackPhaseHours:    24,
+		ShowSolutions:     true,
+		AllowUpsolving:    true,
+		RatedForDivisions: []int{2, 3},
+	}
 }

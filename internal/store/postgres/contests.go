@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -19,12 +20,18 @@ func (s *ContestStore) Create(ctx context.Context, c *model.Contest) error {
 		return err
 	}
 	defer tx.Rollback()
+
+	var configJSON []byte
+	if c.EducationalConfig != nil {
+		configJSON, _ = json.Marshal(c.EducationalConfig)
+	}
+
 	err = tx.QueryRowContext(ctx,
 		`INSERT INTO contests(id,title,type,start_time,end_time,freeze_time,password,visible,description,
-		                    registration_required,registration_deadline,max_participants,division,created_by)
-		 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING created_at`,
+		                    registration_required,registration_deadline,max_participants,division,educational_config,created_by)
+		 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING created_at`,
 		c.ID, c.Title, c.Type, c.StartTime, c.EndTime, c.FreezeTime, c.Password, c.Visible, c.Description,
-		c.RegistrationRequired, c.RegistrationDeadline, c.MaxParticipants, c.Division, c.CreatedBy,
+		c.RegistrationRequired, c.RegistrationDeadline, c.MaxParticipants, c.Division, configJSON, c.CreatedBy,
 	).Scan(&c.CreatedAt)
 	if err != nil {
 		return err
@@ -40,21 +47,28 @@ func (s *ContestStore) Create(ctx context.Context, c *model.Contest) error {
 
 func (s *ContestStore) GetByID(ctx context.Context, id string) (*model.Contest, error) {
 	var c model.Contest
+	var configJSON []byte
 	err := s.db.QueryRowContext(ctx,
 		`SELECT id,title,type,start_time,end_time,freeze_time,visible,description,
-		        registration_required,registration_deadline,max_participants,division,
+		        registration_required,registration_deadline,max_participants,division,educational_config,
 		        created_by,created_at
 		 FROM contests WHERE id=$1`, id).Scan(
 		&c.ID, &c.Title, &c.Type, &c.StartTime, &c.EndTime, &c.FreezeTime,
 		&c.Visible, &c.Description,
 		&c.RegistrationRequired, &c.RegistrationDeadline, &c.MaxParticipants,
-		&c.Division,
+		&c.Division, &configJSON,
 		&c.CreatedBy, &c.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
+	}
+	if len(configJSON) > 0 {
+		var config model.EducationalRoundConfig
+		if err := json.Unmarshal(configJSON, &config); err == nil {
+			c.EducationalConfig = &config
+		}
 	}
 	return &c, nil
 }
@@ -77,7 +91,7 @@ func (s *ContestStore) ListWithDivision(ctx context.Context, offset, limit int, 
 	s.db.QueryRowContext(ctx, countQuery, args...).Scan(&total)
 
 	rowsQuery := `SELECT id,title,type,start_time,end_time,visible,description,
-	              registration_required,registration_deadline,max_participants,division,
+	              registration_required,registration_deadline,max_participants,division,educational_config,
 	              created_at
 	              FROM contests WHERE visible=true`
 	if division != nil {
@@ -95,8 +109,15 @@ func (s *ContestStore) ListWithDivision(ctx context.Context, offset, limit int, 
 	var items []model.Contest
 	for rows.Next() {
 		var c model.Contest
+		var configJSON []byte
 		rows.Scan(&c.ID, &c.Title, &c.Type, &c.StartTime, &c.EndTime, &c.Visible, &c.Description,
-			&c.RegistrationRequired, &c.RegistrationDeadline, &c.MaxParticipants, &c.Division, &c.CreatedAt)
+			&c.RegistrationRequired, &c.RegistrationDeadline, &c.MaxParticipants, &c.Division, &configJSON, &c.CreatedAt)
+		if len(configJSON) > 0 {
+			var config model.EducationalRoundConfig
+			if err := json.Unmarshal(configJSON, &config); err == nil {
+				c.EducationalConfig = &config
+			}
+		}
 		items = append(items, c)
 	}
 	if items == nil {
