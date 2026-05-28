@@ -15,6 +15,7 @@ import Submissions from './pages/Submissions'
 import GymList from './pages/GymList'
 import GymDetail from './pages/GymDetail'
 import HackPanel from './pages/HackPanel'
+import NotificationBell from './components/NotificationBell'
 import './global.css'
 
 function decodeRole(): string | null {
@@ -54,6 +55,7 @@ function Navbar() {
             <div className="flex gap-3 items-center">
                 {loggedIn ? (
                     <>
+                        <NotificationBell />
                         <Link to="/profile" className="text-sm text-gray-600 hover:text-black">Profile</Link>
                         <Link to="/submissions" className="text-sm text-gray-600 hover:text-black">My Submissions</Link>
                         <button onClick={handleLogout} className="text-sm text-gray-500 hover:text-black">Logout</button>

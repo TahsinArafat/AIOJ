@@ -138,4 +138,13 @@ export const api = {
         getProblemStats: (problemId: string) => request<any>(`/stats/problems/${problemId}`),
         getMyStats: () => request<any>('/stats/me'),
     },
+    notifications: {
+        list: (unreadOnly = false, limit = 50) =>
+            request<{ data: any[] }>(`/notifications?unread=${unreadOnly}&limit=${limit}`),
+        unreadCount: () => request<{ count: number }>('/notifications/unread-count'),
+        markAsRead: (id: string) => request(`/notifications/${id}/read`, { method: 'POST' }),
+        markAllAsRead: () => request('/notifications/read-all', { method: 'POST' }),
+        getPreferences: () => request<any>('/notifications/preferences'),
+        updatePreferences: (prefs: any) => request('/notifications/preferences', { method: 'PUT', body: JSON.stringify(prefs) }),
+    },
 }
