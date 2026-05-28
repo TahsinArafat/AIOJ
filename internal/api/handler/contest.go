@@ -11,15 +11,17 @@ import (
 	"github.com/google/uuid"
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
 	"github.com/tahsinarafat/aioj/internal/model"
+	"github.com/tahsinarafat/aioj/internal/rating"
 	"github.com/tahsinarafat/aioj/internal/store/postgres"
 )
 
 type ContestHandler struct {
-	store *postgres.ContestStore
+	store       *postgres.ContestStore
+	ratingStore *postgres.RatingStore
 }
 
-func NewContestHandler(s *postgres.ContestStore) *ContestHandler {
-	return &ContestHandler{store: s}
+func NewContestHandler(s *postgres.ContestStore, rs *postgres.RatingStore) *ContestHandler {
+	return &ContestHandler{store: s, ratingStore: rs}
 }
 
 func (h *ContestHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -306,4 +308,45 @@ func (h *ContestHandler) RemovePermission(w http.ResponseWriter, r *http.Request
 		return
 	}
 	w.WriteHeader(http.StatusOK)
+}
+
+func (h *ContestHandler) CalculateRatings(w http.ResponseWriter, r *http.Request) {
+	contestID := chi.URLParam(r, "id")
+
+	contest, err := h.store.GetByID(r.Context(), contestID)
+	if err != nil || contest == nil {
+		http.Error(w, "contest not found", http.StatusNotFound)
+		return
+	}
+
+	claims := middleware.GetUserClaims(r)
+	if claims == nil || claims.Role != "admin" {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	participants, _ := h.store.GetParticipants(r.Context(), contestID)
+
+	standings := make([]rating.ContestStanding, 0, len(participants))
+	for i, uid := range participants {
+		latest, _ := h.ratingStore.GetLatestByUser(r.Context(), uid)
+		oldRating := rating.DefaultRating
+		if latest != nil {
+			oldRating = latest.NewRating
+		}
+
+		standings = append(standings, rating.ContestStanding{
+			UserID:    uid,
+			Rank:      i + 1,
+			OldRating: oldRating,
+			Username:  h.store.GetUsername(r.Context(), uid),
+		})
+	}
+
+	ratingService := rating.NewService(h.ratingStore, nil)
+	changes := ratingService.CalculateContestRatings(standings)
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"changes": changes,
+	})
 }

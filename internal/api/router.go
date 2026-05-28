@@ -65,6 +65,7 @@ func NewRouter(
 			r.Post("/{id}/permissions", contestH.AddPermission)
 			r.Delete("/{id}/permissions/{userId}", contestH.RemovePermission)
 		})
+		r.Post("/{id}/calculate-ratings", contestH.CalculateRatings)
 	})
 
 	r.Route("/api/vjudge", func(r chi.Router) {
