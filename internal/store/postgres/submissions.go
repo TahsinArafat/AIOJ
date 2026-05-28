@@ -14,11 +14,14 @@ type SubmissionStore struct{ db *sql.DB }
 func NewSubmissionStore(db *sql.DB) *SubmissionStore { return &SubmissionStore{db: db} }
 
 func (s *SubmissionStore) Create(ctx context.Context, sub *model.Submission) error {
+	if sub.SubmissionType == "" {
+		sub.SubmissionType = "code"
+	}
 	cid := sql.NullString{String: sub.ContestID, Valid: sub.ContestID != ""}
 	return s.db.QueryRowContext(ctx,
-		`INSERT INTO submissions(id,problem_id,user_id,contest_id,language,source_code,code_size,status)
-		 VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING created_at`,
-		sub.ID, sub.ProblemID, sub.UserID, cid, sub.Language, sub.SourceCode, sub.CodeSize, sub.Status,
+		`INSERT INTO submissions(id,problem_id,user_id,contest_id,language,source_code,code_size,status,submission_type)
+		 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING created_at`,
+		sub.ID, sub.ProblemID, sub.UserID, cid, sub.Language, sub.SourceCode, sub.CodeSize, sub.Status, sub.SubmissionType,
 	).Scan(&sub.CreatedAt)
 }
 
@@ -31,10 +34,10 @@ func (s *SubmissionStore) GetByID(ctx context.Context, id string) (*model.Submis
 	err := s.db.QueryRowContext(ctx,
 		`SELECT id,problem_id,user_id,COALESCE(contest_id::text,''),language,source_code,code_size,
 		        status,score,time_used,memory_used,compile_output,judge_result,
-		        judged_by,created_at,judged_at FROM submissions WHERE id=$1`, id).Scan(
+		        judged_by,created_at,judged_at,submission_type FROM submissions WHERE id=$1`, id).Scan(
 		&sub.ID, &sub.ProblemID, &sub.UserID, &cid, &sub.Language, &sub.SourceCode, &sub.CodeSize,
 		&sub.Status, &sub.Score, &sub.TimeUsed, &sub.MemoryUsed, &co, &jr,
-		&sub.JudgedBy, &sub.CreatedAt, &ja)
+		&sub.JudgedBy, &sub.CreatedAt, &ja, &sub.SubmissionType)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -58,7 +61,7 @@ func (s *SubmissionStore) ListByProblem(ctx context.Context, pid string, offset,
 	var total int
 	s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM submissions WHERE problem_id=$1", pid).Scan(&total)
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id,user_id,language,status,score,time_used,memory_used,created_at
+		`SELECT id,user_id,language,status,score,time_used,memory_used,created_at,submission_type
 		 FROM submissions WHERE problem_id=$1 ORDER BY created_at DESC OFFSET $2 LIMIT $3`, pid, offset, limit)
 	if err != nil {
 		return nil, 0, err
@@ -67,7 +70,7 @@ func (s *SubmissionStore) ListByProblem(ctx context.Context, pid string, offset,
 	var items []model.Submission
 	for rows.Next() {
 		var sub model.Submission
-		rows.Scan(&sub.ID, &sub.UserID, &sub.Language, &sub.Status, &sub.Score, &sub.TimeUsed, &sub.MemoryUsed, &sub.CreatedAt)
+		rows.Scan(&sub.ID, &sub.UserID, &sub.Language, &sub.Status, &sub.Score, &sub.TimeUsed, &sub.MemoryUsed, &sub.CreatedAt, &sub.SubmissionType)
 		items = append(items, sub)
 	}
 	if items == nil {
@@ -80,7 +83,7 @@ func (s *SubmissionStore) ListByUser(ctx context.Context, uid string, offset, li
 	var total int
 	s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM submissions WHERE user_id=$1", uid).Scan(&total)
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id,problem_id,language,status,score,time_used,memory_used,created_at
+		`SELECT id,problem_id,language,status,score,time_used,memory_used,created_at,submission_type
 		 FROM submissions WHERE user_id=$1 ORDER BY created_at DESC OFFSET $2 LIMIT $3`, uid, offset, limit)
 	if err != nil {
 		return nil, 0, err
@@ -89,7 +92,7 @@ func (s *SubmissionStore) ListByUser(ctx context.Context, uid string, offset, li
 	var items []model.Submission
 	for rows.Next() {
 		var sub model.Submission
-		rows.Scan(&sub.ID, &sub.ProblemID, &sub.Language, &sub.Status, &sub.Score, &sub.TimeUsed, &sub.MemoryUsed, &sub.CreatedAt)
+		rows.Scan(&sub.ID, &sub.ProblemID, &sub.Language, &sub.Status, &sub.Score, &sub.TimeUsed, &sub.MemoryUsed, &sub.CreatedAt, &sub.SubmissionType)
 		items = append(items, sub)
 	}
 	if items == nil {
@@ -173,4 +176,12 @@ func (s *SubmissionStore) GetUserStats(ctx context.Context, userID string) (*mod
 	s.db.QueryRowContext(ctx, `SELECT language FROM submissions WHERE user_id = $1 GROUP BY language ORDER BY COUNT(*) DESC LIMIT 1`, userID).Scan(&stats.FavoriteLanguage)
 
 	return stats, nil
+}
+
+func (s *SubmissionStore) GetPlatformStats(ctx context.Context) (*model.PlatformStats, error) {
+	var stats model.PlatformStats
+	s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM problems WHERE visible=true").Scan(&stats.Problems)
+	s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM users").Scan(&stats.Users)
+	s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM submissions").Scan(&stats.Submissions)
+	return &stats, nil
 }

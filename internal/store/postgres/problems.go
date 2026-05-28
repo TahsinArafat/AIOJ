@@ -20,6 +20,13 @@ func NewProblemStore(db *sql.DB) *ProblemStore {
 }
 
 func (s *ProblemStore) Create(ctx context.Context, p *model.Problem) error {
+	if p.ScoringMode == "" {
+		p.ScoringMode = "complete"
+	}
+	if p.SubtaskAggregation == "" {
+		p.SubtaskAggregation = "min"
+	}
+
 	samples, err := json.Marshal(p.SampleCases)
 	if err != nil {
 		return fmt.Errorf("marshal sample_cases: %w", err)
@@ -38,12 +45,16 @@ func (s *ProblemStore) Create(ctx context.Context, p *model.Problem) error {
 	err = tx.QueryRowContext(ctx, `INSERT INTO problems
 		(id,slug,title,description,input_format,output_format,hint,sample_cases,
 		 time_limit,memory_limit,difficulty,tags,visible,testdata_path,testcase_score,
-		 spj,spj_language,spj_source_code,spj_version,source,remote_id,created_by)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
+		 spj,spj_language,spj_source_code,spj_version,source,remote_id,created_by,
+		 checker_type,float_epsilon,interactive,interactor_language,interactor_source_code,
+		 scoring_mode,subtask_aggregation)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29)
 		RETURNING created_at,updated_at`,
 		p.ID, p.Slug, p.Title, p.Description, p.InputFormat, p.OutputFormat, p.Hint, samples,
 		p.TimeLimit, p.MemoryLimit, p.Difficulty, pq.Array(p.Tags), p.Visible, p.TestdataPath, scores,
 		p.SPJ, p.SPJLanguage, p.SPJSourceCode, p.SPJVersion, p.Source, p.RemoteID, p.CreatedBy,
+		p.CheckerType, p.FloatEpsilon, p.Interactive, p.InteractorLanguage, p.InteractorSourceCode,
+		p.ScoringMode, p.SubtaskAggregation,
 	).Scan(&p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
 		return fmt.Errorf("insert problem: %w", err)
@@ -77,12 +88,16 @@ func (s *ProblemStore) getBy(ctx context.Context, field, value string) (*model.P
 	err := s.db.QueryRowContext(ctx, fmt.Sprintf(`SELECT
 		id,slug,title,description,input_format,output_format,hint,sample_cases,
 		time_limit,memory_limit,difficulty,tags,visible,testdata_path,testcase_score,
-		spj,spj_language,spj_source_code,spj_version,submission_count,accepted_count,
-		source,remote_id,created_by,created_at,updated_at FROM problems WHERE %s=$1`, field), value).Scan(
+		spj,spj_language,spj_source_code,spj_version,checker_type,float_epsilon,submission_count,accepted_count,
+		source,remote_id,created_by,created_at,updated_at,
+		interactive,COALESCE(interactor_language,''),COALESCE(interactor_source_code,''),
+		COALESCE(scoring_mode,'complete'),COALESCE(subtask_aggregation,'min') FROM problems WHERE %s=$1`, field), value).Scan(
 		&p.ID, &p.Slug, &p.Title, &p.Description, &p.InputFormat, &p.OutputFormat, &p.Hint, &samples,
 		&p.TimeLimit, &p.MemoryLimit, &p.Difficulty, pq.Array(&tags), &p.Visible, &p.TestdataPath, &scores,
-		&p.SPJ, &p.SPJLanguage, &p.SPJSourceCode, &p.SPJVersion, &p.SubmissionCount, &p.AcceptedCount,
-		&p.Source, &p.RemoteID, &p.CreatedBy, &p.CreatedAt, &p.UpdatedAt)
+		&p.SPJ, &p.SPJLanguage, &p.SPJSourceCode, &p.SPJVersion, &p.CheckerType, &p.FloatEpsilon, &p.SubmissionCount, &p.AcceptedCount,
+		&p.Source, &p.RemoteID, &p.CreatedBy, &p.CreatedAt, &p.UpdatedAt,
+		&p.Interactive, &p.InteractorLanguage, &p.InteractorSourceCode,
+		&p.ScoringMode, &p.SubtaskAggregation)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -139,10 +154,14 @@ func (s *ProblemStore) Update(ctx context.Context, id string, p *model.Problem) 
 	_, err = s.db.ExecContext(ctx, `UPDATE problems SET
 		title=$2, description=$3, input_format=$4, output_format=$5, hint=$6, sample_cases=$7,
 		time_limit=$8, memory_limit=$9, difficulty=$10, tags=$11, visible=$12,
-		testcase_score=$13, spj=$14, spj_language=$15, spj_source_code=$16, updated_at=NOW() WHERE id=$1`,
+		testcase_score=$13, spj=$14, spj_language=$15, spj_source_code=$16, checker_type=$17, float_epsilon=$18,
+		interactive=$19, interactor_language=$20, interactor_source_code=$21,
+		scoring_mode=$22, subtask_aggregation=$23, updated_at=NOW() WHERE id=$1`,
 		id, p.Title, p.Description, p.InputFormat, p.OutputFormat, p.Hint, samples,
 		p.TimeLimit, p.MemoryLimit, p.Difficulty, pq.Array(p.Tags), p.Visible,
-		scores, p.SPJ, p.SPJLanguage, p.SPJSourceCode)
+		scores, p.SPJ, p.SPJLanguage, p.SPJSourceCode, p.CheckerType, p.FloatEpsilon,
+		p.Interactive, p.InteractorLanguage, p.InteractorSourceCode,
+		p.ScoringMode, p.SubtaskAggregation)
 	return err
 }
 
