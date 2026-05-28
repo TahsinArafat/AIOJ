@@ -29,6 +29,7 @@ func NewRouter(
 	notifH *handler.NotificationHandler,
 	groupH *handler.GroupHandler,
 	teamH *handler.TeamHandler,
+	blogH *handler.BlogHandler,
 ) http.Handler {
 	r := chi.NewRouter()
 	r.Use(chiMiddleware.RequestID, chiMiddleware.RealIP, middleware.Logging, chiMiddleware.Recoverer)
@@ -177,6 +178,18 @@ func NewRouter(
 			r.Post("/", teamH.Create)
 			r.Post("/{id}/join", teamH.Join)
 			r.Post("/{id}/leave", teamH.Leave)
+		})
+	})
+
+	r.Route("/api/blog", func(r chi.Router) {
+		r.Get("/", blogH.ListPosts)
+		r.Get("/{id}", blogH.GetPost)
+		r.Get("/{type}/{id}/comments", blogH.GetComments)
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.AuthMiddleware(jwtManager))
+			r.Post("/", blogH.CreatePost)
+			r.Post("/comments", blogH.CreateComment)
+			r.Post("/vote", blogH.Vote)
 		})
 	})
 

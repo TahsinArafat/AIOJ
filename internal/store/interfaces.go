@@ -149,3 +149,16 @@ type TeamStore interface {
 	GetUserTeams(ctx context.Context, userID string) ([]model.TeamListItem, error)
 	UpdateRating(ctx context.Context, teamID string, newRating int) error
 }
+
+type BlogStore interface {
+	CreatePost(ctx context.Context, p *model.BlogPost) error
+	GetPostByID(ctx context.Context, id string) (*model.BlogPost, error)
+	ListPosts(ctx context.Context, offset, limit int, tag string) ([]model.BlogListItem, int, error)
+	UpdatePost(ctx context.Context, id string, p *model.BlogPost) error
+	DeletePost(ctx context.Context, id string) error
+	CreateComment(ctx context.Context, c *model.Comment) error
+	GetComments(ctx context.Context, parentType, parentID string) ([]model.Comment, error)
+	DeleteComment(ctx context.Context, id string) error
+	Vote(ctx context.Context, userID, targetType, targetID string, value int) error
+	GetUserVote(ctx context.Context, userID, targetType, targetID string) (int, error)
+}
