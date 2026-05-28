@@ -9,7 +9,7 @@ import (
 
 func TestRun_Success(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		json.NewEncoder(w).Encode(ExecResponse{Results: []CmdResult{{Status: "Accepted", ExitStatus: 0, Time: 1000000, Memory: 4096}}})
+		json.NewEncoder(w).Encode([]CmdResult{{Status: "Accepted", ExitStatus: 0, Time: 1000000, Memory: 4096}})
 	}))
 	defer srv.Close()
 	client := NewClient(srv.URL)
@@ -17,8 +17,8 @@ func TestRun_Success(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resp.Results[0].Status != "Accepted" {
-		t.Fatalf("got %s", resp.Results[0].Status)
+	if resp[0].Status != "Accepted" {
+		t.Fatalf("got %s", resp[0].Status)
 	}
 }
 
