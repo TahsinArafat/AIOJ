@@ -179,3 +179,10 @@ type APIKeyStore interface {
 	IncrementRequestCount(ctx context.Context, keyID string, windowStart time.Time) error
 	GetRequestCount(ctx context.Context, keyID string, windowStart time.Time) (int, error)
 }
+
+type WebhookStore interface {
+	Create(ctx context.Context, w *model.Webhook) error
+	GetByUser(ctx context.Context, userID string) ([]model.Webhook, error)
+	Delete(ctx context.Context, id string) error
+	GetByEvent(ctx context.Context, eventType string) ([]model.Webhook, error)
+}
