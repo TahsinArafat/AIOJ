@@ -71,16 +71,19 @@ func main() {
 
 	judgeQueue := queue.NewMemory()
 	execClient := executor.NewClient(cfg.Judge.Endpoint)
-	workerPool := judge.NewWorkerPool(judgeQueue, execClient, cfg.LangDir, cfg.Judge.Concurrency, submissionStore, problemStore)
+	langLimitStore := postgres.NewLanguageLimitStore(db)
+	langLimitH := handler.NewLanguageLimitHandler(langLimitStore, problemStore)
+	workerPool := judge.NewWorkerPool(judgeQueue, execClient, cfg.LangDir, cfg.Judge.Concurrency, submissionStore, problemStore, langLimitStore)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go workerPool.Start(ctx)
 
 	wsManager := handler.NewWSManager()
-	authH := handler.NewAuthHandler(userStore, refreshTokenStore, jwtManager)
+	passwordResetTokenStore := postgres.NewPasswordResetTokenStore(db)
+	authH := handler.NewAuthHandler(userStore, refreshTokenStore, passwordResetTokenStore, jwtManager)
 	problemH := handler.NewProblemHandler(problemStore)
-	submissionH := handler.NewSubmissionHandler(submissionStore, problemStore, contestStore, judgeQueue, wsManager)
+	submissionH := handler.NewSubmissionHandler(submissionStore, problemStore, contestStore, judgeQueue, wsManager, execClient, cfg.LangDir)
 	contestH := handler.NewContestHandler(contestStore, ratingStore)
 
 	vjService := vjudge.NewService(submissionStore)
@@ -117,8 +120,12 @@ func main() {
 	webhookStore := postgres.NewWebhookStore(db)
 	webhookH := handler.NewWebhookHandler(webhookStore)
 	recommendationH := handler.NewRecommendationHandler(problemStore, ratingStore)
+	rankingsH := handler.NewRankingsHandler(userStore)
+	usersH := handler.NewUsersHandler(userStore)
+	searchStore := postgres.NewSearchStore(db)
+	searchH := handler.NewSearchHandler(searchStore)
 
-	router := api.NewRouter(authH, problemH, submissionH, contestH, vjH, adminH, testcaseH, wsManager, jwtManager, ratingH, registrationH, virtualH, gymH, hackH, statsH, notifH, groupH, teamH, blogH, editorialH, apiKeyH, webhookH, recommendationH)
+	router := api.NewRouter(authH, problemH, submissionH, contestH, vjH, adminH, testcaseH, wsManager, jwtManager, ratingH, registrationH, virtualH, gymH, hackH, statsH, notifH, groupH, teamH, blogH, editorialH, apiKeyH, webhookH, recommendationH, rankingsH, usersH, searchH, langLimitH)
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),

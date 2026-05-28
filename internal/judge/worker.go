@@ -19,23 +19,25 @@ import (
 )
 
 type WorkerPool struct {
-	queue     queue.JudgeQueue
-	exec      *executor.Client
-	langDir   string
-	sem       chan struct{}
-	subStore  store.SubmissionStore
-	probStore store.ProblemStore
+	queue          queue.JudgeQueue
+	exec           *executor.Client
+	langDir        string
+	sem            chan struct{}
+	subStore       store.SubmissionStore
+	probStore      store.ProblemStore
+	langLimitStore store.LanguageLimitStore
 }
 
 func NewWorkerPool(q queue.JudgeQueue, exec *executor.Client, langDir string, concurrency int,
-	subStore store.SubmissionStore, probStore store.ProblemStore) *WorkerPool {
+	subStore store.SubmissionStore, probStore store.ProblemStore, langLimitStore store.LanguageLimitStore) *WorkerPool {
 	return &WorkerPool{
-		queue:     q,
-		exec:      exec,
-		langDir:   langDir,
-		sem:       make(chan struct{}, concurrency),
-		subStore:  subStore,
-		probStore: probStore,
+		queue:          q,
+		exec:           exec,
+		langDir:        langDir,
+		sem:            make(chan struct{}, concurrency),
+		subStore:       subStore,
+		probStore:      probStore,
+		langLimitStore: langLimitStore,
 	}
 }
 
@@ -71,6 +73,16 @@ func (wp *WorkerPool) judge(ctx context.Context, submissionID string) {
 	if err != nil || prob == nil {
 		wp.subStore.UpdateResult(ctx, submissionID, model.StatusSE, 0, 0, 0, "problem not found", nil)
 		return
+	}
+
+	// Load per-language limits for this problem
+	if wp.langLimitStore != nil {
+		langLimits, err := wp.langLimitStore.GetByProblem(ctx, prob.ID)
+		if err == nil {
+			for _, ll := range langLimits {
+				prob.LanguageLimits = append(prob.LanguageLimits, *ll)
+			}
+		}
 	}
 
 	if sub.SubmissionType == model.SubmissionTypeOutput {

@@ -34,21 +34,33 @@ func NewRouter(
 	apiKeyH *handler.APIKeyHandler,
 	webhookH *handler.WebhookHandler,
 	recommendationH *handler.RecommendationHandler,
+	rankingsH *handler.RankingsHandler,
+	usersH *handler.UsersHandler,
+	searchH *handler.SearchHandler,
+	langLimitH *handler.LanguageLimitHandler,
 ) http.Handler {
 	r := chi.NewRouter()
-	r.Use(chiMiddleware.RequestID, chiMiddleware.RealIP, middleware.Logging, chiMiddleware.Recoverer)
+	rl := middleware.NewRateLimiter()
+	r.Use(middleware.RateLimit(rl, "/api/health", "/api/ws"), chiMiddleware.RequestID, chiMiddleware.RealIP, middleware.Logging, chiMiddleware.Recoverer)
 
 	r.Get("/api/health", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte(`{"status":"ok"}`)) })
+
+	r.Get("/api/search", searchH.Search)
 
 	r.Post("/api/auth/register", authH.Register)
 	r.Post("/api/auth/login", authH.Login)
 	r.Post("/api/auth/refresh", authH.Refresh)
+	r.Post("/api/auth/forgot-password", authH.ForgotPassword)
+	r.Post("/api/auth/reset-password", authH.ResetPassword)
+
+	r.Get("/api/users/{username}", usersH.GetByUsername)
 
 	r.Route("/api/problems", func(r chi.Router) {
 		r.Get("/", problemH.List)
 		r.Get("/tags", problemH.ListTags)
 		r.With(middleware.OptionalAuthMiddleware(jwtManager)).Get("/{slug}", problemH.GetBySlug)
 		r.Get("/{slug}/submissions", submissionH.ListByProblem)
+		r.Get("/{slug}/language-limits", langLimitH.List)
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.AuthMiddleware(jwtManager))
 			r.Post("/", problemH.Create)
@@ -58,6 +70,8 @@ func NewRouter(
 			r.Post("/{slug}/permissions", problemH.AddPermission)
 			r.Delete("/{slug}/permissions/{userId}", problemH.RemovePermission)
 			r.Post("/{slug}/testcases", testcaseH.Upload)
+			r.Post("/{slug}/language-limits", langLimitH.Set)
+			r.Delete("/{slug}/language-limits/{lang}", langLimitH.Delete)
 		})
 	})
 
@@ -65,6 +79,7 @@ func NewRouter(
 		r.Use(middleware.AuthMiddleware(jwtManager))
 		r.Post("/", submissionH.Create)
 		r.Post("/upsolving", submissionH.CreateUpsolving)
+		r.Post("/run", submissionH.CustomRun)
 		r.Get("/", submissionH.ListByUser)
 		r.Get("/{id}", submissionH.GetByID)
 	})
@@ -77,11 +92,15 @@ func NewRouter(
 			r.Use(middleware.AuthMiddleware(jwtManager))
 			r.Post("/", contestH.Create)
 			r.Post("/educational", contestH.CreateEducational)
+			r.Put("/{id}", contestH.Update)
+			r.Delete("/{id}", contestH.Delete)
 			r.Get("/{id}/permissions", contestH.ListPermissions)
 			r.Post("/{id}/permissions", contestH.AddPermission)
 			r.Delete("/{id}/permissions/{userId}", contestH.RemovePermission)
 		})
 		r.Post("/{id}/calculate-ratings", contestH.CalculateRatings)
+		r.Post("/{id}/register-team", contestH.RegisterTeam)
+		r.Get("/{id}/team-registrations", contestH.ListTeamRegistrations)
 	})
 
 	r.Route("/api/contests/{id}/register", func(r chi.Router) {
@@ -120,6 +139,8 @@ func NewRouter(
 		r.Get("/contest/{contestId}", ratingH.GetByContest)
 	})
 
+	r.Get("/api/rankings", rankingsH.List)
+
 	r.Route("/api/virtual", func(r chi.Router) {
 		r.Use(middleware.AuthMiddleware(jwtManager))
 		r.Post("/start", virtualH.Start)
@@ -146,6 +167,7 @@ func NewRouter(
 	})
 
 	r.Route("/api/stats", func(r chi.Router) {
+		r.Get("/platform", statsH.GetPlatformStats)
 		r.Get("/problems/{problemId}", statsH.GetProblemStats)
 		r.With(middleware.AuthMiddleware(jwtManager)).Get("/me", statsH.GetUserStats)
 	})
