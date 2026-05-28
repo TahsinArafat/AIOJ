@@ -26,6 +26,7 @@ func NewRouter(
 	gymH *handler.GymHandler,
 	hackH *handler.HackHandler,
 	statsH *handler.StatsHandler,
+	notifH *handler.NotificationHandler,
 ) http.Handler {
 	r := chi.NewRouter()
 	r.Use(chiMiddleware.RequestID, chiMiddleware.RealIP, middleware.Logging, chiMiddleware.Recoverer)
@@ -140,6 +141,16 @@ func NewRouter(
 	r.Route("/api/stats", func(r chi.Router) {
 		r.Get("/problems/{problemId}", statsH.GetProblemStats)
 		r.With(middleware.AuthMiddleware(jwtManager)).Get("/me", statsH.GetUserStats)
+	})
+
+	r.Route("/api/notifications", func(r chi.Router) {
+		r.Use(middleware.AuthMiddleware(jwtManager))
+		r.Get("/", notifH.List)
+		r.Get("/unread-count", notifH.UnreadCount)
+		r.Post("/{id}/read", notifH.MarkAsRead)
+		r.Post("/read-all", notifH.MarkAllAsRead)
+		r.Get("/preferences", notifH.GetPreferences)
+		r.Put("/preferences", notifH.UpdatePreferences)
 	})
 
 	return r

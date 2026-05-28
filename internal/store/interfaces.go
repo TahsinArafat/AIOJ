@@ -107,3 +107,14 @@ type HackStore interface {
 	GetByContest(ctx context.Context, contestID string) ([]model.Hack, error)
 	GetHackableSubmissions(ctx context.Context, contestID, problemID string) ([]model.Submission, error)
 }
+
+type NotificationStore interface {
+	Create(ctx context.Context, n *model.Notification) error
+	GetByUser(ctx context.Context, userID string, unreadOnly bool, limit int) ([]model.Notification, error)
+	MarkAsRead(ctx context.Context, id string) error
+	MarkAllAsRead(ctx context.Context, userID string) error
+	GetUnreadCount(ctx context.Context, userID string) (int, error)
+	Delete(ctx context.Context, id string) error
+	GetPreferences(ctx context.Context, userID string) (*model.NotificationPreferences, error)
+	UpdatePreferences(ctx context.Context, userID string, prefs *model.NotificationPreferences) error
+}
