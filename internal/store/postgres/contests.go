@@ -26,11 +26,18 @@ func (s *ContestStore) Create(ctx context.Context, c *model.Contest) error {
 		configJSON, _ = json.Marshal(c.EducationalConfig)
 	}
 
+	var formatConfigJSON []byte
+	if len(c.FormatConfig) > 0 {
+		formatConfigJSON = c.FormatConfig
+	} else {
+		formatConfigJSON = []byte("{}")
+	}
+
 	err = tx.QueryRowContext(ctx,
-		`INSERT INTO contests(id,title,type,start_time,end_time,freeze_time,password,visible,description,
+		`INSERT INTO contests(id,title,type,format,format_config,start_time,end_time,freeze_time,password,visible,description,
 		                    registration_required,registration_deadline,max_participants,division,educational_config,created_by)
-		 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING created_at`,
-		c.ID, c.Title, c.Type, c.StartTime, c.EndTime, c.FreezeTime, c.Password, c.Visible, c.Description,
+		 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING created_at`,
+		c.ID, c.Title, c.Type, c.Format, formatConfigJSON, c.StartTime, c.EndTime, c.FreezeTime, c.Password, c.Visible, c.Description,
 		c.RegistrationRequired, c.RegistrationDeadline, c.MaxParticipants, c.Division, configJSON, c.CreatedBy,
 	).Scan(&c.CreatedAt)
 	if err != nil {
@@ -48,12 +55,13 @@ func (s *ContestStore) Create(ctx context.Context, c *model.Contest) error {
 func (s *ContestStore) GetByID(ctx context.Context, id string) (*model.Contest, error) {
 	var c model.Contest
 	var configJSON []byte
+	var formatConfigJSON []byte
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id,title,type,start_time,end_time,freeze_time,visible,description,
+		`SELECT id,title,type,format,format_config,start_time,end_time,freeze_time,visible,description,
 		        registration_required,registration_deadline,max_participants,division,educational_config,
 		        created_by,created_at
 		 FROM contests WHERE id=$1`, id).Scan(
-		&c.ID, &c.Title, &c.Type, &c.StartTime, &c.EndTime, &c.FreezeTime,
+		&c.ID, &c.Title, &c.Type, &c.Format, &formatConfigJSON, &c.StartTime, &c.EndTime, &c.FreezeTime,
 		&c.Visible, &c.Description,
 		&c.RegistrationRequired, &c.RegistrationDeadline, &c.MaxParticipants,
 		&c.Division, &configJSON,
@@ -69,6 +77,9 @@ func (s *ContestStore) GetByID(ctx context.Context, id string) (*model.Contest, 
 		if err := json.Unmarshal(configJSON, &config); err == nil {
 			c.EducationalConfig = &config
 		}
+	}
+	if len(formatConfigJSON) > 0 {
+		c.FormatConfig = formatConfigJSON
 	}
 	return &c, nil
 }
@@ -90,7 +101,7 @@ func (s *ContestStore) ListWithDivision(ctx context.Context, offset, limit int, 
 	}
 	s.db.QueryRowContext(ctx, countQuery, args...).Scan(&total)
 
-	rowsQuery := `SELECT id,title,type,start_time,end_time,visible,description,
+	rowsQuery := `SELECT id,title,type,format,format_config,start_time,end_time,visible,description,
 	              registration_required,registration_deadline,max_participants,division,educational_config,
 	              created_at
 	              FROM contests WHERE visible=true`
@@ -110,13 +121,17 @@ func (s *ContestStore) ListWithDivision(ctx context.Context, offset, limit int, 
 	for rows.Next() {
 		var c model.Contest
 		var configJSON []byte
-		rows.Scan(&c.ID, &c.Title, &c.Type, &c.StartTime, &c.EndTime, &c.Visible, &c.Description,
+		var formatConfigJSON []byte
+		rows.Scan(&c.ID, &c.Title, &c.Type, &c.Format, &formatConfigJSON, &c.StartTime, &c.EndTime, &c.Visible, &c.Description,
 			&c.RegistrationRequired, &c.RegistrationDeadline, &c.MaxParticipants, &c.Division, &configJSON, &c.CreatedAt)
 		if len(configJSON) > 0 {
 			var config model.EducationalRoundConfig
 			if err := json.Unmarshal(configJSON, &config); err == nil {
 				c.EducationalConfig = &config
 			}
+		}
+		if len(formatConfigJSON) > 0 {
+			c.FormatConfig = formatConfigJSON
 		}
 		items = append(items, c)
 	}
@@ -127,11 +142,18 @@ func (s *ContestStore) ListWithDivision(ctx context.Context, offset, limit int, 
 }
 
 func (s *ContestStore) Update(ctx context.Context, c *model.Contest) error {
+	var formatConfigJSON []byte
+	if len(c.FormatConfig) > 0 {
+		formatConfigJSON = c.FormatConfig
+	} else {
+		formatConfigJSON = []byte("{}")
+	}
+
 	_, err := s.db.ExecContext(ctx,
-		`UPDATE contests SET title=$1, type=$2, start_time=$3, end_time=$4,
-		 freeze_time=$5, password=$6, description=$7, visible=$8, updated_at=NOW()
-		 WHERE id=$9`,
-		c.Title, c.Type, c.StartTime, c.EndTime, c.FreezeTime, c.Password, c.Description, c.Visible, c.ID)
+		`UPDATE contests SET title=$1, type=$2, format=$3, format_config=$4, start_time=$5, end_time=$6,
+		 freeze_time=$7, password=$8, description=$9, visible=$10, updated_at=NOW()
+		 WHERE id=$11`,
+		c.Title, c.Type, c.Format, formatConfigJSON, c.StartTime, c.EndTime, c.FreezeTime, c.Password, c.Description, c.Visible, c.ID)
 	return err
 }
 

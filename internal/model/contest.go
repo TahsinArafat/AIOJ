@@ -1,11 +1,16 @@
 package model
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 type Contest struct {
 	ID                   string     `json:"id"`
 	Title                string     `json:"title"`
 	Type                 string     `json:"type"`
+	Format               string     `json:"format"`
+	FormatConfig         json.RawMessage `json:"format_config,omitempty"`
 	StartTime            time.Time  `json:"start_time"`
 	EndTime              time.Time  `json:"end_time"`
 	FreezeTime           *time.Time `json:"freeze_time,omitempty"`
@@ -60,9 +65,11 @@ type ContestPermission struct {
 }
 
 type CreateContestRequest struct {
-	Title       string     `json:"title"`
-	Type        string     `json:"type"`
-	Division    int        `json:"division"`
+	Title        string          `json:"title"`
+	Type         string          `json:"type"`
+	Format       string          `json:"format"`
+	FormatConfig json.RawMessage `json:"format_config,omitempty"`
+	Division     int             `json:"division"`
 	StartTime   time.Time  `json:"start_time"`
 	EndTime     time.Time  `json:"end_time"`
 	FreezeTime  *time.Time `json:"freeze_time,omitempty"`
