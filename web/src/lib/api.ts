@@ -193,4 +193,18 @@ export const api = {
             request<{ api_key: any; secret: string }>('/keys', { method: 'POST', body: JSON.stringify(d) }),
         delete: (id: string) => request(`/keys/${id}`, { method: 'DELETE' }),
     },
+    webhooks: {
+        list: () => request<{ data: any[] }>('/webhooks'),
+        create: (d: { url: string; secret?: string; events: string[] }) =>
+            request<any>('/webhooks', { method: 'POST', body: JSON.stringify(d) }),
+        delete: (id: string) => request(`/webhooks/${id}`, { method: 'DELETE' }),
+    },
+    recommendations: {
+        get: (rating?: number) =>
+            request<{
+                progression: any[];
+                weak_tags: { tags: string[]; problems: any[] };
+                hybrid: any[];
+            }>(rating !== undefined ? `/recommendations?rating=${rating}` : '/recommendations'),
+    },
 }
