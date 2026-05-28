@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
+	"github.com/tahsinarafat/aioj/internal/fps"
 	"github.com/tahsinarafat/aioj/internal/store"
 )
 
@@ -64,9 +65,34 @@ func (h *TestcaseHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, fileHeader := range files {
-		if err := h.saveFile(probDir, fileHeader); err != nil {
-			http.Error(w, "failed to save file: "+fileHeader.Filename, http.StatusInternalServerError)
+		file, err := fileHeader.Open()
+		if err != nil {
+			http.Error(w, "failed to open file: "+err.Error(), http.StatusBadRequest)
 			return
+		}
+
+		filename := fileHeader.Filename
+
+		if strings.HasSuffix(strings.ToLower(filename), ".zip") {
+			zipBytes, err := io.ReadAll(file)
+			file.Close()
+			if err != nil {
+				http.Error(w, "failed to read zip file: "+err.Error(), http.StatusBadRequest)
+				return
+			}
+
+			_, err = fps.ExtractZip(zipBytes, probDir)
+			if err != nil {
+				http.Error(w, "failed to extract zip: "+err.Error(), http.StatusBadRequest)
+				return
+			}
+		} else {
+			err = h.saveFile(probDir, fileHeader)
+			file.Close()
+			if err != nil {
+				http.Error(w, "failed to save file: "+fileHeader.Filename, http.StatusInternalServerError)
+				return
+			}
 		}
 	}
 
