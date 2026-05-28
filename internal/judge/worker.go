@@ -583,8 +583,9 @@ func (wp *WorkerPool) judgeInteractive(ctx context.Context, sub *model.Submissio
 	finalStatus := model.StatusAC
 	maxTime, maxMem, totalScore := 0, 0, 0
 
-	cpuLimitNs := uint64(float64(prob.TimeLimit) * 1e6 * cfg.TimeLimitMultiplier)
-	memLimitBytes := uint64(float64(prob.MemoryLimit) * 1024 * cfg.MemoryLimitMultiplier)
+	timeLimitMs, memoryLimitKB := wp.getEffectiveLimits(prob, sub.Language)
+	cpuLimitNs := uint64(float64(timeLimitMs) * float64(cfg.TimeLimitMultiplier)) * 1_000_000
+	memLimitBytes := uint64(float64(memoryLimitKB) * float64(cfg.MemoryLimitMultiplier)) * 1024
 
 	srcName := "Main" + cfg.Extensions[0]
 
