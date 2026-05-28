@@ -12,8 +12,10 @@ type UserStore interface {
 	GetByID(ctx context.Context, id string) (*model.User, error)
 	GetByUsername(ctx context.Context, username string) (*model.User, error)
 	GetByEmail(ctx context.Context, email string) (*model.User, error)
+	GetPublicProfile(ctx context.Context, username string) (*model.PublicProfile, error)
 	ListUsers(ctx context.Context, offset, limit int) ([]model.User, int, error)
 	UpdateRole(ctx context.Context, id, role string) error
+	UpdatePassword(ctx context.Context, id, passwordHash string) error
 }
 
 type ProblemStore interface {
@@ -43,6 +45,7 @@ type SubmissionStore interface {
 	ListPending(ctx context.Context, limit int) ([]string, error)
 	GetProblemStats(ctx context.Context, problemID string) (*model.ProblemStats, error)
 	GetUserStats(ctx context.Context, userID string) (*model.UserProblemStats, error)
+	GetPlatformStats(ctx context.Context) (*model.PlatformStats, error)
 }
 
 type RefreshTokenStore interface {
@@ -54,6 +57,8 @@ type ContestStore interface {
 	Create(ctx context.Context, c *model.Contest) error
 	GetByID(ctx context.Context, id string) (*model.Contest, error)
 	List(ctx context.Context, offset, limit int) ([]model.Contest, int, error)
+	Update(ctx context.Context, c *model.Contest) error
+	Delete(ctx context.Context, id string) error
 	AddProblem(ctx context.Context, contestID, problemID, index string, score, sortOrder int) error
 	GetProblems(ctx context.Context, contestID string) ([]model.ContestProblem, error)
 	GetParticipants(ctx context.Context, contestID string) ([]string, error)
@@ -181,9 +186,22 @@ type APIKeyStore interface {
 	GetRequestCount(ctx context.Context, keyID string, windowStart time.Time) (int, error)
 }
 
+type PasswordResetTokenStore interface {
+	Create(ctx context.Context, tokenID, userID, tokenHash string, expiresAt time.Time) error
+	GetByHash(ctx context.Context, tokenHash string) (*model.PasswordResetToken, error)
+	MarkUsed(ctx context.Context, id string) error
+}
+
 type WebhookStore interface {
 	Create(ctx context.Context, w *model.Webhook) error
 	GetByUser(ctx context.Context, userID string) ([]model.Webhook, error)
 	Delete(ctx context.Context, id string) error
 	GetByEvent(ctx context.Context, eventType string) ([]model.Webhook, error)
+}
+
+type LanguageLimitStore interface {
+	Set(ctx context.Context, limit *model.LanguageLimit) error
+	Get(ctx context.Context, problemID, languageID string) (*model.LanguageLimit, error)
+	GetByProblem(ctx context.Context, problemID string) ([]*model.LanguageLimit, error)
+	Delete(ctx context.Context, problemID, languageID string) error
 }
