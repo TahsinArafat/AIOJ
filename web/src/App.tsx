@@ -11,6 +11,7 @@ import AdminDashboard from './pages/AdminDashboard'
 import SetterPanel from './pages/SetterPanel'
 import Profile from './pages/Profile'
 import ProblemCreate from './pages/ProblemCreate'
+import Practice from './pages/Practice'
 import Submissions from './pages/Submissions'
 import SubmissionDetail from './pages/SubmissionDetail'
 import GymList from './pages/GymList'
@@ -63,6 +64,7 @@ function Navbar() {
                 <Link to="/problems" className="text-sm text-gray-600 hover:text-black transition-colors">Problems</Link>
                 <Link to="/contests" className="text-sm text-gray-600 hover:text-black transition-colors">Contests</Link>
                 <Link to="/gym" className="text-sm text-gray-600 hover:text-black transition-colors">Gym</Link>
+                <Link to="/practice" className="text-sm text-gray-600 hover:text-black transition-colors">Practice</Link>
                 <Link to="/groups" className="text-sm text-gray-600 hover:text-black transition-colors">Groups</Link>
                 <Link to="/teams" className="text-sm text-gray-600 hover:text-black transition-colors">Teams</Link>
                 <Link to="/blog" className="text-sm text-gray-600 hover:text-black transition-colors">Blog</Link>
@@ -138,6 +140,7 @@ export default function App() {
                         <Route path="/admin" element={<AdminDashboard />} />
                         <Route path="/setter" element={<SetterPanel />} />
                         <Route path="/setter/create" element={<ProblemCreate />} />
+                        <Route path="/practice" element={<Practice />} />
                         <Route path="/profile" element={<Profile />} />
                         <Route path="*" element={<div className="text-center py-20 text-gray-400">404 Not Found</div>} />
                     </Routes>
