@@ -14,6 +14,7 @@ import ProblemCreate from './pages/ProblemCreate'
 import Submissions from './pages/Submissions'
 import GymList from './pages/GymList'
 import GymDetail from './pages/GymDetail'
+import HackPanel from './pages/HackPanel'
 import './global.css'
 
 function decodeRole(): string | null {
@@ -98,6 +99,7 @@ export default function App() {
                         <Route path="/contests/:id/scoreboard" element={<ContestScoreboard />} />
                         <Route path="/gym" element={<GymList />} />
                         <Route path="/gym/:id" element={<GymDetail />} />
+                        <Route path="/hack/:contestId/:problemId" element={<HackPanel />} />
                         <Route path="/submissions" element={<Submissions />} />
                         <Route path="/admin" element={<AdminDashboard />} />
                         <Route path="/setter" element={<SetterPanel />} />

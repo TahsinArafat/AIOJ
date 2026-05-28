@@ -127,9 +127,16 @@ export default function ContestDetail() {
                                             <Link to={`/problems/${p.problem_id}`} className="hover:underline text-blue-600 font-medium">
                                                 {p.problem_id}
                                             </Link>
-                                            {isEnded && (
-                                                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">Upsolving Mode</span>
-                                            )}
+                                            <div className="flex gap-2 items-center">
+                                                {contest.hack_phase_enabled && (
+                                                    <Link to={`/hack/${id}/${p.problem_id}`} className="text-xs text-red-600 bg-red-50 hover:bg-red-100 px-2.5 py-1 rounded font-medium">
+                                                        Hack
+                                                    </Link>
+                                                )}
+                                                {isEnded && (
+                                                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">Upsolving Mode</span>
+                                                )}
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}

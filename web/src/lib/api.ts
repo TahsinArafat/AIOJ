@@ -127,4 +127,11 @@ export const api = {
         create: (d: any) => request<any>('/gym', { method: 'POST', body: JSON.stringify(d) }),
         markSolved: (id: string) => request(`/gym/${id}/solve`, { method: 'POST' }),
     },
+    hacks: {
+        submit: (d: { contest_id: string; problem_id: string; submission_id: string; test_input: string }) =>
+            request<any>('/hacks', { method: 'POST', body: JSON.stringify(d) }),
+        get: (id: string) => request<any>(`/hacks/${id}`),
+        listByContest: (contestId: string) => request<any>(`/hacks/contest/${contestId}`),
+        listHackable: (contestId: string, problemId: string) => request<any>(`/hacks/hackable/${contestId}/${problemId}`),
+    },
 }
