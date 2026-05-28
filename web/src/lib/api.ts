@@ -147,4 +147,15 @@ export const api = {
         getPreferences: () => request<any>('/notifications/preferences'),
         updatePreferences: (prefs: any) => request('/notifications/preferences', { method: 'PUT', body: JSON.stringify(prefs) }),
     },
+    groups: {
+        list: (offset = 0, limit = 20) =>
+            request<{ data: any[]; total: number }>(`/groups?offset=${offset}&limit=${limit}`),
+        get: (id: string) => request<any>(`/groups/${id}`),
+        create: (d: any) => request<any>('/groups', { method: 'POST', body: JSON.stringify(d) }),
+        join: (id: string) => request(`/groups/${id}/join`, { method: 'POST' }),
+        leave: (id: string) => request(`/groups/${id}/leave`, { method: 'POST' }),
+        members: (id: string) => request<any>(`/groups/${id}/members`),
+        addContest: (id: string, contestId: string) =>
+            request(`/groups/${id}/contests`, { method: 'POST', body: JSON.stringify({ contest_id: contestId }) }),
+    },
 }

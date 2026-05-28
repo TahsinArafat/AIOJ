@@ -16,6 +16,9 @@ import GymList from './pages/GymList'
 import GymDetail from './pages/GymDetail'
 import HackPanel from './pages/HackPanel'
 import NotificationBell from './components/NotificationBell'
+import GroupList from './pages/GroupList'
+import GroupCreate from './pages/GroupCreate'
+import GroupDetail from './pages/GroupDetail'
 import './global.css'
 
 function decodeRole(): string | null {
@@ -49,6 +52,7 @@ function Navbar() {
                 <Link to="/problems" className="text-sm text-gray-600 hover:text-black transition-colors">Problems</Link>
                 <Link to="/contests" className="text-sm text-gray-600 hover:text-black transition-colors">Contests</Link>
                 <Link to="/gym" className="text-sm text-gray-600 hover:text-black transition-colors">Gym</Link>
+                <Link to="/groups" className="text-sm text-gray-600 hover:text-black transition-colors">Groups</Link>
                 {isAdmin && <Link to="/admin" className="text-sm font-medium text-purple-600 hover:text-purple-800 transition-colors">Admin</Link>}
                 {isSetter && <Link to="/setter" className="text-sm font-medium text-orange-600 hover:text-orange-800 transition-colors">Setter Workspace</Link>}
             </div>
@@ -102,6 +106,9 @@ export default function App() {
                         <Route path="/gym" element={<GymList />} />
                         <Route path="/gym/:id" element={<GymDetail />} />
                         <Route path="/hack/:contestId/:problemId" element={<HackPanel />} />
+                        <Route path="/groups" element={<GroupList />} />
+                        <Route path="/groups/create" element={<GroupCreate />} />
+                        <Route path="/groups/:id" element={<GroupDetail />} />
                         <Route path="/submissions" element={<Submissions />} />
                         <Route path="/admin" element={<AdminDashboard />} />
                         <Route path="/setter" element={<SetterPanel />} />
