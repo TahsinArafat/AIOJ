@@ -22,6 +22,7 @@ func NewRouter(
 	jwtManager *auth.JWTManager,
 	ratingH *handler.RatingHandler,
 	registrationH *handler.RegistrationHandler,
+	virtualH *handler.VirtualHandler,
 ) http.Handler {
 	r := chi.NewRouter()
 	r.Use(chiMiddleware.RequestID, chiMiddleware.RealIP, middleware.Logging, chiMiddleware.Recoverer)
@@ -104,6 +105,13 @@ func NewRouter(
 	r.Route("/api/rating", func(r chi.Router) {
 		r.Get("/user/{userId}", ratingH.GetByUser)
 		r.Get("/contest/{contestId}", ratingH.GetByContest)
+	})
+
+	r.Route("/api/virtual", func(r chi.Router) {
+		r.Use(middleware.AuthMiddleware(jwtManager))
+		r.Post("/start", virtualH.Start)
+		r.Get("/status", virtualH.Status)
+		r.Post("/{id}/complete", virtualH.Complete)
 	})
 
 	return r

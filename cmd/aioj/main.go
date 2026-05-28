@@ -20,6 +20,7 @@ import (
 	"github.com/tahsinarafat/aioj/internal/judge/executor"
 	"github.com/tahsinarafat/aioj/internal/queue"
 	"github.com/tahsinarafat/aioj/internal/store/postgres"
+	"github.com/tahsinarafat/aioj/internal/virtual"
 	"github.com/tahsinarafat/aioj/internal/vjudge"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -91,8 +92,11 @@ func main() {
 	ratingH := handler.NewRatingHandler(ratingStore)
 	registrationStore := postgres.NewRegistrationStore(db)
 	registrationH := handler.NewRegistrationHandler(registrationStore, contestStore)
+	virtualStore := postgres.NewVirtualStore(db)
+	virtualService := virtual.NewService(virtualStore)
+	virtualH := handler.NewVirtualHandler(virtualService, virtualStore)
 
-	router := api.NewRouter(authH, problemH, submissionH, contestH, vjH, adminH, testcaseH, wsManager, jwtManager, ratingH, registrationH)
+	router := api.NewRouter(authH, problemH, submissionH, contestH, vjH, adminH, testcaseH, wsManager, jwtManager, ratingH, registrationH, virtualH)
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),

@@ -82,3 +82,10 @@ type SetterStore interface {
 	UpdateApplicationStatus(ctx context.Context, userID, status string) error
 	GetApplication(ctx context.Context, userID string) (*model.SetterApplication, error)
 }
+
+type VirtualStore interface {
+	Create(ctx context.Context, v *model.VirtualContest) error
+	GetByID(ctx context.Context, id string) (*model.VirtualContest, error)
+	GetActiveByUser(ctx context.Context, userID string) (*model.VirtualContest, error)
+	Complete(ctx context.Context, id string) error
+}
