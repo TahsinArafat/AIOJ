@@ -3,6 +3,8 @@ package fps
 import (
 	"strings"
 	"testing"
+
+	"github.com/tahsinarafat/aioj/internal/model"
 )
 
 func TestParseXML_SingleProblem(t *testing.T) {
@@ -216,5 +218,40 @@ func TestParseXML_MultipleSampleCases(t *testing.T) {
 	}
 	if problems[0].SampleCases[1].Output != "7" {
 		t.Errorf("expected second sample output '7', got %q", problems[0].SampleCases[1].Output)
+	}
+}
+
+func TestGenerateXML(t *testing.T) {
+	p := &model.Problem{
+		ID:           "test-id",
+		Title:        "Sum Problem",
+		TimeLimit:    2000,
+		MemoryLimit:  262144, // 256MB in KB
+		Description:  "Given two numbers",
+		InputFormat:  "Two integers on one line",
+		OutputFormat: "Their sum",
+		Tags:         []string{"math", "easy"},
+		SampleCases: []model.SampleCase{
+			{Input: "1 2", Output: "3"},
+		},
+	}
+
+	xmlBytes, err := GenerateXML([]*model.Problem{p})
+	if err != nil {
+		t.Fatalf("generation failed: %v", err)
+	}
+
+	xml := string(xmlBytes)
+	if !strings.Contains(xml, "<title>Sum Problem</title>") {
+		t.Errorf("title missing in XML:\n%s", xml)
+	}
+	if !strings.Contains(xml, "<memory_limit>256</memory_limit>") {
+		t.Errorf("memory limit not converted from KB to MB:\n%s", xml)
+	}
+	if !strings.Contains(xml, "<tags>math,easy</tags>") {
+		t.Errorf("tags missing in XML:\n%s", xml)
+	}
+	if !strings.Contains(xml, "1 2") {
+		t.Errorf("sample input missing:\n%s", xml)
 	}
 }
