@@ -202,6 +202,7 @@ export const api = {
         },
         get: (id: string) => request<any>(`/contests/${id}`),
         create: (d: any) => request<any>('/contests', { method: 'POST', body: JSON.stringify(d) }),
+        getFormats: () => request<{ formats: string[] }>('/contests/formats'),
         scoreboard: (id: string) => request<any>(`/contests/${id}/scoreboard`),
         register: (id: string) => request(`/contests/${id}/register`, { method: 'POST' }),
         unregister: (id: string) => request(`/contests/${id}/register`, { method: 'DELETE' }),

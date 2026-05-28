@@ -82,6 +82,9 @@ export default function ContestDetail() {
                         {contest.type === 'educational' && (
                             <span className="bg-green-100 text-green-800 text-xs px-2 py-0.5 rounded font-medium">Educational</span>
                         )}
+                        {contest.format && (
+                            <span className="bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded font-medium uppercase">{contest.format}</span>
+                        )}
                     </div>
                     {contest.description && <p className="text-gray-600 mt-1">{contest.description}</p>}
                     <div className="mt-3 text-sm text-gray-500 space-y-1">

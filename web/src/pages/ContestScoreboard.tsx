@@ -91,7 +91,9 @@ export default function ContestScoreboard() {
                         <tr className="bg-gray-100">
                             <th className="border border-gray-200 px-3 py-2 text-left w-12">Rank</th>
                             <th className="border border-gray-200 px-3 py-2 text-left">User</th>
-                            <th className="border border-gray-200 px-3 py-2 text-center w-16">Solved</th>
+                            <th className="border border-gray-200 px-3 py-2 text-center w-16">
+                                {contest?.format === 'oi' || contest?.format === 'ioi' ? 'Score' : 'Solved'}
+                            </th>
                             <th className="border border-gray-200 px-3 py-2 text-center w-20">Penalty</th>
                             {ratingChanges && <th className="border border-gray-200 px-3 py-2 text-center w-20">Rating</th>}
                             {problems?.map((p: any) => (
@@ -108,7 +110,9 @@ export default function ContestScoreboard() {
                                 <td className="border border-gray-200 px-3 py-2 font-medium">
                                     {e.username || e.user_id?.substring(0, 8)}
                                 </td>
-                                <td className="border border-gray-200 px-3 py-2 text-center font-semibold">{e.total_solved}</td>
+                                <td className="border border-gray-200 px-3 py-2 text-center font-semibold">
+                                    {contest?.format === 'oi' || contest?.format === 'ioi' ? e.total_score : e.total_solved}
+                                </td>
                                 <td className="border border-gray-200 px-3 py-2 text-center text-gray-500">{e.total_penalty}</td>
                                 {ratingChanges && (
                                     <td className="border border-gray-200 px-3 py-2 text-center">
@@ -130,6 +134,22 @@ export default function ContestScoreboard() {
                                 {problems?.map((p: any) => {
                                     const pr = e.problems?.[p.index]
                                     if (!pr) return <td key={p.problem_id} className="border border-gray-200 px-2 py-2 text-center text-gray-200">—</td>
+                                    
+                                    if (contest?.format === 'oi' || contest?.format === 'ioi') {
+                                        if (pr.score > 0) {
+                                            return (
+                                                <td key={p.problem_id} className="border border-gray-200 px-2 py-2 text-center text-green-600 font-medium text-xs">
+                                                    {pr.score}<br />
+                                                    <span className="text-gray-400">{pr.attempts} tries</span>
+                                                </td>
+                                            )
+                                        }
+                                        if (pr.attempts > 0) {
+                                            return <td key={p.problem_id} className="border border-gray-200 px-2 py-2 text-center text-red-500 text-xs">0/{pr.attempts}</td>
+                                        }
+                                        return <td key={p.problem_id} className="border border-gray-200 px-2 py-2 text-center text-gray-200">—</td>
+                                    }
+
                                     if (pr.solved) {
                                         return (
                                             <td key={p.problem_id} className="border border-gray-200 px-2 py-2 text-center text-green-600 font-medium text-xs">

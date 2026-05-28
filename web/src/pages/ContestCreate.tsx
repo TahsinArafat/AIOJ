@@ -3,11 +3,25 @@ import { useNavigate } from 'react-router-dom'
 import { api, getAccessToken } from '../lib/api'
 import { DIVISIONS } from '../lib/divisions'
 
+const FORMAT_OPTIONS = [
+    { value: 'acm', label: 'ACM/ICPC', desc: 'Standard penalty-based scoring.' },
+    { value: 'oi', label: 'OI', desc: 'Max score per problem. No penalty.' },
+    { value: 'ioi', label: 'IOI', desc: 'Subtask-based scoring with partial credit.' },
+    { value: 'atcoder', label: 'AtCoder', desc: 'Time of first AC as penalty.' },
+    { value: 'codeforces', label: 'Codeforces', desc: 'Dynamic score decaying over time.' },
+]
+
 export default function ContestCreate() {
     const nav = useNavigate()
     const [form, setForm] = useState({
         title: '',
         type: 'acm',
+        format: 'acm',
+        penalty_per_wrong: '20',
+        max_score: '100',
+        decay_factor: '250',
+        min_ratio: '0.3',
+        cf_penalty: '50',
         start_time: '',
         end_time: '',
         freeze_time: '',
@@ -49,9 +63,42 @@ export default function ContestCreate() {
                 .split(',')
                 .map(s => s.trim())
                 .filter(Boolean)
+
+            // Construct format config
+            let formatConfig: any = {}
+            if (form.format === 'acm') {
+                formatConfig = {
+                    penalty_per_wrong: Number(form.penalty_per_wrong),
+                    time_penalty: true,
+                }
+            } else if (form.format === 'oi') {
+                formatConfig = {
+                    max_score_per_problem: Number(form.max_score),
+                }
+            } else if (form.format === 'ioi') {
+                formatConfig = {
+                    partial_credit: true,
+                    subtask_scoring: true,
+                }
+            } else if (form.format === 'atcoder') {
+                formatConfig = {
+                    penalty_is_time_of_ac: true,
+                    no_wrong_attempt_penalty: true,
+                }
+            } else if (form.format === 'codeforces') {
+                formatConfig = {
+                    initial_scores: [500, 1000, 1500, 2000, 2500],
+                    decay_factor: Number(form.decay_factor),
+                    min_score_ratio: Number(form.min_ratio),
+                    wrong_submission_penalty: Number(form.cf_penalty),
+                }
+            }
+
             const contest = await api.contests.create({
                 title: form.title,
                 type: form.type,
+                format: form.format,
+                format_config: formatConfig,
                 start_time: new Date(form.start_time).toISOString(),
                 end_time: new Date(form.end_time).toISOString(),
                 freeze_time: form.freeze_time ? new Date(form.freeze_time).toISOString() : undefined,
@@ -84,13 +131,25 @@ export default function ContestCreate() {
                         placeholder="e.g. AIOJ Round 1"
                         className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
                         <select value={form.type} onChange={e => handleChange('type', e.target.value)}
                             className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                             <option value="acm">ACM</option>
                             <option value="oi">OI</option>
+                            <option value="ioi">IOI</option>
+                            <option value="practice">Practice</option>
+                            <option value="educational">Educational</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Scoring Format</label>
+                        <select value={form.format} onChange={e => handleChange('format', e.target.value)}
+                            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            {FORMAT_OPTIONS.map(opt => (
+                                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                            ))}
                         </select>
                     </div>
                     <div>
@@ -103,6 +162,48 @@ export default function ContestCreate() {
                         </select>
                     </div>
                 </div>
+
+                {/* Dynamic scoring settings */}
+                <div className="border border-gray-200 rounded-lg p-4 bg-gray-50 space-y-3">
+                    <h3 className="font-semibold text-sm text-gray-700">Format-Specific Settings</h3>
+                    {form.format === 'acm' && (
+                        <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-1">Penalty Per Wrong Attempt (minutes)</label>
+                            <input type="number" value={form.penalty_per_wrong} onChange={e => handleChange('penalty_per_wrong', e.target.value)}
+                                className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none" />
+                        </div>
+                    )}
+                    {form.format === 'oi' && (
+                        <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-1">Max Score Per Problem</label>
+                            <input type="number" value={form.max_score} onChange={e => handleChange('max_score', e.target.value)}
+                                className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none" />
+                        </div>
+                    )}
+                    {form.format === 'codeforces' && (
+                        <div className="grid grid-cols-3 gap-3">
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1">Decay Factor</label>
+                                <input type="number" value={form.decay_factor} onChange={e => handleChange('decay_factor', e.target.value)}
+                                    className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1">Min Score Ratio</label>
+                                <input type="number" step="0.05" value={form.min_ratio} onChange={e => handleChange('min_ratio', e.target.value)}
+                                    className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1">Penalty (pts)</label>
+                                <input type="number" value={form.cf_penalty} onChange={e => handleChange('cf_penalty', e.target.value)}
+                                    className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none" />
+                            </div>
+                        </div>
+                    )}
+                    {(form.format === 'ioi' || form.format === 'atcoder') && (
+                        <div className="text-xs text-gray-500">No additional parameters needed for {form.format.toUpperCase()} scoring.</div>
+                    )}
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Start Time</label>
@@ -159,6 +260,7 @@ export default function ContestCreate() {
                     <div className="space-y-2 text-sm">
                         <div><span className="text-gray-500">Title:</span> <span className="font-medium">{form.title || '—'}</span></div>
                         <div><span className="text-gray-500">Type:</span> <span className="uppercase font-medium">{form.type}</span></div>
+                        <div><span className="text-gray-500">Format:</span> <span className="uppercase font-medium">{form.format}</span></div>
                         <div><span className="text-gray-500">Division:</span> <span className="font-medium">{DIVISIONS[Number(form.division) as keyof typeof DIVISIONS]?.name ?? 'Open'}</span></div>
                         <div><span className="text-gray-500">Start:</span> <span className="font-medium">{form.start_time ? new Date(form.start_time).toLocaleString() : '—'}</span></div>
                         <div><span className="text-gray-500">End:</span> <span className="font-medium">{form.end_time ? new Date(form.end_time).toLocaleString() : '—'}</span></div>
