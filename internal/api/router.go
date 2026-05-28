@@ -20,6 +20,7 @@ func NewRouter(
 	testcaseH *handler.TestcaseHandler,
 	wsManager *handler.WSManager,
 	jwtManager *auth.JWTManager,
+	ratingH *handler.RatingHandler,
 ) http.Handler {
 	r := chi.NewRouter()
 	r.Use(chiMiddleware.RequestID, chiMiddleware.RealIP, middleware.Logging, chiMiddleware.Recoverer)
@@ -88,6 +89,11 @@ func NewRouter(
 	})
 
 	r.Get("/api/ws", wsManager.Handle)
+
+	r.Route("/api/rating", func(r chi.Router) {
+		r.Get("/user/{userId}", ratingH.GetByUser)
+		r.Get("/contest/{contestId}", ratingH.GetByContest)
+	})
 
 	return r
 }

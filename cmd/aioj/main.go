@@ -65,6 +65,7 @@ func main() {
 	problemStore := postgres.NewProblemStore(db)
 	submissionStore := postgres.NewSubmissionStore(db)
 	contestStore := postgres.NewContestStore(db)
+	ratingStore := postgres.NewRatingStore(db)
 
 	judgeQueue := queue.NewMemory()
 	execClient := executor.NewClient(cfg.Judge.Endpoint)
@@ -87,8 +88,9 @@ func main() {
 	adminH := handler.NewAdminHandler(userStore, setterStore)
 
 	testcaseH := handler.NewTestcaseHandler(problemStore, "./testdata")
+	ratingH := handler.NewRatingHandler(ratingStore)
 
-	router := api.NewRouter(authH, problemH, submissionH, contestH, vjH, adminH, testcaseH, wsManager, jwtManager)
+	router := api.NewRouter(authH, problemH, submissionH, contestH, vjH, adminH, testcaseH, wsManager, jwtManager, ratingH)
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),
