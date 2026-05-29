@@ -28,7 +28,7 @@ const baseState: ProblemFormState = {
 
 test('renders all statement form fields', () => {
   const onUpdate = vi.fn()
-  render(<StatementTab formState={baseState} onUpdate={onUpdate} onSave={vi.fn()} saving={false} />)
+  render(<StatementTab formState={baseState} onUpdate={onUpdate} onSave={vi.fn()} saving={false} uploadingImage={false} onImageUpload={vi.fn()} />)
 
   expect(screen.getByDisplayValue('Test Problem')).toBeInTheDocument()
   expect(screen.getByDisplayValue('Description here')).toBeInTheDocument()
@@ -41,7 +41,7 @@ test('renders all statement form fields', () => {
 
 test('calls onUpdate when title changes', () => {
   const onUpdate = vi.fn()
-  render(<StatementTab formState={baseState} onUpdate={onUpdate} onSave={vi.fn()} saving={false} />)
+  render(<StatementTab formState={baseState} onUpdate={onUpdate} onSave={vi.fn()} saving={false} uploadingImage={false} onImageUpload={vi.fn()} />)
 
   const titleInput = screen.getByDisplayValue('Test Problem')
   fireEvent.change(titleInput, { target: { value: 'New Title' } })
@@ -51,7 +51,7 @@ test('calls onUpdate when title changes', () => {
 
 test('calls onSave when save button clicked', () => {
   const onSave = vi.fn()
-  render(<StatementTab formState={baseState} onUpdate={vi.fn()} onSave={onSave} saving={false} />)
+  render(<StatementTab formState={baseState} onUpdate={vi.fn()} onSave={onSave} saving={false} uploadingImage={false} onImageUpload={vi.fn()} />)
 
   fireEvent.click(screen.getByText('Save Statement'))
   expect(onSave).toHaveBeenCalledTimes(1)
@@ -59,7 +59,7 @@ test('calls onSave when save button clicked', () => {
 
 test('adds a new sample case', () => {
   const onUpdate = vi.fn()
-  render(<StatementTab formState={baseState} onUpdate={onUpdate} onSave={vi.fn()} saving={false} />)
+  render(<StatementTab formState={baseState} onUpdate={onUpdate} onSave={vi.fn()} saving={false} uploadingImage={false} onImageUpload={vi.fn()} />)
 
   fireEvent.click(screen.getByText('+ Add Sample'))
   expect(onUpdate).toHaveBeenCalledWith(
@@ -70,7 +70,7 @@ test('adds a new sample case', () => {
 
 test('removes a sample case', () => {
   const onUpdate = vi.fn()
-  render(<StatementTab formState={baseState} onUpdate={onUpdate} onSave={vi.fn()} saving={false} />)
+  render(<StatementTab formState={baseState} onUpdate={onUpdate} onSave={vi.fn()} saving={false} uploadingImage={false} onImageUpload={vi.fn()} />)
 
   const removeButton = screen.getByText('Remove')
   fireEvent.click(removeButton)
