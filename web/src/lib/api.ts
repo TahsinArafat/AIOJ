@@ -78,7 +78,17 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
         const text = await res.text()
         throw new Error(text || `HTTP ${res.status}`)
     }
-    return res.json()
+    const contentType = res.headers.get('content-type') || ''
+    if (res.status === 204 || contentType.includes('text/plain')) {
+        return null as unknown as T
+    }
+    const text = await res.text()
+    if (!text) return null as unknown as T
+    try {
+        return JSON.parse(text)
+    } catch (e) {
+        return text as unknown as T
+    }
 }
 
 export const api = {
@@ -139,6 +149,15 @@ export const api = {
             if (!res.ok) {
                 const text = await res.text()
                 throw new Error(text || `HTTP ${res.status}`)
+            }
+            if (res.status === 204 || res.status === 200) {
+                const text = await res.text()
+                if (!text) return null as any
+                try {
+                    return JSON.parse(text)
+                } catch {
+                    return text as any
+                }
             }
             return res.json()
         },
