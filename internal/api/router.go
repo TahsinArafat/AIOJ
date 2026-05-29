@@ -39,6 +39,9 @@ func NewRouter(
 	searchH *handler.SearchHandler,
 	langLimitH *handler.LanguageLimitHandler,
 	importH *handler.ImportHandler,
+	orgH *handler.OrganizationHandler,
+	classH *handler.ClassHandler,
+	trainingH *handler.TrainingHandler,
 ) http.Handler {
 	r := chi.NewRouter()
 	rl := middleware.NewRateLimiter()
@@ -250,6 +253,62 @@ func NewRouter(
 	r.Route("/api/recommendations", func(r chi.Router) {
 		r.Use(middleware.AuthMiddleware(jwtManager))
 		r.Get("/", recommendationH.GetRecommendations)
+	})
+
+	r.Route("/api/organizations", func(r chi.Router) {
+		r.Get("/", orgH.List)
+		r.Get("/{id}", orgH.GetByID)
+		r.Get("/{id}/members", orgH.GetMembers)
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.AuthMiddleware(jwtManager))
+			r.Post("/", orgH.Create)
+			r.Put("/{id}", orgH.Update)
+			r.Delete("/{id}", orgH.Delete)
+			r.Post("/{id}/join", orgH.Join)
+			r.Post("/{id}/leave", orgH.Leave)
+			r.Post("/{id}/members", orgH.AddMember)
+			r.Delete("/{id}/members/{userId}", orgH.RemoveMember)
+			r.Get("/my", orgH.MyOrganizations)
+		})
+	})
+
+	r.Route("/api/organizations/{orgId}/classes", func(r chi.Router) {
+		r.Get("/", classH.List)
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.AuthMiddleware(jwtManager))
+			r.Post("/", classH.Create)
+		})
+	})
+
+	r.Route("/api/classes", func(r chi.Router) {
+		r.Get("/{id}", classH.GetByID)
+		r.Get("/{id}/members", classH.GetMembers)
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.AuthMiddleware(jwtManager))
+			r.Put("/{id}", classH.Update)
+			r.Delete("/{id}", classH.Delete)
+			r.Post("/join", classH.JoinByCode)
+			r.Post("/{id}/leave", classH.Leave)
+		})
+	})
+
+	r.Route("/api/training", func(r chi.Router) {
+		r.Get("/", trainingH.List)
+		r.Get("/{id}", trainingH.GetByID)
+		r.Get("/{id}/enrollments", trainingH.GetEnrollments)
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.AuthMiddleware(jwtManager))
+			r.Post("/", trainingH.Create)
+			r.Put("/{id}", trainingH.Update)
+			r.Delete("/{id}", trainingH.Delete)
+			r.Post("/{id}/enroll", trainingH.Enroll)
+			r.Delete("/{id}/enroll", trainingH.Unenroll)
+			r.Get("/{id}/progress", trainingH.GetMyProgress)
+			r.Post("/{id}/sections", trainingH.AddSection)
+			r.Delete("/sections/{sectionId}", trainingH.DeleteSection)
+			r.Post("/sections/{sectionId}/problems", trainingH.AddProblem)
+			r.Delete("/problems/{problemId}", trainingH.RemoveProblem)
+		})
 	})
 
 	return r

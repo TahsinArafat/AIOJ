@@ -126,7 +126,15 @@ func main() {
 	searchStore := postgres.NewSearchStore(db)
 	searchH := handler.NewSearchHandler(searchStore)
 
-	router := api.NewRouter(authH, problemH, submissionH, contestH, vjH, adminH, testcaseH, wsManager, jwtManager, ratingH, registrationH, virtualH, gymH, hackH, statsH, notifH, groupH, teamH, blogH, editorialH, apiKeyH, webhookH, recommendationH, rankingsH, usersH, searchH, langLimitH, importH)
+	orgStore := postgres.NewOrganizationStore(db)
+	classStore := postgres.NewClassStore(db)
+	trainingStore := postgres.NewTrainingPlanStore(db)
+
+	orgH := handler.NewOrganizationHandler(orgStore)
+	classH := handler.NewClassHandler(classStore, orgStore)
+	trainingH := handler.NewTrainingHandler(trainingStore, orgStore)
+
+	router := api.NewRouter(authH, problemH, submissionH, contestH, vjH, adminH, testcaseH, wsManager, jwtManager, ratingH, registrationH, virtualH, gymH, hackH, statsH, notifH, groupH, teamH, blogH, editorialH, apiKeyH, webhookH, recommendationH, rankingsH, usersH, searchH, langLimitH, importH, orgH, classH, trainingH)
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),
