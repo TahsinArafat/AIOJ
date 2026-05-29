@@ -5,6 +5,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/tahsinarafat/aioj/internal/api/handler"
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
 	"github.com/tahsinarafat/aioj/internal/auth"
@@ -46,7 +47,9 @@ func NewRouter(
 ) http.Handler {
 	r := chi.NewRouter()
 	rl := middleware.NewRateLimiter()
-	r.Use(middleware.RateLimit(rl, "/api/health", "/api/ws"), chiMiddleware.RequestID, chiMiddleware.RealIP, middleware.Logging, chiMiddleware.Recoverer)
+	r.Use(middleware.RateLimit(rl, "/api/health", "/api/ws", "/metrics"), chiMiddleware.RequestID, chiMiddleware.RealIP, middleware.Logging, chiMiddleware.Recoverer)
+
+	r.Get("/metrics", promhttp.Handler().ServeHTTP)
 
 	r.Get("/api/health", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte(`{"status":"ok"}`)) })
 
