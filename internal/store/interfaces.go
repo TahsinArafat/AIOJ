@@ -205,3 +205,54 @@ type LanguageLimitStore interface {
 	GetByProblem(ctx context.Context, problemID string) ([]*model.LanguageLimit, error)
 	Delete(ctx context.Context, problemID, languageID string) error
 }
+
+type OrganizationStore interface {
+	Create(ctx context.Context, o *model.Organization) error
+	GetByID(ctx context.Context, id string) (*model.Organization, error)
+	List(ctx context.Context, offset, limit int) ([]model.OrganizationListItem, int, error)
+	Update(ctx context.Context, id string, o *model.Organization) error
+	Delete(ctx context.Context, id string) error
+	AddMember(ctx context.Context, orgID, userID, role string) error
+	RemoveMember(ctx context.Context, orgID, userID string) error
+	GetMembers(ctx context.Context, orgID string) ([]model.OrganizationMember, error)
+	IsMember(ctx context.Context, orgID, userID string) (bool, error)
+	GetMemberRole(ctx context.Context, orgID, userID string) (string, error)
+	GetMemberCount(ctx context.Context, orgID string) (int, error)
+	ListByUser(ctx context.Context, userID string) ([]model.OrganizationListItem, error)
+}
+
+type ClassStore interface {
+	Create(ctx context.Context, c *model.Class) error
+	GetByID(ctx context.Context, id string) (*model.Class, error)
+	GetByInviteCode(ctx context.Context, code string) (*model.Class, error)
+	List(ctx context.Context, orgID string, offset, limit int) ([]model.ClassListItem, int, error)
+	Update(ctx context.Context, id string, c *model.Class) error
+	Delete(ctx context.Context, id string) error
+	AddMember(ctx context.Context, classID, userID, role string) error
+	RemoveMember(ctx context.Context, classID, userID string) error
+	GetMembers(ctx context.Context, classID string) ([]model.ClassMember, error)
+	IsMember(ctx context.Context, classID, userID string) (bool, error)
+	GetMemberCount(ctx context.Context, classID string) (int, error)
+}
+
+type TrainingPlanStore interface {
+	Create(ctx context.Context, p *model.TrainingPlan) error
+	GetByID(ctx context.Context, id string) (*model.TrainingPlan, error)
+	List(ctx context.Context, offset, limit int, orgID *string, publicOnly bool) ([]model.TrainingPlan, int, error)
+	Update(ctx context.Context, id string, p *model.TrainingPlan) error
+	Delete(ctx context.Context, id string) error
+	CreateSection(ctx context.Context, s *model.TrainingPlanSection) error
+	GetSections(ctx context.Context, planID string) ([]model.TrainingPlanSection, error)
+	DeleteSection(ctx context.Context, sectionID string) error
+	AddProblem(ctx context.Context, sectionID, problemID string, sortOrder, points int) error
+	RemoveProblem(ctx context.Context, id string) error
+	GetProblems(ctx context.Context, sectionID string) ([]model.TrainingPlanProblem, error)
+	Enroll(ctx context.Context, planID, userID string) error
+	Unenroll(ctx context.Context, planID, userID string) error
+	IsEnrolled(ctx context.Context, planID, userID string) (bool, error)
+	GetEnrollments(ctx context.Context, planID string) ([]model.TrainingPlanEnrollment, error)
+	MarkProblemCompleted(ctx context.Context, planID, userID, problemID string) error
+	GetProgress(ctx context.Context, planID, userID string) (*model.PlanProgressSummary, error)
+	GetDetail(ctx context.Context, planID, userID string) (*model.TrainingPlanDetail, error)
+	FindByProblem(ctx context.Context, problemID string) ([]string, error)
+}
