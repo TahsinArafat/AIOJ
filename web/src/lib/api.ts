@@ -308,6 +308,62 @@ export const api = {
                 hybrid: any[];
             }>(rating !== undefined ? `/recommendations?rating=${rating}` : '/recommendations'),
     },
+    organizations: {
+        list: (offset = 0, limit = 20) =>
+            request<{ data: any[]; total: number }>(`/organizations?offset=${offset}&limit=${limit}`),
+        get: (id: string) => request<any>(`/organizations/${id}`),
+        create: (d: { name: string; description: string }) =>
+            request<any>('/organizations', { method: 'POST', body: JSON.stringify(d) }),
+        update: (id: string, d: { name: string; description: string }) =>
+            request<any>(`/organizations/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
+        delete: (id: string) => request(`/organizations/${id}`, { method: 'DELETE' }),
+        join: (id: string) => request(`/organizations/${id}/join`, { method: 'POST' }),
+        leave: (id: string) => request(`/organizations/${id}/leave`, { method: 'POST' }),
+        members: (id: string) => request<{ data: any[] }>(`/organizations/${id}/members`),
+        addMember: (id: string, userId: string, role: string) =>
+            request(`/organizations/${id}/members`, { method: 'POST', body: JSON.stringify({ user_id: userId, role }) }),
+        removeMember: (id: string, userId: string) =>
+            request(`/organizations/${id}/members/${userId}`, { method: 'DELETE' }),
+        my: () => request<{ data: any[] }>('/organizations/my'),
+    },
+    classes: {
+        list: (orgId: string, offset = 0, limit = 20) =>
+            request<{ data: any[]; total: number }>(`/organizations/${orgId}/classes?offset=${offset}&limit=${limit}`),
+        get: (id: string) => request<any>(`/classes/${id}`),
+        create: (orgId: string, d: { name: string; description: string }) =>
+            request<any>(`/organizations/${orgId}/classes`, { method: 'POST', body: JSON.stringify(d) }),
+        update: (id: string, d: { name: string; description: string }) =>
+            request<any>(`/classes/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
+        delete: (id: string) => request(`/classes/${id}`, { method: 'DELETE' }),
+        joinByCode: (inviteCode: string) =>
+            request<any>('/classes/join', { method: 'POST', body: JSON.stringify({ invite_code: inviteCode }) }),
+        leave: (id: string) => request(`/classes/${id}/leave`, { method: 'POST' }),
+        members: (id: string) => request<{ data: any[] }>(`/classes/${id}/members`),
+    },
+    training: {
+        list: (offset = 0, limit = 20, opts?: { orgId?: string; public?: boolean }) => {
+            let url = `/training?offset=${offset}&limit=${limit}`;
+            if (opts?.orgId) url += `&org_id=${opts.orgId}`;
+            if (opts?.public) url += `&public=true`;
+            return request<{ data: any[]; total: number }>(url);
+        },
+        get: (id: string) => request<any>(`/training/${id}`),
+        create: (d: any) => request<any>('/training', { method: 'POST', body: JSON.stringify(d) }),
+        update: (id: string, d: any) => request<any>(`/training/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
+        delete: (id: string) => request(`/training/${id}`, { method: 'DELETE' }),
+        enroll: (id: string) => request(`/training/${id}/enroll`, { method: 'POST' }),
+        unenroll: (id: string) => request(`/training/${id}/enroll`, { method: 'DELETE' }),
+        enrollments: (id: string) => request<{ data: any[] }>(`/training/${id}/enrollments`),
+        progress: (id: string) => request<any>(`/training/${id}/progress`),
+        addSection: (planId: string, d: { title: string; description: string }) =>
+            request<any>(`/training/${planId}/sections`, { method: 'POST', body: JSON.stringify(d) }),
+        deleteSection: (sectionId: string) =>
+            request(`/training/sections/${sectionId}`, { method: 'DELETE' }),
+        addProblem: (sectionId: string, d: { problem_id: string; points: number }) =>
+            request<any>(`/training/sections/${sectionId}/problems`, { method: 'POST', body: JSON.stringify(d) }),
+        removeProblem: (problemId: string) =>
+            request(`/training/problems/${problemId}`, { method: 'DELETE' }),
+    },
     ratings: {
         getByUser: (userId: string, limit = 50) =>
             request<{ data: any[] }>(`/rating/user/${userId}?limit=${limit}`),

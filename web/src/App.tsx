@@ -41,6 +41,13 @@ import UserPublicProfile from './pages/UserPublicProfile'
 import ContestCreate from './pages/ContestCreate'
 import NotificationPreferences from './pages/NotificationPreferences'
 import Notifications from './pages/Notifications'
+import OrganizationList from './pages/OrganizationList'
+import OrganizationCreate from './pages/OrganizationCreate'
+import OrganizationDetail from './pages/OrganizationDetail'
+import ClassDetail from './pages/ClassDetail'
+import TrainingPlanList from './pages/TrainingPlanList'
+import TrainingPlanCreate from './pages/TrainingPlanCreate'
+import TrainingPlanDetail from './pages/TrainingPlanDetail'
 import './global.css'
 
 function Home() {
@@ -218,6 +225,13 @@ export default function App() {
                         <Route path="/setter/:slug" element={<SetterProblemWorkspace />} />
                         <Route path="/setter/contest/create" element={<ContestCreate />} />
                         <Route path="/practice" element={<Practice />} />
+                        <Route path="/organizations" element={<OrganizationList />} />
+                        <Route path="/organizations/create" element={<OrganizationCreate />} />
+                        <Route path="/organizations/:id" element={<OrganizationDetail />} />
+                        <Route path="/classes/:id" element={<ClassDetail />} />
+                        <Route path="/training" element={<TrainingPlanList />} />
+                        <Route path="/training/create" element={<TrainingPlanCreate />} />
+                        <Route path="/training/:id" element={<TrainingPlanDetail />} />
                         <Route path="/profile" element={<Profile />} />
                         <Route path="/virtual" element={<VirtualContest />} />
                         <Route path="/rating-history" element={<RatingHistory />} />

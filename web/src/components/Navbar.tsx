@@ -7,7 +7,7 @@ import GlobalSearch from './GlobalSearch'
 import {
     Code2, Trophy, Dumbbell, BookOpen, Users, UserCheck,
     MessageSquare, BarChart3, Settings, LogOut, User, FileCode,
-    Bell, Key, ChevronDown, Menu, X
+    Bell, Key, ChevronDown, Menu, X, Building2, GraduationCap
 } from 'lucide-react'
 
 function decodeRole(): string | null {
@@ -90,9 +90,11 @@ export default function Navbar() {
                             <NavLink to="/practice" icon={BookOpen}>Practice</NavLink>
                         </NavDropdown>
                         <NavDropdown label="Community" icon={Users}>
+                            <NavLink to="/organizations" icon={Building2}>Organizations</NavLink>
                             <NavLink to="/groups" icon={Users}>Groups</NavLink>
                             <NavLink to="/teams" icon={UserCheck}>Teams</NavLink>
                             <NavLink to="/blog" icon={MessageSquare}>Blog</NavLink>
+                            <NavLink to="/training" icon={GraduationCap}>Training Plans</NavLink>
                             <NavLink to="/rankings" icon={BarChart3}>Rankings</NavLink>
                         </NavDropdown>
                         <Link to="/problems" className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-black transition-colors">
