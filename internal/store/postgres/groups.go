@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/google/uuid"
 	"github.com/tahsinarafat/aioj/internal/model"
 )
 
@@ -42,6 +43,9 @@ func (s *GroupStore) Create(ctx context.Context, g *model.Group) error {
 }
 
 func (s *GroupStore) GetByID(ctx context.Context, id string) (*model.Group, error) {
+	if _, err := uuid.Parse(id); err != nil {
+		return nil, nil
+	}
 	var g model.Group
 	err := s.db.QueryRowContext(ctx,
 		`SELECT g.id, g.name, g.description, g.is_public, g.max_members, g.created_by,

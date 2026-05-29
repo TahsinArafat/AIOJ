@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/google/uuid"
 	"github.com/tahsinarafat/aioj/internal/model"
 )
 
@@ -26,6 +27,9 @@ func (s *EditorialStore) Create(ctx context.Context, e *model.Editorial) error {
 }
 
 func (s *EditorialStore) GetByID(ctx context.Context, id string) (*model.Editorial, error) {
+	if _, err := uuid.Parse(id); err != nil {
+		return nil, nil
+	}
 	var e model.Editorial
 	err := s.db.QueryRowContext(ctx,
 		`SELECT e.id, e.problem_id, p.title, e.contest_id, e.user_id, u.username, e.title, e.content,

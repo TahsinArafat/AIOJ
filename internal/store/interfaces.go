@@ -23,7 +23,7 @@ type ProblemStore interface {
 	GetByID(ctx context.Context, id string) (*model.Problem, error)
 	GetBySlug(ctx context.Context, slug string) (*model.Problem, error)
 	List(ctx context.Context, offset, limit int) ([]model.ProblemListItem, int, error)
-	ListWithFilter(ctx context.Context, offset, limit int, difficulty string, tags []string, search string) ([]model.ProblemListItem, int, error)
+	ListWithFilter(ctx context.Context, offset, limit int, difficulty string, tags []string, search string, source string, rating string, sortBy string) ([]model.ProblemListItem, int, error)
 	GetAllTags(ctx context.Context) ([]string, error)
 	UpdateCounts(ctx context.Context, id string, addSubmission, addAccepted int) error
 	Update(ctx context.Context, id string, p *model.Problem) error
@@ -39,7 +39,7 @@ type SubmissionStore interface {
 	Create(ctx context.Context, s *model.Submission) error
 	GetByID(ctx context.Context, id string) (*model.Submission, error)
 	ListByProblem(ctx context.Context, problemID string, offset, limit int) ([]model.Submission, int, error)
-	ListByUser(ctx context.Context, userID string, offset, limit int) ([]model.Submission, int, error)
+	ListByUser(ctx context.Context, userID string, offset, limit int, problemID, contestID string) ([]model.Submission, int, error)
 	UpdateStatus(ctx context.Context, id string, status model.SubmissionStatus)
 	UpdateResult(ctx context.Context, id string, status model.SubmissionStatus, score, timeUsed, memoryUsed int, compileOutput string, results []model.TestCaseResult) error
 	ListPending(ctx context.Context, limit int) ([]string, error)
@@ -268,4 +268,32 @@ type PlagiarismStore interface {
 	ListPairsByReport(ctx context.Context, reportID string, offset, limit int) ([]model.PlagiarismPairDetail, int, error)
 	UpdatePairStatus(ctx context.Context, id string, status model.PlagiarismPairStatus) error
 	GetPairsByUser(ctx context.Context, userID string) ([]model.PlagiarismPairDetail, error)
+}
+
+type BalloonStore interface {
+	CreateRequest(ctx context.Context, contestID, submissionID, userID, problemID string) error
+	ListByContest(ctx context.Context, contestID string) ([]model.BalloonRequest, error)
+	Dispatch(ctx context.Context, id string) error
+}
+
+type PrintStore interface {
+	Create(ctx context.Context, contestID, userID, filename, content string) error
+	ListByContest(ctx context.Context, contestID string) ([]model.PrintRequest, error)
+	UpdateStatus(ctx context.Context, id, status string) error
+}
+
+type BotAccountStore interface {
+	List(ctx context.Context, offset, limit int) ([]model.BotAccount, int, error)
+	ListByPlatform(ctx context.Context, platform string) ([]model.BotAccount, error)
+	GetByID(ctx context.Context, id string) (*model.BotAccount, error)
+	Create(ctx context.Context, ba *model.BotAccount) error
+	Update(ctx context.Context, id string, ba *model.BotAccount) error
+	Delete(ctx context.Context, id string) error
+}
+
+type SystemSettingsStore interface {
+	List(ctx context.Context) ([]model.SystemSetting, error)
+	Get(ctx context.Context, key string) (*model.SystemSetting, error)
+	Set(ctx context.Context, s *model.SystemSetting) error
+	Delete(ctx context.Context, key string) error
 }

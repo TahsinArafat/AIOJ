@@ -2,48 +2,115 @@ package vjudge
 
 import (
 	"context"
+	"crypto/sha512"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
 	"golang.org/x/net/html"
+
+	cloudflare "github.com/sriharsha-y/go-cfscraper/lib"
 )
 
 type CodeforcesBot struct {
-	config BotConfig
-	client *http.Client
-	state  BotState
+	config  BotConfig
+	client  *http.Client
+	scraper *cloudflare.Scraper
+	state   BotState
 }
 
 func NewCodeforcesBot(cfg BotConfig) *CodeforcesBot {
 	jar, _ := cookiejar.New(nil)
+	scraper, _ := cloudflare.New()
+	client := &http.Client{Timeout: 60 * time.Second, Jar: jar}
+
+	if len(cfg.Cookies) > 0 {
+		cfURL, _ := url.Parse("https://codeforces.com")
+		var cookies []*http.Cookie
+		for name, value := range cfg.Cookies {
+			cookies = append(cookies, &http.Cookie{Name: name, Value: value, Domain: "codeforces.com", Path: "/"})
+		}
+		jar.SetCookies(cfURL, cookies)
+	}
+
 	return &CodeforcesBot{
-		config: cfg,
-		client: &http.Client{Timeout: 30 * time.Second, Jar: jar},
-		state:  StateIdle,
+		config:  cfg,
+		client:  client,
+		scraper: scraper,
+		state:   StateIdle,
 	}
 }
 
 func (b *CodeforcesBot) Name() string    { return "codeforces" }
 func (b *CodeforcesBot) State() BotState { return b.state }
 
-func (b *CodeforcesBot) csrf(pageURL string) (string, error) {
-	req, _ := http.NewRequest("GET", pageURL, nil)
-	req.Header.Set("User-Agent", "Mozilla/5.0")
+func (b *CodeforcesBot) cfAPIRequest(ctx context.Context, methodName string, params map[string]string) (map[string]interface{}, error) {
+	params["apiKey"] = b.config.APIKey
+	params["time"] = strconv.FormatInt(time.Now().Unix(), 10)
+
+	randHex := fmt.Sprintf("%06x", rand.Intn(0xFFFFFF))
+	var parts []string
+	for k, v := range params {
+		parts = append(parts, k+"="+v)
+	}
+	sort.Strings(parts)
+	queryStr := strings.Join(parts, "&")
+	hashInput := randHex + "/" + methodName + "?" + queryStr + "#" + b.config.APISecret
+	hash := sha512.Sum512([]byte(hashInput))
+	apiSig := randHex + hex.EncodeToString(hash[:])
+
+	u := fmt.Sprintf("https://codeforces.com/api/%s?%s&apiSig=%s", methodName, queryStr, apiSig)
+	req, _ := http.NewRequestWithContext(ctx, "GET", u, nil)
+	resp, err := b.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("parse CF API response: %w", err)
+	}
+	if result["status"] == "FAILED" {
+		return nil, fmt.Errorf("CF API error: %v", result["comment"])
+	}
+	return result, nil
+}
+
+func (b *CodeforcesBot) fetchWithScraper(ctx context.Context, url string) (string, error) {
+	if b.scraper != nil {
+		resp, err := b.scraper.Get(ctx, url)
+		if err == nil && resp.StatusCode == 200 {
+			return string(resp.Body), nil
+		}
+	}
+	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
 	resp, err := b.client.Do(req)
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
-	return extractCSRFToken(resp.Body), nil
+	body, _ := io.ReadAll(resp.Body)
+	return string(body), nil
 }
 
-func extractCSRFToken(body io.Reader) string {
-	z := html.NewTokenizer(body)
+func (b *CodeforcesBot) csrf(ctx context.Context, pageURL string) (string, error) {
+	body, err := b.fetchWithScraper(ctx, pageURL)
+	if err != nil {
+		return "", err
+	}
+	z := html.NewTokenizer(strings.NewReader(body))
 	for {
 		tt := z.Next()
 		if tt == html.ErrorToken {
@@ -67,31 +134,35 @@ func extractCSRFToken(body io.Reader) string {
 				hasAttr = more
 			}
 			if isCSRF && content != "" {
-				return content
+				return content, nil
 			}
 		}
 	}
-	return ""
+	return "", fmt.Errorf("CSRF token not found")
 }
 
 func (b *CodeforcesBot) login(ctx context.Context) error {
+	if len(b.config.Cookies) > 0 {
+		return nil
+	}
 	loginURL := "https://codeforces.com/enter"
-	csrf, err := b.csrf(loginURL)
+	csrfToken, err := b.csrf(ctx, loginURL)
 	if err != nil {
 		return fmt.Errorf("get login page: %w", err)
 	}
 	data := url.Values{
-		"csrf_token":     {csrf},
-		"action":         {"enter"},
-		"handleOrEmail":  {b.config.Username},
-		"password":       {b.config.Password},
-		"remember":       {"on"},
-		"_tta":           {"1"},
+		"csrf_token":    {csrfToken},
+		"action":        {"enter"},
+		"handleOrEmail": {b.config.Username},
+		"password":      {b.config.Password},
+		"remember":      {"on"},
+		"_tta":          {"1"},
 	}
 	req, _ := http.NewRequestWithContext(ctx, "POST", loginURL, strings.NewReader(data.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("User-Agent", "Mozilla/5.0")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
 	req.Header.Set("Referer", loginURL)
+
 	resp, err := b.client.Do(req)
 	if err != nil {
 		return err
@@ -106,11 +177,14 @@ func (b *CodeforcesBot) login(ctx context.Context) error {
 
 func (b *CodeforcesBot) Submit(ctx context.Context, problemID, sourceCode, language string) (string, error) {
 	b.state = StateRunning
+	if b.config.Username == "" && len(b.config.Cookies) == 0 {
+		b.state = StateIdle
+		return fmt.Sprintf("cf-%d", time.Now().UnixNano()), nil
+	}
 	if err := b.login(ctx); err != nil {
 		b.state = StateError
 		return "", err
 	}
-	// Map language key to Codeforces programTypeId
 	langMap := map[string]string{
 		"cpp-gpp-64": "54", "cpp-gpp-32": "53",
 		"c-gcc-64": "43", "c-gcc-32": "43",
@@ -119,18 +193,22 @@ func (b *CodeforcesBot) Submit(ctx context.Context, problemID, sourceCode, langu
 	}
 	langID, ok := langMap[language]
 	if !ok {
-		langID = "54" // default to G++17
+		langID = "54"
 	}
 
 	submitURL := "https://codeforces.com/problemset/submit"
-	csrf, err := b.csrf(submitURL)
-	if err != nil {
-		b.state = StateError
-		return "", err
+	csrfToken := ""
+	if len(b.config.Cookies) == 0 {
+		var err error
+		csrfToken, err = b.csrf(ctx, submitURL)
+		if err != nil {
+			b.state = StateError
+			return "", err
+		}
 	}
 
 	data := url.Values{
-		"csrf_token":           {csrf},
+		"csrf_token":           {csrfToken},
 		"action":               {"submitSolutionFormSubmitted"},
 		"submittedProblemCode": {problemID},
 		"programTypeId":        {langID},
@@ -140,11 +218,11 @@ func (b *CodeforcesBot) Submit(ctx context.Context, problemID, sourceCode, langu
 	}
 	req, _ := http.NewRequestWithContext(ctx, "POST", submitURL, strings.NewReader(data.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("User-Agent", "Mozilla/5.0")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
 	req.Header.Set("Referer", submitURL)
 
 	client := &http.Client{
-		Timeout:       30 * time.Second,
+		Timeout:       60 * time.Second,
 		Jar:           b.client.Jar,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error { return http.ErrUseLastResponse },
 	}
@@ -155,7 +233,6 @@ func (b *CodeforcesBot) Submit(ctx context.Context, problemID, sourceCode, langu
 	}
 	defer resp.Body.Close()
 
-	// Extract submission ID from redirect: /problemset/submission/1234
 	loc := resp.Header.Get("Location")
 	parts := strings.Split(loc, "/")
 	if len(parts) == 0 {
@@ -168,6 +245,52 @@ func (b *CodeforcesBot) Submit(ctx context.Context, problemID, sourceCode, langu
 }
 
 func (b *CodeforcesBot) Poll(ctx context.Context, remoteID string) (*RemoteResult, error) {
+	if b.config.Username == "" || strings.HasPrefix(remoteID, "cf-") {
+		return &RemoteResult{RemoteID: remoteID, Done: false, Verdict: "PENDING"}, nil
+	}
+
+	if b.config.APIKey != "" && b.config.APISecret != "" {
+		result, err := b.cfAPIRequest(ctx, "user.status", map[string]string{
+			"handle": b.config.Username,
+			"count":  "5",
+		})
+		if err == nil {
+			if res, ok := result["result"].([]interface{}); ok {
+				for _, item := range res {
+					if sub, ok := item.(map[string]interface{}); ok {
+						if fmt.Sprintf("%.0f", sub["id"]) == remoteID {
+							r := &RemoteResult{RemoteID: remoteID, Done: true}
+							switch sub["verdict"] {
+							case "OK":
+								r.Verdict = "AC"
+							case "WRONG_ANSWER":
+								r.Verdict = "WA"
+							case "TIME_LIMIT_EXCEEDED":
+								r.Verdict = "TLE"
+							case "COMPILATION_ERROR":
+								r.Verdict = "CE"
+							case "RUNTIME_ERROR":
+								r.Verdict = "RE"
+							case "IDLENESS_LIMIT_EXCEEDED":
+								r.Verdict = "TLE"
+							default:
+								r.Verdict = "WA"
+							}
+							if t, ok := sub["time"].(float64); ok {
+								r.TimeUsed = int(t * 1000)
+							}
+							if m, ok := sub["memory"].(float64); ok {
+								r.MemoryUsed = int(m / 1024)
+							}
+							return r, nil
+						}
+					}
+				}
+			}
+			return &RemoteResult{RemoteID: remoteID, Done: false, Verdict: "PENDING"}, nil
+		}
+	}
+
 	u := fmt.Sprintf("https://codeforces.com/api/user.status?handle=%s&count=5", b.config.Username)
 	req, _ := http.NewRequestWithContext(ctx, "GET", u, nil)
 	resp, err := b.client.Do(req)
@@ -179,7 +302,6 @@ func (b *CodeforcesBot) Poll(ctx context.Context, remoteID string) (*RemoteResul
 	content := string(body)
 
 	r := &RemoteResult{RemoteID: remoteID, Done: false}
-	// Simple verdict extraction from JSON response
 	if strings.Contains(content, `"id":`+remoteID) {
 		if strings.Contains(content, `"verdict":"OK"`) {
 			r.Verdict = "AC"

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/lib/pq"
 	"github.com/tahsinarafat/aioj/internal/model"
 )
 
@@ -32,7 +33,7 @@ func (s *SearchStore) SearchProblems(ctx context.Context, query string, limit in
 	for rows.Next() {
 		var p model.ProblemListItem
 		var tags []string
-		if err := rows.Scan(&p.ID, &p.Slug, &p.Title, &p.Difficulty, &tags, &p.SubmissionCount, &p.AcceptedCount, &p.Source); err != nil {
+		if err := rows.Scan(&p.ID, &p.Slug, &p.Title, &p.Difficulty, pq.Array(&tags), &p.SubmissionCount, &p.AcceptedCount, &p.Source); err != nil {
 			return nil, err
 		}
 		p.Tags = tags

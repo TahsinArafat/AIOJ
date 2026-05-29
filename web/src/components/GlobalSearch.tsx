@@ -5,6 +5,7 @@ import { api } from '../lib/api'
 interface SearchResult {
     id: string
     title: string
+    slug?: string
     subtitle?: string
     username?: string
 }
@@ -40,16 +41,17 @@ export default function GlobalSearch() {
 
     // Debounced search
     useEffect(() => {
-        if (!query.trim()) {
+        const trimmed = query.trim()
+        if (trimmed.length < 2) {
             setResults(null)
-            setIsOpen(false)
+            if (!trimmed) setIsOpen(false)
             return
         }
 
         const timer = setTimeout(async () => {
             setIsLoading(true)
             try {
-                const data = await api.search.global(query.trim())
+                const data = await api.search.global(trimmed)
                 setResults(data)
                 setIsOpen(true)
                 setSelectedIndex(-1)
@@ -76,7 +78,7 @@ export default function GlobalSearch() {
 
     const getResultPath = (result: typeof flatResults[number]) => {
         switch (result.type) {
-            case 'problem': return `/problems/${result.id}`
+            case 'problem': return `/problems/${result.slug || result.id}`
             case 'user': return `/user/${result.username}`
             case 'contest': return `/contests/${result.id}`
         }
@@ -110,6 +112,8 @@ export default function GlobalSearch() {
                 e.preventDefault()
                 if (selectedIndex >= 0 && selectedIndex < flatResults.length) {
                     handleSelect(flatResults[selectedIndex])
+                } else if (flatResults.length > 0) {
+                    handleSelect(flatResults[0])
                 }
                 break
             case 'Escape':

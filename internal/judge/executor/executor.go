@@ -4,15 +4,15 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log/slog"
 	"net/http"
 	"time"
 )
 
 type CmdFile struct {
-	Content string `json:"content,omitempty"`
+	Content string `json:"content"`
 	Src     string `json:"src,omitempty"`
-	Max     int64  `json:"max,omitempty"`
-	Name    string `json:"name,omitempty"`
 }
 
 type Cmd struct {
@@ -56,14 +56,37 @@ func (c *Client) Run(req *ExecRequest) ([]CmdResult, error) {
 	if err != nil {
 		return nil, fmt.Errorf("marshal: %w", err)
 	}
+	slog.Info("executor request", "body_len", len(body), "cmds", len(req.Cmd))
+	if len(req.Cmd) > 0 {
+		slog.Info("executor cmd", "args", req.Cmd[0].Args, "copyIn_keys", len(req.Cmd[0].CopyIn), "files_len", len(req.Cmd[0].Files))
+	}
 	resp, err := c.http.Post(c.endpoint+"/run", "application/json", bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("request: %w", err)
 	}
 	defer resp.Body.Close()
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read body: %w", err)
+	}
+	slog.Info("executor response", "status", resp.StatusCode, "body_len", len(respBody))
+	if resp.StatusCode != 200 {
+		slog.Error("executor error response", "status", resp.StatusCode, "body", string(respBody[:min(len(respBody), 500)]))
+	}
 	var results []CmdResult
-	if err := json.NewDecoder(resp.Body).Decode(&results); err != nil {
-		return nil, fmt.Errorf("decode: %w", err)
+	if err := json.Unmarshal(respBody, &results); err != nil {
+		var errMsg string
+		if json.Unmarshal(respBody, &errMsg) == nil {
+			return nil, fmt.Errorf("executor error: %s", errMsg)
+		}
+		return nil, fmt.Errorf("decode: %w (body: %s)", err, string(respBody[:min(len(respBody), 500)]))
 	}
 	return results, nil
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }

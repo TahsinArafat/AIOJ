@@ -53,6 +53,19 @@ export default function ContestScoreboard() {
 
     const { entries, problems, frozen, contest } = data
 
+    const firstSolveMap = new Map<string, { user_id: string; time: number }>()
+    entries?.forEach((e: any) => {
+        Object.keys(e.problems || {}).forEach((probIndex) => {
+            const pr = e.problems[probIndex]
+            if (pr.solved) {
+                const current = firstSolveMap.get(probIndex)
+                if (!current || pr.time < current.time) {
+                    firstSolveMap.set(probIndex, { user_id: e.user_id, time: pr.time })
+                }
+            }
+        })
+    })
+
     return (
         <div>
             <div className="flex items-center gap-3 mb-4">
@@ -137,10 +150,13 @@ export default function ContestScoreboard() {
                                     
                                     if (contest?.format === 'oi' || contest?.format === 'ioi') {
                                         if (pr.score > 0) {
+                                            const firstSolve = firstSolveMap.get(p.index)
+                                            const isFirstSolve = firstSolve && firstSolve.user_id === e.user_id
                                             return (
-                                                <td key={p.problem_id} className="border border-gray-200 px-2 py-2 text-center text-green-600 font-medium text-xs">
+                                                <td key={p.problem_id} className={`border px-2 py-2 text-center text-green-600 font-medium text-xs ${isFirstSolve ? 'bg-green-100 text-green-800 border-green-300 font-bold animate-pulse shadow-sm' : 'border-gray-200'}`}>
+                                                    {isFirstSolve && <span className="block text-2xs uppercase tracking-wider text-green-700 font-bold mb-0.5">⭐ First Solve</span>}
                                                     {pr.score}<br />
-                                                    <span className="text-gray-400">{pr.attempts} tries</span>
+                                                    <span className={`${isFirstSolve ? 'text-green-700' : 'text-gray-400'}`}>{pr.attempts} tries</span>
                                                 </td>
                                             )
                                         }
@@ -151,10 +167,13 @@ export default function ContestScoreboard() {
                                     }
 
                                     if (pr.solved) {
+                                        const firstSolve = firstSolveMap.get(p.index)
+                                        const isFirstSolve = firstSolve && firstSolve.user_id === e.user_id
                                         return (
-                                            <td key={p.problem_id} className="border border-gray-200 px-2 py-2 text-center text-green-600 font-medium text-xs">
+                                            <td key={p.problem_id} className={`border px-2 py-2 text-center text-green-600 font-medium text-xs ${isFirstSolve ? 'bg-green-100 text-green-800 border-green-300 font-bold animate-pulse shadow-sm' : 'border-gray-200'}`}>
+                                                {isFirstSolve && <span className="block text-2xs uppercase tracking-wider text-green-700 font-bold mb-0.5">⭐ First Solve</span>}
                                                 +{pr.attempts > 1 ? pr.attempts - 1 : ''}<br />
-                                                <span className="text-gray-400">{pr.time}min</span>
+                                                <span className={`${isFirstSolve ? 'text-green-700' : 'text-gray-400'}`}>{pr.time}min</span>
                                             </td>
                                         )
                                     }

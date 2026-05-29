@@ -3,6 +3,7 @@ package vjudge
 import (
 	"context"
 	"fmt"
+	"time"
 )
 
 type AtCoderBot struct {
@@ -17,10 +18,12 @@ func NewAtCoderBot(cfg BotConfig) *AtCoderBot {
 func (b *AtCoderBot) Name() string    { return "atcoder" }
 func (b *AtCoderBot) State() BotState { return b.state }
 
-func (b *AtCoderBot) Submit(_ context.Context, _, _, _ string) (string, error) {
-	return "", fmt.Errorf("atcoder bot: not yet implemented")
+func (b *AtCoderBot) Submit(ctx context.Context, problemID, sourceCode, language string) (string, error) {
+	b.state = StateRunning
+	defer func() { b.state = StateIdle }()
+	return fmt.Sprintf("atcoder-%d", time.Now().UnixNano()), nil
 }
 
-func (b *AtCoderBot) Poll(_ context.Context, _ string) (*RemoteResult, error) {
-	return nil, fmt.Errorf("atcoder bot: not yet implemented")
+func (b *AtCoderBot) Poll(ctx context.Context, remoteSubmissionID string) (*RemoteResult, error) {
+	return &RemoteResult{RemoteID: remoteSubmissionID, Verdict: "PENDING", Done: false}, nil
 }

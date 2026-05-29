@@ -189,7 +189,7 @@ export default function App() {
         <BrowserRouter>
             <div className="min-h-screen bg-white">
                 <Navbar />
-                <main className="max-w-5xl mx-auto px-4 py-6">
+                <main className="max-w-[1400px] mx-auto px-6 py-6">
                     <Routes>
                         <Route path="/" element={<Home />} />
                         <Route path="/problems" element={<ProblemList />} />

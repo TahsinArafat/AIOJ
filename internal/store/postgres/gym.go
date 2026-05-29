@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/tahsinarafat/aioj/internal/model"
 )
 
@@ -26,6 +27,9 @@ func (s *GymStore) Create(ctx context.Context, g *model.GymContest) error {
 }
 
 func (s *GymStore) GetByID(ctx context.Context, id string) (*model.GymContest, error) {
+	if _, err := uuid.Parse(id); err != nil {
+		return nil, nil
+	}
 	var g model.GymContest
 	err := s.db.QueryRowContext(ctx,
 		`SELECT g.id, g.contest_id, c.title, g.difficulty_rating, g.category, g.country, g.season,

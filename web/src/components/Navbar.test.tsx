@@ -17,6 +17,6 @@ test('renders brand logo and primary navigation links', () => {
 
     // Verify key navigation paths exist
     expect(screen.getByText('Problems')).toBeInTheDocument()
-    expect(screen.getByText('Contests')).toBeInTheDocument()
-    expect(screen.getByText('Practice')).toBeInTheDocument()
+    expect(screen.getByText('Compete')).toBeInTheDocument()
+    expect(screen.getByText('Community')).toBeInTheDocument()
 })

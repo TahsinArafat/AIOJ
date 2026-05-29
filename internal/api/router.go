@@ -44,6 +44,11 @@ func NewRouter(
 	classH *handler.ClassHandler,
 	trainingH *handler.TrainingHandler,
 	plagiarismH *handler.PlagiarismHandler,
+	mediaH *handler.MediaHandler,
+	onsiteH *handler.OnsiteHandler,
+	botAccountH *handler.AdminBotAccountHandler,
+	settingsH *handler.AdminSystemSettingsHandler,
+	langAdminH *handler.AdminLanguageHandler,
 ) http.Handler {
 	r := chi.NewRouter()
 	rl := middleware.NewRateLimiter()
@@ -82,6 +87,8 @@ func NewRouter(
 			r.Delete("/{slug}/language-limits/{lang}", langLimitH.Delete)
 			r.Get("/{slug}/export", problemH.Export)
 			r.Post("/import", importH.Import)
+			r.Post("/import/codeforces", importH.ImportCodeforces)
+			r.Post("/{slug}/media", mediaH.Upload)
 		})
 	})
 
@@ -122,6 +129,15 @@ func NewRouter(
 
 	r.Get("/api/contests/{id}/registrations", registrationH.ListRegistrations)
 
+	r.Route("/api/contests/{id}/onsite", func(r chi.Router) {
+		r.Use(middleware.AuthMiddleware(jwtManager))
+		r.Get("/balloons", onsiteH.ListBalloons)
+		r.Post("/balloons/{balloonId}/dispatch", onsiteH.DispatchBalloon)
+		r.Post("/print", onsiteH.RequestPrint)
+		r.Get("/prints", onsiteH.ListPrints)
+		r.Post("/prints/{printId}/status", onsiteH.UpdatePrintStatus)
+	})
+
 	r.Route("/api/vjudge", func(r chi.Router) {
 		r.Use(middleware.AuthMiddleware(jwtManager))
 		r.Get("/bots", vjudgeH.ListBots)
@@ -135,6 +151,34 @@ func NewRouter(
 		r.Put("/users/{id}/role", adminH.UpdateUserRole)
 		r.Get("/setter-applications", adminH.ListSetterApps)
 		r.Post("/setter-applications/{id}/review", adminH.ReviewSetterApp)
+
+		r.Route("/bot-accounts", func(r chi.Router) {
+			r.Get("/", botAccountH.List)
+			r.Post("/", botAccountH.Create)
+			r.Get("/{id}", botAccountH.GetByID)
+			r.Put("/{id}", botAccountH.Update)
+			r.Delete("/{id}", botAccountH.Delete)
+		})
+
+		r.Route("/settings", func(r chi.Router) {
+			r.Get("/", settingsH.List)
+			r.Post("/", settingsH.Set)
+			r.Get("/{key}", settingsH.Get)
+			r.Delete("/{key}", settingsH.Delete)
+		})
+
+		r.Route("/languages", func(r chi.Router) {
+			r.Get("/", langAdminH.List)
+			r.Post("/", langAdminH.Create)
+			r.Get("/detect", langAdminH.Detect)
+			r.Get("/templates", langAdminH.Templates)
+			r.Get("/{key}", langAdminH.Get)
+			r.Put("/{key}", langAdminH.Update)
+			r.Delete("/{key}", langAdminH.Delete)
+			r.Get("/{key}/raw", langAdminH.GetRaw)
+			r.Put("/{key}/raw", langAdminH.UpdateRaw)
+			r.Post("/{key}/test", langAdminH.Test)
+		})
 	})
 
 	r.Group(func(r chi.Router) {
@@ -323,6 +367,9 @@ func NewRouter(
 		r.Get("/report/{reportId}/pairs", plagiarismH.ListPairs)
 		r.Put("/pairs/{pairId}", plagiarismH.UpdatePairStatus)
 	})
+
+	fileServer := http.FileServer(http.Dir("./media"))
+	r.Handle("/media/*", http.StripPrefix("/media/", fileServer))
 
 	return r
 }

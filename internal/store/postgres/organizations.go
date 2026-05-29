@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/google/uuid"
 	"github.com/tahsinarafat/aioj/internal/model"
 )
 
@@ -42,6 +43,9 @@ func (s *OrganizationStore) Create(ctx context.Context, o *model.Organization) e
 }
 
 func (s *OrganizationStore) GetByID(ctx context.Context, id string) (*model.Organization, error) {
+	if _, err := uuid.Parse(id); err != nil {
+		return nil, nil
+	}
 	var o model.Organization
 	err := s.db.QueryRowContext(ctx,
 		`SELECT o.id, o.name, o.description, o.created_by,

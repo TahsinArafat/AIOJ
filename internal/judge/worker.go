@@ -26,10 +26,11 @@ type WorkerPool struct {
 	subStore       store.SubmissionStore
 	probStore      store.ProblemStore
 	langLimitStore store.LanguageLimitStore
+	balloonStore   store.BalloonStore
 }
 
 func NewWorkerPool(q queue.JudgeQueue, exec *executor.Client, langDir string, concurrency int,
-	subStore store.SubmissionStore, probStore store.ProblemStore, langLimitStore store.LanguageLimitStore) *WorkerPool {
+	subStore store.SubmissionStore, probStore store.ProblemStore, langLimitStore store.LanguageLimitStore, balloonStore store.BalloonStore) *WorkerPool {
 	return &WorkerPool{
 		queue:          q,
 		exec:           exec,
@@ -38,6 +39,7 @@ func NewWorkerPool(q queue.JudgeQueue, exec *executor.Client, langDir string, co
 		subStore:       subStore,
 		probStore:      probStore,
 		langLimitStore: langLimitStore,
+		balloonStore:   balloonStore,
 	}
 }
 
@@ -103,6 +105,7 @@ func (wp *WorkerPool) judge(ctx context.Context, submissionID string) {
 	}
 
 	spjExeDir := ""
+	spjBinContent := ""
 	if prob.SPJ && prob.SPJSourceCode != "" {
 		spjLang := prob.SPJLanguage
 		if spjLang == "" {
@@ -152,70 +155,29 @@ func (wp *WorkerPool) judge(ctx context.Context, submissionID string) {
 			return
 		}
 		spjExeDir = spjResp[0].RunDir
+		if binData, ok := spjResp[0].Files[spjExeName]; ok {
+			spjBinContent = binData
+		}
 	}
 
 	compileOutput := ""
-	compiledExeDir := ""
-	if cfg.CompileCmd != "" {
-		srcName := "Main" + cfg.Extensions[0]
-		exeName := "Main"
-		cmdStr := cfg.CompileCmd
-		cmdStr = strings.ReplaceAll(cmdStr, "{{exe}}", exeName)
-		cmdStr = strings.ReplaceAll(cmdStr, "{{src}}", srcName)
-		cmdStr = strings.ReplaceAll(cmdStr, "{{dir}}", "/box")
-
-		copyIn := map[string]executor.CmdFile{srcName: {Content: sub.SourceCode}}
-
-		slog.Info("compiling", "lang", sub.Language)
-		resp, err := wp.exec.Run(&executor.ExecRequest{
-			Cmd: []executor.Cmd{{
-				Args:        []string{"/bin/sh", "-c", cmdStr},
-				Env:         []string{"PATH=/usr/bin:/bin"},
-				CPULimit:    30_000_000_000,
-				MemoryLimit: 536_870_912,
-				ProcLimit:   64,
-				CopyIn:      copyIn,
-				CopyOut:     []string{exeName},
-			}},
-		})
-		if err != nil {
-			wp.subStore.UpdateResult(ctx, submissionID, model.StatusCE, 0, 0, 0, err.Error(), nil)
-			return
-		}
-		compiledStatus := resp[0].Status
-		if len(resp) == 0 || (compiledStatus != "Accepted" && compiledStatus != "Nonzero Exit Status") {
-			ce := "compile error: unexpected status: " + compiledStatus
-			if resp[0].Error != "" {
-				ce = resp[0].Error
-			}
-			wp.subStore.UpdateResult(ctx, submissionID, model.StatusCE, 0, 0, 0, ce, nil)
-			return
-		}
-		if compiledStatus == "Nonzero Exit Status" {
-			ceMsg := "compile error: nonzero exit status"
-			if resp[0].Error != "" {
-				ceMsg = resp[0].Error
-			}
-			wp.subStore.UpdateResult(ctx, submissionID, model.StatusCE, 0, 0, 0, ceMsg, nil)
-			return
-		}
-		compiledExeDir = resp[0].RunDir
-	}
-
+	compileCmdStr := ""
 	srcName := "Main" + cfg.Extensions[0]
-	exeFile := map[string]executor.CmdFile{}
-	if cfg.Runtime != "" {
-		exeFile[srcName] = executor.CmdFile{Content: sub.SourceCode}
-	} else {
-		exeFile["Main"] = executor.CmdFile{Src: filepath.Join(compiledExeDir, "Main")}
+	if cfg.CompileCmd != "" {
+		compileCmdStr = cfg.CompileCmd
+		compileCmdStr = strings.ReplaceAll(compileCmdStr, "{{exe}}", "Main")
+		compileCmdStr = strings.ReplaceAll(compileCmdStr, "{{src}}", srcName)
+		compileCmdStr = strings.ReplaceAll(compileCmdStr, "{{dir}}", "/box")
 	}
+
+	copyIn := map[string]executor.CmdFile{srcName: {Content: sub.SourceCode}}
 
 	timeLimitMs, memoryLimitKB := wp.getEffectiveLimits(prob, sub.Language)
 	cpuNs := uint64(float64(timeLimitMs)*cfg.TimeLimitMultiplier) * 1_000_000
 	memBytes := uint64(float64(memoryLimitKB)*cfg.MemoryLimitMultiplier) * 1024
 
 	if prob.HasSubtasks() && prob.ScoringMode == "partial" {
-		wp.evaluateSubtasks(ctx, sub, prob, cfg, exeFile, spjExeDir)
+		wp.evaluateSubtasks(ctx, sub, prob, cfg, copyIn, compileCmdStr, spjExeDir, spjBinContent)
 		return
 	}
 
@@ -224,7 +186,7 @@ func (wp *WorkerPool) judge(ctx context.Context, submissionID string) {
 	maxTime, maxMem, totalScore := 0, 0, 0
 
 	for _, tc := range prob.TestCaseScore {
-		r := wp.runTestCase(ctx, prob, cfg, tc, exeFile, spjExeDir, cpuNs, memBytes)
+		r := wp.runTestCase(ctx, prob, cfg, tc, copyIn, compileCmdStr, spjExeDir, spjBinContent, cpuNs, memBytes)
 		results = append(results, r)
 		if r.Time > maxTime {
 			maxTime = r.Time
@@ -244,6 +206,9 @@ func (wp *WorkerPool) judge(ctx context.Context, submissionID string) {
 	}
 
 	wp.subStore.UpdateResult(ctx, submissionID, finalStatus, avgScore, maxTime, maxMem, compileOutput, results)
+	if finalStatus == model.StatusAC && sub.ContestID != "" {
+		_ = wp.balloonStore.CreateRequest(ctx, sub.ContestID, sub.ID, sub.UserID, sub.ProblemID)
+	}
 	wp.probStore.UpdateCounts(ctx, prob.ID, 1, boolToInt(finalStatus == model.StatusAC))
 	slog.Info("judged", "id", submissionID, "verdict", finalStatus)
 }
@@ -287,8 +252,10 @@ func (wp *WorkerPool) runTestCase(
 	prob *model.Problem,
 	langCfg *compiler.LangConfig,
 	tc model.TestCaseScore,
-	exeFile map[string]executor.CmdFile,
+	copyIn map[string]executor.CmdFile,
+	compileCmdStr string,
 	spjExeDir string,
+	spjBinContent string,
 	cpuLimitNs uint64,
 	memLimitBytes uint64,
 ) model.TestCaseResult {
@@ -297,6 +264,8 @@ func (wp *WorkerPool) runTestCase(
 	if langCfg.Runtime != "" {
 		rtParts := strings.Fields(langCfg.Runtime)
 		args = append(rtParts, "/box/"+srcName)
+	} else if compileCmdStr != "" {
+		args = []string{"/bin/sh", "-c", compileCmdStr + " && ./Main"}
 	} else {
 		args = []string{"/box/Main"}
 	}
@@ -311,11 +280,11 @@ func (wp *WorkerPool) runTestCase(
 			CPULimit:    cpuLimitNs,
 			MemoryLimit: memLimitBytes,
 			ProcLimit:   16,
-			CopyIn:      exeFile,
+			CopyIn:      copyIn,
 			Files: []executor.CmdFile{
 				{Content: inputContent},
-				{Name: "stdout", Max: 10 * 1024 * 1024},
-				{Name: "stderr", Max: 10 * 1024 * 1024},
+				{Content: ""},
+				{Content: ""},
 			},
 		}},
 	})
@@ -336,6 +305,17 @@ func (wp *WorkerPool) runTestCase(
 
 	cr := resp[0]
 	r.Memory = int(cr.Memory / 1024)
+
+	if compileCmdStr != "" && cr.Status == "Nonzero Exit Status" {
+		r.Status = model.StatusCE
+		if errOut, ok := cr.Files["stderr"]; ok && errOut != "" {
+			r.Detail = errOut
+		} else {
+			r.Detail = cr.Error
+		}
+		return r
+	}
+
 	switch cr.Status {
 	case "Accepted":
 		output := ""
@@ -346,7 +326,7 @@ func (wp *WorkerPool) runTestCase(
 
 		if prob.SPJ && spjExeDir != "" {
 			spjCopyIn := map[string]executor.CmdFile{
-				"spj":        {Src: filepath.Join(spjExeDir, "spj")},
+				"spj":        {Content: spjBinContent},
 				"input.txt":  {Content: inputContent},
 				"user.txt":   {Content: output},
 				"answer.txt": {Content: expected},
@@ -362,8 +342,8 @@ func (wp *WorkerPool) runTestCase(
 					CopyIn:      spjCopyIn,
 					Files: []executor.CmdFile{
 						{Content: ""},
-						{Name: "stdout", Max: 1024 * 1024},
-						{Name: "stderr", Max: 1024 * 1024},
+						{Content: ""},
+						{Content: ""},
 					},
 				}},
 			})
@@ -422,8 +402,10 @@ func (wp *WorkerPool) evaluateSubtasks(
 	sub *model.Submission,
 	prob *model.Problem,
 	langCfg *compiler.LangConfig,
-	exeFile map[string]executor.CmdFile,
+	copyIn map[string]executor.CmdFile,
+	compileCmdStr string,
 	spjExeDir string,
+	spjBinContent string,
 ) {
 	subtasks := prob.GetSubtasks()
 
@@ -449,7 +431,7 @@ func (wp *WorkerPool) evaluateSubtasks(
 
 		for _, tc := range cases {
 			maxScore += tc.Score
-			result := wp.runTestCase(ctx, prob, langCfg, tc, exeFile, spjExeDir, cpuLimitNs, memLimitBytes)
+			result := wp.runTestCase(ctx, prob, langCfg, tc, copyIn, compileCmdStr, spjExeDir, spjBinContent, cpuLimitNs, memLimitBytes)
 			allResults = append(allResults, result)
 
 			if result.Time > maxTime {
@@ -482,6 +464,9 @@ func (wp *WorkerPool) evaluateSubtasks(
 	}
 
 	wp.subStore.UpdateResult(ctx, sub.ID, finalStatus, percentageScore, maxTime, maxMemory, "", allResults)
+	if finalStatus == model.StatusAC && sub.ContestID != "" {
+		_ = wp.balloonStore.CreateRequest(ctx, sub.ContestID, sub.ID, sub.UserID, sub.ProblemID)
+	}
 	wp.probStore.UpdateCounts(ctx, sub.ProblemID, 1, boolToInt(finalStatus == model.StatusAC))
 }
 
@@ -494,7 +479,7 @@ func (wp *WorkerPool) judgeInteractive(ctx context.Context, sub *model.Submissio
 	}
 
 	// Compile contestant code
-	compiledExeDir := ""
+	compiledBinContent := ""
 	if cfg.CompileCmd != "" {
 		srcName := "Main" + cfg.Extensions[0]
 		exeName := "Main"
@@ -537,7 +522,9 @@ func (wp *WorkerPool) judgeInteractive(ctx context.Context, sub *model.Submissio
 			wp.subStore.UpdateResult(ctx, sub.ID, model.StatusCE, 0, 0, 0, ceMsg, nil)
 			return
 		}
-		compiledExeDir = resp[0].RunDir
+		if binData, ok := resp[0].Files[exeName]; ok {
+			compiledBinContent = binData
+		}
 	}
 
 	// Compile interactor
@@ -588,7 +575,10 @@ func (wp *WorkerPool) judgeInteractive(ctx context.Context, sub *model.Submissio
 		wp.subStore.UpdateResult(ctx, sub.ID, model.StatusSE, 0, 0, 0, "interactor compile error:\n"+interResp[0].Error, nil)
 		return
 	}
-	interExeDir := interResp[0].RunDir
+	interBinContent := ""
+	if binData, ok := interResp[0].Files["interactor"]; ok {
+		interBinContent = binData
+	}
 
 	// Run interactive judging for each test case
 	results := make([]model.TestCaseResult, 0)
@@ -605,7 +595,7 @@ func (wp *WorkerPool) judgeInteractive(ctx context.Context, sub *model.Submissio
 		inputContent := loadFile(filepath.Join(prob.TestdataPath, tc.InputName))
 
 		interRunCopyIn := map[string]executor.CmdFile{
-			"interactor": {Src: filepath.Join(interExeDir, "interactor")},
+			"interactor": {Content: interBinContent},
 		}
 		// Some interactors read the input file
 		if inputContent != "" {
@@ -620,7 +610,7 @@ func (wp *WorkerPool) judgeInteractive(ctx context.Context, sub *model.Submissio
 			contestantRunCopyIn[srcName] = executor.CmdFile{Content: sub.SourceCode}
 		} else {
 			contestantArgs = []string{"/box/Main"}
-			contestantRunCopyIn["Main"] = executor.CmdFile{Src: filepath.Join(compiledExeDir, "Main")}
+			contestantRunCopyIn["Main"] = executor.CmdFile{Content: compiledBinContent}
 		}
 
 		interArgs := []string{"/box/interactor"}
@@ -685,6 +675,9 @@ func (wp *WorkerPool) judgeInteractive(ctx context.Context, sub *model.Submissio
 	}
 
 	wp.subStore.UpdateResult(ctx, sub.ID, finalStatus, avgScore, maxTime, maxMem, "", results)
+	if finalStatus == model.StatusAC && sub.ContestID != "" {
+		_ = wp.balloonStore.CreateRequest(ctx, sub.ContestID, sub.ID, sub.UserID, sub.ProblemID)
+	}
 	wp.probStore.UpdateCounts(ctx, prob.ID, 1, boolToInt(finalStatus == model.StatusAC))
 	slog.Info("judged interactive", "id", sub.ID, "verdict", finalStatus)
 }
@@ -743,5 +736,8 @@ func (wp *WorkerPool) judgeOutputOnly(ctx context.Context, sub *model.Submission
 	}
 
 	wp.subStore.UpdateResult(ctx, sub.ID, finalStatus, percentageScore, 0, 0, "", results)
+	if finalStatus == model.StatusAC && sub.ContestID != "" {
+		_ = wp.balloonStore.CreateRequest(ctx, sub.ContestID, sub.ID, sub.UserID, sub.ProblemID)
+	}
 	wp.probStore.UpdateCounts(ctx, sub.ProblemID, 1, boolToInt(finalStatus == model.StatusAC))
 }

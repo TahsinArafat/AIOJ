@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/tahsinarafat/aioj/internal/model"
 )
 
@@ -53,6 +54,9 @@ func (s *ContestStore) Create(ctx context.Context, c *model.Contest) error {
 }
 
 func (s *ContestStore) GetByID(ctx context.Context, id string) (*model.Contest, error) {
+	if _, err := uuid.Parse(id); err != nil {
+		return nil, nil
+	}
 	var c model.Contest
 	var configJSON []byte
 	var formatConfigJSON []byte

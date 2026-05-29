@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/lib/pq"
@@ -216,7 +217,7 @@ func (s *ProblemStore) HasAccess(ctx context.Context, problemID, userID string, 
 	return false
 }
 
-func (s *ProblemStore) ListWithFilter(ctx context.Context, offset, limit int, difficulty string, tags []string, search string) ([]model.ProblemListItem, int, error) {
+func (s *ProblemStore) ListWithFilter(ctx context.Context, offset, limit int, difficulty string, tags []string, search string, source string, rating string, sortBy string) ([]model.ProblemListItem, int, error) {
 	where := []string{"p.visible = true"}
 	args := []interface{}{}
 	argIdx := 1
@@ -239,14 +240,48 @@ func (s *ProblemStore) ListWithFilter(ctx context.Context, offset, limit int, di
 		argIdx++
 	}
 
+	if source != "" {
+		where = append(where, fmt.Sprintf("p.source = $%d", argIdx))
+		args = append(args, source)
+		argIdx++
+	}
+
+	if rating != "" {
+		parts := strings.Split(rating, "-")
+		if len(parts) == 2 {
+			minR, _ := strconv.Atoi(parts[0])
+			maxR, _ := strconv.Atoi(parts[1])
+			where = append(where, fmt.Sprintf("p.rating >= $%d AND p.rating <= $%d", argIdx, argIdx+1))
+			args = append(args, minR, maxR)
+			argIdx += 2
+		} else if strings.HasSuffix(rating, "+") {
+			minR, _ := strconv.Atoi(strings.TrimSuffix(rating, "+"))
+			where = append(where, fmt.Sprintf("p.rating >= $%d", argIdx))
+			args = append(args, minR)
+			argIdx++
+		}
+	}
+
 	whereClause := strings.Join(where, " AND ")
 
 	var total int
 	countQuery := "SELECT COUNT(*) FROM problems p WHERE " + whereClause
 	s.db.QueryRowContext(ctx, countQuery, args...).Scan(&total)
 
+	orderClause := "p.created_at DESC"
+	switch sortBy {
+	case "oldest":
+		orderClause = "p.created_at ASC"
+	case "most_solved":
+		orderClause = "p.accepted_count DESC"
+	case "least_solved":
+		orderClause = "p.accepted_count ASC"
+	case "title_asc":
+		orderClause = "p.title ASC"
+	}
+
 	selectQuery := fmt.Sprintf(`SELECT p.id, p.slug, p.title, p.difficulty, p.tags, p.submission_count, p.accepted_count, p.source
-		FROM problems p WHERE %s ORDER BY p.created_at DESC OFFSET $%d LIMIT $%d`, whereClause, argIdx, argIdx+1)
+		FROM problems p WHERE %s ORDER BY %s OFFSET $%d LIMIT $%d`, whereClause, orderClause, argIdx, argIdx+1)
 	args = append(args, offset, limit)
 
 	rows, err := s.db.QueryContext(ctx, selectQuery, args...)

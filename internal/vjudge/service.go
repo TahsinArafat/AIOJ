@@ -20,13 +20,14 @@ type SubmitRequest struct {
 }
 
 type Service struct {
-	mu       sync.RWMutex
-	bots     map[string]Bot
-	subStore store.SubmissionStore
+	mu          sync.RWMutex
+	bots        map[string]Bot
+	subStore    store.SubmissionStore
+	botAccStore store.BotAccountStore
 }
 
-func NewService(subStore store.SubmissionStore) *Service {
-	return &Service{bots: make(map[string]Bot), subStore: subStore}
+func NewService(subStore store.SubmissionStore, botAccStore store.BotAccountStore) *Service {
+	return &Service{bots: make(map[string]Bot), subStore: subStore, botAccStore: botAccStore}
 }
 
 func (s *Service) RegisterBot(name string, bot Bot) {

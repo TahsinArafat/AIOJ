@@ -115,11 +115,12 @@ export const api = {
             }),
     },
     problems: {
-        list: (offset = 0, limit = 20, filters?: { difficulty?: string; tags?: string[]; search?: string }) => {
+        list: (offset = 0, limit = 20, filters?: { difficulty?: string; tags?: string[]; search?: string; source?: string }) => {
             let url = `/problems?offset=${offset}&limit=${limit}`;
             if (filters?.difficulty) url += `&difficulty=${filters.difficulty}`;
             if (filters?.tags?.length) url += `&tags=${filters.tags.join(',')}`;
             if (filters?.search) url += `&search=${encodeURIComponent(filters.search)}`;
+            if (filters?.source) url += `&source=${encodeURIComponent(filters.source)}`;
             return request<{ data: any[]; total: number }>(url);
         },
         listTags: () => request<{ data: string[] }>('/problems/tags'),
@@ -179,11 +180,26 @@ export const api = {
             return res.json() as Promise<{ status: string; problem_id: string; slug: string }>
         },
         exportProblemUrl: (slug: string) => BASE + `/problems/${slug}/export`,
+        importCodeforces: async (contestId: string, problemIndex: string) => {
+            const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+            const token = getAccessToken()
+            if (token) headers['Authorization'] = `Bearer ${token}`
+            const res = await fetch(BASE + '/problems/import/codeforces', {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ contest_id: contestId, problem_index: problemIndex })
+            })
+            if (!res.ok) {
+                const text = await res.text()
+                throw new Error(text || `HTTP ${res.status}`)
+            }
+            return res.json() as Promise<{ status: string; problem_id: string; slug: string }>
+        },
     },
     submissions: {
         create: (d: any) => request<any>('/submissions', { method: 'POST', body: JSON.stringify(d) }),
         createUpsolving: (d: any) => request<any>('/submissions/upsolving', { method: 'POST', body: JSON.stringify(d) }),
-        run: (d: { source_code: string; language: string; input: string }) => 
+        run: (d: { source_code: string; language: string; input: string; expected?: string }) => 
             request<{
                 status: string;
                 stdout: string;
@@ -191,6 +207,8 @@ export const api = {
                 time_used: number;
                 memory_used: number;
                 compile_output: string;
+                passed: boolean | null;
+                expected: string;
             }>('/submissions/run', { method: 'POST', body: JSON.stringify(d) }),
         get: (id: string) => request<any>(`/submissions/${id}`),
         list: (offset = 0, limit = 20, problemId?: string, contestId?: string) => {
@@ -208,6 +226,44 @@ export const api = {
         listApps: () => request<{ data: any[] }>('/admin/setter-applications'),
         reviewApp: (userId: string, status: string) =>
             request(`/admin/setter-applications/${userId}/review`, { method: 'POST', body: JSON.stringify({ status }) }),
+        botAccounts: {
+            list: (offset = 0, limit = 20) =>
+                request<{ data: any[]; total: number }>(`/admin/bot-accounts?offset=${offset}&limit=${limit}`),
+            create: (d: { user_id?: string; platform: string; platform_user: string; platform_pass: string; api_key?: string; api_secret?: string; rate_limit_rps?: number }) =>
+                request<any>('/admin/bot-accounts', { method: 'POST', body: JSON.stringify(d) }),
+            update: (id: string, d: { platform_user?: string; platform_pass?: string; api_key?: string; api_secret?: string; status?: string; rate_limit_rps?: number }) =>
+                request<any>(`/admin/bot-accounts/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
+            delete: (id: string) =>
+                request(`/admin/bot-accounts/${id}`, { method: 'DELETE' }),
+        },
+        settings: {
+            list: () =>
+                request<{ data: { key: string; value: any; description: string; updated_at: string; updated_by: string | null }[] }>('/admin/settings'),
+            update: (key: string, value: any) =>
+                request(`/admin/settings/${encodeURIComponent(key)}`, { method: 'PUT', body: JSON.stringify({ value }) }),
+        },
+        languages: {
+            list: () =>
+                request<{ data: any[] }>('/admin/languages'),
+            get: (key: string) =>
+                request<any>(`/admin/languages/${key}`),
+            getRaw: (key: string) =>
+                request<string>(`/admin/languages/${key}/raw`),
+            create: (d: any) =>
+                request<any>('/admin/languages', { method: 'POST', body: JSON.stringify(d) }),
+            update: (key: string, d: any) =>
+                request<any>(`/admin/languages/${key}`, { method: 'PUT', body: JSON.stringify(d) }),
+            updateRaw: (key: string, content: string) =>
+                request<any>(`/admin/languages/${key}/raw`, { method: 'PUT', body: JSON.stringify({ content }) }),
+            delete: (key: string) =>
+                request(`/admin/languages/${key}`, { method: 'DELETE' }),
+            test: (key: string) =>
+                request<any>(`/admin/languages/${key}/test`, { method: 'POST' }),
+            detect: () =>
+                request<{ compilers: any[]; interpreters: any[] }>('/admin/languages/detect'),
+            templates: () =>
+                request<{ data: any[] }>('/admin/languages/templates'),
+        },
     },
     setter: {
         apply: (reason: string) => request('/auth/setter-apply', { method: 'POST', body: JSON.stringify({ reason }) }),

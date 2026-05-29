@@ -51,6 +51,8 @@ services:
       REDIS_URL: ${REDIS_URL:-redis:6379}
     ports:
       - "8080:8080"
+    volumes:
+      - testdata:/app/testdata
     depends_on:
       postgres:
         condition: service_healthy
@@ -72,6 +74,8 @@ services:
       JUDGE_ENDPOINT: http://judge:5050
       REDIS_URL: ${REDIS_URL:-redis:6379}
       LANG_DIR: /app/lang
+    volumes:
+      - testdata:/app/testdata
     depends_on:
       postgres:
         condition: service_healthy
@@ -88,10 +92,6 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
-
-volumes:
-  pgdata:
-  redisdata:
 
   prometheus:
     image: prom/prometheus:latest
@@ -118,3 +118,10 @@ volumes:
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
     restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:
+  testdata:
+  promdata:
+  grafdata:

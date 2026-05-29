@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/lib/pq"
 	"github.com/tahsinarafat/aioj/internal/model"
 )
@@ -25,6 +26,9 @@ func (s *BlogStore) CreatePost(ctx context.Context, p *model.BlogPost) error {
 }
 
 func (s *BlogStore) GetPostByID(ctx context.Context, id string) (*model.BlogPost, error) {
+	if _, err := uuid.Parse(id); err != nil {
+		return nil, nil
+	}
 	var p model.BlogPost
 	var tags []string
 	err := s.db.QueryRowContext(ctx,

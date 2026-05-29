@@ -37,6 +37,7 @@ type CustomRunRequest struct {
 	SourceCode string `json:"source_code"`
 	Language   string `json:"language"`
 	Input      string `json:"input"`
+	Expected   string `json:"expected,omitempty"`
 }
 
 type CustomRunResponse struct {
@@ -46,6 +47,15 @@ type CustomRunResponse struct {
 	TimeUsed      int    `json:"time_used"`
 	MemoryUsed    int    `json:"memory_used"`
 	CompileOutput string `json:"compile_output,omitempty"`
+	Passed        *bool  `json:"passed,omitempty"`
+	Expected      string `json:"expected,omitempty"`
+}
+
+func normalizeOutput(s string) string {
+	s = strings.ReplaceAll(s, "\r\n", "\n")
+	s = strings.TrimRight(s, "\n\r ")
+	s = strings.TrimSpace(s)
+	return s
 }
 
 func (h *SubmissionHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -153,7 +163,9 @@ func (h *SubmissionHandler) ListByUser(w http.ResponseWriter, r *http.Request) {
 	if limit <= 0 || limit > 100 {
 		limit = 20
 	}
-	subs, total, err := h.subStore.ListByUser(r.Context(), claims.UserID, offset, limit)
+	problemID := r.URL.Query().Get("problem_id")
+	contestID := r.URL.Query().Get("contest_id")
+	subs, total, err := h.subStore.ListByUser(r.Context(), claims.UserID, offset, limit, problemID, contestID)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
@@ -247,8 +259,8 @@ func (h *SubmissionHandler) CustomRun(w http.ResponseWriter, r *http.Request) {
 			CopyIn:      copyIn,
 			Files: []executor.CmdFile{
 				{Content: req.Input},
-				{Name: "stdout", Max: 10 * 1024 * 1024},
-				{Name: "stderr", Max: 10 * 1024 * 1024},
+				{Content: ""},
+				{Content: ""},
 			},
 		}},
 	})
@@ -315,5 +327,21 @@ func (h *SubmissionHandler) CustomRun(w http.ResponseWriter, r *http.Request) {
 		TimeUsed:      elapsed,
 		MemoryUsed:    int(cr.Memory / 1024),
 		CompileOutput: compileOutput,
+		Passed:        compareOutput(status, stdout, req.Expected),
+		Expected:      req.Expected,
 	})
+}
+
+func compareOutput(status, stdout, expected string) *bool {
+	if expected == "" {
+		return nil
+	}
+	if status != "success" {
+		passed := false
+		return &passed
+	}
+	actual := normalizeOutput(stdout)
+	exp := normalizeOutput(expected)
+	result := actual == exp
+	return &result
 }

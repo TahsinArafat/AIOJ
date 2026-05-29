@@ -81,7 +81,9 @@ func main() {
 	execClient := executor.NewClient(cfg.Judge.Endpoint)
 	langLimitStore := postgres.NewLanguageLimitStore(db)
 	langLimitH := handler.NewLanguageLimitHandler(langLimitStore, problemStore)
-	workerPool := judge.NewWorkerPool(judgeQueue, execClient, cfg.LangDir, cfg.Judge.Concurrency, submissionStore, problemStore, langLimitStore)
+	balloonStore := postgres.NewBalloonStore(db)
+	printStore := postgres.NewPrintStore(db)
+	workerPool := judge.NewWorkerPool(judgeQueue, execClient, cfg.LangDir, cfg.Judge.Concurrency, submissionStore, problemStore, langLimitStore, balloonStore)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -103,7 +105,34 @@ func main() {
 	submissionH := handler.NewSubmissionHandler(submissionStore, problemStore, contestStore, judgeQueue, wsManager, execClient, cfg.LangDir)
 	contestH := handler.NewContestHandler(contestStore, ratingStore)
 
-	vjService := vjudge.NewService(submissionStore)
+	botAccountStore := postgres.NewBotAccountStore(db)
+	vjService := vjudge.NewService(submissionStore, botAccountStore)
+
+	platforms := []string{"codeforces", "atcoder", "cses", "toph", "qoj"}
+	for _, platform := range platforms {
+		accounts, _ := botAccountStore.ListByPlatform(ctx, platform)
+		cfg := vjudge.BotConfig{}
+		if len(accounts) > 0 && accounts[0].Status == "active" {
+			cfg.Username = accounts[0].PlatformUser
+			cfg.Password = accounts[0].PlatformPass
+			cfg.APIKey = accounts[0].APIKey
+			cfg.APISecret = accounts[0].APISecret
+			cfg.Cookies = accounts[0].SessionData
+		}
+		switch platform {
+		case "codeforces":
+			vjService.RegisterBot(platform, vjudge.NewCodeforcesBot(cfg))
+		case "atcoder":
+			vjService.RegisterBot(platform, vjudge.NewAtCoderBot(cfg))
+		case "cses":
+			vjService.RegisterBot(platform, vjudge.NewCSESBot(cfg))
+		case "toph":
+			vjService.RegisterBot(platform, vjudge.NewTophBot(cfg))
+		case "qoj":
+			vjService.RegisterBot(platform, vjudge.NewQOJBot(cfg))
+		}
+	}
+
 	vjH := handler.NewVJudgeHandler(vjService)
 
 	setterStore := postgres.NewSetterStore(db)
@@ -155,7 +184,15 @@ func main() {
 	plagiarismService := plagiarism.NewService(plagiarismStore, contestStore, submissionStore)
 	plagiarismH := handler.NewPlagiarismHandler(plagiarismService, plagiarismStore)
 
-	router := api.NewRouter(authH, problemH, submissionH, contestH, vjH, adminH, testcaseH, wsManager, jwtManager, ratingH, registrationH, virtualH, gymH, hackH, statsH, notifH, groupH, teamH, blogH, editorialH, apiKeyH, webhookH, recommendationH, rankingsH, usersH, searchH, langLimitH, importH, orgH, classH, trainingH, plagiarismH)
+	mediaH := handler.NewMediaHandler("./media")
+	onsiteH := handler.NewOnsiteHandler(balloonStore, printStore, contestStore)
+
+	botAccountH := handler.NewAdminBotAccountHandler(botAccountStore)
+	settingsStore := postgres.NewSystemSettingsStore(db)
+	settingsH := handler.NewAdminSystemSettingsHandler(settingsStore)
+	langAdminH := handler.NewAdminLanguageHandler(cfg.LangDir)
+
+	router := api.NewRouter(authH, problemH, submissionH, contestH, vjH, adminH, testcaseH, wsManager, jwtManager, ratingH, registrationH, virtualH, gymH, hackH, statsH, notifH, groupH, teamH, blogH, editorialH, apiKeyH, webhookH, recommendationH, rankingsH, usersH, searchH, langLimitH, importH, orgH, classH, trainingH, plagiarismH, mediaH, onsiteH, botAccountH, settingsH, langAdminH)
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),

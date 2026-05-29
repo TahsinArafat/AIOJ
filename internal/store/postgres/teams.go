@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/google/uuid"
 	"github.com/tahsinarafat/aioj/internal/model"
 )
 
@@ -41,7 +42,11 @@ func (s *TeamStore) Create(ctx context.Context, t *model.Team) error {
 }
 
 func (s *TeamStore) GetByID(ctx context.Context, id string) (*model.Team, error) {
+	if _, err := uuid.Parse(id); err != nil {
+		return nil, nil
+	}
 	var t model.Team
+	var avatarURL sql.NullString
 	err := s.db.QueryRowContext(ctx,
 		`SELECT t.id, t.name, t.description, t.avatar_url, t.rating, t.max_rating, 
 		        t.contest_count, COUNT(tm.user_id), t.created_by, u.username, t.created_at, t.updated_at
@@ -50,13 +55,16 @@ func (s *TeamStore) GetByID(ctx context.Context, id string) (*model.Team, error)
 		 LEFT JOIN team_members tm ON t.id = tm.team_id
 		 WHERE t.id = $1
 		 GROUP BY t.id, u.username`,
-		id).Scan(&t.ID, &t.Name, &t.Description, &t.AvatarURL, &t.Rating, &t.MaxRating,
+		id).Scan(&t.ID, &t.Name, &t.Description, &avatarURL, &t.Rating, &t.MaxRating,
 		&t.ContestCount, &t.MemberCount, &t.CreatedBy, &t.CreatorName, &t.CreatedAt, &t.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
+	}
+	if avatarURL.Valid {
+		t.AvatarURL = avatarURL.String
 	}
 	return &t, nil
 }

@@ -99,15 +99,25 @@ class Program {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-    ac: 'text-green-600', wa: 'text-red-600', tle: 'text-yellow-600',
-    mle: 'text-orange-600', re: 'text-red-700', ce: 'text-purple-600',
-    pending: 'text-blue-500', judging: 'text-blue-600', se: 'text-gray-600',
+    ac: 'text-green-600', success: 'text-green-600',
+    wa: 'text-red-600',
+    tle: 'text-yellow-600', TLE: 'text-yellow-600',
+    mle: 'text-orange-600', MLE: 'text-orange-600',
+    re: 'text-red-700', RE: 'text-red-700',
+    ce: 'text-purple-600', CE: 'text-purple-600',
+    pending: 'text-blue-500', judging: 'text-blue-600',
+    se: 'text-gray-600', SE: 'text-gray-600',
 }
 
 const STATUS_LABELS: Record<string, string> = {
-    ac: 'Accepted', wa: 'Wrong Answer', tle: 'Time Limit Exceeded',
-    mle: 'Memory Limit Exceeded', re: 'Runtime Error', ce: 'Compile Error',
-    pending: 'Pending', judging: 'Judging...', se: 'System Error',
+    ac: 'Accepted', success: 'Accepted',
+    wa: 'Wrong Answer',
+    tle: 'Time Limit Exceeded', TLE: 'Time Limit Exceeded',
+    mle: 'Memory Limit Exceeded', MLE: 'Memory Limit Exceeded',
+    re: 'Runtime Error', RE: 'Runtime Error',
+    ce: 'Compile Error', CE: 'Compile Error',
+    pending: 'Pending', judging: 'Judging...',
+    se: 'System Error', SE: 'System Error',
 }
 
 export default function ProblemDetail() {
@@ -125,7 +135,9 @@ export default function ProblemDetail() {
     const [runningCustom, setRunningCustom] = useState(false)
     const [sampleResults, setSampleResults] = useState<any[]>([])
     const [runningSamples, setRunningSamples] = useState(false)
-    const [tab, setTab] = useState<'statement' | 'stats' | 'editorials' | 'submissions'>('statement')
+    const [lastSubmitTime, setLastSubmitTime] = useState(0)
+    const [lastTestTime, setLastTestTime] = useState(0)
+    const [tab, setTab] = useState<'statement' | 'stats' | 'editorials' | 'submissions' | 'more'>('statement')
     const [mySubs, setMySubs] = useState<any[]>([])
     const [loadingSubs, setLoadingSubs] = useState(false)
     const [editorials, setEditorials] = useState<any[]>([])
@@ -203,8 +215,12 @@ export default function ProblemDetail() {
     }
 
     const testWithSamples = async () => {
+        if (!getAccessToken()) { alert('Please login first'); return }
         if (!code.trim()) { alert('Please write some code'); return }
         if (!problem?.sample_cases?.length) { alert('No sample cases available'); return }
+        const now = Date.now()
+        if (now - lastTestTime < 5000) { alert('Please wait 5 seconds between Test Samples runs'); return }
+        setLastTestTime(now)
         setRunningSamples(true)
         setSampleResults([])
         const results: any[] = []
@@ -215,10 +231,11 @@ export default function ProblemDetail() {
                     source_code: code,
                     language: lang,
                     input: sc.input,
+                    expected: sc.output,
                 })
-                const actual = (res.stdout || '').trim()
-                const expected = (sc.output || '').trim()
-                const passed = res.status === 'ac' && actual === expected
+                const actual = (res.stdout || '').trim().replace(/\r\n/g, '\n')
+                const expected = (res.expected || sc.output || '').trim().replace(/\r\n/g, '\n')
+                const passed = res.passed ?? false
                 results.push({
                     index: i + 1,
                     input: sc.input,
@@ -254,6 +271,9 @@ export default function ProblemDetail() {
     const submit = async () => {
         if (!getAccessToken()) { alert('Please login first'); return }
         if (!code.trim()) { alert('Please write some code'); return }
+        const now = Date.now()
+        if (now - lastSubmitTime < 5000) { alert('Please wait 5 seconds between submissions'); return }
+        setLastSubmitTime(now)
         setSubmitting(true)
         setResult(null)
         try {
@@ -336,15 +356,39 @@ export default function ProblemDetail() {
                             </span>
                         )}
                     </h1>
+                    <div className="mt-3 text-sm text-gray-600 flex flex-wrap items-center gap-4">
+                        <span className="flex items-center gap-1.5"><span className="font-semibold text-gray-700">Time Limit:</span> {problem.time_limit} ms</span>
+                        <span className="flex items-center gap-1.5"><span className="font-semibold text-gray-700">Memory Limit:</span> {Math.round(problem.memory_limit / 1024)} MB</span>
+                        <span className="flex items-center gap-1.5"><span className="font-semibold text-gray-700">Difficulty:</span> <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wider ${
+                            problem.difficulty === 'easy' ? 'bg-green-100 text-green-800' :
+                            problem.difficulty === 'hard' ? 'bg-red-100 text-red-800' :
+                            'bg-yellow-100 text-yellow-800'
+                        }`}>{problem.difficulty}</span></span>
+                    </div>
                     {canExport && (
                         <div className="mt-2">
-                            <a
-                                href={api.problems.exportProblemUrl(problem.slug)}
-                                download
-                                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                            <button
+                                onClick={async () => {
+                                    try {
+                                        const resp = await fetch(api.problems.exportProblemUrl(problem.slug), {
+                                            headers: { 'Authorization': `Bearer ${getAccessToken()}` }
+                                        })
+                                        if (!resp.ok) throw new Error('Export failed')
+                                        const blob = await resp.blob()
+                                        const url = URL.createObjectURL(blob)
+                                        const a = document.createElement('a')
+                                        a.href = url
+                                        a.download = `${problem.slug}.zip`
+                                        a.click()
+                                        URL.revokeObjectURL(url)
+                                    } catch (e: any) {
+                                        alert('Export failed: ' + e.message)
+                                    }
+                                }}
+                                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 cursor-pointer"
                             >
                                 Export (FPS ZIP)
-                            </a>
+                            </button>
                         </div>
                     )}
                 </div>
@@ -364,147 +408,110 @@ export default function ProblemDetail() {
                             My Submissions
                         </button>
                     )}
+                    <button onClick={() => setTab('more')} className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${tab === 'more' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+                        More
+                    </button>
                 </div>
 
                 {tab === 'statement' ? (
-                    <div className="flex flex-col md:flex-row gap-6 items-start">
-                        <div className="flex-1 space-y-5">
-                            <div className="prose prose-sm max-w-none text-gray-800 leading-relaxed">
-                                <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
-                                    {problem.description}
-                                </ReactMarkdown>
-                            </div>
-                            {problem.input_format && (
-                                <div>
-                                    <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide mb-1">Input Format</h3>
-                                    <div className="prose prose-sm max-w-none text-gray-700">
-                                        <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
-                                            {problem.input_format}
-                                        </ReactMarkdown>
-                                    </div>
-                                </div>
-                            )}
-                            {problem.output_format && (
-                                <div>
-                                    <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide mb-1">Output Format</h3>
-                                    <div className="prose prose-sm max-w-none text-gray-700">
-                                        <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
-                                            {problem.output_format}
-                                        </ReactMarkdown>
-                                    </div>
-                                </div>
-                            )}
-                            {problem.hint && (
-                                <div>
-                                    <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide mb-1">Hint</h3>
-                                    <div className="prose prose-sm max-w-none text-gray-700 italic">
-                                        <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
-                                            {problem.hint}
-                                        </ReactMarkdown>
-                                    </div>
-                                </div>
-                            )}
-                            {problem.sample_cases?.length > 0 && problem.sample_cases.map((sc: any, i: number) => (
-                                <div key={i} className="space-y-1">
-                                    <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">Sample {i + 1}</h3>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <div>
-                                            <div className="text-xs text-gray-400 mb-1">Input</div>
-                                            <pre className="bg-gray-100 rounded p-2 text-xs overflow-x-auto select-all">{sc.input}</pre>
-                                        </div>
-                                        <div>
-                                            <div className="text-xs text-gray-400 mb-1">Output</div>
-                                            <pre className="bg-gray-100 rounded p-2 text-xs overflow-x-auto select-all">{sc.output}</pre>
-                                        </div>
-                                    </div>
-                                    {sc.explanation && <p className="text-xs text-gray-500 mt-1">{sc.explanation}</p>}
-                                </div>
-                            ))}
+                    <div className="space-y-5 pb-8">
+                        <div className="prose prose-sm max-w-none text-gray-800 leading-relaxed">
+                            <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                                {problem.description}
+                            </ReactMarkdown>
                         </div>
-
-                        {/* Sidebar details card */}
-                        <div className="w-full md:w-56 shrink-0 bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-4 text-sm text-gray-700">
+                        {problem.input_format && (
                             <div>
-                                <h4 className="font-semibold text-xs text-gray-400 uppercase tracking-wider mb-1">Limits</h4>
-                                <div className="space-y-1">
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-500">Time Limit:</span>
-                                        <span className="font-medium text-gray-900">{problem.time_limit} ms</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-500">Memory Limit:</span>
-                                        <span className="font-medium text-gray-900">{Math.round(problem.memory_limit / 1024)} MB</span>
-                                    </div>
+                                <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide mb-1">Input Format</h3>
+                                <div className="prose prose-sm max-w-none text-gray-700">
+                                    <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                                        {problem.input_format}
+                                    </ReactMarkdown>
                                 </div>
                             </div>
-
-                            {problem.interactive && (
-                                <>
-                                    <hr className="border-gray-200" />
-                                    <div className="bg-purple-50 dark:bg-purple-950 border border-purple-200 dark:border-purple-800 rounded p-2.5">
-                                        <p className="text-xs text-purple-700 dark:text-purple-300 leading-relaxed">
-                                            <span className="font-semibold">Interactive Problem</span> — your program communicates with an interactor via stdin/stdout.
-                                        </p>
-                                    </div>
-                                </>
-                            )}
-
-                            {problem.scoring_mode === 'partial' && (
-                                <>
-                                    <hr className="border-gray-200" />
-                                    <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded p-2.5">
-                                        <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed">
-                                            <span className="font-semibold">Partial Scoring</span> — you earn points for each passing subtask.
-                                        </p>
-                                    </div>
-                                </>
-                            )}
-
-                            <hr className="border-gray-200" />
-
+                        )}
+                        {problem.output_format && (
                             <div>
-                                <h4 className="font-semibold text-xs text-gray-400 uppercase tracking-wider mb-1">Difficulty</h4>
-                                <span className={`inline-block px-2.5 py-0.5 rounded text-xs font-semibold uppercase tracking-wider ${
-                                    problem.difficulty === 'easy' ? 'bg-green-100 text-green-800' :
-                                    problem.difficulty === 'hard' ? 'bg-red-100 text-red-800' :
-                                    'bg-yellow-100 text-yellow-800'
-                                }`}>
-                                    {problem.difficulty}
-                                </span>
+                                <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide mb-1">Output Format</h3>
+                                <div className="prose prose-sm max-w-none text-gray-700">
+                                    <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                                        {problem.output_format}
+                                    </ReactMarkdown>
+                                </div>
                             </div>
-
-                            {problem.tags && problem.tags.length > 0 && (
-                                <>
-                                    <hr className="border-gray-200" />
+                        )}
+                        {problem.hint && (
+                            <div>
+                                <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide mb-1">Hint</h3>
+                                <div className="prose prose-sm max-w-none text-gray-700 italic">
+                                    <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                                        {problem.hint}
+                                    </ReactMarkdown>
+                                </div>
+                            </div>
+                        )}
+                        {problem.sample_cases?.length > 0 && problem.sample_cases.map((sc: any, i: number) => (
+                            <div key={i} className="space-y-1">
+                                <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">Sample {i + 1}</h3>
+                                <div className="grid grid-cols-2 gap-2">
                                     <div>
-                                        <h4 className="font-semibold text-xs text-gray-400 uppercase tracking-wider mb-2">Problem Tags</h4>
-                                        <div className="flex flex-wrap gap-1.5">
-                                            {problem.tags.map((tag: string) => (
-                                                <Link 
-                                                    key={tag} 
-                                                    to={`/problems?tag=${tag}`} 
-                                                    className="bg-white hover:bg-gray-100 border border-gray-200 text-xs text-gray-600 px-2 py-0.5 rounded transition-colors"
-                                                >
-                                                    {tag}
-                                                </Link>
-                                            ))}
-                                        </div>
+                                        <div className="text-xs text-gray-400 mb-1">Input</div>
+                                        <pre className="bg-gray-100 rounded p-2 text-xs overflow-x-auto select-all">{sc.input}</pre>
                                     </div>
-                                </>
-                            )}
-
-                            {problem.source && (
-                                <>
-                                    <hr className="border-gray-200" />
                                     <div>
-                                        <h4 className="font-semibold text-xs text-gray-400 uppercase tracking-wider mb-1">Source</h4>
-                                        <span className="text-xs font-medium text-gray-900 bg-gray-100 border border-gray-200 px-2 py-0.5 rounded block text-center">
-                                            {problem.source}
-                                        </span>
+                                        <div className="text-xs text-gray-400 mb-1">Output</div>
+                                        <pre className="bg-gray-100 rounded p-2 text-xs overflow-x-auto select-all">{sc.output}</pre>
                                     </div>
-                                </>
-                            )}
-                        </div>
+                                </div>
+                                {sc.explanation && <p className="text-xs text-gray-500 mt-1">{sc.explanation}</p>}
+                            </div>
+                        ))}
+                    </div>
+                ) : tab === 'more' ? (
+                    <div className="space-y-6 max-w-2xl py-2">
+                        {problem.interactive && (
+                            <div className="bg-purple-50 dark:bg-purple-950 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
+                                <h3 className="font-semibold text-purple-800 dark:text-purple-300 mb-1">Interactive Problem</h3>
+                                <p className="text-sm text-purple-700 dark:text-purple-400 leading-relaxed">
+                                    Your program communicates with an interactor via stdin/stdout. Remember to flush your output buffer after each write.
+                                </p>
+                            </div>
+                        )}
+                        {problem.scoring_mode === 'partial' && (
+                            <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                                <h3 className="font-semibold text-blue-800 dark:text-blue-300 mb-1">Partial Scoring</h3>
+                                <p className="text-sm text-blue-700 dark:text-blue-400 leading-relaxed">
+                                    You earn points for each passing subtask. The final score is the sum of the points from the subtasks your solution passes.
+                                </p>
+                            </div>
+                        )}
+                        {problem.tags && problem.tags.length > 0 && (
+                            <div>
+                                <h3 className="font-semibold text-gray-800 mb-3">Tags</h3>
+                                <div className="flex flex-wrap gap-2">
+                                    {problem.tags.map((tag: string) => (
+                                        <Link 
+                                            key={tag} 
+                                            to={`/problems?tag=${tag}`} 
+                                            className="bg-gray-100 hover:bg-gray-200 border border-gray-200 text-sm text-gray-700 px-3 py-1.5 rounded transition-colors"
+                                        >
+                                            {tag}
+                                        </Link>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        {problem.source && (
+                            <div>
+                                <h3 className="font-semibold text-gray-800 mb-2">Source / Author</h3>
+                                <div className="text-sm text-gray-700 bg-gray-50 border border-gray-200 px-4 py-2 rounded-lg inline-block">
+                                    {problem.source}
+                                </div>
+                            </div>
+                        )}
+                        {(!problem.tags?.length && !problem.source && !problem.interactive && problem.scoring_mode !== 'partial') && (
+                            <p className="text-gray-500 text-sm py-4">No additional information available for this problem.</p>
+                        )}
                     </div>
                 ) : tab === 'stats' ? (
                     <ProblemStats problemId={problem.id} />
@@ -599,10 +606,11 @@ export default function ProblemDetail() {
                     >
                         {LANGS.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
                     </select>
-                    <div className="flex gap-2">
+                        <div className="flex gap-2">
                         <button
                             onClick={testWithSamples}
-                            disabled={runningSamples || !code.trim()}
+                            disabled={runningSamples || !code.trim() || problem?.source !== 'local'}
+                            title={problem?.source !== 'local' ? 'Test Samples is only available for local problems' : undefined}
                             className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors cursor-pointer"
                         >
                             {runningSamples ? 'Testing...' : 'Test Samples'}

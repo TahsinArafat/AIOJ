@@ -43,6 +43,9 @@ func (h *BlogHandler) CreatePost(w http.ResponseWriter, r *http.Request) {
 		Content: req.Content,
 		Tags:    req.Tags,
 	}
+	if p.Tags == nil {
+		p.Tags = []string{}
+	}
 
 	if err := h.store.CreatePost(r.Context(), p); err != nil {
 		http.Error(w, "create failed", http.StatusInternalServerError)

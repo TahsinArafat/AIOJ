@@ -1,9 +1,13 @@
 package postgres
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
+	"io"
 	"time"
 
 	"github.com/tahsinarafat/aioj/internal/model"
@@ -13,15 +17,43 @@ type SubmissionStore struct{ db *sql.DB }
 
 func NewSubmissionStore(db *sql.DB) *SubmissionStore { return &SubmissionStore{db: db} }
 
+func compressCode(src string) []byte {
+	if src == "" {
+		return nil
+	}
+	var buf bytes.Buffer
+	w := gzip.NewWriter(&buf)
+	w.Write([]byte(src))
+	w.Close()
+	return buf.Bytes()
+}
+
+func decompressCode(data []byte) string {
+	if len(data) == 0 {
+		return ""
+	}
+	r, err := gzip.NewReader(bytes.NewReader(data))
+	if err != nil {
+		return ""
+	}
+	defer r.Close()
+	out, err := io.ReadAll(r)
+	if err != nil {
+		return ""
+	}
+	return string(out)
+}
+
 func (s *SubmissionStore) Create(ctx context.Context, sub *model.Submission) error {
 	if sub.SubmissionType == "" {
 		sub.SubmissionType = "code"
 	}
 	cid := sql.NullString{String: sub.ContestID, Valid: sub.ContestID != ""}
+	compressed := compressCode(sub.SourceCode)
 	return s.db.QueryRowContext(ctx,
-		`INSERT INTO submissions(id,problem_id,user_id,contest_id,language,source_code,code_size,status,submission_type)
-		 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING created_at`,
-		sub.ID, sub.ProblemID, sub.UserID, cid, sub.Language, sub.SourceCode, sub.CodeSize, sub.Status, sub.SubmissionType,
+		`INSERT INTO submissions(id,problem_id,user_id,contest_id,language,source_code,source_code_gz,code_size,status,submission_type)
+		 VALUES($1,$2,$3,$4,$5,'',$6,$7,$8,$9) RETURNING created_at`,
+		sub.ID, sub.ProblemID, sub.UserID, cid, sub.Language, compressed, sub.CodeSize, sub.Status, sub.SubmissionType,
 	).Scan(&sub.CreatedAt)
 }
 
@@ -31,11 +63,12 @@ func (s *SubmissionStore) GetByID(ctx context.Context, id string) (*model.Submis
 	var co sql.NullString
 	var jr []byte
 	var ja sql.NullTime
+	var compressed []byte
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id,problem_id,user_id,COALESCE(contest_id::text,''),language,source_code,code_size,
+		`SELECT id,problem_id,user_id,COALESCE(contest_id::text,''),language,source_code,source_code_gz,code_size,
 		        status,score,time_used,memory_used,compile_output,judge_result,
 		        judged_by,created_at,judged_at,submission_type FROM submissions WHERE id=$1`, id).Scan(
-		&sub.ID, &sub.ProblemID, &sub.UserID, &cid, &sub.Language, &sub.SourceCode, &sub.CodeSize,
+		&sub.ID, &sub.ProblemID, &sub.UserID, &cid, &sub.Language, &sub.SourceCode, &compressed, &sub.CodeSize,
 		&sub.Status, &sub.Score, &sub.TimeUsed, &sub.MemoryUsed, &co, &jr,
 		&sub.JudgedBy, &sub.CreatedAt, &ja, &sub.SubmissionType)
 	if err == sql.ErrNoRows {
@@ -43,6 +76,9 @@ func (s *SubmissionStore) GetByID(ctx context.Context, id string) (*model.Submis
 	}
 	if err != nil {
 		return nil, err
+	}
+	if len(compressed) > 0 {
+		sub.SourceCode = decompressCode(compressed)
 	}
 	if cid.Valid {
 		sub.ContestID = cid.String
@@ -79,12 +115,29 @@ func (s *SubmissionStore) ListByProblem(ctx context.Context, pid string, offset,
 	return items, total, nil
 }
 
-func (s *SubmissionStore) ListByUser(ctx context.Context, uid string, offset, limit int) ([]model.Submission, int, error) {
+func (s *SubmissionStore) ListByUser(ctx context.Context, uid string, offset, limit int, problemID, contestID string) ([]model.Submission, int, error) {
+	where := "user_id=$1"
+	args := []interface{}{uid}
+	argIdx := 2
+
+	if problemID != "" {
+		where += fmt.Sprintf(" AND problem_id=$%d", argIdx)
+		args = append(args, problemID)
+		argIdx++
+	}
+	if contestID != "" {
+		where += fmt.Sprintf(" AND contest_id=$%d", argIdx)
+		args = append(args, contestID)
+		argIdx++
+	}
+
 	var total int
-	s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM submissions WHERE user_id=$1", uid).Scan(&total)
+	s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM submissions WHERE "+where, args...).Scan(&total)
+
+	args = append(args, offset, limit)
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id,problem_id,language,status,score,time_used,memory_used,created_at,submission_type
-		 FROM submissions WHERE user_id=$1 ORDER BY created_at DESC OFFSET $2 LIMIT $3`, uid, offset, limit)
+		fmt.Sprintf(`SELECT id,problem_id,language,status,score,time_used,memory_used,created_at,submission_type
+		 FROM submissions WHERE %s ORDER BY created_at DESC OFFSET $%d LIMIT $%d`, where, argIdx, argIdx+1), args...)
 	if err != nil {
 		return nil, 0, err
 	}

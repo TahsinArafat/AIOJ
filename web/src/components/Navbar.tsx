@@ -21,7 +21,7 @@ function decodeRole(): string | null {
     }
 }
 
-function NavDropdown({ label, icon: Icon, children }: { label: string; icon: any; children: React.ReactNode }) {
+function NavDropdown({ label, icon: Icon, align = 'left', children }: { label: string; icon: any; align?: 'left' | 'right'; children: React.ReactNode }) {
     const [open, setOpen] = useState(false)
     const ref = useRef<HTMLDivElement>(null)
 
@@ -40,11 +40,11 @@ function NavDropdown({ label, icon: Icon, children }: { label: string; icon: any
                 className="flex items-center gap-1 text-sm text-gray-600 hover:text-black transition-colors cursor-pointer"
             >
                 <Icon className="w-4 h-4" />
-                <span>{label}</span>
+                {label && <span>{label}</span>}
                 <ChevronDown className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`} />
             </button>
             {open && (
-                <div className="absolute left-0 mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50">
+                <div className={`absolute ${align === 'right' ? 'right-0' : 'left-0'} mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50`}>
                     {children}
                 </div>
             )}
@@ -123,7 +123,7 @@ export default function Navbar() {
                     {loggedIn ? (
                         <>
                             <NotificationBell />
-                            <NavDropdown label="" icon={User}>
+                            <NavDropdown label="" icon={User} align="right">
                                 <NavLink to="/profile" icon={User}>Profile</NavLink>
                                 <NavLink to="/notifications" icon={Bell}>Notifications</NavLink>
                                 <NavLink to="/submissions" icon={FileCode}>My Submissions</NavLink>
