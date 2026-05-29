@@ -42,6 +42,8 @@ export default function SetterProblemWorkspace() {
     // Test Cases State
     const [testcases, setTestcases] = useState<TestCase[]>([])
     const [newTestCase, setNewTestCase] = useState<TestCase>({ input_name: '', output_name: '', score: 10 })
+    const [batchScore, setBatchScore] = useState<number>(10)
+    const [batchApplying, setBatchApplying] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
 
     // Checker/SPJ State
@@ -229,6 +231,49 @@ export default function SetterProblemWorkspace() {
             setSuccess('Testcase score removed successfully!')
         } catch (err: any) {
             setError(err.message || 'Failed to save testcase scores')
+        }
+    }
+
+    const handleBatchSetScores = async () => {
+        if (testcases.length === 0) {
+            setError('No testcases registered to allocate scores')
+            return
+        }
+        setError(null)
+        setSuccess(null)
+        setBatchApplying(true)
+        const updated = testcases.map(tc => ({ ...tc, score: batchScore }))
+        setTestcases(updated)
+        try {
+            const tagsArray = tags.split(',').map(t => t.trim()).filter(t => t !== '')
+            const payload = {
+                title,
+                description,
+                input_format: inputFormat,
+                output_format: outputFormat,
+                hint,
+                time_limit: Number(timeLimit),
+                memory_limit: Number(memoryLimit),
+                difficulty,
+                tags: tagsArray,
+                sample_cases: sampleCases,
+                testcase_score: updated,
+                spj,
+                spj_language: spjLanguage,
+                spj_source_code: spjSourceCode,
+                checker_type: checkerType,
+                float_epsilon: floatEpsilon,
+                interactive,
+                interactor_language: interactorLanguage,
+                interactor_source_code: interactorSourceCode,
+                visible
+            }
+            await api.problems.update(problem.slug, payload)
+            setSuccess(`All ${testcases.length} testcase scores set to ${batchScore} points successfully!`)
+        } catch (err: any) {
+            setError(err.message || 'Failed to update testcase scores')
+        } finally {
+            setBatchApplying(false)
         }
     }
 
@@ -626,6 +671,32 @@ export default function SetterProblemWorkspace() {
                                     </table>
                                 </div>
 
+                                {testcases.length > 0 && (
+                                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 mb-4 flex items-end justify-between">
+                                        <div className="flex gap-4 items-end">
+                                            <div>
+                                                <label className="block text-xs text-gray-500 mb-1">Set Score for All Test Cases</label>
+                                                <input 
+                                                    type="number" 
+                                                    value={batchScore} 
+                                                    onChange={e => setBatchScore(Number(e.target.value))} 
+                                                    className="border rounded px-3 py-1 text-xs w-28" 
+                                                />
+                                            </div>
+                                            <button 
+                                                onClick={handleBatchSetScores}
+                                                disabled={batchApplying}
+                                                className="bg-blue-600 text-white px-3 py-1.5 rounded text-xs hover:bg-blue-700 disabled:opacity-50 transition-colors cursor-pointer"
+                                            >
+                                                {batchApplying ? 'Applying...' : 'Apply to All'}
+                                            </button>
+                                        </div>
+                                        <span className="text-xs text-gray-400 font-medium">
+                                            Total Testcases: {testcases.length} | Total Points: {testcases.reduce((sum, tc) => sum + (tc.score || 0), 0)} pts
+                                        </span>
+                                    </div>
+                                )}
+
                                 <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 space-y-4">
                                     <h4 className="font-semibold text-xs text-gray-500 uppercase tracking-wider">Register TestCase File Matches</h4>
                                     <div className="grid grid-cols-3 gap-3">
@@ -683,11 +754,13 @@ export default function SetterProblemWorkspace() {
                                     <option value="exact">Exact Bytes Match (Standard)</option>
                                     <option value="lines">Lines Differences (Ignore Trailing Spaces)</option>
                                     <option value="float">Float Tolerance Precision</option>
+                                    <option value="float_absolute">Floating Point (Absolute Epsilon)</option>
+                                    <option value="float_relative">Floating Point (Relative Epsilon)</option>
                                     <option value="custom">Custom Special Judge (SPJ)</option>
                                 </select>
                             </div>
 
-                            {checkerType === 'float' && (
+                            {(checkerType === 'float' || checkerType === 'float_absolute' || checkerType === 'float_relative') && (
                                 <div>
                                     <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Float Epsilon (Precision Tolerance)</label>
                                     <input 

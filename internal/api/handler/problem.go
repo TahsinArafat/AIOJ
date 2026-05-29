@@ -35,6 +35,9 @@ func (h *ProblemHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	difficulty := r.URL.Query().Get("difficulty")
 	search := r.URL.Query().Get("search")
+	source := r.URL.Query().Get("source")
+	rating := r.URL.Query().Get("rating")
+	sortBy := r.URL.Query().Get("sort")
 	var filterTags []string
 	if tagsStr := r.URL.Query().Get("tags"); tagsStr != "" {
 		filterTags = strings.Split(tagsStr, ",")
@@ -44,8 +47,8 @@ func (h *ProblemHandler) List(w http.ResponseWriter, r *http.Request) {
 	var total int
 	var err error
 
-	if difficulty != "" || len(filterTags) > 0 || search != "" {
-		items, total, err = h.store.ListWithFilter(r.Context(), offset, limit, difficulty, filterTags, search)
+	if difficulty != "" || len(filterTags) > 0 || search != "" || source != "" || rating != "" || sortBy != "" {
+		items, total, err = h.store.ListWithFilter(r.Context(), offset, limit, difficulty, filterTags, search, source, rating, sortBy)
 	} else {
 		items, total, err = h.store.List(r.Context(), offset, limit)
 	}
@@ -63,7 +66,11 @@ func (h *ProblemHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ProblemHandler) ListTags(w http.ResponseWriter, r *http.Request) {
-	tags, _ := h.store.GetAllTags(r.Context())
+	tags, err := h.store.GetAllTags(r.Context())
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
 	respondJSON(w, http.StatusOK, map[string]interface{}{"data": tags})
 }
 
@@ -132,7 +139,10 @@ func (h *ProblemHandler) Update(w http.ResponseWriter, r *http.Request) {
 	p.Interactive = req.Interactive
 	p.InteractorLanguage = req.InteractorLanguage
 	p.InteractorSourceCode = req.InteractorSourceCode
-	h.store.Update(r.Context(), p.ID, p)
+	if err := h.store.Update(r.Context(), p.ID, p); err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -157,9 +167,15 @@ func (h *ProblemHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if p.TestdataPath != "" {
-		os.RemoveAll(p.TestdataPath)
+		if err := os.RemoveAll(p.TestdataPath); err != nil {
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
 	}
-	h.store.Delete(r.Context(), p.ID)
+	if err := h.store.Delete(r.Context(), p.ID); err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -299,7 +315,11 @@ func (h *ProblemHandler) ListPermissions(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
-	perms, _ := h.store.GetPermissions(r.Context(), p.ID)
+	perms, err := h.store.GetPermissions(r.Context(), p.ID)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
 	if perms == nil {
 		perms = []model.ProblemPermission{}
 	}
@@ -333,7 +353,10 @@ func (h *ProblemHandler) AddPermission(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid body", http.StatusBadRequest)
 		return
 	}
-	h.store.AddPermission(r.Context(), p.ID, req.UserID, req.Level)
+	if err := h.store.AddPermission(r.Context(), p.ID, req.UserID, req.Level); err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -357,6 +380,9 @@ func (h *ProblemHandler) RemovePermission(w http.ResponseWriter, r *http.Request
 		return
 	}
 	targetUserID := chi.URLParam(r, "userId")
-	h.store.RemovePermission(r.Context(), p.ID, targetUserID)
+	if err := h.store.RemovePermission(r.Context(), p.ID, targetUserID); err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
 	w.WriteHeader(http.StatusOK)
 }

@@ -7,11 +7,13 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
 	"github.com/tahsinarafat/aioj/internal/fps"
+	"github.com/tahsinarafat/aioj/internal/model"
 	"github.com/tahsinarafat/aioj/internal/store"
 )
 
@@ -96,7 +98,14 @@ func (h *TestcaseHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if p.TestdataPath != probDir {
+	scores := autoDiscoverTestCases(probDir)
+	needsUpdate := p.TestdataPath != probDir
+	if scores != nil {
+		p.TestCaseScore = scores
+		needsUpdate = true
+	}
+
+	if needsUpdate {
 		p.TestdataPath = probDir
 		if err := h.store.Update(r.Context(), p.ID, p); err != nil {
 			http.Error(w, "failed to update problem", http.StatusInternalServerError)
@@ -134,4 +143,69 @@ func (h *TestcaseHandler) saveFile(dir string, fileHeader *multipart.FileHeader)
 	}
 
 	return err
+}
+
+// autoDiscoverTestCases scans targetDir for paired input/output test case files
+// and returns TestCaseScore entries with a default score of 10 per pair.
+// Input extensions: .in, .input, .txt
+// Output extensions: .out, .output, .ans, .sol
+// Matching is by filename stem (prefix before extension).
+func autoDiscoverTestCases(targetDir string) []model.TestCaseScore {
+	entries, err := os.ReadDir(targetDir)
+	if err != nil {
+		return nil
+	}
+
+	inputExts := map[string]bool{
+		".in":    true,
+		".input": true,
+		".txt":   true,
+	}
+	outputExts := map[string]bool{
+		".out":   true,
+		".output": true,
+		".ans":   true,
+		".sol":   true,
+	}
+
+	inputFiles := make(map[string]string)
+	outputFiles := make(map[string]string)
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		ext := strings.ToLower(filepath.Ext(name))
+		stem := strings.TrimSuffix(name, filepath.Ext(name))
+
+		if inputExts[ext] {
+			inputFiles[stem] = name
+		} else if outputExts[ext] {
+			outputFiles[stem] = name
+		}
+	}
+
+	var scores []model.TestCaseScore
+	for stem, inName := range inputFiles {
+		outName, ok := outputFiles[stem]
+		if !ok {
+			continue
+		}
+		scores = append(scores, model.TestCaseScore{
+			InputName:  inName,
+			OutputName: outName,
+			Score:      10,
+		})
+	}
+
+	if len(scores) == 0 {
+		return nil
+	}
+
+	sort.Slice(scores, func(i, j int) bool {
+		return scores[i].InputName < scores[j].InputName
+	})
+
+	return scores
 }
