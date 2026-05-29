@@ -11,3 +11,5 @@ web/dist/
 *.swp
 .DS_Store
 pgdata/
+.omo/
+Reference_Projects/
