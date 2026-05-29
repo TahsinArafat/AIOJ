@@ -66,7 +66,24 @@ Browser -> nginx(:80) -> React SPA (Vite + TypeScript + Tailwind)
 
 ---
 
-## Implemented Features (status as of 2026-05-28)
+## Implemented Features (status as of 2026-05-29 — Superiority Roadmap COMPLETE)
+
+| Phase | Plans | Status |
+|-------|-------|--------|
+| Phase 1 - Core | 01-04 | Done |
+| Phase 2 - Contests | 05-08 | Done |
+| Phase 3 - Engagement | 09-11 | Done |
+| Phase 4 - Community | 12-14 | Done |
+| Phase 5 - Content | 15-16 | Done |
+| Phase 6 - Platform | 17-19 | Done |
+| Phase 7 - Polish | 20-23 | Done |
+| **Superiority Phase 1** | Judging Engine v2 (interactive, submit-answer, subtask, 8 checkers, per-lang limits) | Done |
+| **Superiority Phase 2** | Problem Ecosystem (FPS import/export, ZIP test case upload) | Done |
+| **Superiority Phase 3** | Contest Depth (pluggable format registry: ACM/OI/IOI/AtCoder/CF) | Done |
+| **Superiority Phase 4** | Community Platform (orgs, classes, training plans, auto-progress) | Done |
+| **Superiority Phase 5** | Quality Assurance (LCS plagiarism detection, admin dashboard) | Done |
+| **Superiority Phase 6** | Scale & Reliability (Redis queue, distributed judge worker, circuit breaker, read replicas) | Done |
+| **Superiority Phase 7** | Polish (Prometheus /metrics, Grafana dashboards, alerts) | Done |
 
 | Phase | Plans | Status |
 |-------|-------|--------|
