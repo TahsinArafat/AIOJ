@@ -256,3 +256,16 @@ type TrainingPlanStore interface {
 	GetDetail(ctx context.Context, planID, userID string) (*model.TrainingPlanDetail, error)
 	FindByProblem(ctx context.Context, problemID string) ([]string, error)
 }
+
+type PlagiarismStore interface {
+	CreateReport(ctx context.Context, r *model.PlagiarismReport) error
+	GetReportByID(ctx context.Context, id string) (*model.PlagiarismReport, error)
+	GetReportByContest(ctx context.Context, contestID string) (*model.PlagiarismReport, error)
+	UpdateReportStatus(ctx context.Context, id string, status model.PlagiarismReportStatus, errMsg string) error
+	UpdateReportCounts(ctx context.Context, id string, totalPairs, flaggedCount int) error
+	CreatePair(ctx context.Context, p *model.PlagiarismPair) error
+	GetPairByID(ctx context.Context, id string) (*model.PlagiarismPair, error)
+	ListPairsByReport(ctx context.Context, reportID string, offset, limit int) ([]model.PlagiarismPairDetail, int, error)
+	UpdatePairStatus(ctx context.Context, id string, status model.PlagiarismPairStatus) error
+	GetPairsByUser(ctx context.Context, userID string) ([]model.PlagiarismPairDetail, error)
+}
