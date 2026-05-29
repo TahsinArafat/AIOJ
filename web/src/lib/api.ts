@@ -370,6 +370,24 @@ export const api = {
         getByContest: (contestId: string) =>
             request<{ data: any[] }>(`/rating/contest/${contestId}`),
     },
+    plagiarism: {
+        runCheck: (contestId: string, threshold?: number) =>
+            request<any>(`/contests/${contestId}/plagiarism/check`, {
+                method: 'POST',
+                body: JSON.stringify({ contest_id: contestId, threshold }),
+            }),
+        getReport: (contestId: string) =>
+            request<any>(`/contests/${contestId}/plagiarism/report`),
+        listPairs: (contestId: string, reportId: string, offset = 0, limit = 50) =>
+            request<{ data: any[]; total: number }>(
+                `/contests/${contestId}/plagiarism/report/${reportId}/pairs?offset=${offset}&limit=${limit}`
+            ),
+        updatePair: (contestId: string, pairId: string, status: string) =>
+            request(`/contests/${contestId}/plagiarism/pairs/${pairId}`, {
+                method: 'PUT',
+                body: JSON.stringify({ status }),
+            }),
+    },
     rankings: {
         list: (offset = 0, limit = 50) =>
             request<{ data: any[]; total: number }>(`/rankings?offset=${offset}&limit=${limit}`),
