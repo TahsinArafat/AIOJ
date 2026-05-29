@@ -20,6 +20,7 @@ import (
 	"github.com/tahsinarafat/aioj/internal/judge/executor"
 	"github.com/tahsinarafat/aioj/internal/queue"
 	"github.com/tahsinarafat/aioj/internal/hack"
+	"github.com/tahsinarafat/aioj/internal/plagiarism"
 	"github.com/tahsinarafat/aioj/internal/store/postgres"
 	"github.com/tahsinarafat/aioj/internal/virtual"
 	"github.com/tahsinarafat/aioj/internal/vjudge"
@@ -134,7 +135,11 @@ func main() {
 	classH := handler.NewClassHandler(classStore, orgStore)
 	trainingH := handler.NewTrainingHandler(trainingStore, orgStore)
 
-	router := api.NewRouter(authH, problemH, submissionH, contestH, vjH, adminH, testcaseH, wsManager, jwtManager, ratingH, registrationH, virtualH, gymH, hackH, statsH, notifH, groupH, teamH, blogH, editorialH, apiKeyH, webhookH, recommendationH, rankingsH, usersH, searchH, langLimitH, importH, orgH, classH, trainingH)
+	plagiarismStore := postgres.NewPlagiarismStore(db)
+	plagiarismService := plagiarism.NewService(plagiarismStore, contestStore, submissionStore)
+	plagiarismH := handler.NewPlagiarismHandler(plagiarismService, plagiarismStore)
+
+	router := api.NewRouter(authH, problemH, submissionH, contestH, vjH, adminH, testcaseH, wsManager, jwtManager, ratingH, registrationH, virtualH, gymH, hackH, statsH, notifH, groupH, teamH, blogH, editorialH, apiKeyH, webhookH, recommendationH, rankingsH, usersH, searchH, langLimitH, importH, orgH, classH, trainingH, plagiarismH)
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),

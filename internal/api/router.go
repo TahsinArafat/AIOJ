@@ -42,6 +42,7 @@ func NewRouter(
 	orgH *handler.OrganizationHandler,
 	classH *handler.ClassHandler,
 	trainingH *handler.TrainingHandler,
+	plagiarismH *handler.PlagiarismHandler,
 ) http.Handler {
 	r := chi.NewRouter()
 	rl := middleware.NewRateLimiter()
@@ -309,6 +310,15 @@ func NewRouter(
 			r.Post("/sections/{sectionId}/problems", trainingH.AddProblem)
 			r.Delete("/problems/{problemId}", trainingH.RemoveProblem)
 		})
+	})
+
+	r.Route("/api/contests/{contestId}/plagiarism", func(r chi.Router) {
+		r.Use(middleware.AuthMiddleware(jwtManager))
+		r.Post("/check", plagiarismH.RunCheck)
+		r.Get("/report", plagiarismH.GetReportByContest)
+		r.Get("/report/{reportId}", plagiarismH.GetReport)
+		r.Get("/report/{reportId}/pairs", plagiarismH.ListPairs)
+		r.Put("/pairs/{pairId}", plagiarismH.UpdatePairStatus)
 	})
 
 	return r
