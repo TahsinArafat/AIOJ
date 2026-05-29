@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS class_members;
+DROP TABLE IF EXISTS classes;
