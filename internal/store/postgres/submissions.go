@@ -105,12 +105,37 @@ func (s *SubmissionStore) UpdateStatus(_ context.Context, id string, status mode
 	s.db.Exec("UPDATE submissions SET status=$1 WHERE id=$2", status, id)
 }
 
-func (s *SubmissionStore) UpdateResult(_ context.Context, id string, status model.SubmissionStatus, score, timeUsed, memoryUsed int, compileOutput string, results []model.TestCaseResult) error {
+func (s *SubmissionStore) UpdateResult(ctx context.Context, id string, status model.SubmissionStatus, score, timeUsed, memoryUsed int, compileOutput string, results []model.TestCaseResult) error {
 	jr, _ := json.Marshal(results)
-	_, err := s.db.Exec(
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	_, err = tx.ExecContext(ctx,
 		`UPDATE submissions SET status=$1,score=$2,time_used=$3,memory_used=$4,compile_output=$5,judge_result=$6,judged_at=$7 WHERE id=$8`,
 		status, score, timeUsed, memoryUsed, compileOutput, jr, time.Now(), id)
-	return err
+	if err != nil {
+		return err
+	}
+
+	if status == model.StatusAC {
+		_, _ = tx.ExecContext(ctx,
+			`INSERT INTO training_plan_progress (plan_id, user_id, problem_id, completed, completed_at)
+			 SELECT DISTINCT tps.plan_id, sub.user_id, sub.problem_id, true, NOW()
+			 FROM submissions sub
+			 JOIN training_plan_problems tpp ON sub.problem_id = tpp.problem_id
+			 JOIN training_plan_sections tps ON tpp.section_id = tps.id
+			 JOIN training_plan_enrollments tpe ON tpe.plan_id = tps.plan_id AND tpe.user_id = sub.user_id
+			 WHERE sub.id = $1
+			 ON CONFLICT (plan_id, user_id, problem_id)
+			 DO UPDATE SET completed = true, completed_at = NOW()
+			 WHERE NOT training_plan_progress.completed`,
+			id)
+	}
+
+	return tx.Commit()
 }
 
 func (s *SubmissionStore) ListPending(_ context.Context, limit int) ([]string, error) {
