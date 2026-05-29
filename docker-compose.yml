@@ -27,6 +27,14 @@ services:
       - "5050:5050"
     restart: unless-stopped
 
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    restart: unless-stopped
+
   backend:
     build:
       context: .
@@ -40,6 +48,7 @@ services:
       JUDGE_ENDPOINT: http://judge:5050
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       LANG_DIR: /app/lang
+      REDIS_URL: ${REDIS_URL:-redis:6379}
     ports:
       - "8080:8080"
     depends_on:
@@ -47,6 +56,27 @@ services:
         condition: service_healthy
       judge:
         condition: service_started
+    restart: unless-stopped
+
+  judge-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: /app/aioj --mode=judge-worker
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: aioj
+      DB_USER: aioj
+      DB_PASSWORD: ${DB_PASSWORD:-aioj_secret}
+      JUDGE_ENDPOINT: http://judge:5050
+      REDIS_URL: ${REDIS_URL:-redis:6379}
+      LANG_DIR: /app/lang
+    depends_on:
+      postgres:
+        condition: service_healthy
+    deploy:
+      replicas: 1
     restart: unless-stopped
 
   frontend:
@@ -61,3 +91,4 @@ services:
 
 volumes:
   pgdata:
+  redisdata:

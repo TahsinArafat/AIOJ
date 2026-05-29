@@ -25,6 +25,7 @@ import (
 	"github.com/tahsinarafat/aioj/internal/virtual"
 	"github.com/tahsinarafat/aioj/internal/vjudge"
 
+	"github.com/redis/go-redis/v9"
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
@@ -32,6 +33,7 @@ import (
 
 func main() {
 	cfgPath := flag.String("config", "config.yaml", "path to config file")
+	mode := flag.String("mode", "server", "run mode: server|judge-worker")
 	flag.Parse()
 
 	cfg, err := config.Load(*cfgPath)
@@ -70,7 +72,12 @@ func main() {
 	contestStore := postgres.NewContestStore(db)
 	ratingStore := postgres.NewRatingStore(db)
 
-	judgeQueue := queue.NewMemory()
+	var judgeQueue queue.JudgeQueue = queue.NewMemory()
+	if cfg.Redis.URL != "" {
+		redisClient := redis.NewClient(&redis.Options{Addr: cfg.Redis.URL})
+		judgeQueue = queue.NewRedisQueue(redisClient)
+		slog.Info("using redis judge queue", "url", cfg.Redis.URL)
+	}
 	execClient := executor.NewClient(cfg.Judge.Endpoint)
 	langLimitStore := postgres.NewLanguageLimitStore(db)
 	langLimitH := handler.NewLanguageLimitHandler(langLimitStore, problemStore)
@@ -79,6 +86,15 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go workerPool.Start(ctx)
+
+	if *mode == "judge-worker" {
+		slog.Info("running in judge-worker mode, waiting for submissions")
+		quit := make(chan os.Signal, 1)
+		signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+		<-quit
+		slog.Info("judge-worker shutting down")
+		return
+	}
 
 	wsManager := handler.NewWSManager()
 	passwordResetTokenStore := postgres.NewPasswordResetTokenStore(db)

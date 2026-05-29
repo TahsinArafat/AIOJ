@@ -12,6 +12,7 @@ type Config struct {
 	Database DatabaseConfig `yaml:"database"`
 	Auth     AuthConfig     `yaml:"auth"`
 	Judge    JudgeConfig    `yaml:"judge"`
+	Redis    RedisConfig    `yaml:"redis"`
 	LangDir  string         `yaml:"lang_dir"`
 }
 
@@ -40,6 +41,10 @@ type JudgeConfig struct {
 	Endpoint    string `yaml:"endpoint"`
 	Concurrency int    `yaml:"concurrency"`
 	MaxCodeSize int64  `yaml:"max_code_size"`
+}
+
+type RedisConfig struct {
+	URL string `yaml:"url"`
 }
 
 func Load(path string) (*Config, error) {
@@ -71,6 +76,9 @@ func Load(path string) (*Config, error) {
 	}
 	if v := os.Getenv("JUDGE_CONCURRENCY"); v != "" {
 		cfg.Judge.Concurrency = atoi(v)
+	}
+	if v := os.Getenv("REDIS_URL"); v != "" {
+		cfg.Redis.URL = v
 	}
 	if v := os.Getenv("JWT_SECRET"); v != "" {
 		cfg.Auth.JWTSecret = v
