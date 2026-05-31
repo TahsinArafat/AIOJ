@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkMath from 'remark-math'
 import rehypeKatex from 'rehype-katex'
 import 'katex/dist/katex.min.css'
+import VisualEditor from '../VisualEditor'
 import type { ProblemFormState } from '../../types/problem-workspace'
 
 interface StatementTabProps {
@@ -114,43 +115,38 @@ export default function StatementTab({
                 {uploadingImage ? 'Uploading...' : 'Insert Image'}
               </button>
             </div>
-            <textarea
-              value={formState.description}
-              onChange={e => onUpdate('description', e.target.value)}
-              rows={8}
-              className="w-full border border-gray-300 rounded px-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-800"
-              required
+            <VisualEditor
+              content={formState.description}
+              onChange={(markdown) => onUpdate('description', markdown)}
+              placeholder="Write your problem statement..."
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Input Format</label>
-              <textarea
-                value={formState.inputFormat}
-                onChange={e => onUpdate('inputFormat', e.target.value)}
-                rows={4}
-                className="w-full border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-800"
+              <VisualEditor
+                content={formState.inputFormat}
+                onChange={(markdown) => onUpdate('inputFormat', markdown)}
+                placeholder="Describe the input format..."
               />
             </div>
             <div>
               <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Output Format</label>
-              <textarea
-                value={formState.outputFormat}
-                onChange={e => onUpdate('outputFormat', e.target.value)}
-                rows={4}
-                className="w-full border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-800"
+              <VisualEditor
+                content={formState.outputFormat}
+                onChange={(markdown) => onUpdate('outputFormat', markdown)}
+                placeholder="Describe the output format..."
               />
             </div>
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Hint</label>
-            <textarea
-              value={formState.hint}
-              onChange={e => onUpdate('hint', e.target.value)}
-              rows={2}
-              className="w-full border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-800"
+            <VisualEditor
+              content={formState.hint}
+              onChange={(markdown) => onUpdate('hint', markdown)}
+              placeholder="Add a hint..."
             />
           </div>
         </div>
