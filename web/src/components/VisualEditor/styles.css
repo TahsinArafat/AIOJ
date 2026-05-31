@@ -1,0 +1,35 @@
+.tiptap {
+  outline: none;
+}
+
+.tiptap p.is-editor-empty:first-child::before {
+  color: #adb5bd;
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+.tiptap .math-node {
+  display: inline-block;
+  cursor: pointer;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: #f0f7ff;
+  border: 1px solid #cce5ff;
+}
+
+.tiptap .math-node:hover {
+  background: #cce5ff;
+}
+
+.tiptap .math-block {
+  display: block;
+  text-align: center;
+  margin: 1em 0;
+  padding: 8px;
+}
+
+.ProseMirror-selectednode .math-node {
+  outline: 2px solid #2563eb;
+}
