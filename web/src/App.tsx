@@ -13,6 +13,7 @@ import ContestScoreboard from './pages/ContestScoreboard'
 import AdminDashboard from './pages/AdminDashboard'
 import SetterPanel from './pages/SetterPanel'
 import SetterProblemWorkspace from './pages/SetterProblemWorkspace'
+import SetterTestPage from './pages/SetterTestPage'
 import Profile from './pages/Profile'
 import ProblemCreate from './pages/ProblemCreate'
 import Navbar from './components/Navbar'
@@ -226,6 +227,7 @@ export default function App() {
                         <Route path="/setter/create" element={<ProblemCreate />} />
                         <Route path="/setter/:slug" element={<SetterProblemWorkspace />} />
                         <Route path="/setter/contest/create" element={<ContestCreate />} />
+                        <Route path="/setter/test1" element={<SetterTestPage />} />
                         <Route path="/practice" element={<Practice />} />
                         <Route path="/organizations" element={<OrganizationList />} />
                         <Route path="/organizations/create" element={<OrganizationCreate />} />
