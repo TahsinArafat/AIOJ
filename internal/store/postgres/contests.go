@@ -326,3 +326,58 @@ func (s *ContestStore) ListTeamRegistrations(ctx context.Context, contestID stri
 	}
 	return items, nil
 }
+
+// GetContestProblemByIndex returns a problem from a contest by its index (A, B, C...).
+// Unlike GetBySlug/GetByID, this does NOT check problem.visible - the problem is
+// accessible if it's in the contest, regardless of its visibility setting.
+func (s *ContestStore) GetContestProblemByIndex(ctx context.Context, contestID, index string) (*model.Problem, error) {
+	query := `
+		SELECT p.id, p.slug, p.title, p.description, p.input_format, p.output_format,
+		       p.hint, p.time_limit, p.memory_limit, p.difficulty, p.tags,
+		       p.visible, p.spj, p.spj_language, p.spj_source_code, p.checker_type,
+		       p.float_epsilon, p.interactive, p.interactor_language, p.interactor_source_code,
+		       p.scoring_mode, p.subtask_aggregation, p.submission_count, p.accepted_count,
+		       p.source, p.remote_id, p.created_by, p.created_at, p.updated_at
+		FROM problems p
+		JOIN contest_problems cp ON p.id = cp.problem_id
+		WHERE cp.contest_id = $1 AND cp.index = $2`
+
+	var p model.Problem
+	var tags []byte
+	err := s.db.QueryRowContext(ctx, query, contestID, index).Scan(
+		&p.ID, &p.Slug, &p.Title, &p.Description, &p.InputFormat, &p.OutputFormat,
+		&p.Hint, &p.TimeLimit, &p.MemoryLimit, &p.Difficulty, &tags,
+		&p.Visible, &p.SPJ, &p.SPJLanguage, &p.SPJSourceCode, &p.CheckerType,
+		&p.FloatEpsilon, &p.Interactive, &p.InteractorLanguage, &p.InteractorSourceCode,
+		&p.ScoringMode, &p.SubtaskAggregation, &p.SubmissionCount, &p.AcceptedCount,
+		&p.Source, &p.RemoteID, &p.CreatedBy, &p.CreatedAt, &p.UpdatedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get contest problem by index: %w", err)
+	}
+
+	if len(tags) > 0 {
+		if err := json.Unmarshal(tags, &p.Tags); err != nil {
+			p.Tags = []string{}
+		}
+	}
+
+	return &p, nil
+}
+
+// IsParticipant checks if a user has participated in a contest (has submissions or registrations).
+func (s *ContestStore) IsParticipant(ctx context.Context, contestID, userID string) (bool, error) {
+	var exists bool
+	err := s.db.QueryRowContext(ctx,
+		`SELECT EXISTS(
+			SELECT 1 FROM submissions WHERE contest_id = $1 AND user_id = $2
+			UNION
+			SELECT 1 FROM contest_registrations WHERE contest_id = $1 AND user_id = $2
+		)`,
+		contestID, userID,
+	).Scan(&exists)
+	return exists, err
+}

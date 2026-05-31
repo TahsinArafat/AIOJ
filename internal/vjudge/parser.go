@@ -79,31 +79,6 @@ func (p *ProblemParser) ParseCodeforcesProblem(ctx context.Context, contestID, p
 		prob.MemoryLimit = parseMemoryLimit(extractText(ml))
 	}
 
-	// Extract input/output file info from .input-file and .output-file divs
-	// CF text format: "inputstdin" or "inputstandard input"
-	//                 "outputstdout" or "outputstandard output"
-	inputFileDiv := findNode(problemDiv, func(n *html.Node) bool {
-		return n.Type == html.ElementNode && n.Data == "div" && hasClass(n, "input-file")
-	})
-	outputFileDiv := findNode(problemDiv, func(n *html.Node) bool {
-		return n.Type == html.ElementNode && n.Data == "div" && hasClass(n, "output-file")
-	})
-
-	ioDescription := ""
-	if inputFileDiv != nil {
-		inputText := strings.TrimSpace(extractText(inputFileDiv))
-		inputText = strings.TrimPrefix(inputText, "input")
-		inputText = strings.TrimSpace(inputText)
-		ioDescription += "**Input:** " + inputText + "\n"
-	}
-	if outputFileDiv != nil {
-		outputText := strings.TrimSpace(extractText(outputFileDiv))
-		outputText = strings.TrimPrefix(outputText, "output")
-		outputText = strings.TrimSpace(outputText)
-		ioDescription += "**Output:** " + outputText + "\n"
-	}
-
-	// Extract description: render ONLY the actual statement content, skipping header divs
 	descriptionDiv := findNode(problemDiv, func(n *html.Node) bool {
 		return n.Type == html.ElementNode && n.Data == "div" && hasClass(n, "ttypography")
 	})
@@ -113,18 +88,18 @@ func (p *ProblemParser) ParseCodeforcesProblem(ctx context.Context, contestID, p
 		prob.Description = renderNodeToMarkdown(problemDiv)
 	}
 
-	// Prepend I/O description if available
-	if ioDescription != "" {
-		prob.Description = ioDescription + "\n" + prob.Description
-	}
-
-	// Extract sample test cases
 	sampleDivs := findAllNodes(problemDiv, func(n *html.Node) bool {
 		return n.Type == html.ElementNode && n.Data == "div" && hasClass(n, "sample-tests")
 	})
 	if len(sampleDivs) > 0 {
 		prob.SampleCases = extractSampleCases(sampleDivs[0])
 	}
+
+	prob.InputFormat = extractSectionFromDescription(prob.Description, "Input")
+	prob.OutputFormat = extractSectionFromDescription(prob.Description, "Output")
+	prob.Description = removeExamplesFromDescription(prob.Description)
+	prob.Description = removeSectionFromDescription(prob.Description, "Input")
+	prob.Description = removeSectionFromDescription(prob.Description, "Output")
 
 	// Extract tags (including difficulty rating like *800)
 	// Tags are in the SIDEBAR, not inside problem-statement, so search the whole doc
@@ -231,6 +206,15 @@ func (p *ProblemParser) ParseCSESProblem(ctx context.Context, problemID string) 
 		}
 	}
 
+	prob.Hint = extractConstraintsFromDescription(prob.Description)
+	prob.Description = removeConstraintsFromDescription(prob.Description)
+
+	prob.InputFormat = extractSectionFromDescription(prob.Description, "Input")
+	prob.Description = removeSectionFromDescription(prob.Description, "Input")
+
+	prob.OutputFormat = extractSectionFromDescription(prob.Description, "Output")
+	prob.Description = removeSectionFromDescription(prob.Description, "Output")
+
 	return prob, nil
 }
 
@@ -264,6 +248,118 @@ func stripSampleCases(n *html.Node) {
 	for _, node := range removeNodes {
 		n.RemoveChild(node)
 	}
+}
+
+func stripConstraints(n *html.Node) {
+	var removeNodes []*html.Node
+	inConstraints := false
+	for c := n.FirstChild; c != nil; c = c.NextSibling {
+		if c.Type == html.ElementNode && c.Data == "h1" && extractText(c) == "Constraints" {
+			inConstraints = true
+			removeNodes = append(removeNodes, c)
+		} else if inConstraints {
+			removeNodes = append(removeNodes, c)
+		} else if c.Type == html.ElementNode {
+			stripConstraints(c)
+		}
+	}
+	for _, node := range removeNodes {
+		n.RemoveChild(node)
+	}
+}
+
+func extractConstraintsFromDescription(description string) string {
+	return extractSectionFromDescription(description, "Constraints")
+}
+
+func removeConstraintsFromDescription(description string) string {
+	return removeSectionFromDescription(description, "Constraints")
+}
+
+func extractSectionFromDescription(description string, sectionName string) string {
+	lines := strings.Split(description, "\n")
+	var section []string
+	inSection := false
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "# "+sectionName || trimmed == "## "+sectionName || trimmed == sectionName {
+			inSection = true
+			continue
+		}
+		if inSection {
+			if (strings.HasPrefix(trimmed, "#") && trimmed != "# "+sectionName) || 
+			   (trimmed != "" && !strings.HasPrefix(trimmed, "#") && isSectionHeader(trimmed)) {
+				break
+			}
+			if trimmed != "" {
+				section = append(section, trimmed)
+			}
+		}
+	}
+
+	return strings.Join(section, "\n")
+}
+
+func removeSectionFromDescription(description string, sectionName string) string {
+	lines := strings.Split(description, "\n")
+	var result []string
+	inSection := false
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "# "+sectionName || trimmed == "## "+sectionName || trimmed == sectionName {
+			inSection = true
+			continue
+		}
+		if inSection {
+			if (strings.HasPrefix(trimmed, "#") && trimmed != "# "+sectionName) || 
+			   (trimmed != "" && !strings.HasPrefix(trimmed, "#") && isSectionHeader(trimmed)) {
+				inSection = false
+				result = append(result, line)
+			}
+			continue
+		}
+		result = append(result, line)
+	}
+
+	return strings.TrimSpace(strings.Join(result, "\n"))
+}
+
+func isSectionHeader(line string) bool {
+	headers := []string{"Input", "Output", "Constraints", "Examples", "Example", "Note"}
+	for _, h := range headers {
+		if line == h {
+			return true
+		}
+	}
+	return false
+}
+
+func removeExamplesFromDescription(description string) string {
+	lines := strings.Split(description, "\n")
+	var result []string
+	inExamples := false
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "Example") || strings.HasPrefix(trimmed, "Examples") ||
+			strings.HasPrefix(trimmed, "# Example") || strings.HasPrefix(trimmed, "## Example") ||
+			strings.HasPrefix(trimmed, "# Examples") || strings.HasPrefix(trimmed, "## Examples") {
+			inExamples = true
+			continue
+		}
+		if inExamples {
+			if strings.HasPrefix(trimmed, "#") && !strings.HasPrefix(trimmed, "# Example") && !strings.HasPrefix(trimmed, "# Examples") {
+				inExamples = false
+				result = append(result, line)
+			}
+			continue
+		}
+		result = append(result, line)
+	}
+
+	return strings.TrimSpace(strings.Join(result, "\n"))
 }
 
 func extractCSESSampleCases(doc *html.Node) []model.SampleCase {

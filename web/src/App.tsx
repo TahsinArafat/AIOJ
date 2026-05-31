@@ -13,7 +13,7 @@ import ContestScoreboard from './pages/ContestScoreboard'
 import AdminDashboard from './pages/AdminDashboard'
 import SetterPanel from './pages/SetterPanel'
 import SetterProblemWorkspace from './pages/SetterProblemWorkspace'
-import SetterTestPage from './pages/SetterTestPage'
+
 import Profile from './pages/Profile'
 import ProblemCreate from './pages/ProblemCreate'
 import Navbar from './components/Navbar'
@@ -50,6 +50,7 @@ import TrainingPlanList from './pages/TrainingPlanList'
 import TrainingPlanCreate from './pages/TrainingPlanCreate'
 import TrainingPlanDetail from './pages/TrainingPlanDetail'
 import ContestPlagiarism from './pages/ContestPlagiarism'
+import ContestProblem from './pages/ContestProblem'
 import './global.css'
 
 function Home() {
@@ -203,6 +204,7 @@ export default function App() {
                         <Route path="/contests/:id" element={<ContestDetail />} />
                         <Route path="/contests/:id/scoreboard" element={<ContestScoreboard />} />
                         <Route path="/contests/:id/plagiarism" element={<ContestPlagiarism />} />
+                        <Route path="/contests/:contestId/problem/:index" element={<ContestProblem />} />
                         <Route path="/gym" element={<GymList />} />
                         <Route path="/gym/:id" element={<GymDetail />} />
                         <Route path="/hack/:contestId/:problemId" element={<HackPanel />} />
@@ -227,7 +229,7 @@ export default function App() {
                         <Route path="/setter/create" element={<ProblemCreate />} />
                         <Route path="/setter/:slug" element={<SetterProblemWorkspace />} />
                         <Route path="/setter/contest/create" element={<ContestCreate />} />
-                        <Route path="/setter/test1" element={<SetterTestPage />} />
+
                         <Route path="/practice" element={<Practice />} />
                         <Route path="/organizations" element={<OrganizationList />} />
                         <Route path="/organizations/create" element={<OrganizationCreate />} />

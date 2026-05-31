@@ -475,8 +475,8 @@ export default function ProblemDetail() {
                         )}
                         {problem.hint && (
                             <div>
-                                <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide mb-1">Hint</h3>
-                                <div className="prose prose-sm max-w-none text-gray-700 italic">
+                                <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide mb-1">Constraints</h3>
+                                <div className="prose prose-sm max-w-none text-gray-700">
                                     <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
                                         {problem.hint}
                                     </ReactMarkdown>

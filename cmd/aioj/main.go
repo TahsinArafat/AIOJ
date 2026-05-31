@@ -111,6 +111,7 @@ func main() {
 
 	submissionH := handler.NewSubmissionHandler(submissionStore, problemStore, contestStore, judgeQueue, wsManager, execClient, cfg.LangDir, vjService)
 	contestH := handler.NewContestHandler(contestStore, ratingStore)
+	contestProblemH := handler.NewContestProblemHandler(contestStore, problemStore)
 
 	platforms := []string{"codeforces", "atcoder", "cses", "toph", "qoj"}
 	for _, platform := range platforms {
@@ -201,7 +202,7 @@ func main() {
 	remoteLangH := handler.NewRemoteLanguageHandler(remoteLangStore)
 	adminSubH := handler.NewAdminSubmissionHandler(submissionStore, problemStore, vjService)
 
-	router := api.NewRouter(authH, problemH, submissionH, contestH, vjH, adminH, testcaseH, wsManager, jwtManager, ratingH, registrationH, virtualH, gymH, hackH, statsH, notifH, groupH, teamH, blogH, editorialH, apiKeyH, webhookH, recommendationH, rankingsH, usersH, searchH, langLimitH, importH, orgH, classH, trainingH, plagiarismH, mediaH, onsiteH, botAccountH, settingsH, langAdminH, remoteLangH, adminSubH)
+	router := api.NewRouter(authH, problemH, submissionH, contestH, contestProblemH, vjH, adminH, testcaseH, wsManager, jwtManager, ratingH, registrationH, virtualH, gymH, hackH, statsH, notifH, groupH, teamH, blogH, editorialH, apiKeyH, webhookH, recommendationH, rankingsH, usersH, searchH, langLimitH, importH, orgH, classH, trainingH, plagiarismH, mediaH, onsiteH, botAccountH, settingsH, langAdminH, remoteLangH, adminSubH)
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),

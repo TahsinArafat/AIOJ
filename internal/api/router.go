@@ -16,6 +16,7 @@ func NewRouter(
 	problemH *handler.ProblemHandler,
 	submissionH *handler.SubmissionHandler,
 	contestH *handler.ContestHandler,
+	contestProblemH *handler.ContestProblemHandler,
 	vjudgeH *handler.VJudgeHandler,
 	adminH *handler.AdminHandler,
 	testcaseH *handler.TestcaseHandler,
@@ -109,6 +110,7 @@ func NewRouter(
 		r.Get("/formats", contestH.ListAvailableFormats)
 		r.With(middleware.OptionalAuthMiddleware(jwtManager)).Get("/{id}", contestH.GetByID)
 		r.With(middleware.OptionalAuthMiddleware(jwtManager)).Get("/{id}/scoreboard", contestH.Scoreboard)
+		r.With(middleware.OptionalAuthMiddleware(jwtManager)).Get("/{contestId}/problems/{index}", contestProblemH.GetByIndex)
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.AuthMiddleware(jwtManager))
 			r.Post("/", contestH.Create)

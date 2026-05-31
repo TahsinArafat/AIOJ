@@ -27,9 +27,17 @@ type Contest struct {
 	HackPhaseEnd         *time.Time `json:"hack_phase_end,omitempty"`
 	TeamSize             int        `json:"team_size"`
 	IsTeamContest        bool       `json:"is_team_contest"`
+	UpsolvingEnabled     bool       `json:"upsolving_enabled"`
+	VirtualContestEnabled bool      `json:"virtual_contest_enabled"`
 	CreatedBy            string     `json:"created_by"`
 	CreatedAt            time.Time  `json:"created_at"`
 }
+
+const (
+	ContestPermissionManager = "manager"
+	ContestPermissionJudge   = "judge"
+	ContestPermissionTester  = "tester"
+)
 
 type ContestProblem struct {
 	ContestID string `json:"contest_id"`

@@ -142,11 +142,11 @@ export default function StatementTab({
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Hint</label>
+            <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Constraints</label>
             <VisualEditor
               content={formState.hint}
               onChange={(markdown) => onUpdate('hint', markdown)}
-              placeholder="Add a hint..."
+              placeholder="Add constraints..."
             />
           </div>
         </div>
@@ -182,7 +182,7 @@ export default function StatementTab({
                 )}
                 {formState.hint && (
                   <div>
-                    <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Hint</h4>
+                    <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Constraints</h4>
                     <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
                       {formState.hint}
                     </ReactMarkdown>

@@ -318,6 +318,8 @@ export const api = {
         unregister: (id: string) => request(`/contests/${id}/register`, { method: 'DELETE' }),
         checkRegistration: (id: string) => request<{ registered: boolean }>(`/contests/${id}/register`),
         listRegistrations: (id: string) => request<{ data: any[]; count: number }>(`/contests/${id}/registrations`),
+        getProblemByIndex: (contestId: string, index: string) =>
+            request<{ problem: any; contest: any; can_submit?: boolean; upsolving_disabled?: boolean }>(`/contests/${contestId}/problems/${index}`),
     },
     virtual: {
         start: (contestId: string, durationMinutes?: number) =>
