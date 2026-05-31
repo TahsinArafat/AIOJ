@@ -169,6 +169,12 @@ func (h *AdminLanguageHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	key := chi.URLParam(r, "key")
+	filePath := filepath.Join(h.langDir, key+".yaml")
+
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		http.Error(w, "language not found; use POST /api/admin/languages to create new languages", http.StatusNotFound)
+		return
+	}
 
 	var cfg compiler.LangConfig
 	if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
@@ -196,7 +202,6 @@ func (h *AdminLanguageHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	filePath := filepath.Join(h.langDir, key+".yaml")
 	if err := os.WriteFile(filePath, data, 0644); err != nil {
 		http.Error(w, "failed to write file: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -340,6 +345,12 @@ func (h *AdminLanguageHandler) UpdateRaw(w http.ResponseWriter, r *http.Request)
 	}
 
 	key := chi.URLParam(r, "key")
+	filePath := filepath.Join(h.langDir, key+".yaml")
+
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		http.Error(w, "language not found; use POST /api/admin/languages to create new languages", http.StatusNotFound)
+		return
+	}
 
 	var body struct {
 		Content string `json:"content"`
@@ -355,7 +366,6 @@ func (h *AdminLanguageHandler) UpdateRaw(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	filePath := filepath.Join(h.langDir, key+".yaml")
 	if err := os.WriteFile(filePath, []byte(body.Content), 0644); err != nil {
 		http.Error(w, "failed to write file: "+err.Error(), http.StatusInternalServerError)
 		return

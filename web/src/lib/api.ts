@@ -195,6 +195,21 @@ export const api = {
             }
             return res.json() as Promise<{ status: string; problem_id: string; slug: string }>
         },
+        importCSES: async (problemId: string) => {
+            const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+            const token = getAccessToken()
+            if (token) headers['Authorization'] = `Bearer ${token}`
+            const res = await fetch(BASE + '/problems/import/cses', {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ problem_id: problemId })
+            })
+            if (!res.ok) {
+                const text = await res.text()
+                throw new Error(text || `HTTP ${res.status}`)
+            }
+            return res.json() as Promise<{ status: string; problem_id: string; slug: string }>
+        },
     },
     submissions: {
         create: (d: any) => request<any>('/submissions', { method: 'POST', body: JSON.stringify(d) }),
@@ -229,12 +244,32 @@ export const api = {
         botAccounts: {
             list: (offset = 0, limit = 20) =>
                 request<{ data: any[]; total: number }>(`/admin/bot-accounts?offset=${offset}&limit=${limit}`),
-            create: (d: { user_id?: string; platform: string; platform_user: string; platform_pass: string; api_key?: string; api_secret?: string; rate_limit_rps?: number }) =>
+            create: (d: { user_id?: string; platform: string; platform_user: string; platform_pass: string; api_key?: string; api_secret?: string; rate_limit_rps?: number; session_data?: Record<string, string> }) =>
                 request<any>('/admin/bot-accounts', { method: 'POST', body: JSON.stringify(d) }),
-            update: (id: string, d: { platform_user?: string; platform_pass?: string; api_key?: string; api_secret?: string; status?: string; rate_limit_rps?: number }) =>
+            update: (id: string, d: { platform_user?: string; platform_pass?: string; api_key?: string; api_secret?: string; status?: string; rate_limit_rps?: number; session_data?: Record<string, string> }) =>
                 request<any>(`/admin/bot-accounts/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
             delete: (id: string) =>
                 request(`/admin/bot-accounts/${id}`, { method: 'DELETE' }),
+            testLogin: (d: { platform: string; platform_user?: string; platform_pass?: string; session_data?: Record<string, string> }) =>
+                request<{ status: string; message: string; cookies?: number }>('/admin/bot-accounts/test-login', { method: 'POST', body: JSON.stringify(d) }),
+        },
+        remoteLanguages: {
+            list: (platform: string) =>
+                request<{ data: any[] }>(`/admin/remote-languages/${platform}`),
+            create: (d: { platform: string; local_id: string; remote_id: string; display_name: string; enabled?: boolean; sort_order?: number }) =>
+                request<any>('/admin/remote-languages', { method: 'POST', body: JSON.stringify(d) }),
+            update: (id: string, d: { local_id?: string; remote_id?: string; display_name?: string; enabled?: boolean; sort_order?: number }) =>
+                request<any>(`/admin/remote-languages/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
+            delete: (id: string) =>
+                request(`/admin/remote-languages/${id}`, { method: 'DELETE' }),
+        },
+        submissions: {
+            pendingRemote: () =>
+                request<{ data: any[]; total: number }>('/admin/submissions/pending-remote'),
+            rejudge: (id: string) =>
+                request<{ status: string }>(`/admin/submissions/${id}/rejudge`, { method: 'POST' }),
+            refresh: (id: string) =>
+                request<{ status: string }>(`/admin/submissions/${id}/refresh`, { method: 'POST' }),
         },
         settings: {
             list: () =>

@@ -2,20 +2,23 @@ package handler
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/tahsinarafat/aioj/internal/model"
 	"github.com/tahsinarafat/aioj/internal/store"
+	"github.com/tahsinarafat/aioj/internal/vjudge"
 )
 
 type AdminBotAccountHandler struct {
-	store store.BotAccountStore
+	store      store.BotAccountStore
+	vjudgeSvc  *vjudge.Service
 }
 
-func NewAdminBotAccountHandler(s store.BotAccountStore) *AdminBotAccountHandler {
-	return &AdminBotAccountHandler{store: s}
+func NewAdminBotAccountHandler(s store.BotAccountStore, vjSvc *vjudge.Service) *AdminBotAccountHandler {
+	return &AdminBotAccountHandler{store: s, vjudgeSvc: vjSvc}
 }
 
 func (h *AdminBotAccountHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -83,6 +86,28 @@ func (h *AdminBotAccountHandler) Create(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "failed to create bot account: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	if h.vjudgeSvc != nil && ba.Platform == "codeforces" {
+		if len(ba.SessionData) > 0 {
+			h.vjudgeSvc.SetCookies(ba.Platform, ba.SessionData)
+			slog.Info("bot cookies loaded from session_data", "platform", ba.Platform)
+		} else if ba.PlatformUser != "" && ba.PlatformPass != "" {
+			go func() {
+				cookies, err := h.vjudgeSvc.Login(r.Context(), ba.Platform)
+				if err != nil {
+					slog.Error("bot auto-login failed", "platform", ba.Platform, "err", err)
+					return
+				}
+				if len(cookies) > 0 {
+					ba.SessionData = cookies
+					h.store.Update(r.Context(), ba.ID, ba)
+					h.vjudgeSvc.UpdateCookies(ba.Platform, cookies)
+					slog.Info("bot auto-login succeeded, cookies saved", "platform", ba.Platform)
+				}
+			}()
+		}
+	}
+
 	respondJSON(w, http.StatusCreated, ba)
 }
 
@@ -98,10 +123,11 @@ func (h *AdminBotAccountHandler) Update(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	var req struct {
-		PlatformUser *string  `json:"platform_user"`
-		PlatformPass *string  `json:"platform_pass"`
-		Status       *string  `json:"status"`
-		RateLimitRPS *float32 `json:"rate_limit_rps"`
+		PlatformUser *string            `json:"platform_user"`
+		PlatformPass *string            `json:"platform_pass"`
+		Status       *string            `json:"status"`
+		RateLimitRPS *float32           `json:"rate_limit_rps"`
+		SessionData  map[string]string  `json:"session_data"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid body", http.StatusBadRequest)
@@ -124,10 +150,35 @@ func (h *AdminBotAccountHandler) Update(w http.ResponseWriter, r *http.Request) 
 	if req.RateLimitRPS != nil {
 		existing.RateLimitRPS = *req.RateLimitRPS
 	}
+	if req.SessionData != nil {
+		existing.SessionData = req.SessionData
+	}
 	if err := h.store.Update(r.Context(), id, existing); err != nil {
 		http.Error(w, "failed to update bot account", http.StatusInternalServerError)
 		return
 	}
+
+	if h.vjudgeSvc != nil && existing.Platform == "codeforces" {
+		if req.SessionData != nil && len(req.SessionData) > 0 {
+			h.vjudgeSvc.SetCookies(existing.Platform, req.SessionData)
+			slog.Info("bot cookies updated from session_data", "platform", existing.Platform)
+		} else if req.PlatformUser != nil || req.PlatformPass != nil {
+			go func() {
+				cookies, err := h.vjudgeSvc.Login(r.Context(), existing.Platform)
+				if err != nil {
+					slog.Error("bot auto-login failed after update", "platform", existing.Platform, "err", err)
+					return
+				}
+				if len(cookies) > 0 {
+					existing.SessionData = cookies
+					h.store.Update(r.Context(), id, existing)
+					h.vjudgeSvc.UpdateCookies(existing.Platform, cookies)
+					slog.Info("bot auto-login succeeded after update, cookies saved", "platform", existing.Platform)
+				}
+			}()
+		}
+	}
+
 	respondJSON(w, http.StatusOK, existing)
 }
 
@@ -138,4 +189,72 @@ func (h *AdminBotAccountHandler) Delete(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	respondJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+}
+
+func (h *AdminBotAccountHandler) TestLogin(w http.ResponseWriter, r *http.Request) {
+	if h.vjudgeSvc == nil {
+		http.Error(w, "vjudge service not available", http.StatusInternalServerError)
+		return
+	}
+
+	var req struct {
+		Platform     string            `json:"platform"`
+		PlatformUser string            `json:"platform_user"`
+		PlatformPass string            `json:"platform_pass"`
+		SessionData  map[string]string `json:"session_data"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+
+	if req.Platform == "" {
+		http.Error(w, "platform is required", http.StatusBadRequest)
+		return
+	}
+
+	if req.Platform == "codeforces" {
+		if len(req.SessionData) > 0 {
+			hasLogin := req.SessionData["JSESSIONID"] != "" || req.SessionData["39ce7"] != ""
+			if !hasLogin {
+				respondJSON(w, http.StatusOK, map[string]interface{}{
+					"status":  "error",
+					"message": "Missing login cookies. Need at least JSESSIONID or 39ce7.",
+				})
+				return
+			}
+
+			err := h.vjudgeSvc.ValidateCookies(r.Context(), req.SessionData)
+			if err != nil {
+				respondJSON(w, http.StatusOK, map[string]interface{}{
+					"status":  "error",
+					"message": "Cookies invalid: " + err.Error(),
+				})
+				return
+			}
+
+			respondJSON(w, http.StatusOK, map[string]interface{}{
+				"status":  "ok",
+				"message": "Login validated successfully! Cookies are valid.",
+				"cookies": len(req.SessionData),
+			})
+			return
+		}
+
+		if req.PlatformUser == "" || req.PlatformPass == "" {
+			http.Error(w, "username and password are required for Codeforces", http.StatusBadRequest)
+			return
+		}
+
+		respondJSON(w, http.StatusOK, map[string]interface{}{
+			"status":  "ok",
+			"message": "Credentials provided. Bot will attempt login via FlareSolverr on first submission.",
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"status":  "ok",
+		"message": "Bot account configured.",
+	})
 }

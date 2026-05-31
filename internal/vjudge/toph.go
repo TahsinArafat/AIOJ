@@ -27,3 +27,11 @@ func (b *TophBot) Submit(ctx context.Context, problemID, sourceCode, language st
 func (b *TophBot) Poll(ctx context.Context, remoteSubmissionID string) (*RemoteResult, error) {
 	return &RemoteResult{RemoteID: remoteSubmissionID, Verdict: "PENDING", Done: false}, nil
 }
+
+func (b *TophBot) Login(ctx context.Context) (map[string]string, error) {
+	return nil, fmt.Errorf("toph login not implemented")
+}
+
+func (b *TophBot) IsLoggedIn(ctx context.Context) bool {
+	return false
+}

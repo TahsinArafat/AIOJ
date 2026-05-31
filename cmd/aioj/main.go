@@ -102,36 +102,42 @@ func main() {
 	passwordResetTokenStore := postgres.NewPasswordResetTokenStore(db)
 	authH := handler.NewAuthHandler(userStore, refreshTokenStore, passwordResetTokenStore, jwtManager)
 	problemH := handler.NewProblemHandler(problemStore)
-	submissionH := handler.NewSubmissionHandler(submissionStore, problemStore, contestStore, judgeQueue, wsManager, execClient, cfg.LangDir)
-	contestH := handler.NewContestHandler(contestStore, ratingStore)
 
 	botAccountStore := postgres.NewBotAccountStore(db)
-	vjService := vjudge.NewService(submissionStore, botAccountStore)
+	remoteLangStore := postgres.NewRemoteLanguageStore(db)
+	vjService := vjudge.NewService(submissionStore, botAccountStore, remoteLangStore)
+
+	cfSubmit := vjudge.NewCFSubmitClient("http://host.docker.internal:8002")
+
+	submissionH := handler.NewSubmissionHandler(submissionStore, problemStore, contestStore, judgeQueue, wsManager, execClient, cfg.LangDir, vjService)
+	contestH := handler.NewContestHandler(contestStore, ratingStore)
 
 	platforms := []string{"codeforces", "atcoder", "cses", "toph", "qoj"}
 	for _, platform := range platforms {
 		accounts, _ := botAccountStore.ListByPlatform(ctx, platform)
-		cfg := vjudge.BotConfig{}
+		vjCfg := vjudge.BotConfig{}
 		if len(accounts) > 0 && accounts[0].Status == "active" {
-			cfg.Username = accounts[0].PlatformUser
-			cfg.Password = accounts[0].PlatformPass
-			cfg.APIKey = accounts[0].APIKey
-			cfg.APISecret = accounts[0].APISecret
-			cfg.Cookies = accounts[0].SessionData
+			vjCfg.Username = accounts[0].PlatformUser
+			vjCfg.Password = accounts[0].PlatformPass
+			vjCfg.APIKey = accounts[0].APIKey
+			vjCfg.APISecret = accounts[0].APISecret
+			vjCfg.Cookies = accounts[0].SessionData
 		}
 		switch platform {
 		case "codeforces":
-			vjService.RegisterBot(platform, vjudge.NewCodeforcesBot(cfg))
+			vjService.RegisterBot(platform, vjudge.NewCodeforcesBotWithSubmit(vjCfg, cfSubmit))
 		case "atcoder":
-			vjService.RegisterBot(platform, vjudge.NewAtCoderBot(cfg))
+			vjService.RegisterBot(platform, vjudge.NewAtCoderBot(vjCfg))
 		case "cses":
-			vjService.RegisterBot(platform, vjudge.NewCSESBot(cfg))
+			vjService.RegisterBot(platform, vjudge.NewCSESBotWithStore(vjCfg, remoteLangStore))
 		case "toph":
-			vjService.RegisterBot(platform, vjudge.NewTophBot(cfg))
+			vjService.RegisterBot(platform, vjudge.NewTophBot(vjCfg))
 		case "qoj":
-			vjService.RegisterBot(platform, vjudge.NewQOJBot(cfg))
+			vjService.RegisterBot(platform, vjudge.NewQOJBot(vjCfg))
 		}
 	}
+
+	vjService.StartPollWorkers()
 
 	vjH := handler.NewVJudgeHandler(vjService)
 
@@ -187,12 +193,15 @@ func main() {
 	mediaH := handler.NewMediaHandler("./media")
 	onsiteH := handler.NewOnsiteHandler(balloonStore, printStore, contestStore)
 
-	botAccountH := handler.NewAdminBotAccountHandler(botAccountStore)
+	botAccountH := handler.NewAdminBotAccountHandler(botAccountStore, vjService)
 	settingsStore := postgres.NewSystemSettingsStore(db)
 	settingsH := handler.NewAdminSystemSettingsHandler(settingsStore)
 	langAdminH := handler.NewAdminLanguageHandler(cfg.LangDir)
 
-	router := api.NewRouter(authH, problemH, submissionH, contestH, vjH, adminH, testcaseH, wsManager, jwtManager, ratingH, registrationH, virtualH, gymH, hackH, statsH, notifH, groupH, teamH, blogH, editorialH, apiKeyH, webhookH, recommendationH, rankingsH, usersH, searchH, langLimitH, importH, orgH, classH, trainingH, plagiarismH, mediaH, onsiteH, botAccountH, settingsH, langAdminH)
+	remoteLangH := handler.NewRemoteLanguageHandler(remoteLangStore)
+	adminSubH := handler.NewAdminSubmissionHandler(submissionStore, problemStore, vjService)
+
+	router := api.NewRouter(authH, problemH, submissionH, contestH, vjH, adminH, testcaseH, wsManager, jwtManager, ratingH, registrationH, virtualH, gymH, hackH, statsH, notifH, groupH, teamH, blogH, editorialH, apiKeyH, webhookH, recommendationH, rankingsH, usersH, searchH, langLimitH, importH, orgH, classH, trainingH, plagiarismH, mediaH, onsiteH, botAccountH, settingsH, langAdminH, remoteLangH, adminSubH)
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),

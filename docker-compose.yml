@@ -53,6 +53,7 @@ services:
       - "8080:8080"
     volumes:
       - testdata:/app/testdata
+      - ./lang:/app/lang
     depends_on:
       postgres:
         condition: service_healthy
@@ -76,6 +77,7 @@ services:
       LANG_DIR: /app/lang
     volumes:
       - testdata:/app/testdata
+      - ./lang:/app/lang
     depends_on:
       postgres:
         condition: service_healthy
@@ -117,6 +119,22 @@ services:
     environment:
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    restart: unless-stopped
+
+  cf-bypass:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    ports:
+      - "8191:8191"
+    environment:
+      LOG_LEVEL: info
+    restart: unless-stopped
+
+  cf-submit:
+    build:
+      context: ./deploy/cf-submit
+      dockerfile: Dockerfile
+    ports:
+      - "8002:8002"
     restart: unless-stopped
 
 volumes:

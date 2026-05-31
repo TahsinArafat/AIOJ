@@ -19,7 +19,7 @@ turndownService.addRule('math', {
   filter: (node) => {
     return node.classList?.contains('math-node') || node.nodeName === 'MATH'
   },
-  replacement: (content, node) => {
+  replacement: (_content, node) => {
     const latex = node.getAttribute('data-latex') || node.textContent
     const displayMode = node.classList?.contains('math-block')
     return displayMode ? `$$${latex}$$` : `$${latex}$`

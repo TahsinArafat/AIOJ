@@ -27,3 +27,11 @@ func (b *QOJBot) Submit(ctx context.Context, problemID, sourceCode, language str
 func (b *QOJBot) Poll(ctx context.Context, remoteSubmissionID string) (*RemoteResult, error) {
 	return &RemoteResult{RemoteID: remoteSubmissionID, Verdict: "PENDING", Done: false}, nil
 }
+
+func (b *QOJBot) Login(ctx context.Context) (map[string]string, error) {
+	return nil, fmt.Errorf("qoj login not implemented")
+}
+
+func (b *QOJBot) IsLoggedIn(ctx context.Context) bool {
+	return false
+}

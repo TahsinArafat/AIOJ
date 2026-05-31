@@ -5,8 +5,10 @@ import { api } from '../lib/api'
 export default function SetterPanel() {
     const [problems, setProblems] = useState<any[]>([])
     const [showImport, setShowImport] = useState(false)
+    const [showCSESImport, setShowCSESImport] = useState(false)
     const [contestId, setContestId] = useState('')
     const [problemIndex, setProblemIndex] = useState('')
+    const [csesProblemId, setCSESProblemId] = useState('')
     const [importing, setImporting] = useState(false)
 
     const loadData = () => {
@@ -32,14 +34,34 @@ export default function SetterPanel() {
         }
     }
 
+    const handleCSESImport = async () => {
+        if (!csesProblemId) return alert('Problem ID is required')
+        setImporting(true)
+        try {
+            const result = await api.problems.importCSES(csesProblemId)
+            alert(`Imported: ${result.slug}`)
+            setShowCSESImport(false)
+            setCSESProblemId('')
+            loadData()
+        } catch (e: any) {
+            alert(e.message)
+        } finally {
+            setImporting(false)
+        }
+    }
+
     return (
         <div>
             <div className="flex items-center justify-between mb-6">
                 <h1 className="text-2xl font-bold">Problem Setter Workspace</h1>
                 <div className="flex gap-2">
-                    <button onClick={() => setShowImport(!showImport)}
+                    <button onClick={() => { setShowImport(!showImport); setShowCSESImport(false) }}
                         className="bg-purple-600 text-white px-4 py-2 rounded text-sm hover:bg-purple-700 transition-colors">
                         Import from CF
+                    </button>
+                    <button onClick={() => { setShowCSESImport(!showCSESImport); setShowImport(false) }}
+                        className="bg-teal-600 text-white px-4 py-2 rounded text-sm hover:bg-teal-700 transition-colors">
+                        Import from CSES
                     </button>
                     <Link to="/setter/contest/create" className="bg-green-600 text-white px-4 py-2 rounded text-sm hover:bg-green-700 transition-colors">+ Create Contest</Link>
                     <Link to="/setter/create" className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 transition-colors">+ Create Problem</Link>
@@ -66,6 +88,25 @@ export default function SetterPanel() {
                             {importing ? 'Importing...' : 'Import'}
                         </button>
                         <button onClick={() => setShowImport(false)} className="text-gray-500 text-sm px-2">Cancel</button>
+                    </div>
+                </div>
+            )}
+
+            {showCSESImport && (
+                <div className="bg-teal-50 border border-teal-200 rounded-lg p-4 mb-6">
+                    <h3 className="font-semibold text-sm text-teal-800 mb-3">Import from CSES</h3>
+                    <p className="text-xs text-gray-500 mb-3">Enter the CSES Problem ID (e.g. 1068 for Weird Algorithm)</p>
+                    <div className="flex gap-3 items-end">
+                        <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-1">Problem ID</label>
+                            <input type="text" value={csesProblemId} onChange={e => setCSESProblemId(e.target.value)}
+                                placeholder="e.g. 1068, 1069" className="border rounded px-3 py-2 text-sm w-32" />
+                        </div>
+                        <button onClick={handleCSESImport} disabled={importing}
+                            className="bg-teal-600 text-white px-4 py-2 rounded text-sm hover:bg-teal-700 disabled:opacity-50">
+                            {importing ? 'Importing...' : 'Import'}
+                        </button>
+                        <button onClick={() => setShowCSESImport(false)} className="text-gray-500 text-sm px-2">Cancel</button>
                     </div>
                 </div>
             )}

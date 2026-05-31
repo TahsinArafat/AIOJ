@@ -64,13 +64,18 @@ func (s *SubmissionStore) GetByID(ctx context.Context, id string) (*model.Submis
 	var jr []byte
 	var ja sql.NullTime
 	var compressed []byte
+	var remoteID sql.NullString
+	var remoteURL sql.NullString
+	var botID sql.NullString
+	var botSlug sql.NullString
 	err := s.db.QueryRowContext(ctx,
 		`SELECT id,problem_id,user_id,COALESCE(contest_id::text,''),language,source_code,source_code_gz,code_size,
 		        status,score,time_used,memory_used,compile_output,judge_result,
-		        judged_by,created_at,judged_at,submission_type FROM submissions WHERE id=$1`, id).Scan(
+		        judged_by,created_at,judged_at,submission_type,remote_id,remote_url,
+		        COALESCE(bot_id,''),COALESCE(bot_slug,'') FROM submissions WHERE id=$1`, id).Scan(
 		&sub.ID, &sub.ProblemID, &sub.UserID, &cid, &sub.Language, &sub.SourceCode, &compressed, &sub.CodeSize,
 		&sub.Status, &sub.Score, &sub.TimeUsed, &sub.MemoryUsed, &co, &jr,
-		&sub.JudgedBy, &sub.CreatedAt, &ja, &sub.SubmissionType)
+		&sub.JudgedBy, &sub.CreatedAt, &ja, &sub.SubmissionType, &remoteID, &remoteURL, &botID, &botSlug)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -90,6 +95,10 @@ func (s *SubmissionStore) GetByID(ctx context.Context, id string) (*model.Submis
 	if jr != nil {
 		json.Unmarshal(jr, &sub.JudgeResult)
 	}
+	sub.RemoteID = remoteID.String
+	sub.RemoteURL = remoteURL.String
+	sub.BotID = botID.String
+	sub.BotSlug = botSlug.String
 	return &sub, nil
 }
 
@@ -189,6 +198,38 @@ func (s *SubmissionStore) UpdateResult(ctx context.Context, id string, status mo
 	}
 
 	return tx.Commit()
+}
+
+func (s *SubmissionStore) UpdateRemoteID(ctx context.Context, id string, remoteID string, remoteURL string) error {
+	_, err := s.db.ExecContext(ctx, "UPDATE submissions SET remote_id=$1, remote_url=$2 WHERE id=$3", remoteID, remoteURL, id)
+	return err
+}
+
+func (s *SubmissionStore) UpdateBotID(ctx context.Context, id string, botID string, botSlug string) error {
+	_, err := s.db.ExecContext(ctx, "UPDATE submissions SET bot_id=$1, bot_slug=$2 WHERE id=$3", botID, botSlug, id)
+	return err
+}
+
+func (s *SubmissionStore) GetPendingRemoteSubmissions(ctx context.Context) ([]model.PendingRemoteSubmission, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, remote_id, COALESCE(bot_id,''), COALESCE(bot_slug,''), status
+		 FROM submissions WHERE remote_id != '' AND status IN ('pending')`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []model.PendingRemoteSubmission
+	for rows.Next() {
+		var ps model.PendingRemoteSubmission
+		if err := rows.Scan(&ps.ID, &ps.RemoteID, &ps.BotID, &ps.BotSlug, &ps.Status); err != nil {
+			return nil, err
+		}
+		items = append(items, ps)
+	}
+	if items == nil {
+		items = []model.PendingRemoteSubmission{}
+	}
+	return items, nil
 }
 
 func (s *SubmissionStore) ListPending(_ context.Context, limit int) ([]string, error) {

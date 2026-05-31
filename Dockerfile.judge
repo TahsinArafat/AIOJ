@@ -1,2 +1,9 @@
 FROM criyle/go-judge:latest
-RUN apt-get update && apt-get install -y --no-install-recommends g++ gcc && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    g++ gcc make \
+    python3 pypy3 \
+    openjdk-21-jdk-headless \
+    rustc cargo \
+    nodejs npm \
+    mono-mcs mono-runtime \
+    && rm -rf /var/lib/apt/lists/*

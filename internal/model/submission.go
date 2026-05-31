@@ -5,9 +5,10 @@ import "time"
 type SubmissionStatus string
 
 const (
-	StatusPending SubmissionStatus = "pending"
-	StatusJudging SubmissionStatus = "judging"
-	StatusAC      SubmissionStatus = "ac"
+	StatusPending   SubmissionStatus = "pending"
+	StatusJudging   SubmissionStatus = "judging"
+	StatusRejudging SubmissionStatus = "rejudging"
+	StatusAC        SubmissionStatus = "ac"
 	StatusWA      SubmissionStatus = "wa"
 	StatusTLE     SubmissionStatus = "tle"
 	StatusMLE     SubmissionStatus = "mle"
@@ -55,6 +56,10 @@ type Submission struct {
 	CompileOutput string           `json:"compile_output,omitempty"`
 	JudgeResult   []TestCaseResult `json:"judge_result,omitempty"`
 	JudgedBy      string           `json:"judged_by"`
+	RemoteID      string           `json:"remote_id,omitempty"`
+	RemoteURL     string           `json:"remote_url,omitempty"`
+	BotID         string           `json:"bot_id,omitempty"`
+	BotSlug       string           `json:"bot_slug,omitempty"`
 	CreatedAt     time.Time        `json:"created_at"`
 	JudgedAt      *time.Time       `json:"judged_at,omitempty"`
 }
@@ -63,6 +68,14 @@ type SubmitRequest struct {
 	ProblemID      string `json:"problem_id"`
 	Language       string `json:"language"`
 	SourceCode     string `json:"source_code"`
-	SubmissionType string `json:"submission_type,omitempty"` // "code" or "output", default "code"
 	ContestID      string `json:"contest_id,omitempty"`
+	SubmissionType string `json:"submission_type,omitempty"`
+}
+
+type PendingRemoteSubmission struct {
+	ID       string `json:"id"`
+	RemoteID string `json:"remote_id"`
+	BotID    string `json:"bot_id"`
+	BotSlug  string `json:"bot_slug"`
+	Status   string `json:"status"`
 }

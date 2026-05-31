@@ -3,18 +3,21 @@ package model
 import "time"
 
 type BotAccount struct {
-	ID           string            `json:"id"`
-	UserID       string            `json:"user_id"`
-	Platform     string            `json:"platform"`
-	PlatformUser string            `json:"-"`
-	PlatformPass string            `json:"-"`
-	APIKey       string            `json:"api_key,omitempty"`
-	APISecret    string            `json:"api_secret,omitempty"`
-	SessionData  map[string]string `json:"session_data,omitempty"`
-	Status       string            `json:"status"`
-	RateLimitRPS float32           `json:"rate_limit_rps"`
-	LastUsedAt   *time.Time        `json:"last_used_at,omitempty"`
-	CreatedAt    time.Time         `json:"created_at"`
+	ID                  string            `json:"id"`
+	UserID              string            `json:"user_id"`
+	Platform            string            `json:"platform"`
+	PlatformUser        string            `json:"platform_user"`
+	PlatformPass        string            `json:"-"`
+	APIKey              string            `json:"api_key,omitempty"`
+	APISecret           string            `json:"api_secret,omitempty"`
+	SessionData         map[string]string `json:"session_data,omitempty"`
+	Status              string            `json:"status"`
+	RateLimitRPS        float32           `json:"rate_limit_rps"`
+	LastUsedAt          *time.Time        `json:"last_used_at,omitempty"`
+	ConsecutiveFailures int               `json:"consecutive_failures"`
+	LastErrorAt         *time.Time        `json:"last_error_at,omitempty"`
+	LastPollAt          *time.Time        `json:"last_poll_at,omitempty"`
+	CreatedAt           time.Time         `json:"created_at"`
 }
 
 type VJSubmitRequest struct {

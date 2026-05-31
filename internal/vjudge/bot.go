@@ -27,6 +27,8 @@ type Bot interface {
 	Submit(ctx context.Context, problemID, sourceCode, language string) (string, error)
 	Poll(ctx context.Context, remoteSubmissionID string) (*RemoteResult, error)
 	State() BotState
+	Login(ctx context.Context) (map[string]string, error)
+	IsLoggedIn(ctx context.Context) bool
 }
 
 type BotConfig struct {
@@ -36,4 +38,5 @@ type BotConfig struct {
 	APISecret string            `yaml:"api_secret,omitempty"`
 	BaseURL   string            `yaml:"base_url,omitempty"`
 	Cookies   map[string]string `yaml:"cookies,omitempty"`
+	UserAgent string            `yaml:"user_agent,omitempty"`
 }

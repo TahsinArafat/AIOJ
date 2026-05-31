@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"math/rand"
 	"net/http"
 	"net/http/cookiejar"
@@ -22,10 +23,11 @@ import (
 )
 
 type CodeforcesBot struct {
-	config  BotConfig
-	client  *http.Client
-	scraper *cloudflare.Scraper
-	state   BotState
+	config   BotConfig
+	client   *http.Client
+	scraper  *cloudflare.Scraper
+	state    BotState
+	cfSubmit *CFSubmitClient
 }
 
 func NewCodeforcesBot(cfg BotConfig) *CodeforcesBot {
@@ -50,8 +52,28 @@ func NewCodeforcesBot(cfg BotConfig) *CodeforcesBot {
 	}
 }
 
-func (b *CodeforcesBot) Name() string    { return "codeforces" }
-func (b *CodeforcesBot) State() BotState { return b.state }
+func NewCodeforcesBotWithSubmit(cfg BotConfig, cfSubmit *CFSubmitClient) *CodeforcesBot {
+	bot := NewCodeforcesBot(cfg)
+	bot.cfSubmit = cfSubmit
+	return bot
+}
+
+func (b *CodeforcesBot) Name() string          { return "codeforces" }
+func (b *CodeforcesBot) State() BotState       { return b.state }
+func (b *CodeforcesBot) IsLoggedIn(ctx context.Context) bool { return len(b.config.Cookies) > 0 }
+func (b *CodeforcesBot) Login(ctx context.Context) (map[string]string, error) {
+	b.login(ctx)
+	return b.config.Cookies, nil
+}
+func (b *CodeforcesBot) SetCookies(cookies map[string]string) {
+	cfURL, _ := url.Parse("https://codeforces.com")
+	var js []*http.Cookie
+	for name, value := range cookies {
+		js = append(js, &http.Cookie{Name: name, Value: value, Domain: "codeforces.com", Path: "/"})
+	}
+	b.client.Jar.SetCookies(cfURL, js)
+	b.config.Cookies = cookies
+}
 
 func (b *CodeforcesBot) cfAPIRequest(ctx context.Context, methodName string, params map[string]string) (map[string]interface{}, error) {
 	params["apiKey"] = b.config.APIKey
@@ -181,21 +203,30 @@ func (b *CodeforcesBot) Submit(ctx context.Context, problemID, sourceCode, langu
 		b.state = StateIdle
 		return fmt.Sprintf("cf-%d", time.Now().UnixNano()), nil
 	}
-	if err := b.login(ctx); err != nil {
-		b.state = StateError
-		return "", err
-	}
-	langMap := map[string]string{
+
+	langID := "54"
+	if langMap, ok := map[string]string{
 		"cpp-gpp-64": "54", "cpp-gpp-32": "53",
 		"c-gcc-64": "43", "c-gcc-32": "43",
 		"cpp-clang": "52", "python": "70", "pypy": "41",
 		"java": "60", "rust": "75", "nodejs": "55", "csharp": "65",
-	}
-	langID, ok := langMap[language]
-	if !ok {
-		langID = "54"
+	}[language]; ok {
+		langID = langMap
 	}
 
+	if b.cfSubmit != nil && b.config.Username != "" && b.config.Password != "" {
+		subID, err := b.cfSubmit.Submit(ctx, problemID, sourceCode, langID, b.config.Username, "", b.config.Username, b.config.Password)
+		if err == nil && subID != "" {
+			b.state = StateIdle
+			return subID, nil
+		}
+		slog.Error("cf-submit failed, falling back to direct POST", "err", err)
+	}
+
+	if err := b.login(ctx); err != nil {
+		b.state = StateError
+		return "", err
+	}
 	submitURL := "https://codeforces.com/problemset/submit"
 	csrfToken := ""
 	if len(b.config.Cookies) == 0 {
@@ -206,7 +237,6 @@ func (b *CodeforcesBot) Submit(ctx context.Context, problemID, sourceCode, langu
 			return "", err
 		}
 	}
-
 	data := url.Values{
 		"csrf_token":           {csrfToken},
 		"action":               {"submitSolutionFormSubmitted"},
@@ -220,7 +250,6 @@ func (b *CodeforcesBot) Submit(ctx context.Context, problemID, sourceCode, langu
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36")
 	req.Header.Set("Referer", submitURL)
-
 	client := &http.Client{
 		Timeout:       60 * time.Second,
 		Jar:           b.client.Jar,
@@ -232,7 +261,6 @@ func (b *CodeforcesBot) Submit(ctx context.Context, problemID, sourceCode, langu
 		return "", err
 	}
 	defer resp.Body.Close()
-
 	loc := resp.Header.Get("Location")
 	parts := strings.Split(loc, "/")
 	if len(parts) == 0 {

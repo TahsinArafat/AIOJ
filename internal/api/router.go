@@ -49,6 +49,8 @@ func NewRouter(
 	botAccountH *handler.AdminBotAccountHandler,
 	settingsH *handler.AdminSystemSettingsHandler,
 	langAdminH *handler.AdminLanguageHandler,
+	remoteLangH *handler.RemoteLanguageHandler,
+	adminSubH *handler.AdminSubmissionHandler,
 ) http.Handler {
 	r := chi.NewRouter()
 	rl := middleware.NewRateLimiter()
@@ -88,6 +90,7 @@ func NewRouter(
 			r.Get("/{slug}/export", problemH.Export)
 			r.Post("/import", importH.Import)
 			r.Post("/import/codeforces", importH.ImportCodeforces)
+		r.Post("/import/cses", importH.ImportCSES)
 			r.Post("/{slug}/media", mediaH.Upload)
 		})
 	})
@@ -155,6 +158,7 @@ func NewRouter(
 		r.Route("/bot-accounts", func(r chi.Router) {
 			r.Get("/", botAccountH.List)
 			r.Post("/", botAccountH.Create)
+			r.Post("/test-login", botAccountH.TestLogin)
 			r.Get("/{id}", botAccountH.GetByID)
 			r.Put("/{id}", botAccountH.Update)
 			r.Delete("/{id}", botAccountH.Delete)
@@ -178,6 +182,19 @@ func NewRouter(
 			r.Get("/{key}/raw", langAdminH.GetRaw)
 			r.Put("/{key}/raw", langAdminH.UpdateRaw)
 			r.Post("/{key}/test", langAdminH.Test)
+		})
+
+		r.Route("/remote-languages", func(r chi.Router) {
+			r.Get("/{platform}", remoteLangH.ListByPlatform)
+			r.Post("/", remoteLangH.Create)
+			r.Put("/{id}", remoteLangH.Update)
+			r.Delete("/{id}", remoteLangH.Delete)
+		})
+
+		r.Route("/submissions", func(r chi.Router) {
+			r.Get("/pending-remote", adminSubH.ListPendingRemote)
+			r.Post("/{id}/rejudge", adminSubH.Rejudge)
+			r.Post("/{id}/refresh", adminSubH.ForceRefresh)
 		})
 	})
 

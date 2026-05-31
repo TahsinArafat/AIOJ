@@ -108,6 +108,76 @@ func (h *ImportHandler) ImportCodeforces(w http.ResponseWriter, r *http.Request)
 	})
 }
 
+func (h *ImportHandler) ImportCSES(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r)
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if claims.Role != "admin" && claims.Role != "teacher" {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	var req struct {
+		ProblemID string `json:"problem_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	if req.ProblemID == "" {
+		http.Error(w, "problem_id is required", http.StatusBadRequest)
+		return
+	}
+
+	parser := vjudge.NewProblemParser(func(ctx context.Context, url string) (string, error) {
+		httpReq, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+		if err != nil {
+			return "", err
+		}
+		httpReq.Header.Set("User-Agent", "Mozilla/5.0")
+		client := &http.Client{Timeout: 30 * time.Second}
+		resp, err := client.Do(httpReq)
+		if err != nil {
+			return "", err
+		}
+		defer resp.Body.Close()
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return "", err
+		}
+		return string(body), nil
+	})
+
+	prob, err := parser.ParseCSESProblem(r.Context(), req.ProblemID)
+	if err != nil {
+		http.Error(w, "failed to parse CSES problem: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	prob.ID = uuid.New().String()
+	prob.Slug = fmt.Sprintf("cses-%s", strings.ToLower(req.ProblemID))
+	if existing, _ := h.probStore.GetBySlug(r.Context(), prob.Slug); existing != nil {
+		prob.Slug = prob.Slug + "-" + uuid.New().String()[:8]
+	}
+	prob.CreatedBy = claims.UserID
+	prob.Visible = true
+	if prob.Tags == nil { prob.Tags = []string{} }
+	if prob.SampleCases == nil { prob.SampleCases = []model.SampleCase{} }
+
+	if err := h.probStore.Create(r.Context(), prob); err != nil {
+		http.Error(w, "failed to save problem: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	respondJSON(w, http.StatusCreated, map[string]string{
+		"status":     "success",
+		"problem_id": prob.ID,
+		"slug":       prob.Slug,
+	})
+}
+
 func (h *ImportHandler) Import(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetUserClaims(r)
 	if claims == nil {

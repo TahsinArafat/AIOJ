@@ -42,6 +42,9 @@ type SubmissionStore interface {
 	ListByUser(ctx context.Context, userID string, offset, limit int, problemID, contestID string) ([]model.Submission, int, error)
 	UpdateStatus(ctx context.Context, id string, status model.SubmissionStatus)
 	UpdateResult(ctx context.Context, id string, status model.SubmissionStatus, score, timeUsed, memoryUsed int, compileOutput string, results []model.TestCaseResult) error
+	UpdateRemoteID(ctx context.Context, id string, remoteID string, remoteURL string) error
+	UpdateBotID(ctx context.Context, id string, botID string, botSlug string) error
+	GetPendingRemoteSubmissions(ctx context.Context) ([]model.PendingRemoteSubmission, error)
 	ListPending(ctx context.Context, limit int) ([]string, error)
 	GetProblemStats(ctx context.Context, problemID string) (*model.ProblemStats, error)
 	GetUserStats(ctx context.Context, userID string) (*model.UserProblemStats, error)
@@ -289,6 +292,10 @@ type BotAccountStore interface {
 	Create(ctx context.Context, ba *model.BotAccount) error
 	Update(ctx context.Context, id string, ba *model.BotAccount) error
 	Delete(ctx context.Context, id string) error
+	IncrementFailures(ctx context.Context, id string) error
+	ResetFailures(ctx context.Context, id string) error
+	MarkUsed(ctx context.Context, id string) error
+	UpdateLastPoll(ctx context.Context, id string) error
 }
 
 type SystemSettingsStore interface {
@@ -296,4 +303,12 @@ type SystemSettingsStore interface {
 	Get(ctx context.Context, key string) (*model.SystemSetting, error)
 	Set(ctx context.Context, s *model.SystemSetting) error
 	Delete(ctx context.Context, key string) error
+}
+
+type RemoteLanguageStore interface {
+	ListByPlatform(ctx context.Context, platform string) ([]model.RemoteLanguage, error)
+	GetByID(ctx context.Context, id string) (*model.RemoteLanguage, error)
+	Create(ctx context.Context, rl *model.RemoteLanguage) error
+	Update(ctx context.Context, id string, rl *model.RemoteLanguage) error
+	Delete(ctx context.Context, id string) error
 }

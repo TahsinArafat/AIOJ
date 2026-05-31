@@ -20,16 +20,16 @@ function decodeRole(): string | null {
 }
 
 const LANGS = [
-    { value: 'cpp-gpp-64', label: 'C++ (G++ 64-bit)' },
-    { value: 'cpp-gpp-32', label: 'C++ (G++ 32-bit)' },
-    { value: 'c-gcc-64', label: 'C (GCC 64-bit)' },
-    { value: 'c-gcc-32', label: 'C (GCC 32-bit)' },
-    { value: 'cpp-clang', label: 'C++ (Clang)' },
-    { value: 'python', label: 'Python 3' },
-    { value: 'java', label: 'Java' },
-    { value: 'rust', label: 'Rust' },
-    { value: 'nodejs', label: 'Node.js' },
-    { value: 'csharp', label: 'C# (Mono)' },
+    { value: 'cpp-gpp-64', label: 'GNU G++17 7.3.0 (64 bit)' },
+    { value: 'cpp-gpp-32', label: 'GNU G++14 6.4.0 (32 bit)' },
+    { value: 'c-gcc-64', label: 'GNU GCC C11 9.2.0 (64 bit)' },
+    { value: 'c-gcc-32', label: 'GNU GCC C11 9.2.0 (32 bit)' },
+    { value: 'cpp-clang', label: 'Clang++17' },
+    { value: 'python', label: 'Python 3.8.10' },
+    { value: 'java', label: 'Java 11.0.6' },
+    { value: 'rust', label: 'Rust 1.75.0' },
+    { value: 'nodejs', label: 'Node.js 18.16.1' },
+    { value: 'csharp', label: 'Mono C# 6.12.0' },
 ]
 
 const TEMPLATE_CODE: Record<string, string> = {
@@ -142,6 +142,39 @@ export default function ProblemDetail() {
     const [loadingSubs, setLoadingSubs] = useState(false)
     const [editorials, setEditorials] = useState<any[]>([])
     const isMountedRef = useRef(true)
+
+    const [splitPos, setSplitPos] = useState(() => {
+        const saved = localStorage.getItem('aioj_split_pos')
+        return saved ? parseFloat(saved) : 50
+    })
+    const [dragging, setDragging] = useState(false)
+    const containerRef = useRef<HTMLDivElement>(null)
+
+    const handleMouseDown = (e: React.MouseEvent) => {
+        e.preventDefault()
+        setDragging(true)
+    }
+
+    useEffect(() => {
+        if (!dragging) return
+        const handleMouseMove = (e: MouseEvent) => {
+            if (!containerRef.current) return
+            const rect = containerRef.current.getBoundingClientRect()
+            const pct = ((e.clientX - rect.left) / rect.width) * 100
+            const clamped = Math.min(Math.max(pct, 20), 80)
+            setSplitPos(clamped)
+        }
+        const handleMouseUp = () => {
+            setDragging(false)
+            localStorage.setItem('aioj_split_pos', splitPos.toString())
+        }
+        window.addEventListener('mousemove', handleMouseMove)
+        window.addEventListener('mouseup', handleMouseUp)
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove)
+            window.removeEventListener('mouseup', handleMouseUp)
+        }
+    }, [dragging, splitPos])
 
     useEffect(() => {
         isMountedRef.current = true
@@ -334,9 +367,9 @@ export default function ProblemDetail() {
     }
 
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full">
+        <div ref={containerRef} className="flex h-full select-none" style={{ cursor: dragging ? 'col-resize' : undefined }}>
             {/* Problem Statement */}
-            <div className="space-y-4 overflow-y-auto pr-1">
+            <div className="space-y-4 overflow-y-auto pr-1" style={{ width: `${splitPos}%`, minWidth: '20%' }}>
                 <div>
                     <h1 className="text-2xl font-bold">
                         {problem.title}
@@ -597,7 +630,16 @@ export default function ProblemDetail() {
                 )}
             </div>
 
-            <div className="flex flex-col gap-3">
+            {/* Divider */}
+            <div
+                onMouseDown={handleMouseDown}
+                className={`w-1.5 flex-shrink-0 cursor-col-resize group hover:bg-blue-500 transition-colors ${dragging ? 'bg-blue-500' : 'bg-gray-200'}`}
+            >
+                <div className="w-0.5 h-full mx-auto group-hover:bg-blue-400" />
+            </div>
+
+            {/* IDE */}
+            <div className="flex flex-col gap-3 overflow-y-auto pl-1" style={{ width: `${100 - splitPos}%`, minWidth: '20%' }}>
                 <div className="flex items-center justify-between">
                     <select
                         value={lang}
@@ -710,7 +752,8 @@ export default function ProblemDetail() {
                         <span className="font-semibold text-sm text-gray-700">Custom Stdin / Scratchpad</span>
                         <button
                             onClick={runCustomCode}
-                            disabled={runningCustom || !code.trim()}
+                            disabled={runningCustom || !code.trim() || problem?.source !== 'local'}
+                            title={problem?.source !== 'local' ? 'Custom run is only available for local problems' : undefined}
                             className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-1.5 rounded disabled:opacity-50 transition-colors cursor-pointer"
                         >
                             {runningCustom ? 'Running...' : 'Run Code'}
@@ -732,11 +775,11 @@ export default function ProblemDetail() {
                             <div className="space-y-3 pt-2 border-t border-gray-100">
                                 <div className="flex items-center justify-between text-xs">
                                     <span className={`font-semibold uppercase tracking-wider ${
-                                        customOutput.status === 'ac' ? 'text-green-600' :
+                                        customOutput.status === 'success' ? 'text-green-600' :
                                         customOutput.status === 'ce' ? 'text-purple-600' : 'text-red-600'
                                     }`}>
-                                        Verdict: {
-                                            customOutput.status === 'ac' ? 'Success' :
+                                        Execution: {
+                                            customOutput.status === 'success' ? 'Completed' :
                                             customOutput.status === 'ce' ? 'Compilation Error' :
                                             customOutput.status === 'tle' ? 'Time Limit Exceeded' :
                                             customOutput.status === 'mle' ? 'Memory Limit Exceeded' :

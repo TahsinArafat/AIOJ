@@ -10,6 +10,7 @@ interface BotAccount {
     platform_pass: string
     api_key: string
     api_secret: string
+    session_data?: Record<string, string>
     status: string
     rate_limit_rps: number
     last_used_at: string | null
@@ -24,9 +25,10 @@ interface BotForm {
     api_key: string
     api_secret: string
     rate_limit_rps: string
+    session_data: string
 }
 
-const emptyForm: BotForm = { user_id: '', platform: 'codeforces', platform_user: '', platform_pass: '', api_key: '', api_secret: '', rate_limit_rps: '1.0' }
+const emptyForm: BotForm = { user_id: '', platform: 'codeforces', platform_user: '', platform_pass: '', api_key: '', api_secret: '', rate_limit_rps: '1.0', session_data: '' }
 
 const PLATFORMS = [
     { value: 'codeforces', label: 'Codeforces', hint: 'Username + Password for web auth, API Key + Secret for verdict polling' },
@@ -84,6 +86,7 @@ export default function BotAccountsPanel() {
             api_key: bot.api_key || '',
             api_secret: '',
             rate_limit_rps: String(bot.rate_limit_rps),
+            session_data: bot.session_data ? JSON.stringify(bot.session_data) : '',
         })
         setShowForm(true)
     }
@@ -99,9 +102,14 @@ export default function BotAccountsPanel() {
                 if (form.api_key) update.api_key = form.api_key
                 if (form.api_secret) update.api_secret = form.api_secret
                 update.rate_limit_rps = parseFloat(form.rate_limit_rps) || 1.0
+                if (form.session_data) {
+                    try {
+                        update.session_data = JSON.parse(form.session_data)
+                    } catch {}
+                }
                 await api.admin.botAccounts.update(editingId, update)
             } else {
-                await api.admin.botAccounts.create({
+                const payload: any = {
                     user_id: form.user_id || 'system',
                     platform: form.platform,
                     platform_user: form.platform_user,
@@ -109,7 +117,13 @@ export default function BotAccountsPanel() {
                     api_key: form.api_key,
                     api_secret: form.api_secret,
                     rate_limit_rps: parseFloat(form.rate_limit_rps) || 1.0,
-                })
+                }
+                if (form.session_data) {
+                    try {
+                        payload.session_data = JSON.parse(form.session_data)
+                    } catch {}
+                }
+                await api.admin.botAccounts.create(payload)
             }
             resetForm()
             loadBots()
@@ -258,6 +272,56 @@ export default function BotAccountsPanel() {
                                 </div>
                             </div>
                         )}
+                        {form.platform === 'codeforces' && (
+                            <div className="border-t border-gray-100 pt-4">
+                                <h4 className="text-xs font-semibold text-gray-500 uppercase mb-3">Browser Cookies (paste from DevTools)</h4>
+                                <div className="space-y-3">
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-500 mb-1">JSESSIONID</label>
+                                        <input type="text" value={form.session_data ? JSON.parse(form.session_data || '{}').JSESSIONID || '' : ''}
+                                            onChange={e => {
+                                                try {
+                                                    const current = JSON.parse(form.session_data || '{}')
+                                                    current.JSESSIONID = e.target.value
+                                                    setForm({ ...form, session_data: JSON.stringify(current) })
+                                                } catch { setForm({ ...form, session_data: JSON.stringify({ JSESSIONID: e.target.value }) }) }
+                                            }}
+                                            placeholder="Copy from browser DevTools (F12) → Application → Cookies → JSESSIONID"
+                                            className="w-full border rounded px-3 py-2 text-sm font-mono" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-500 mb-1">39ce7</label>
+                                        <input type="text" value={form.session_data ? JSON.parse(form.session_data || '{}')['39ce7'] || '' : ''}
+                                            onChange={e => {
+                                                try {
+                                                    const current = JSON.parse(form.session_data || '{}')
+                                                    current['39ce7'] = e.target.value
+                                                    setForm({ ...form, session_data: JSON.stringify(current) })
+                                                } catch { setForm({ ...form, session_data: JSON.stringify({ '39ce7': e.target.value }) }) }
+                                            }}
+                                            placeholder="Copy from browser DevTools (F12) → Application → Cookies → 39ce7"
+                                            className="w-full border rounded px-3 py-2 text-sm font-mono" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-500 mb-1">cf_clearance (optional, auto-generated by bypass proxy)</label>
+                                        <input type="text" value={form.session_data ? JSON.parse(form.session_data || '{}').cf_clearance || '' : ''}
+                                            onChange={e => {
+                                                try {
+                                                    const current = JSON.parse(form.session_data || '{}')
+                                                    current.cf_clearance = e.target.value
+                                                    setForm({ ...form, session_data: JSON.stringify(current) })
+                                                } catch { setForm({ ...form, session_data: JSON.stringify({ cf_clearance: e.target.value }) }) }
+                                            }}
+                                            placeholder="Auto-filled by bypass proxy, or paste from browser"
+                                            className="w-full border rounded px-3 py-2 text-sm font-mono" />
+                                    </div>
+                                    <p className="text-xs text-gray-400 mt-1">
+                                        Get cookies from browser: DevTools (F12) → Application → Cookies → codeforces.com. 
+                                        The bypass proxy auto-generates cf_clearance for the server IP.
+                                    </p>
+                                </div>
+                            </div>
+                        )}
                         <div className="border-t border-gray-100 pt-4">
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
@@ -270,6 +334,26 @@ export default function BotAccountsPanel() {
                         <div className="flex justify-end gap-2 pt-2">
                             <button type="button" onClick={resetForm}
                                 className="px-4 py-2 text-sm text-gray-600 hover:text-black transition-colors">Cancel</button>
+                            <button type="button" onClick={async () => {
+                                try {
+                                    let sessionData: Record<string, string> | undefined
+                                    if (form.session_data) {
+                                        try { sessionData = JSON.parse(form.session_data) } catch {}
+                                    }
+                                    const result = await api.admin.botAccounts.testLogin({
+                                        platform: form.platform,
+                                        platform_user: form.platform_user,
+                                        platform_pass: form.platform_pass,
+                                        session_data: sessionData,
+                                    })
+                                    alert(result.message)
+                                } catch (err: any) {
+                                    alert('Test failed: ' + err.message)
+                                }
+                            }}
+                                className="px-4 py-2 text-sm text-blue-600 hover:text-blue-800 border border-blue-300 rounded transition-colors">
+                                Test Login
+                            </button>
                             <button type="submit" disabled={saving}
                                 className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 disabled:opacity-50 transition-colors">
                                 {saving ? 'Saving...' : editingId ? 'Update Bot Account' : 'Create Bot Account'}

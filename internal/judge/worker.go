@@ -261,31 +261,38 @@ func (wp *WorkerPool) runTestCase(
 ) model.TestCaseResult {
 	srcName := "Main" + langCfg.Extensions[0]
 	var args []string
-	if langCfg.Runtime != "" {
+	if langCfg.CompileCmd != "" && langCfg.Runtime != "" {
+		compileCmd := compileCmdStr
 		rtParts := strings.Fields(langCfg.Runtime)
-		args = append(rtParts, "/box/"+srcName)
+		for i, p := range rtParts {
+			rtParts[i] = strings.ReplaceAll(p, "{{dir}}", ".")
+			rtParts[i] = strings.ReplaceAll(rtParts[i], "{{exe}}", "Main")
+		}
+		runCmd := compileCmd + " && " + strings.Join(rtParts, " ") + " < input.txt > output.txt 2> error.txt"
+		args = []string{"/bin/sh", "-c", runCmd}
+	} else if langCfg.Runtime != "" {
+		rtParts := strings.Fields(langCfg.Runtime)
+		runCmd := strings.Join(rtParts, " ") + " " + srcName + " < input.txt > output.txt 2> error.txt"
+		args = []string{"/bin/sh", "-c", runCmd}
 	} else if compileCmdStr != "" {
-		args = []string{"/bin/sh", "-c", compileCmdStr + " && ./Main"}
+		args = []string{"/bin/sh", "-c", compileCmdStr + " && ./Main < input.txt > output.txt 2> error.txt"}
 	} else {
-		args = []string{"/box/Main"}
+		args = []string{"/bin/sh", "-c", "./Main < input.txt > output.txt 2> error.txt"}
 	}
 
 	inputContent := loadFile(filepath.Join(prob.TestdataPath, tc.InputName))
+	copyIn["input.txt"] = executor.CmdFile{Content: inputContent}
 
 	start := time.Now()
 	resp, err := wp.exec.Run(&executor.ExecRequest{
 		Cmd: []executor.Cmd{{
 			Args:        args,
-			Env:         []string{"PATH=/usr/bin:/bin"},
+			Env:         []string{"PATH=/usr/bin:/bin", "HOME=/tmp"},
 			CPULimit:    cpuLimitNs,
 			MemoryLimit: memLimitBytes,
-			ProcLimit:   16,
+			ProcLimit:   64,
 			CopyIn:      copyIn,
-			Files: []executor.CmdFile{
-				{Content: inputContent},
-				{Content: ""},
-				{Content: ""},
-			},
+			CopyOut:     []string{"output.txt", "error.txt"},
 		}},
 	})
 	elapsed := int(time.Since(start).Milliseconds())
@@ -308,7 +315,7 @@ func (wp *WorkerPool) runTestCase(
 
 	if compileCmdStr != "" && cr.Status == "Nonzero Exit Status" {
 		r.Status = model.StatusCE
-		if errOut, ok := cr.Files["stderr"]; ok && errOut != "" {
+		if errOut, ok := cr.Files["error.txt"]; ok && errOut != "" {
 			r.Detail = errOut
 		} else {
 			r.Detail = cr.Error
@@ -319,7 +326,7 @@ func (wp *WorkerPool) runTestCase(
 	switch cr.Status {
 	case "Accepted":
 		output := ""
-		if f, ok := cr.Files["stdout"]; ok {
+		if f, ok := cr.Files["output.txt"]; ok {
 			output = f
 		}
 		expected := loadFile(filepath.Join(prob.TestdataPath, tc.OutputName))
@@ -334,17 +341,13 @@ func (wp *WorkerPool) runTestCase(
 
 			spjResp, err := wp.exec.Run(&executor.ExecRequest{
 				Cmd: []executor.Cmd{{
-					Args:        []string{"/box/spj", "/box/input.txt", "/box/user.txt", "/box/answer.txt"},
+					Args:        []string{"/bin/sh", "-c", "/box/spj /box/input.txt /box/user.txt /box/answer.txt > output.txt 2> error.txt"},
 					Env:         []string{"PATH=/usr/bin:/bin"},
 					CPULimit:    5_000_000_000,
 					MemoryLimit: 268_435_456,
 					ProcLimit:   8,
 					CopyIn:      spjCopyIn,
-					Files: []executor.CmdFile{
-						{Content: ""},
-						{Content: ""},
-						{Content: ""},
-					},
+					CopyOut:     []string{"output.txt", "error.txt"},
 				}},
 			})
 			if err != nil {
@@ -360,8 +363,8 @@ func (wp *WorkerPool) runTestCase(
 					r.Score = tc.Score
 				} else {
 					r.Status = model.StatusWA
-					spjStdout, _ := scr.Files["stdout"]
-					spjStderr, _ := scr.Files["stderr"]
+					spjStdout, _ := scr.Files["output.txt"]
+					spjStderr, _ := scr.Files["error.txt"]
 					msg := strings.TrimSpace(spjStderr)
 					if msg == "" {
 						msg = strings.TrimSpace(spjStdout)

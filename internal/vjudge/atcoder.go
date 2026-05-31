@@ -27,3 +27,11 @@ func (b *AtCoderBot) Submit(ctx context.Context, problemID, sourceCode, language
 func (b *AtCoderBot) Poll(ctx context.Context, remoteSubmissionID string) (*RemoteResult, error) {
 	return &RemoteResult{RemoteID: remoteSubmissionID, Verdict: "PENDING", Done: false}, nil
 }
+
+func (b *AtCoderBot) Login(ctx context.Context) (map[string]string, error) {
+	return nil, fmt.Errorf("atcoder login not implemented")
+}
+
+func (b *AtCoderBot) IsLoggedIn(ctx context.Context) bool {
+	return false
+}

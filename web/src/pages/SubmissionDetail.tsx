@@ -79,6 +79,18 @@ export default function SubmissionDetail() {
                         {' · '}{sub.language}
                         {' · '}{new Date(sub.created_at).toLocaleString()}
                     </p>
+                    {sub.remote_id && (
+                        <p className="text-sm text-gray-600 mt-2 flex items-center gap-1.5">
+                            <span className="font-semibold text-gray-700">Remote OJ ID:</span>
+                            {sub.remote_url ? (
+                                <a href={sub.remote_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-mono font-medium">
+                                    {sub.remote_id}
+                                </a>
+                            ) : (
+                                <span className="font-mono text-gray-700">{sub.remote_id}</span>
+                            )}
+                        </p>
+                    )}
                 </div>
                 <span className={`px-4 py-2 rounded-lg text-sm font-bold border ${STATUS_COLOR[sub.status] || ''}`}>
                     {STATUS_LABEL[sub.status] || sub.status}

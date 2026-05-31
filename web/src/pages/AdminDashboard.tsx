@@ -1,18 +1,22 @@
 import { useState } from 'react'
-import { Users, FileText, Bot, Settings, Code } from 'lucide-react'
+import { Users, FileText, Bot, Settings, Code, Globe, Send } from 'lucide-react'
 import UsersPanel from './admin/UsersPanel'
 import SetterAppsPanel from './admin/SetterAppsPanel'
 import BotAccountsPanel from './admin/BotAccountsPanel'
 import SystemSettingsPanel from './admin/SystemSettingsPanel'
 import LanguagesPanel from './admin/LanguagesPanel'
+import RemoteLanguagesPanel from './admin/RemoteLanguagesPanel'
+import SubmissionsPanel from './admin/SubmissionsPanel'
 
-type AdminTab = 'users' | 'applications' | 'bots' | 'settings' | 'languages'
+type AdminTab = 'users' | 'applications' | 'bots' | 'languages' | 'remote-languages' | 'submissions' | 'settings'
 
 const tabs: { key: AdminTab; label: string; icon: typeof Users }[] = [
     { key: 'users', label: 'Users', icon: Users },
     { key: 'applications', label: 'Applications', icon: FileText },
     { key: 'bots', label: 'Bot Accounts', icon: Bot },
     { key: 'languages', label: 'Languages', icon: Code },
+    { key: 'remote-languages', label: 'Remote Languages', icon: Globe },
+    { key: 'submissions', label: 'Remote Subs', icon: Send },
     { key: 'settings', label: 'Settings', icon: Settings },
 ]
 
@@ -49,6 +53,8 @@ export default function AdminDashboard() {
                     {activeTab === 'applications' && <SetterAppsPanel />}
                     {activeTab === 'bots' && <BotAccountsPanel />}
                     {activeTab === 'languages' && <LanguagesPanel />}
+                    {activeTab === 'remote-languages' && <RemoteLanguagesPanel />}
+                    {activeTab === 'submissions' && <SubmissionsPanel />}
                     {activeTab === 'settings' && <SystemSettingsPanel />}
                 </div>
             </div>

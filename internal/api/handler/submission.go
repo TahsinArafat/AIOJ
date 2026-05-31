@@ -16,21 +16,23 @@ import (
 	"github.com/tahsinarafat/aioj/internal/model"
 	"github.com/tahsinarafat/aioj/internal/queue"
 	"github.com/tahsinarafat/aioj/internal/store"
+	"github.com/tahsinarafat/aioj/internal/vjudge"
 )
 
 type SubmissionHandler struct {
-	subStore  store.SubmissionStore
-	probStore store.ProblemStore
+	subStore     store.SubmissionStore
+	probStore    store.ProblemStore
 	contestStore store.ContestStore
-	queue     queue.JudgeQueue
-	wsManager *WSManager
-	exec      *executor.Client
-	langDir   string
+	queue        queue.JudgeQueue
+	wsManager    *WSManager
+	exec         *executor.Client
+	langDir      string
+	vjudgeSvc    *vjudge.Service
 }
 
 func NewSubmissionHandler(sub store.SubmissionStore, prob store.ProblemStore, contest store.ContestStore,
-	q queue.JudgeQueue, ws *WSManager, exec *executor.Client, langDir string) *SubmissionHandler {
-	return &SubmissionHandler{subStore: sub, probStore: prob, contestStore: contest, queue: q, wsManager: ws, exec: exec, langDir: langDir}
+	q queue.JudgeQueue, ws *WSManager, exec *executor.Client, langDir string, vjSvc *vjudge.Service) *SubmissionHandler {
+	return &SubmissionHandler{subStore: sub, probStore: prob, contestStore: contest, queue: q, wsManager: ws, exec: exec, langDir: langDir, vjudgeSvc: vjSvc}
 }
 
 type CustomRunRequest struct {
@@ -80,6 +82,12 @@ func (h *SubmissionHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	prob, err := h.probStore.GetByID(r.Context(), req.ProblemID)
+	if err != nil || prob == nil {
+		http.Error(w, "problem not found", http.StatusNotFound)
+		return
+	}
+
 	sub := &model.Submission{
 		ID:         uuid.New().String(),
 		ProblemID:  req.ProblemID,
@@ -97,7 +105,24 @@ func (h *SubmissionHandler) Create(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "create failed", http.StatusInternalServerError)
 		return
 	}
-	h.queue.Enqueue(r.Context(), sub.ID)
+
+	if prob.Source != "" && prob.Source != "local" && h.vjudgeSvc != nil {
+		vjReq := vjudge.SubmitRequest{
+			ID:              sub.ID,
+			ProblemRemoteID: prob.RemoteID,
+			SourceCode:      req.SourceCode,
+			Language:        req.Language,
+			RemoteOJ:        prob.Source,
+		}
+		if err := h.vjudgeSvc.Submit(r.Context(), vjReq); err != nil {
+			slog.Error("vjudge submit failed", "sub", sub.ID, "err", err)
+			sub.Status = model.StatusSE
+			respondJSON(w, http.StatusCreated, sub)
+			return
+		}
+	} else {
+		h.queue.Enqueue(r.Context(), sub.ID)
+	}
 	respondJSON(w, http.StatusCreated, sub)
 }
 
@@ -123,6 +148,12 @@ func (h *SubmissionHandler) CreateUpsolving(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	prob, err := h.probStore.GetByID(r.Context(), req.ProblemID)
+	if err != nil || prob == nil {
+		http.Error(w, "problem not found", http.StatusNotFound)
+		return
+	}
+
 	sub := &model.Submission{
 		ID:         uuid.New().String(),
 		ProblemID:  req.ProblemID,
@@ -138,7 +169,24 @@ func (h *SubmissionHandler) CreateUpsolving(w http.ResponseWriter, r *http.Reque
 		http.Error(w, "create failed", http.StatusInternalServerError)
 		return
 	}
-	h.queue.Enqueue(r.Context(), sub.ID)
+
+	if prob.Source != "" && prob.Source != "local" && h.vjudgeSvc != nil {
+		vjReq := vjudge.SubmitRequest{
+			ID:              sub.ID,
+			ProblemRemoteID: prob.RemoteID,
+			SourceCode:      req.SourceCode,
+			Language:        req.Language,
+			RemoteOJ:        prob.Source,
+		}
+		if err := h.vjudgeSvc.Submit(r.Context(), vjReq); err != nil {
+			slog.Error("vjudge submit failed", "sub", sub.ID, "err", err)
+			sub.Status = model.StatusSE
+			respondJSON(w, http.StatusCreated, sub)
+			return
+		}
+	} else {
+		h.queue.Enqueue(r.Context(), sub.ID)
+	}
 	respondJSON(w, http.StatusCreated, sub)
 }
 
@@ -149,6 +197,17 @@ func (h *SubmissionHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
+
+	if sub.ContestID != "" {
+		contest, err := h.contestStore.GetByID(r.Context(), sub.ContestID)
+		if err == nil && contest != nil {
+			if time.Now().Before(contest.EndTime) {
+				sub.RemoteID = ""
+				sub.RemoteURL = ""
+			}
+		}
+	}
+
 	respondJSON(w, http.StatusOK, sub)
 }
 
@@ -229,20 +288,36 @@ func (h *SubmissionHandler) CustomRun(w http.ResponseWriter, r *http.Request) {
 	copyIn := map[string]executor.CmdFile{}
 	var args []string
 
-	if cfg.CompileCmd != "" {
-		srcName := "Main" + cfg.Extensions[0]
-		cmdStr := cfg.CompileCmd
-		cmdStr = strings.ReplaceAll(cmdStr, "{{exe}}", "Main")
-		cmdStr = strings.ReplaceAll(cmdStr, "{{src}}", srcName)
-		cmdStr = strings.ReplaceAll(cmdStr, "{{dir}}", ".")
-		compileAndRunCmd := cmdStr + " && ./Main"
-		copyIn[srcName] = executor.CmdFile{Content: req.SourceCode}
-		args = []string{"/bin/sh", "-c", compileAndRunCmd}
-	} else {
-		srcName := "Main" + cfg.Extensions[0]
+	srcName := "Main" + cfg.Extensions[0]
+	copyIn[srcName] = executor.CmdFile{Content: req.SourceCode}
+	copyIn["input.txt"] = executor.CmdFile{Content: req.Input}
+
+	if cfg.CompileCmd != "" && cfg.Runtime != "" {
+		compileCmd := cfg.CompileCmd
+		compileCmd = strings.ReplaceAll(compileCmd, "{{exe}}", "Main")
+		compileCmd = strings.ReplaceAll(compileCmd, "{{src}}", srcName)
+		compileCmd = strings.ReplaceAll(compileCmd, "{{dir}}", ".")
 		rtParts := strings.Fields(cfg.Runtime)
-		args = append(rtParts, "/box/"+srcName)
-		copyIn[srcName] = executor.CmdFile{Content: req.SourceCode}
+		for i, p := range rtParts {
+			rtParts[i] = strings.ReplaceAll(p, "{{dir}}", ".")
+			rtParts[i] = strings.ReplaceAll(rtParts[i], "{{exe}}", "Main")
+		}
+		runCmd := compileCmd + " && " + strings.Join(rtParts, " ") + " < input.txt > output.txt 2> error.txt"
+		args = []string{"/bin/sh", "-c", runCmd}
+	} else if cfg.CompileCmd != "" {
+		compileCmd := cfg.CompileCmd
+		compileCmd = strings.ReplaceAll(compileCmd, "{{exe}}", "Main")
+		compileCmd = strings.ReplaceAll(compileCmd, "{{src}}", srcName)
+		compileCmd = strings.ReplaceAll(compileCmd, "{{dir}}", ".")
+		runCmd := compileCmd + " && ./Main < input.txt > output.txt 2> error.txt"
+		args = []string{"/bin/sh", "-c", runCmd}
+	} else if cfg.Runtime != "" {
+		rtParts := strings.Fields(cfg.Runtime)
+		runCmd := strings.Join(rtParts, " ") + " " + srcName + " < input.txt > output.txt 2> error.txt"
+		args = []string{"/bin/sh", "-c", runCmd}
+	} else {
+		runCmd := "./Main < input.txt > output.txt 2> error.txt"
+		args = []string{"/bin/sh", "-c", runCmd}
 	}
 
 	cpuNs := uint64(5.0 * 1e9 * cfg.TimeLimitMultiplier)
@@ -252,16 +327,12 @@ func (h *SubmissionHandler) CustomRun(w http.ResponseWriter, r *http.Request) {
 	resp, err := h.exec.Run(&executor.ExecRequest{
 		Cmd: []executor.Cmd{{
 			Args:        args,
-			Env:         []string{"PATH=/usr/bin:/bin"},
+			Env:         []string{"PATH=/usr/bin:/bin", "HOME=/tmp"},
 			CPULimit:    cpuNs,
 			MemoryLimit: memBytes,
-			ProcLimit:   16,
+			ProcLimit:   64,
 			CopyIn:      copyIn,
-			Files: []executor.CmdFile{
-				{Content: req.Input},
-				{Content: ""},
-				{Content: ""},
-			},
+			CopyOut:     []string{"output.txt", "error.txt"},
 		}},
 	})
 	elapsed := int(time.Since(start).Milliseconds())
@@ -286,11 +357,11 @@ func (h *SubmissionHandler) CustomRun(w http.ResponseWriter, r *http.Request) {
 	slog.Info("custom run result", "status", cr.Status, "exit", cr.ExitStatus, "error", cr.Error)
 
 	stdout := ""
-	if out, ok := cr.Files["stdout"]; ok {
+	if out, ok := cr.Files["output.txt"]; ok {
 		stdout = out
 	}
 	stderr := ""
-	if errOut, ok := cr.Files["stderr"]; ok {
+	if errOut, ok := cr.Files["error.txt"]; ok {
 		stderr = errOut
 	}
 
@@ -299,11 +370,13 @@ func (h *SubmissionHandler) CustomRun(w http.ResponseWriter, r *http.Request) {
 		if compileOutput == "" {
 			compileOutput = cr.Error
 		}
-		respondJSON(w, http.StatusOK, CustomRunResponse{
-			Status:        "CE",
-			CompileOutput: compileOutput,
-		})
-		return
+		if compileOutput != "" {
+			respondJSON(w, http.StatusOK, CustomRunResponse{
+				Status:        "CE",
+				CompileOutput: compileOutput,
+			})
+			return
+		}
 	}
 
 	status := "success"

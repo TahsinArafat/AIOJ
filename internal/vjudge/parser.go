@@ -183,6 +183,107 @@ func (p *ProblemParser) ParseCodeforcesProblem(ctx context.Context, contestID, p
 	return prob, nil
 }
 
+func (p *ProblemParser) ParseCSESProblem(ctx context.Context, problemID string) (*model.Problem, error) {
+	problemURL := fmt.Sprintf("https://cses.fi/problemset/task/%s", problemID)
+	body, err := p.fetcher(ctx, problemURL)
+	if err != nil {
+		return nil, fmt.Errorf("fetch CSES problem page: %w", err)
+	}
+
+	prob := &model.Problem{
+		Source:     "cses",
+		RemoteID:   problemID,
+		Difficulty: "medium",
+	}
+
+	doc, err := html.Parse(strings.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("parse HTML: %w", err)
+	}
+
+	titleNode := findNode(doc, func(n *html.Node) bool {
+		return n.Type == html.ElementNode && n.Data == "h1"
+	})
+	if titleNode != nil {
+		prob.Title = strings.TrimSpace(extractText(titleNode))
+	}
+	if prob.Title == "" {
+		prob.Title = fmt.Sprintf("CSES %s", problemID)
+	}
+
+	prob.TimeLimit = 1000
+	prob.MemoryLimit = 524288
+
+	contentDiv := findNode(doc, func(n *html.Node) bool {
+		return n.Type == html.ElementNode && n.Data == "div" && hasClass(n, "content")
+	})
+	if contentDiv != nil {
+		stripScriptAndStyle(contentDiv)
+		prob.SampleCases = extractCSESSampleCases(doc)
+		stripSampleCases(contentDiv)
+		mdDiv := findNode(contentDiv, func(n *html.Node) bool {
+			return n.Type == html.ElementNode && n.Data == "div" && hasClass(n, "md")
+		})
+		if mdDiv != nil {
+			prob.Description = renderNodeToMarkdown(mdDiv)
+		} else {
+			prob.Description = renderNodeToMarkdown(contentDiv)
+		}
+	}
+
+	return prob, nil
+}
+
+func stripScriptAndStyle(n *html.Node) {
+	var removeNodes []*html.Node
+	for c := n.FirstChild; c != nil; c = c.NextSibling {
+		if c.Type == html.ElementNode && (c.Data == "script" || c.Data == "style") {
+			removeNodes = append(removeNodes, c)
+		} else {
+			stripScriptAndStyle(c)
+		}
+	}
+	for _, node := range removeNodes {
+		n.RemoveChild(node)
+	}
+}
+
+func stripSampleCases(n *html.Node) {
+	var removeNodes []*html.Node
+	inExample := false
+	for c := n.FirstChild; c != nil; c = c.NextSibling {
+		if c.Type == html.ElementNode && c.Data == "h1" && extractText(c) == "Example" {
+			inExample = true
+			removeNodes = append(removeNodes, c)
+		} else if inExample {
+			removeNodes = append(removeNodes, c)
+		} else if c.Type == html.ElementNode {
+			stripSampleCases(c)
+		}
+	}
+	for _, node := range removeNodes {
+		n.RemoveChild(node)
+	}
+}
+
+func extractCSESSampleCases(doc *html.Node) []model.SampleCase {
+	var cases []model.SampleCase
+	preNodes := findAllNodes(doc, func(n *html.Node) bool {
+		return n.Type == html.ElementNode && n.Data == "pre"
+	})
+	for i := 0; i+1 < len(preNodes); i += 2 {
+		input := strings.TrimSpace(extractText(preNodes[i]))
+		output := strings.TrimSpace(extractText(preNodes[i+1]))
+		if input != "" && output != "" && !strings.HasPrefix(input, "<") {
+			cases = append(cases, model.SampleCase{
+				Input:  input + "\n",
+				Output: output + "\n",
+			})
+		}
+	}
+	return cases
+}
+
 func (p *ProblemParser) ListCodeforcesProblems(ctx context.Context, contestID string) ([]model.ProblemListItem, error) {
 	url := fmt.Sprintf("https://codeforces.com/api/contest.standings?contestId=%s&from=1&count=1", contestID)
 	result, err := p.fetcher(ctx, url)
@@ -400,24 +501,45 @@ func renderNodeToMarkdown(n *html.Node) string {
 				}
 			}
 			sb.WriteString("\n")
-		case "span":
-			// Check if this is a MathJax inline math span (class "mjx-chtml" or similar)
-			// CF uses $$$...$$$ for inline math which gets rendered as <span class="mjx-chtml">
-			// We just walk children to get the text content
+	case "span":
+		if hasClass(n, "math") {
+			if hasClass(n, "math-display") {
+				sb.WriteString("$$")
+			} else {
+				sb.WriteString("$")
+			}
 			for c := n.FirstChild; c != nil; c = c.NextSibling {
 				walk(c)
 			}
-		default:
+			if hasClass(n, "math-display") {
+				sb.WriteString("$$")
+			} else {
+				sb.WriteString("$")
+			}
+		} else {
+			for c := n.FirstChild; c != nil; c = c.NextSibling {
+				walk(c)
+			}
+		}
+	default:
+		if n.Data == "div" && hasClass(n, "math-display") {
+			sb.WriteString("$$")
+			for c := n.FirstChild; c != nil; c = c.NextSibling {
+				walk(c)
+			}
+			sb.WriteString("$$")
+		} else {
 			for c := n.FirstChild; c != nil; c = c.NextSibling {
 				walk(c)
 			}
 		}
 	}
-	walk(n)
-	result := sb.String()
-	// Clean up excessive newlines
-	result = regexp.MustCompile(`\n{3,}`).ReplaceAllString(result, "\n\n")
-	return strings.TrimSpace(result)
+}
+walk(n)
+result := sb.String()
+// Clean up excessive newlines
+result = regexp.MustCompile(`\n{3,}`).ReplaceAllString(result, "\n\n")
+return strings.TrimSpace(result)
 }
 
 // parseTimeLimit extracts time limit in milliseconds from CF text.

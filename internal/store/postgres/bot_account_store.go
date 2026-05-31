@@ -113,3 +113,27 @@ func (s *BotAccountStore) Delete(ctx context.Context, id string) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM bot_accounts WHERE id=$1`, id)
 	return err
 }
+
+func (s *BotAccountStore) IncrementFailures(ctx context.Context, id string) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE bot_accounts SET consecutive_failures = consecutive_failures + 1, last_error_at = NOW() WHERE id = $1`, id)
+	return err
+}
+
+func (s *BotAccountStore) ResetFailures(ctx context.Context, id string) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE bot_accounts SET consecutive_failures = 0, last_error_at = NULL WHERE id = $1`, id)
+	return err
+}
+
+func (s *BotAccountStore) MarkUsed(ctx context.Context, id string) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE bot_accounts SET last_used_at = NOW() WHERE id = $1`, id)
+	return err
+}
+
+func (s *BotAccountStore) UpdateLastPoll(ctx context.Context, id string) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE bot_accounts SET last_poll_at = NOW() WHERE id = $1`, id)
+	return err
+}
