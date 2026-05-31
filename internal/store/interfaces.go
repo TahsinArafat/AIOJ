@@ -315,3 +315,11 @@ type RemoteLanguageStore interface {
 	Update(ctx context.Context, id string, rl *model.RemoteLanguage) error
 	Delete(ctx context.Context, id string) error
 }
+
+type OnsiteUserStore interface {
+	CreateBatch(ctx context.Context, contestID string, users []model.BatchUserRequest) ([]model.OnsiteBatchUser, error)
+	GetByUsername(ctx context.Context, username string) (*model.OnsiteBatchUser, error)
+	MarkUsed(ctx context.Context, id string, userID string) error
+	ListByContest(ctx context.Context, contestID string) ([]model.OnsiteBatchUser, error)
+	DeleteByContest(ctx context.Context, contestID string) error
+}

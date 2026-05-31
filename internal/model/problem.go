@@ -64,6 +64,11 @@ type ProblemListItem struct {
 	Source          string   `json:"source"`
 }
 
+type ProblemWithSamples struct {
+	Problem
+	Index string `json:"index"`
+}
+
 type ProblemPermission struct {
 	ProblemID   string `json:"problem_id"`
 	UserID      string `json:"user_id"`

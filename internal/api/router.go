@@ -47,6 +47,7 @@ func NewRouter(
 	plagiarismH *handler.PlagiarismHandler,
 	mediaH *handler.MediaHandler,
 	onsiteH *handler.OnsiteHandler,
+	onsiteBatchH *handler.OnsiteBatchHandler,
 	botAccountH *handler.AdminBotAccountHandler,
 	settingsH *handler.AdminSystemSettingsHandler,
 	langAdminH *handler.AdminLanguageHandler,
@@ -111,6 +112,7 @@ func NewRouter(
 		r.With(middleware.OptionalAuthMiddleware(jwtManager)).Get("/{id}", contestH.GetByID)
 		r.With(middleware.OptionalAuthMiddleware(jwtManager)).Get("/{id}/scoreboard", contestH.Scoreboard)
 		r.With(middleware.OptionalAuthMiddleware(jwtManager)).Get("/{contestId}/problems/{index}", contestProblemH.GetByIndex)
+		r.Get("/{id}/pdf", contestH.DownloadPDF)
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.AuthMiddleware(jwtManager))
 			r.Post("/", contestH.Create)
@@ -143,7 +145,11 @@ func NewRouter(
 		r.Post("/print", onsiteH.RequestPrint)
 		r.Get("/prints", onsiteH.ListPrints)
 		r.Post("/prints/{printId}/status", onsiteH.UpdatePrintStatus)
+		r.Post("/generate", onsiteBatchH.GenerateBatch)
+		r.Get("/users", onsiteBatchH.ListBatch)
 	})
+
+	r.Post("/api/contests/{id}/onsite/login", onsiteBatchH.LoginAsTeam)
 
 	r.Route("/api/vjudge", func(r chi.Router) {
 		r.Use(middleware.AuthMiddleware(jwtManager))

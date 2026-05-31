@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -17,17 +18,20 @@ import (
 	_ "github.com/tahsinarafat/aioj/internal/contest/format/ioi"
 	_ "github.com/tahsinarafat/aioj/internal/contest/format/oi"
 	"github.com/tahsinarafat/aioj/internal/model"
+	pdfgen "github.com/tahsinarafat/aioj/internal/pdf"
 	"github.com/tahsinarafat/aioj/internal/rating"
+	"github.com/tahsinarafat/aioj/internal/store"
 	"github.com/tahsinarafat/aioj/internal/store/postgres"
 )
 
 type ContestHandler struct {
-	store       *postgres.ContestStore
-	ratingStore *postgres.RatingStore
+	store        *postgres.ContestStore
+	ratingStore  *postgres.RatingStore
+	problemStore store.ProblemStore
 }
 
-func NewContestHandler(s *postgres.ContestStore, rs *postgres.RatingStore) *ContestHandler {
-	return &ContestHandler{store: s, ratingStore: rs}
+func NewContestHandler(s *postgres.ContestStore, rs *postgres.RatingStore, ps store.ProblemStore) *ContestHandler {
+	return &ContestHandler{store: s, ratingStore: rs, problemStore: ps}
 }
 
 func (h *ContestHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -637,4 +641,38 @@ func (h *ContestHandler) RemoveProblem(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondJSON(w, http.StatusOK, map[string]string{"status": "removed"})
+}
+
+func (h *ContestHandler) DownloadPDF(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+
+	contest, err := h.store.GetByID(r.Context(), id)
+	if err != nil || contest == nil {
+		http.Error(w, "contest not found", http.StatusNotFound)
+		return
+	}
+
+	contestProblems, _ := h.store.GetProblems(r.Context(), id)
+
+	var problems []model.ProblemWithSamples
+	for _, cp := range contestProblems {
+		problem, _ := h.problemStore.GetByID(r.Context(), cp.ProblemID)
+		if problem != nil {
+			problems = append(problems, model.ProblemWithSamples{
+				Problem: *problem,
+				Index:   cp.Index,
+			})
+		}
+	}
+
+	generator := pdfgen.NewGenerator()
+	pdfBytes, err := generator.GenerateContestPDF(contest, problems)
+	if err != nil {
+		http.Error(w, "failed to generate PDF", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/pdf")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s.pdf\"", contest.Title))
+	w.Write(pdfBytes)
 }

@@ -110,7 +110,7 @@ func main() {
 	cfSubmit := vjudge.NewCFSubmitClient("http://host.docker.internal:8002")
 
 	submissionH := handler.NewSubmissionHandler(submissionStore, problemStore, contestStore, judgeQueue, wsManager, execClient, cfg.LangDir, vjService)
-	contestH := handler.NewContestHandler(contestStore, ratingStore)
+	contestH := handler.NewContestHandler(contestStore, ratingStore, problemStore)
 	contestProblemH := handler.NewContestProblemHandler(contestStore, problemStore)
 
 	platforms := []string{"codeforces", "atcoder", "cses", "toph", "qoj"}
@@ -193,6 +193,8 @@ func main() {
 
 	mediaH := handler.NewMediaHandler("./media")
 	onsiteH := handler.NewOnsiteHandler(balloonStore, printStore, contestStore)
+	onsiteUserStore := postgres.NewOnsiteUserStore(db)
+	onsiteBatchH := handler.NewOnsiteBatchHandler(contestStore, onsiteUserStore, userStore)
 
 	botAccountH := handler.NewAdminBotAccountHandler(botAccountStore, vjService)
 	settingsStore := postgres.NewSystemSettingsStore(db)
@@ -202,7 +204,7 @@ func main() {
 	remoteLangH := handler.NewRemoteLanguageHandler(remoteLangStore)
 	adminSubH := handler.NewAdminSubmissionHandler(submissionStore, problemStore, vjService)
 
-	router := api.NewRouter(authH, problemH, submissionH, contestH, contestProblemH, vjH, adminH, testcaseH, wsManager, jwtManager, ratingH, registrationH, virtualH, gymH, hackH, statsH, notifH, groupH, teamH, blogH, editorialH, apiKeyH, webhookH, recommendationH, rankingsH, usersH, searchH, langLimitH, importH, orgH, classH, trainingH, plagiarismH, mediaH, onsiteH, botAccountH, settingsH, langAdminH, remoteLangH, adminSubH)
+	router := api.NewRouter(authH, problemH, submissionH, contestH, contestProblemH, vjH, adminH, testcaseH, wsManager, jwtManager, ratingH, registrationH, virtualH, gymH, hackH, statsH, notifH, groupH, teamH, blogH, editorialH, apiKeyH, webhookH, recommendationH, rankingsH, usersH, searchH, langLimitH, importH, orgH, classH, trainingH, plagiarismH, mediaH, onsiteH, onsiteBatchH, botAccountH, settingsH, langAdminH, remoteLangH, adminSubH)
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),
