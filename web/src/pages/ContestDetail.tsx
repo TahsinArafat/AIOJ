@@ -4,6 +4,17 @@ import { api, getAccessToken } from '../lib/api'
 import DivisionBadge from '../components/DivisionBadge'
 import { resolveProblemSlug, resolveProblemTitle } from '../lib/problemSlugResolver'
 
+function decodeRole(): string | null {
+    const token = localStorage.getItem('access_token')
+    if (!token) return null
+    try {
+        const payload = JSON.parse(atob(token.split('.')[1]))
+        return payload.role ?? null
+    } catch {
+        return null
+    }
+}
+
 export default function ContestDetail() {
     const { id } = useParams<{ id: string }>()
     const [data, setData] = useState<any>(null)
@@ -12,6 +23,7 @@ export default function ContestDetail() {
     const [registrationCount, setRegistrationCount] = useState(0)
     const [problemSlugs, setProblemSlugs] = useState<Map<string, string>>(new Map())
     const [problemTitles, setProblemTitles] = useState<Map<string, string>>(new Map())
+    const role = decodeRole()
 
     useEffect(() => {
         if (!id) return
@@ -186,8 +198,49 @@ export default function ContestDetail() {
                 </div>
             )}
 
+            {getAccessToken() && (role === 'admin' || role === 'teacher') && (
+                <div className="border border-gray-200 rounded-lg p-4">
+                    <h3 className="font-semibold mb-3">Judge Panel</h3>
+                    <div className="flex gap-3 flex-wrap">
+                        <a
+                            href={`/api/contests/${id}/pdf`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded text-sm hover:bg-purple-700"
+                        >
+                            📄 Download PDF
+                        </a>
+                        <Link
+                            to={`/contests/${id}/clarifications`}
+                            className="inline-flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700"
+                        >
+                            💬 View Clarifications
+                        </Link>
+                        <Link
+                            to={`/contests/${id}/notices`}
+                            className="inline-flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded text-sm hover:bg-green-700"
+                        >
+                            📢 Manage Notices
+                        </Link>
+                    </div>
+                    {contest.statement_hidden && (
+                        <p className="text-sm text-yellow-700 mt-2">
+                            ⚠️ Statement hidden mode is ON - participants can only see sample cases online.
+                        </p>
+                    )}
+                </div>
+            )}
+
             {getAccessToken() && (
                 <VirtualContestSection contestId={id!} isEnded={isEnded} />
+            )}
+
+            {(isRunning || isEnded) && (
+                <ContestNoticesSection contestId={id!} />
+            )}
+
+            {(isRunning || isEnded) && getAccessToken() && (
+                <ClarificationsSection contestId={id!} problems={problems || []} isRunning={isRunning} />
             )}
         </div>
     )
@@ -235,6 +288,142 @@ function VirtualContestSection({ contestId, isEnded }: { contestId: string; isEn
                 </div>
             ) : (
                 <p className="text-sm text-gray-400">Virtual contests are only available after the contest ends.</p>
+            )}
+        </div>
+    )
+}
+
+function ContestNoticesSection({ contestId }: { contestId: string }) {
+    const [notices, setNotices] = useState<any[]>([])
+    const [loading, setLoading] = useState(true)
+
+    useEffect(() => {
+        api.notices.list(contestId).then(d => setNotices(d.data || [])).catch(() => {}).finally(() => setLoading(false))
+    }, [contestId])
+
+    if (loading || notices.length === 0) return null
+
+    return (
+        <div className="border border-yellow-200 bg-yellow-50 rounded-lg p-4">
+            <h3 className="font-semibold text-yellow-800 mb-3">📢 Notices</h3>
+            <div className="space-y-3">
+                {notices.map(n => (
+                    <div key={n.id} className="bg-white p-3 rounded border border-yellow-200">
+                        <p className="text-sm text-gray-800">{n.content}</p>
+                        <p className="text-xs text-gray-500 mt-1">
+                            {n.username} • {new Date(n.created_at).toLocaleString()}
+                        </p>
+                    </div>
+                ))}
+            </div>
+        </div>
+    )
+}
+
+function ClarificationsSection({ contestId, problems, isRunning }: { contestId: string; problems: any[]; isRunning: boolean }) {
+    const [clarifications, setClarifications] = useState<any[]>([])
+    const [loading, setLoading] = useState(true)
+    const [showForm, setShowForm] = useState(false)
+    const [question, setQuestion] = useState('')
+    const [problemId, setProblemId] = useState('')
+    const [submitting, setSubmitting] = useState(false)
+
+    const loadClarifications = () => {
+        api.clarifications.list(contestId).then(d => setClarifications(d.data || [])).catch(() => {}).finally(() => setLoading(false))
+    }
+
+    useEffect(() => {
+        loadClarifications()
+    }, [contestId])
+
+    const handleSubmit = async () => {
+        if (!question.trim()) return
+        setSubmitting(true)
+        try {
+            await api.clarifications.create(contestId, {
+                question: question.trim(),
+                problem_id: problemId || undefined,
+            })
+            setQuestion('')
+            setProblemId('')
+            setShowForm(false)
+            loadClarifications()
+        } catch (e: any) {
+            alert('Failed: ' + e.message)
+        } finally {
+            setSubmitting(false)
+        }
+    }
+
+    if (loading) return null
+
+    return (
+        <div className="border border-gray-200 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-3">
+                <h3 className="font-semibold">Clarifications</h3>
+                {isRunning && (
+                    <button
+                        onClick={() => setShowForm(!showForm)}
+                        className="text-sm text-blue-600 hover:underline"
+                    >
+                        {showForm ? 'Cancel' : 'Ask Question'}
+                    </button>
+                )}
+            </div>
+
+            {showForm && (
+                <div className="mb-4 p-3 bg-gray-50 rounded border">
+                    <select
+                        value={problemId}
+                        onChange={e => setProblemId(e.target.value)}
+                        className="w-full p-2 border rounded mb-2 text-sm"
+                    >
+                        <option value="">General (no specific problem)</option>
+                        {problems.map((p: any) => (
+                            <option key={p.problem_id} value={p.problem_id}>{p.index} - Problem</option>
+                        ))}
+                    </select>
+                    <textarea
+                        value={question}
+                        onChange={e => setQuestion(e.target.value)}
+                        placeholder="Type your question..."
+                        className="w-full p-2 border rounded text-sm h-20 resize-none"
+                    />
+                    <button
+                        onClick={handleSubmit}
+                        disabled={submitting || !question.trim()}
+                        className="mt-2 bg-blue-600 text-white px-4 py-1.5 rounded text-sm hover:bg-blue-700 disabled:opacity-50"
+                    >
+                        {submitting ? 'Submitting...' : 'Submit'}
+                    </button>
+                </div>
+            )}
+
+            {clarifications.length === 0 ? (
+                <p className="text-sm text-gray-500">No clarifications yet.</p>
+            ) : (
+                <div className="space-y-3">
+                    {clarifications.map(c => (
+                        <div key={c.id} className={`p-3 rounded border ${c.answer ? 'bg-green-50 border-green-200' : 'bg-white'}`}>
+                            <div className="flex items-start justify-between">
+                                <div>
+                                    <p className="text-sm font-medium text-gray-800">{c.question}</p>
+                                    <p className="text-xs text-gray-500 mt-1">
+                                        {c.username} • {new Date(c.created_at).toLocaleString()}
+                                        {c.problem_idx && ` • Problem ${c.problem_idx}`}
+                                    </p>
+                                </div>
+                                {!c.answer && <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded">Pending</span>}
+                            </div>
+                            {c.answer && (
+                                <div className="mt-2 pl-3 border-l-2 border-green-400">
+                                    <p className="text-sm text-gray-700">{c.answer}</p>
+                                    {c.is_public && <span className="text-xs text-green-600 mt-1">Public</span>}
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </div>
             )}
         </div>
     )

@@ -48,6 +48,8 @@ func NewRouter(
 	mediaH *handler.MediaHandler,
 	onsiteH *handler.OnsiteHandler,
 	onsiteBatchH *handler.OnsiteBatchHandler,
+	clarificationH *handler.ClarificationHandler,
+	noticeH *handler.ContestNoticeHandler,
 	botAccountH *handler.AdminBotAccountHandler,
 	settingsH *handler.AdminSystemSettingsHandler,
 	langAdminH *handler.AdminLanguageHandler,
@@ -128,6 +130,24 @@ func NewRouter(
 		r.Post("/{id}/calculate-ratings", contestH.CalculateRatings)
 		r.Post("/{id}/register-team", contestH.RegisterTeam)
 		r.Get("/{id}/team-registrations", contestH.ListTeamRegistrations)
+	})
+
+	r.Route("/api/contests/{contestId}/clarifications", func(r chi.Router) {
+		r.Get("/", clarificationH.List)
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.AuthMiddleware(jwtManager))
+			r.Post("/", clarificationH.Create)
+			r.Post("/{id}/answer", clarificationH.Answer)
+		})
+	})
+
+	r.Route("/api/contests/{contestId}/notices", func(r chi.Router) {
+		r.Get("/", noticeH.List)
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.AuthMiddleware(jwtManager))
+			r.Post("/", noticeH.Create)
+			r.Delete("/{id}", noticeH.Delete)
+		})
 	})
 
 	r.Route("/api/contests/{id}/register", func(r chi.Router) {

@@ -89,6 +89,7 @@ export default function ContestProblem() {
     const [contest, setContest] = useState<any>(null)
     const [canSubmit, setCanSubmit] = useState(true)
     const [upsolvingDisabled, setUpsolvingDisabled] = useState(false)
+    const [statementHidden, setStatementHidden] = useState(false)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
 
@@ -105,6 +106,7 @@ export default function ContestProblem() {
             setContest(data.contest)
             setCanSubmit(data.can_submit ?? true)
             setUpsolvingDisabled(data.upsolving_disabled ?? false)
+            setStatementHidden(data.statement_hidden ?? false)
         } catch (err: any) {
             setError(err.message || 'Failed to load problem')
         } finally {
@@ -178,32 +180,46 @@ export default function ContestProblem() {
                         </div>
                     )}
 
-                    <div className="prose max-w-none">
-                        <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
-                            {problem.description}
-                        </ReactMarkdown>
-                    </div>
-
-                    {problem.input_format && (
-                        <div className="mt-6">
-                            <h3 className="text-lg font-semibold mb-2">Input Format</h3>
-                            <div className="prose max-w-none">
-                                <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
-                                    {problem.input_format}
-                                </ReactMarkdown>
-                            </div>
+                    {statementHidden && (
+                        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded">
+                            <p className="text-blue-800 font-medium">Problem statement is hidden</p>
+                            <p className="text-blue-700 text-sm mt-1">
+                                The full problem statement is only available in printed form. Please refer to your printed problem set.
+                                Sample cases are shown below for reference.
+                            </p>
                         </div>
                     )}
 
-                    {problem.output_format && (
-                        <div className="mt-6">
-                            <h3 className="text-lg font-semibold mb-2">Output Format</h3>
+                    {!statementHidden && (
+                        <>
                             <div className="prose max-w-none">
                                 <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
-                                    {problem.output_format}
+                                    {problem.description}
                                 </ReactMarkdown>
                             </div>
-                        </div>
+
+                            {problem.input_format && (
+                                <div className="mt-6">
+                                    <h3 className="text-lg font-semibold mb-2">Input Format</h3>
+                                    <div className="prose max-w-none">
+                                        <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                                            {problem.input_format}
+                                        </ReactMarkdown>
+                                    </div>
+                                </div>
+                            )}
+
+                            {problem.output_format && (
+                                <div className="mt-6">
+                                    <h3 className="text-lg font-semibold mb-2">Output Format</h3>
+                                    <div className="prose max-w-none">
+                                        <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                                            {problem.output_format}
+                                        </ReactMarkdown>
+                                    </div>
+                                </div>
+                            )}
+                        </>
                     )}
 
                     {problem.sample_cases && problem.sample_cases.length > 0 && (

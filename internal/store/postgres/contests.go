@@ -34,11 +34,16 @@ func (s *ContestStore) Create(ctx context.Context, c *model.Contest) error {
 		formatConfigJSON = []byte("{}")
 	}
 
+	var slug interface{}
+	if c.Slug != "" {
+		slug = c.Slug
+	}
+
 	err = tx.QueryRowContext(ctx,
-		`INSERT INTO contests(id,title,type,format,format_config,start_time,end_time,freeze_time,password,visible,description,
+		`INSERT INTO contests(id,slug,title,type,format,format_config,start_time,end_time,freeze_time,password,visible,description,
 		                    registration_required,registration_deadline,max_participants,division,educational_config,created_by)
-		 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING created_at`,
-		c.ID, c.Title, c.Type, c.Format, formatConfigJSON, c.StartTime, c.EndTime, c.FreezeTime, c.Password, c.Visible, c.Description,
+		 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING created_at`,
+		c.ID, slug, c.Title, c.Type, c.Format, formatConfigJSON, c.StartTime, c.EndTime, c.FreezeTime, c.Password, c.Visible, c.Description,
 		c.RegistrationRequired, c.RegistrationDeadline, c.MaxParticipants, c.Division, configJSON, c.CreatedBy,
 	).Scan(&c.CreatedAt)
 	if err != nil {
@@ -55,26 +60,68 @@ func (s *ContestStore) Create(ctx context.Context, c *model.Contest) error {
 
 func (s *ContestStore) GetByID(ctx context.Context, id string) (*model.Contest, error) {
 	if _, err := uuid.Parse(id); err != nil {
-		return nil, nil
+		return s.GetBySlug(ctx, id)
 	}
 	var c model.Contest
 	var configJSON []byte
 	var formatConfigJSON []byte
+	var slug sql.NullString
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id,title,type,format,format_config,start_time,end_time,freeze_time,visible,description,
+		`SELECT id,slug,title,type,format,format_config,start_time,end_time,freeze_time,visible,description,
 		        registration_required,registration_deadline,max_participants,division,educational_config,
-		        created_by,created_at
+		        upsolving_enabled,virtual_contest_enabled,pdf_enabled,statement_hidden,created_by,created_at
 		 FROM contests WHERE id=$1`, id).Scan(
-		&c.ID, &c.Title, &c.Type, &c.Format, &formatConfigJSON, &c.StartTime, &c.EndTime, &c.FreezeTime,
+		&c.ID, &slug, &c.Title, &c.Type, &c.Format, &formatConfigJSON, &c.StartTime, &c.EndTime, &c.FreezeTime,
 		&c.Visible, &c.Description,
 		&c.RegistrationRequired, &c.RegistrationDeadline, &c.MaxParticipants,
 		&c.Division, &configJSON,
+		&c.UpsolvingEnabled, &c.VirtualContestEnabled, &c.PDFEnabled, &c.StatementHidden,
 		&c.CreatedBy, &c.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
+	}
+	if slug.Valid {
+		c.Slug = slug.String
+	}
+	if len(configJSON) > 0 {
+		var config model.EducationalRoundConfig
+		if err := json.Unmarshal(configJSON, &config); err == nil {
+			c.EducationalConfig = &config
+		}
+	}
+	if len(formatConfigJSON) > 0 {
+		c.FormatConfig = formatConfigJSON
+	}
+	return &c, nil
+}
+
+func (s *ContestStore) GetBySlug(ctx context.Context, slug string) (*model.Contest, error) {
+	var c model.Contest
+	var configJSON []byte
+	var formatConfigJSON []byte
+	var slugDB sql.NullString
+	err := s.db.QueryRowContext(ctx,
+		`SELECT id,slug,title,type,format,format_config,start_time,end_time,freeze_time,visible,description,
+		        registration_required,registration_deadline,max_participants,division,educational_config,
+		        upsolving_enabled,virtual_contest_enabled,pdf_enabled,statement_hidden,created_by,created_at
+		 FROM contests WHERE slug=$1`, slug).Scan(
+		&c.ID, &slugDB, &c.Title, &c.Type, &c.Format, &formatConfigJSON, &c.StartTime, &c.EndTime, &c.FreezeTime,
+		&c.Visible, &c.Description,
+		&c.RegistrationRequired, &c.RegistrationDeadline, &c.MaxParticipants,
+		&c.Division, &configJSON,
+		&c.UpsolvingEnabled, &c.VirtualContestEnabled, &c.PDFEnabled, &c.StatementHidden,
+		&c.CreatedBy, &c.CreatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if slugDB.Valid {
+		c.Slug = slugDB.String
 	}
 	if len(configJSON) > 0 {
 		var config model.EducationalRoundConfig
@@ -155,9 +202,9 @@ func (s *ContestStore) Update(ctx context.Context, c *model.Contest) error {
 
 	_, err := s.db.ExecContext(ctx,
 		`UPDATE contests SET title=$1, type=$2, format=$3, format_config=$4, start_time=$5, end_time=$6,
-		 freeze_time=$7, password=$8, description=$9, visible=$10, updated_at=NOW()
-		 WHERE id=$11`,
-		c.Title, c.Type, c.Format, formatConfigJSON, c.StartTime, c.EndTime, c.FreezeTime, c.Password, c.Description, c.Visible, c.ID)
+		 freeze_time=$7, password=$8, description=$9, visible=$10, pdf_enabled=$11, statement_hidden=$12, updated_at=NOW()
+		 WHERE id=$13`,
+		c.Title, c.Type, c.Format, formatConfigJSON, c.StartTime, c.EndTime, c.FreezeTime, c.Password, c.Description, c.Visible, c.PDFEnabled, c.StatementHidden, c.ID)
 	return err
 }
 

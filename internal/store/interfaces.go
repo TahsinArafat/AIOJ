@@ -59,6 +59,7 @@ type RefreshTokenStore interface {
 type ContestStore interface {
 	Create(ctx context.Context, c *model.Contest) error
 	GetByID(ctx context.Context, id string) (*model.Contest, error)
+	GetBySlug(ctx context.Context, slug string) (*model.Contest, error)
 	List(ctx context.Context, offset, limit int) ([]model.Contest, int, error)
 	Update(ctx context.Context, c *model.Contest) error
 	Delete(ctx context.Context, id string) error
@@ -322,4 +323,17 @@ type OnsiteUserStore interface {
 	MarkUsed(ctx context.Context, id string, userID string) error
 	ListByContest(ctx context.Context, contestID string) ([]model.OnsiteBatchUser, error)
 	DeleteByContest(ctx context.Context, contestID string) error
+}
+
+type ClarificationStore interface {
+	Create(ctx context.Context, c *model.Clarification) error
+	GetByID(ctx context.Context, id string) (*model.Clarification, error)
+	ListByContest(ctx context.Context, contestID string, userID *string) ([]model.Clarification, error)
+	Answer(ctx context.Context, id string, answer string, answeredBy string, isPublic bool) error
+}
+
+type ContestNoticeStore interface {
+	Create(ctx context.Context, n *model.ContestNotice) error
+	ListByContest(ctx context.Context, contestID string) ([]model.ContestNotice, error)
+	Delete(ctx context.Context, id string) error
 }

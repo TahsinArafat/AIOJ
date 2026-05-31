@@ -1,0 +1,2 @@
+ALTER TABLE contests ADD COLUMN IF NOT EXISTS slug VARCHAR(255) UNIQUE;
+CREATE INDEX IF NOT EXISTS idx_contests_slug ON contests(slug);

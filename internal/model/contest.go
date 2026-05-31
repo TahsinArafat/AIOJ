@@ -7,6 +7,7 @@ import (
 
 type Contest struct {
 	ID                   string     `json:"id"`
+	Slug                 string     `json:"slug,omitempty"`
 	Title                string     `json:"title"`
 	Type                 string     `json:"type"`
 	Format               string     `json:"format"`
@@ -29,6 +30,8 @@ type Contest struct {
 	IsTeamContest        bool       `json:"is_team_contest"`
 	UpsolvingEnabled     bool       `json:"upsolving_enabled"`
 	VirtualContestEnabled bool      `json:"virtual_contest_enabled"`
+	PDFEnabled           bool       `json:"pdf_enabled"`
+	StatementHidden      bool       `json:"statement_hidden"`
 	CreatedBy            string     `json:"created_by"`
 	CreatedAt            time.Time  `json:"created_at"`
 }
@@ -74,6 +77,7 @@ type ContestPermission struct {
 
 type CreateContestRequest struct {
 	Title        string          `json:"title"`
+	Slug         string          `json:"slug,omitempty"`
 	Type         string          `json:"type"`
 	Format       string          `json:"format"`
 	FormatConfig json.RawMessage `json:"format_config,omitempty"`
@@ -84,6 +88,8 @@ type CreateContestRequest struct {
 	Password    string     `json:"password,omitempty"`
 	Description string     `json:"description,omitempty"`
 	ProblemIDs  []string   `json:"problem_ids"`
+	PDFEnabled  *bool      `json:"pdf_enabled,omitempty"`
+	StatementHidden *bool  `json:"statement_hidden,omitempty"`
 }
 
 type ContestRegistration struct {

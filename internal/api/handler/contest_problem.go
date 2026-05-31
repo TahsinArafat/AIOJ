@@ -75,9 +75,14 @@ func (h *ContestProblemHandler) GetByIndex(w http.ResponseWriter, r *http.Reques
 		canSubmit = false
 	}
 
+	isJudge := claims != nil && (claims.Role == "admin" || h.contestStore.HasAccess(r.Context(), contest.ID, claims.UserID, "manager", "judge"))
+
+	statementHidden := contest.StatementHidden && !isJudge
+
 	respondJSON(w, http.StatusOK, map[string]interface{}{
-		"problem":    problem,
-		"contest":    contest,
-		"can_submit": canSubmit,
+		"problem":           problem,
+		"contest":           contest,
+		"can_submit":        canSubmit,
+		"statement_hidden":  statementHidden,
 	})
 }

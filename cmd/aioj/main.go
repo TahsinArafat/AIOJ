@@ -196,6 +196,11 @@ func main() {
 	onsiteUserStore := postgres.NewOnsiteUserStore(db)
 	onsiteBatchH := handler.NewOnsiteBatchHandler(contestStore, onsiteUserStore, userStore)
 
+	clarificationStore := postgres.NewClarificationStore(db)
+	clarificationH := handler.NewClarificationHandler(clarificationStore, contestStore)
+	noticeStore := postgres.NewContestNoticeStore(db)
+	noticeH := handler.NewContestNoticeHandler(noticeStore, contestStore)
+
 	botAccountH := handler.NewAdminBotAccountHandler(botAccountStore, vjService)
 	settingsStore := postgres.NewSystemSettingsStore(db)
 	settingsH := handler.NewAdminSystemSettingsHandler(settingsStore)
@@ -204,7 +209,7 @@ func main() {
 	remoteLangH := handler.NewRemoteLanguageHandler(remoteLangStore)
 	adminSubH := handler.NewAdminSubmissionHandler(submissionStore, problemStore, vjService)
 
-	router := api.NewRouter(authH, problemH, submissionH, contestH, contestProblemH, vjH, adminH, testcaseH, wsManager, jwtManager, ratingH, registrationH, virtualH, gymH, hackH, statsH, notifH, groupH, teamH, blogH, editorialH, apiKeyH, webhookH, recommendationH, rankingsH, usersH, searchH, langLimitH, importH, orgH, classH, trainingH, plagiarismH, mediaH, onsiteH, onsiteBatchH, botAccountH, settingsH, langAdminH, remoteLangH, adminSubH)
+	router := api.NewRouter(authH, problemH, submissionH, contestH, contestProblemH, vjH, adminH, testcaseH, wsManager, jwtManager, ratingH, registrationH, virtualH, gymH, hackH, statsH, notifH, groupH, teamH, blogH, editorialH, apiKeyH, webhookH, recommendationH, rankingsH, usersH, searchH, langLimitH, importH, orgH, classH, trainingH, plagiarismH, mediaH, onsiteH, onsiteBatchH, clarificationH, noticeH, botAccountH, settingsH, langAdminH, remoteLangH, adminSubH)
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),

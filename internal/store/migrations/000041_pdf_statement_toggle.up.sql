@@ -1,0 +1,2 @@
+ALTER TABLE contests ADD COLUMN IF NOT EXISTS pdf_enabled BOOLEAN DEFAULT true;
+ALTER TABLE contests ADD COLUMN IF NOT EXISTS statement_hidden BOOLEAN DEFAULT false;

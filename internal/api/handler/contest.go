@@ -82,6 +82,7 @@ func (h *ContestHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	c := &model.Contest{
 		ID:           uuid.New().String(),
+		Slug:         req.Slug,
 		Title:        req.Title,
 		Type:         req.Type,
 		Format:       fmtName,
@@ -192,6 +193,12 @@ func (h *ContestHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if req.Description != "" {
 		c.Description = req.Description
 	}
+	if req.PDFEnabled != nil {
+		c.PDFEnabled = *req.PDFEnabled
+	}
+	if req.StatementHidden != nil {
+		c.StatementHidden = *req.StatementHidden
+	}
 	if err := h.store.Update(r.Context(), c); err != nil {
 		http.Error(w, "update failed", http.StatusInternalServerError)
 		return
@@ -225,24 +232,27 @@ func (h *ContestHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	now := time.Now()
+	claims := middleware.GetUserClaims(r)
+
 	if !contest.Visible || now.Before(contest.StartTime) {
-		claims := middleware.GetUserClaims(r)
 		if claims == nil || (claims.Role != "admin" && !h.store.HasAccess(r.Context(), contest.ID, claims.UserID, "manager", "tester")) {
 			http.Error(w, "forbidden", http.StatusForbidden)
 			return
 		}
 	}
 
+	isJudge := claims != nil && (claims.Role == "admin" || h.store.HasAccess(r.Context(), contest.ID, claims.UserID, "manager", "judge"))
+
 	problems, _ := h.store.GetProblems(r.Context(), id)
 
 	frozen := contest.FreezeTime != nil && now.After(*contest.FreezeTime) && now.Before(contest.EndTime)
 
 	var beforeTime *time.Time
-	if frozen {
+	if frozen && !isJudge {
 		beforeTime = contest.FreezeTime
 	}
 
-	rows, _ := h.store.GetScoreboardRows(r.Context(), id, beforeTime)
+	rows, _ := h.store.GetScoreboardRows(r.Context(), id, nil)
 	participants, _ := h.store.GetParticipants(r.Context(), id)
 
 	fmtName := contest.Format
@@ -260,8 +270,14 @@ func (h *ContestHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 		ProblemID string
 	}
 	submissionsByUserProblem := make(map[userProblemKey][]format.Submission)
+	frozenSubmissionsByUserProblem := make(map[userProblemKey]int)
+
 	for _, row := range rows {
 		key := userProblemKey{UserID: row.UserID, ProblemID: row.ProblemID}
+		if frozen && !isJudge && beforeTime != nil && row.CreatedAt.After(*beforeTime) {
+			frozenSubmissionsByUserProblem[key]++
+			continue
+		}
 		sub := format.Submission{
 			ID:        "",
 			UserID:    row.UserID,
@@ -336,12 +352,15 @@ func (h *ContestHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 	for i, rank := range ranks {
 		probMap := make(map[string]model.ProblemResult)
 		for _, pResult := range rank.Score.Problems {
+			key := userProblemKey{UserID: rank.Score.UserID, ProblemID: pResult.ProblemIndex}
+			pending := frozenSubmissionsByUserProblem[key]
+
 			probMap[pResult.ProblemIndex] = model.ProblemResult{
 				Solved:   pResult.Solved,
 				Attempts: pResult.Attempts,
 				Time:     pResult.Penalty,
 				Score:    int(pResult.Score),
-				Pending:  0,
+				Pending:  pending,
 			}
 		}
 
@@ -359,6 +378,7 @@ func (h *ContestHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, map[string]interface{}{
 		"entries": entries, "problems": problems,
 		"frozen": frozen, "contest": contest,
+		"is_judge": isJudge,
 	})
 }
 
@@ -644,11 +664,24 @@ func (h *ContestHandler) RemoveProblem(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ContestHandler) DownloadPDF(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r)
 	id := chi.URLParam(r, "id")
 
 	contest, err := h.store.GetByID(r.Context(), id)
 	if err != nil || contest == nil {
 		http.Error(w, "contest not found", http.StatusNotFound)
+		return
+	}
+
+	isJudge := claims != nil && (claims.Role == "admin" || h.store.HasAccess(r.Context(), id, claims.UserID, "manager", "judge"))
+
+	if !contest.PDFEnabled && !isJudge {
+		http.Error(w, "PDF generation is disabled for this contest", http.StatusForbidden)
+		return
+	}
+
+	if !isJudge {
+		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
 

@@ -319,7 +319,23 @@ export const api = {
         checkRegistration: (id: string) => request<{ registered: boolean }>(`/contests/${id}/register`),
         listRegistrations: (id: string) => request<{ data: any[]; count: number }>(`/contests/${id}/registrations`),
         getProblemByIndex: (contestId: string, index: string) =>
-            request<{ problem: any; contest: any; can_submit?: boolean; upsolving_disabled?: boolean }>(`/contests/${contestId}/problems/${index}`),
+            request<{ problem: any; contest: any; can_submit?: boolean; upsolving_disabled?: boolean; statement_hidden?: boolean }>(`/contests/${contestId}/problems/${index}`),
+    },
+    clarifications: {
+        list: (contestId: string) =>
+            request<{ data: any[] }>(`/contests/${contestId}/clarifications`),
+        create: (contestId: string, d: { problem_id?: string; question: string }) =>
+            request<any>(`/contests/${contestId}/clarifications`, { method: 'POST', body: JSON.stringify(d) }),
+        answer: (contestId: string, id: string, d: { answer: string; is_public: boolean }) =>
+            request<any>(`/contests/${contestId}/clarifications/${id}/answer`, { method: 'POST', body: JSON.stringify(d) }),
+    },
+    notices: {
+        list: (contestId: string) =>
+            request<{ data: any[] }>(`/contests/${contestId}/notices`),
+        create: (contestId: string, d: { content: string }) =>
+            request<any>(`/contests/${contestId}/notices`, { method: 'POST', body: JSON.stringify(d) }),
+        delete: (contestId: string, id: string) =>
+            request(`/contests/${contestId}/notices/${id}`, { method: 'DELETE' }),
     },
     virtual: {
         start: (contestId: string, durationMinutes?: number) =>
