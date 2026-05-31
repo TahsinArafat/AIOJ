@@ -120,6 +120,8 @@ func NewRouter(
 			r.Get("/{id}/permissions", contestH.ListPermissions)
 			r.Post("/{id}/permissions", contestH.AddPermission)
 			r.Delete("/{id}/permissions/{userId}", contestH.RemovePermission)
+			r.Post("/{id}/problems", contestH.AddProblem)
+			r.Delete("/{id}/problems/{problemId}", contestH.RemoveProblem)
 		})
 		r.Post("/{id}/calculate-ratings", contestH.CalculateRatings)
 		r.Post("/{id}/register-team", contestH.RegisterTeam)

@@ -173,6 +173,13 @@ func (s *ContestStore) AddProblem(ctx context.Context, contestID, problemID, ind
 	return err
 }
 
+func (s *ContestStore) RemoveProblem(ctx context.Context, contestID, problemID string) error {
+	_, err := s.db.ExecContext(ctx,
+		`DELETE FROM contest_problems WHERE contest_id=$1 AND problem_id=$2`,
+		contestID, problemID)
+	return err
+}
+
 func (s *ContestStore) GetProblems(ctx context.Context, contestID string) ([]model.ContestProblem, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT cp.contest_id,cp.problem_id,cp.index,cp.score,cp.sort_order

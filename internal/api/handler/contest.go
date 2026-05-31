@@ -564,3 +564,77 @@ func (h *ContestHandler) ListAvailableFormats(w http.ResponseWriter, r *http.Req
 		"formats": formats,
 	})
 }
+
+func (h *ContestHandler) AddProblem(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r)
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	id := chi.URLParam(r, "id")
+	c, err := h.store.GetByID(r.Context(), id)
+	if err != nil || c == nil {
+		http.Error(w, "contest not found", http.StatusNotFound)
+		return
+	}
+
+	if claims.Role != "admin" && !h.store.HasAccess(r.Context(), c.ID, claims.UserID, "manager", "judge") {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	var req struct {
+		ProblemID string `json:"problem_id"`
+		Index     string `json:"index"`
+		Score     int    `json:"score"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+
+	if req.ProblemID == "" || req.Index == "" {
+		http.Error(w, "problem_id and index required", http.StatusBadRequest)
+		return
+	}
+
+	if req.Score <= 0 {
+		req.Score = 100
+	}
+
+	if err := h.store.AddProblem(r.Context(), id, req.ProblemID, req.Index, req.Score, 0); err != nil {
+		http.Error(w, "failed to add problem", http.StatusInternalServerError)
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]string{"status": "added"})
+}
+
+func (h *ContestHandler) RemoveProblem(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r)
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	id := chi.URLParam(r, "id")
+	c, err := h.store.GetByID(r.Context(), id)
+	if err != nil || c == nil {
+		http.Error(w, "contest not found", http.StatusNotFound)
+		return
+	}
+
+	if claims.Role != "admin" && !h.store.HasAccess(r.Context(), c.ID, claims.UserID, "manager") {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	problemID := chi.URLParam(r, "problemId")
+	if err := h.store.RemoveProblem(r.Context(), id, problemID); err != nil {
+		http.Error(w, "failed to remove problem", http.StatusInternalServerError)
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]string{"status": "removed"})
+}

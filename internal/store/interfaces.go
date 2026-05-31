@@ -63,6 +63,7 @@ type ContestStore interface {
 	Update(ctx context.Context, c *model.Contest) error
 	Delete(ctx context.Context, id string) error
 	AddProblem(ctx context.Context, contestID, problemID, index string, score, sortOrder int) error
+	RemoveProblem(ctx context.Context, contestID, problemID string) error
 	GetProblems(ctx context.Context, contestID string) ([]model.ContestProblem, error)
 	GetContestProblemByIndex(ctx context.Context, contestID, index string) (*model.Problem, error)
 	GetParticipants(ctx context.Context, contestID string) ([]string, error)
