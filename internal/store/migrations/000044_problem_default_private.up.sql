@@ -1,0 +1,1 @@
+ALTER TABLE problems ALTER COLUMN visible SET DEFAULT false;

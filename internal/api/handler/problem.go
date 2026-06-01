@@ -295,7 +295,7 @@ func (h *ProblemHandler) Create(w http.ResponseWriter, r *http.Request) {
 		InteractorLanguage:   req.InteractorLanguage,
 		InteractorSourceCode: req.InteractorSourceCode,
 		Source:        "local",
-		Visible:       true,
+		Visible:       false,
 		CreatedBy:     claims.UserID,
 	}
 	if err := h.store.Create(r.Context(), prob); err != nil {
