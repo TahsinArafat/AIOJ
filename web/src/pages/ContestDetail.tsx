@@ -211,16 +211,10 @@ export default function ContestDetail() {
                             📄 Download PDF
                         </a>
                         <Link
-                            to={`/contests/${id}/clarifications`}
-                            className="inline-flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700"
+                            to={`/setter/contest/${id}/edit`}
+                            className="inline-flex items-center gap-2 bg-gray-600 text-white px-4 py-2 rounded text-sm hover:bg-gray-700"
                         >
-                            💬 View Clarifications
-                        </Link>
-                        <Link
-                            to={`/contests/${id}/notices`}
-                            className="inline-flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded text-sm hover:bg-green-700"
-                        >
-                            📢 Manage Notices
+                            ⚙️ Edit Contest
                         </Link>
                     </div>
                     {contest.statement_hidden && (
@@ -228,6 +222,9 @@ export default function ContestDetail() {
                             ⚠️ Statement hidden mode is ON - participants can only see sample cases online.
                         </p>
                     )}
+                    <p className="text-xs text-gray-500 mt-2">
+                        Clarifications and notices are shown below the scoreboard.
+                    </p>
                 </div>
             )}
 

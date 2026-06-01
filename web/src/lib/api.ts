@@ -320,6 +320,12 @@ export const api = {
         listRegistrations: (id: string) => request<{ data: any[]; count: number }>(`/contests/${id}/registrations`),
         getProblemByIndex: (contestId: string, index: string) =>
             request<{ problem: any; contest: any; can_submit?: boolean; upsolving_disabled?: boolean; statement_hidden?: boolean }>(`/contests/${contestId}/problems/${index}`),
+        addProblem: (contestId: string, d: { problem_id: string; index: string; score?: number }) =>
+            request<any>(`/contests/${contestId}/problems`, { method: 'POST', body: JSON.stringify(d) }),
+        removeProblem: (contestId: string, problemId: string) =>
+            request(`/contests/${contestId}/problems/${problemId}`, { method: 'DELETE' }),
+        update: (id: string, d: any) =>
+            request<any>(`/contests/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
     },
     clarifications: {
         list: (contestId: string) =>

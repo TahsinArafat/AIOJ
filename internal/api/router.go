@@ -114,7 +114,7 @@ func NewRouter(
 		r.With(middleware.OptionalAuthMiddleware(jwtManager)).Get("/{id}", contestH.GetByID)
 		r.With(middleware.OptionalAuthMiddleware(jwtManager)).Get("/{id}/scoreboard", contestH.Scoreboard)
 		r.With(middleware.OptionalAuthMiddleware(jwtManager)).Get("/{contestId}/problems/{index}", contestProblemH.GetByIndex)
-		r.Get("/{id}/pdf", contestH.DownloadPDF)
+		r.With(middleware.OptionalAuthMiddleware(jwtManager)).Get("/{id}/pdf", contestH.DownloadPDF)
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.AuthMiddleware(jwtManager))
 			r.Post("/", contestH.Create)

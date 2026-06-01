@@ -51,6 +51,7 @@ import TrainingPlanCreate from './pages/TrainingPlanCreate'
 import TrainingPlanDetail from './pages/TrainingPlanDetail'
 import ContestPlagiarism from './pages/ContestPlagiarism'
 import ContestProblem from './pages/ContestProblem'
+import ContestEdit from './pages/ContestEdit'
 import './global.css'
 
 function Home() {
@@ -205,6 +206,7 @@ export default function App() {
                         <Route path="/contests/:id/scoreboard" element={<ContestScoreboard />} />
                         <Route path="/contests/:id/plagiarism" element={<ContestPlagiarism />} />
                         <Route path="/contests/:contestId/problem/:index" element={<ContestProblem />} />
+                        <Route path="/setter/contest/:id/edit" element={<ContestEdit />} />
                         <Route path="/gym" element={<GymList />} />
                         <Route path="/gym/:id" element={<GymDetail />} />
                         <Route path="/hack/:contestId/:problemId" element={<HackPanel />} />
