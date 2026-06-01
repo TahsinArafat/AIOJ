@@ -15,6 +15,7 @@ export default function ContestCreate() {
     const nav = useNavigate()
     const [form, setForm] = useState({
         title: '',
+        slug: '',
         type: 'acm',
         format: 'acm',
         penalty_per_wrong: '20',
@@ -29,6 +30,8 @@ export default function ContestCreate() {
         description: '',
         problem_ids: '',
         division: '0',
+        pdf_enabled: true,
+        statement_hidden: false,
     })
     const [error, setError] = useState('')
     const [submitting, setSubmitting] = useState(false)
@@ -38,7 +41,7 @@ export default function ContestCreate() {
         if (!getAccessToken()) nav('/login')
     }, [nav])
 
-    const handleChange = (field: string, value: string) => {
+    const handleChange = (field: string, value: string | boolean) => {
         setForm(p => ({ ...p, [field]: value }))
     }
 
@@ -96,6 +99,7 @@ export default function ContestCreate() {
 
             const contest = await api.contests.create({
                 title: form.title,
+                slug: form.slug || undefined,
                 type: form.type,
                 format: form.format,
                 format_config: formatConfig,
@@ -106,6 +110,8 @@ export default function ContestCreate() {
                 description: form.description || undefined,
                 problem_ids: problemIds.length > 0 ? problemIds : undefined,
                 division: Number(form.division),
+                pdf_enabled: form.pdf_enabled,
+                statement_hidden: form.statement_hidden,
             })
             nav(`/contests/${contest.id}`)
         } catch (err: any) {
@@ -130,6 +136,19 @@ export default function ContestCreate() {
                     <input required value={form.title} onChange={e => handleChange('title', e.target.value)}
                         placeholder="e.g. AIOJ Round 1"
                         className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Custom URL Slug <span className="text-gray-400">(optional)</span>
+                    </label>
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-500">/contests/</span>
+                        <input value={form.slug} onChange={e => handleChange('slug', e.target.value)}
+                            placeholder="e.g. icpc-dhaka-2024"
+                            pattern="[a-z0-9-]+"
+                            className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">Lowercase letters, numbers, and hyphens only. Leave empty for auto-generated ID.</p>
                 </div>
                 <div className="grid grid-cols-3 gap-4">
                     <div>
@@ -240,6 +259,34 @@ export default function ContestCreate() {
                     <textarea rows={4} value={form.description} onChange={e => handleChange('description', e.target.value)}
                         placeholder="Contest description or rules..."
                         className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+
+                <div className="border border-gray-200 rounded-lg p-4 bg-gray-50 space-y-3">
+                    <h3 className="font-semibold text-sm text-gray-700">Onsite Contest Settings</h3>
+                    <div className="flex items-center gap-3">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={form.pdf_enabled}
+                                onChange={e => setForm(p => ({ ...p, pdf_enabled: e.target.checked }))}
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            <span className="text-sm text-gray-700">Enable PDF Generation</span>
+                        </label>
+                        <span className="text-xs text-gray-500">Judges can download problem statements as PDF</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={form.statement_hidden}
+                                onChange={e => setForm(p => ({ ...p, statement_hidden: e.target.checked }))}
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            <span className="text-sm text-gray-700">Hide Problem Statements Online</span>
+                        </label>
+                        <span className="text-xs text-gray-500">For onsite contests with printed copies. Only sample cases shown online.</span>
+                    </div>
                 </div>
 
                 <div className="flex gap-3">
