@@ -35,7 +35,8 @@ export default function ContestCreate() {
     })
     const [error, setError] = useState('')
     const [submitting, setSubmitting] = useState(false)
-    const [showPreview, setShowPreview] = useState(false)
+    const [showAdvanced, setShowAdvanced] = useState(false)
+    const [showScoring, setShowScoring] = useState(false)
 
     useEffect(() => {
         if (!getAccessToken()) nav('/login')
@@ -67,27 +68,15 @@ export default function ContestCreate() {
                 .map(s => s.trim())
                 .filter(Boolean)
 
-            // Construct format config
             let formatConfig: any = {}
             if (form.format === 'acm') {
-                formatConfig = {
-                    penalty_per_wrong: Number(form.penalty_per_wrong),
-                    time_penalty: true,
-                }
+                formatConfig = { penalty_per_wrong: Number(form.penalty_per_wrong), time_penalty: true }
             } else if (form.format === 'oi') {
-                formatConfig = {
-                    max_score_per_problem: Number(form.max_score),
-                }
+                formatConfig = { max_score_per_problem: Number(form.max_score) }
             } else if (form.format === 'ioi') {
-                formatConfig = {
-                    partial_credit: true,
-                    subtask_scoring: true,
-                }
+                formatConfig = { partial_credit: true, subtask_scoring: true }
             } else if (form.format === 'atcoder') {
-                formatConfig = {
-                    penalty_is_time_of_ac: true,
-                    no_wrong_attempt_penalty: true,
-                }
+                formatConfig = { penalty_is_time_of_ac: true, no_wrong_attempt_penalty: true }
             } else if (form.format === 'codeforces') {
                 formatConfig = {
                     initial_scores: [500, 1000, 1500, 2000, 2500],
@@ -121,216 +110,194 @@ export default function ContestCreate() {
         }
     }
 
-    const previewProblems = form.problem_ids
-        .split(',')
-        .map(s => s.trim())
-        .filter(Boolean)
-
     return (
         <div className="max-w-2xl mx-auto">
             <h1 className="text-2xl font-bold mb-6">Create Contest</h1>
             {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded mb-4 text-sm">{error}</div>}
-            <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
-                    <input required value={form.title} onChange={e => handleChange('title', e.target.value)}
-                        placeholder="e.g. AIOJ Round 1"
-                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Custom URL Slug <span className="text-gray-400">(optional)</span>
-                    </label>
-                    <div className="flex items-center gap-2">
-                        <span className="text-sm text-gray-500">/contests/</span>
-                        <input value={form.slug} onChange={e => handleChange('slug', e.target.value)}
-                            placeholder="e.g. icpc-dhaka-2024"
-                            pattern="[a-z0-9-]+"
-                            className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">Lowercase letters, numbers, and hyphens only. Leave empty for auto-generated ID.</p>
-                </div>
-                <div className="grid grid-cols-3 gap-4">
+            
+            <form onSubmit={handleSubmit} className="space-y-5">
+                {/* Essential Fields */}
+                <div className="space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-                        <select value={form.type} onChange={e => handleChange('type', e.target.value)}
-                            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <option value="acm">ACM</option>
-                            <option value="oi">OI</option>
-                            <option value="ioi">IOI</option>
-                            <option value="practice">Practice</option>
-                            <option value="educational">Educational</option>
-                        </select>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Contest Title</label>
+                        <input required value={form.title} onChange={e => handleChange('title', e.target.value)}
+                            placeholder="e.g. AIOJ Round 1"
+                            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                     </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Scoring Format</label>
-                        <select value={form.format} onChange={e => handleChange('format', e.target.value)}
-                            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            {FORMAT_OPTIONS.map(opt => (
-                                <option key={opt.value} value={opt.value}>{opt.label}</option>
-                            ))}
-                        </select>
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Division</label>
-                        <select value={form.division} onChange={e => handleChange('division', e.target.value)}
-                            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            {(Object.entries(DIVISIONS) as [string, { name: string }][]).map(([key, info]) => (
-                                <option key={key} value={key}>{info.name}</option>
-                            ))}
-                        </select>
-                    </div>
-                </div>
 
-                {/* Dynamic scoring settings */}
-                <div className="border border-gray-200 rounded-lg p-4 bg-gray-50 space-y-3">
-                    <h3 className="font-semibold text-sm text-gray-700">Format-Specific Settings</h3>
-                    {form.format === 'acm' && (
+                    <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-xs font-medium text-gray-500 mb-1">Penalty Per Wrong Attempt (minutes)</label>
-                            <input type="number" value={form.penalty_per_wrong} onChange={e => handleChange('penalty_per_wrong', e.target.value)}
-                                className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none" />
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Start Time</label>
+                            <input type="datetime-local" required value={form.start_time} onChange={e => handleChange('start_time', e.target.value)}
+                                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
                         </div>
-                    )}
-                    {form.format === 'oi' && (
                         <div>
-                            <label className="block text-xs font-medium text-gray-500 mb-1">Max Score Per Problem</label>
-                            <input type="number" value={form.max_score} onChange={e => handleChange('max_score', e.target.value)}
-                                className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none" />
+                            <label className="block text-sm font-medium text-gray-700 mb-1">End Time</label>
+                            <input type="datetime-local" required value={form.end_time} onChange={e => handleChange('end_time', e.target.value)}
+                                className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Problem IDs <span className="text-gray-400 font-normal">(comma-separated)</span></label>
+                        <input value={form.problem_ids} onChange={e => handleChange('problem_ids', e.target.value)}
+                            placeholder="e.g. p1, p2, p3"
+                            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    </div>
+                </div>
+
+                {/* Scoring & Format - Collapsible */}
+                <div className="border border-gray-200 rounded-lg">
+                    <button
+                        type="button"
+                        onClick={() => setShowScoring(!showScoring)}
+                        className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-50"
+                    >
+                        <span className="text-sm font-medium text-gray-700">Scoring & Format</span>
+                        <svg className={`w-4 h-4 text-gray-500 transition-transform ${showScoring ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+                    {showScoring && (
+                        <div className="px-4 pb-4 space-y-3 border-t border-gray-200 pt-3">
+                            <div className="grid grid-cols-3 gap-3">
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1">Type</label>
+                                    <select value={form.type} onChange={e => handleChange('type', e.target.value)}
+                                        className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm focus:outline-none">
+                                        <option value="acm">ACM</option>
+                                        <option value="oi">OI</option>
+                                        <option value="ioi">IOI</option>
+                                        <option value="practice">Practice</option>
+                                        <option value="educational">Educational</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1">Scoring</label>
+                                    <select value={form.format} onChange={e => handleChange('format', e.target.value)}
+                                        className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm focus:outline-none">
+                                        {FORMAT_OPTIONS.map(opt => (
+                                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1">Division</label>
+                                    <select value={form.division} onChange={e => handleChange('division', e.target.value)}
+                                        className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm focus:outline-none">
+                                        {(Object.entries(DIVISIONS) as [string, { name: string }][]).map(([key, info]) => (
+                                            <option key={key} value={key}>{info.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
+                            {form.format === 'acm' && (
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1">Penalty Per Wrong (min)</label>
+                                    <input type="number" value={form.penalty_per_wrong} onChange={e => handleChange('penalty_per_wrong', e.target.value)}
+                                        className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm focus:outline-none" />
+                                </div>
+                            )}
+                            {form.format === 'oi' && (
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1">Max Score Per Problem</label>
+                                    <input type="number" value={form.max_score} onChange={e => handleChange('max_score', e.target.value)}
+                                        className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm focus:outline-none" />
+                                </div>
+                            )}
+                            {form.format === 'codeforces' && (
+                                <div className="grid grid-cols-3 gap-2">
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-500 mb-1">Decay</label>
+                                        <input type="number" value={form.decay_factor} onChange={e => handleChange('decay_factor', e.target.value)}
+                                            className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm focus:outline-none" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-500 mb-1">Min Ratio</label>
+                                        <input type="number" step="0.05" value={form.min_ratio} onChange={e => handleChange('min_ratio', e.target.value)}
+                                            className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm focus:outline-none" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-500 mb-1">Penalty</label>
+                                        <input type="number" value={form.cf_penalty} onChange={e => handleChange('cf_penalty', e.target.value)}
+                                            className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm focus:outline-none" />
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
-                    {form.format === 'codeforces' && (
-                        <div className="grid grid-cols-3 gap-3">
+                </div>
+
+                {/* Advanced Settings - Collapsible */}
+                <div className="border border-gray-200 rounded-lg">
+                    <button
+                        type="button"
+                        onClick={() => setShowAdvanced(!showAdvanced)}
+                        className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-50"
+                    >
+                        <span className="text-sm font-medium text-gray-700">Advanced Settings</span>
+                        <svg className={`w-4 h-4 text-gray-500 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+                    {showAdvanced && (
+                        <div className="px-4 pb-4 space-y-3 border-t border-gray-200 pt-3">
                             <div>
-                                <label className="block text-xs font-medium text-gray-500 mb-1">Decay Factor</label>
-                                <input type="number" value={form.decay_factor} onChange={e => handleChange('decay_factor', e.target.value)}
-                                    className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none" />
+                                <label className="block text-xs font-medium text-gray-500 mb-1">Custom URL Slug</label>
+                                <div className="flex items-center gap-1">
+                                    <span className="text-xs text-gray-400">/contests/</span>
+                                    <input value={form.slug} onChange={e => handleChange('slug', e.target.value)}
+                                        placeholder="icpc-dhaka-2024"
+                                        pattern="[a-z0-9-]+"
+                                        className="flex-1 border border-gray-300 rounded-md px-2 py-1.5 text-sm focus:outline-none" />
+                                </div>
                             </div>
-                            <div>
-                                <label className="block text-xs font-medium text-gray-500 mb-1">Min Score Ratio</label>
-                                <input type="number" step="0.05" value={form.min_ratio} onChange={e => handleChange('min_ratio', e.target.value)}
-                                    className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none" />
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1">Freeze Time</label>
+                                    <input type="datetime-local" value={form.freeze_time} onChange={e => handleChange('freeze_time', e.target.value)}
+                                        className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm focus:outline-none" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1">Password</label>
+                                    <input type="text" value={form.password} onChange={e => handleChange('password', e.target.value)}
+                                        placeholder="Empty = public"
+                                        className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm focus:outline-none" />
+                                </div>
                             </div>
+
                             <div>
-                                <label className="block text-xs font-medium text-gray-500 mb-1">Penalty (pts)</label>
-                                <input type="number" value={form.cf_penalty} onChange={e => handleChange('cf_penalty', e.target.value)}
-                                    className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none" />
+                                <label className="block text-xs font-medium text-gray-500 mb-1">Description</label>
+                                <textarea rows={2} value={form.description} onChange={e => handleChange('description', e.target.value)}
+                                    placeholder="Optional contest description..."
+                                    className="w-full border border-gray-300 rounded-md px-2 py-1.5 text-sm focus:outline-none" />
+                            </div>
+
+                            <div className="flex items-center gap-4 pt-1">
+                                <label className="flex items-center gap-1.5 cursor-pointer">
+                                    <input type="checkbox" checked={form.pdf_enabled}
+                                        onChange={e => setForm(p => ({ ...p, pdf_enabled: e.target.checked }))}
+                                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                                    <span className="text-xs text-gray-600">PDF enabled</span>
+                                </label>
+                                <label className="flex items-center gap-1.5 cursor-pointer">
+                                    <input type="checkbox" checked={form.statement_hidden}
+                                        onChange={e => setForm(p => ({ ...p, statement_hidden: e.target.checked }))}
+                                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                                    <span className="text-xs text-gray-600">Hide statements (onsite)</span>
+                                </label>
                             </div>
                         </div>
                     )}
-                    {(form.format === 'ioi' || form.format === 'atcoder') && (
-                        <div className="text-xs text-gray-500">No additional parameters needed for {form.format.toUpperCase()} scoring.</div>
-                    )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Start Time</label>
-                        <input type="datetime-local" required value={form.start_time} onChange={e => handleChange('start_time', e.target.value)}
-                            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">End Time</label>
-                        <input type="datetime-local" required value={form.end_time} onChange={e => handleChange('end_time', e.target.value)}
-                            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                    </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Freeze Time <span className="text-gray-400 font-normal">(optional)</span></label>
-                        <input type="datetime-local" value={form.freeze_time} onChange={e => handleChange('freeze_time', e.target.value)}
-                            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Password <span className="text-gray-400 font-normal">(optional)</span></label>
-                        <input type="text" value={form.password} onChange={e => handleChange('password', e.target.value)}
-                            placeholder="Leave empty for public"
-                            className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                    </div>
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Problem IDs <span className="text-gray-400 font-normal">(comma-separated)</span></label>
-                    <input value={form.problem_ids} onChange={e => handleChange('problem_ids', e.target.value)}
-                        placeholder="e.g. p1, p2, p3"
-                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Description <span className="text-gray-400 font-normal">(optional)</span></label>
-                    <textarea rows={4} value={form.description} onChange={e => handleChange('description', e.target.value)}
-                        placeholder="Contest description or rules..."
-                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-
-                <div className="border border-gray-200 rounded-lg p-4 bg-gray-50 space-y-3">
-                    <h3 className="font-semibold text-sm text-gray-700">Onsite Contest Settings</h3>
-                    <div className="flex items-center gap-3">
-                        <label className="flex items-center gap-2 cursor-pointer">
-                            <input
-                                type="checkbox"
-                                checked={form.pdf_enabled}
-                                onChange={e => setForm(p => ({ ...p, pdf_enabled: e.target.checked }))}
-                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                            />
-                            <span className="text-sm text-gray-700">Enable PDF Generation</span>
-                        </label>
-                        <span className="text-xs text-gray-500">Judges can download problem statements as PDF</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <label className="flex items-center gap-2 cursor-pointer">
-                            <input
-                                type="checkbox"
-                                checked={form.statement_hidden}
-                                onChange={e => setForm(p => ({ ...p, statement_hidden: e.target.checked }))}
-                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                            />
-                            <span className="text-sm text-gray-700">Hide Problem Statements Online</span>
-                        </label>
-                        <span className="text-xs text-gray-500">For onsite contests with printed copies. Only sample cases shown online.</span>
-                    </div>
-                </div>
-
-                <div className="flex gap-3">
-                    <button type="submit" disabled={submitting}
-                        className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 disabled:opacity-50 transition-colors">
-                        {submitting ? 'Creating...' : 'Create Contest'}
-                    </button>
-                    <button type="button" onClick={() => setShowPreview(!showPreview)}
-                        className="border border-gray-300 px-4 py-2 rounded text-sm hover:bg-gray-50 transition-colors">
-                        {showPreview ? 'Hide Preview' : 'Preview'}
-                    </button>
-                </div>
+                <button type="submit" disabled={submitting}
+                    className="w-full bg-blue-600 text-white px-6 py-2.5 rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors font-medium">
+                    {submitting ? 'Creating...' : 'Create Contest'}
+                </button>
             </form>
-
-            {showPreview && (
-                <div className="mt-6 border border-gray-200 rounded-lg p-5 bg-gray-50">
-                    <h2 className="text-lg font-semibold mb-3">Contest Preview</h2>
-                    <div className="space-y-2 text-sm">
-                        <div><span className="text-gray-500">Title:</span> <span className="font-medium">{form.title || '—'}</span></div>
-                        <div><span className="text-gray-500">Type:</span> <span className="uppercase font-medium">{form.type}</span></div>
-                        <div><span className="text-gray-500">Format:</span> <span className="uppercase font-medium">{form.format}</span></div>
-                        <div><span className="text-gray-500">Division:</span> <span className="font-medium">{DIVISIONS[Number(form.division) as keyof typeof DIVISIONS]?.name ?? 'Open'}</span></div>
-                        <div><span className="text-gray-500">Start:</span> <span className="font-medium">{form.start_time ? new Date(form.start_time).toLocaleString() : '—'}</span></div>
-                        <div><span className="text-gray-500">End:</span> <span className="font-medium">{form.end_time ? new Date(form.end_time).toLocaleString() : '—'}</span></div>
-                        {form.freeze_time && <div><span className="text-gray-500">Freeze:</span> <span className="font-medium">{new Date(form.freeze_time).toLocaleString()}</span></div>}
-                        {form.password && <div><span className="text-gray-500">Password:</span> <span className="font-medium text-orange-600">Set</span></div>}
-                        {form.description && <div><span className="text-gray-500">Description:</span> <span>{form.description}</span></div>}
-                        <div>
-                            <span className="text-gray-500">Problems:</span>{' '}
-                            {previewProblems.length > 0
-                                ? previewProblems.map((p, i) => <span key={i} className="inline-block bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded mr-1 font-medium">{p}</span>)
-                                : <span className="text-gray-400">None</span>}
-                        </div>
-                        {form.start_time && form.end_time && (
-                            <div>
-                                <span className="text-gray-500">Duration:</span>{' '}
-                                <span className="font-medium">
-                                    {Math.round((new Date(form.end_time).getTime() - new Date(form.start_time).getTime()) / 60000)} minutes
-                                </span>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
         </div>
     )
 }
