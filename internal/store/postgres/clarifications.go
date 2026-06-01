@@ -58,8 +58,6 @@ func (s *ClarificationStoreImpl) ListByContest(ctx context.Context, contestID st
 	if userID != nil {
 		query += " AND (c.is_public = true OR c.user_id = $2)"
 		args = append(args, *userID)
-	} else {
-		query += " AND c.is_public = true"
 	}
 	query += " ORDER BY c.created_at DESC"
 

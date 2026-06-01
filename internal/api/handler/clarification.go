@@ -29,9 +29,9 @@ func (h *ClarificationHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	contestID := chi.URLParam(r, "contestId")
+	contestSlug := chi.URLParam(r, "contestId")
 
-	contest, err := h.contestStore.GetByID(r.Context(), contestID)
+	contest, err := h.contestStore.GetByID(r.Context(), contestSlug)
 	if err != nil || contest == nil {
 		http.Error(w, "contest not found", http.StatusNotFound)
 		return
@@ -52,7 +52,7 @@ func (h *ClarificationHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	c := &model.Clarification{
-		ContestID: contestID,
+		ContestID: contest.ID,
 		UserID:    claims.UserID,
 		ProblemID: req.ProblemID,
 		Question:  req.Question,
@@ -68,24 +68,26 @@ func (h *ClarificationHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 func (h *ClarificationHandler) List(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetUserClaims(r)
-	contestID := chi.URLParam(r, "contestId")
+	contestSlug := chi.URLParam(r, "contestId")
+
+	contest, err := h.contestStore.GetByID(r.Context(), contestSlug)
+	if err != nil || contest == nil {
+		http.Error(w, "contest not found", http.StatusNotFound)
+		return
+	}
 
 	var userID *string
 	if claims != nil {
-		if claims.Role == "admin" || h.contestStore.HasAccess(r.Context(), contestID, claims.UserID, "manager", "judge") {
-			userID = nil
-		} else {
+		isJudge := claims.Role == "admin" || h.contestStore.HasAccess(r.Context(), contest.ID, claims.UserID, "manager", "judge")
+		if !isJudge {
 			uid := claims.UserID
 			userID = &uid
 		}
-	} else {
-		empty := ""
-		userID = &empty
 	}
 
-	clarifications, err := h.clarificationStore.ListByContest(r.Context(), contestID, userID)
+	clarifications, err := h.clarificationStore.ListByContest(r.Context(), contest.ID, userID)
 	if err != nil {
-		http.Error(w, "failed to list clarifications", http.StatusInternalServerError)
+		http.Error(w, "failed to list clarifications: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -150,9 +152,15 @@ func (h *ContestNoticeHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	contestID := chi.URLParam(r, "contestId")
+	contestSlug := chi.URLParam(r, "contestId")
 
-	if claims.Role != "admin" && !h.contestStore.HasAccess(r.Context(), contestID, claims.UserID, "manager", "judge") {
+	contest, err := h.contestStore.GetByID(r.Context(), contestSlug)
+	if err != nil || contest == nil {
+		http.Error(w, "contest not found", http.StatusNotFound)
+		return
+	}
+
+	if claims.Role != "admin" && !h.contestStore.HasAccess(r.Context(), contest.ID, claims.UserID, "manager", "judge") {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
@@ -171,7 +179,7 @@ func (h *ContestNoticeHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	notice := &model.ContestNotice{
-		ContestID: contestID,
+		ContestID: contest.ID,
 		Content:   req.Content,
 		CreatedBy: claims.UserID,
 	}
@@ -185,9 +193,15 @@ func (h *ContestNoticeHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ContestNoticeHandler) List(w http.ResponseWriter, r *http.Request) {
-	contestID := chi.URLParam(r, "contestId")
+	contestSlug := chi.URLParam(r, "contestId")
 
-	notices, err := h.noticeStore.ListByContest(r.Context(), contestID)
+	contest, err := h.contestStore.GetByID(r.Context(), contestSlug)
+	if err != nil || contest == nil {
+		http.Error(w, "contest not found", http.StatusNotFound)
+		return
+	}
+
+	notices, err := h.noticeStore.ListByContest(r.Context(), contest.ID)
 	if err != nil {
 		http.Error(w, "failed to list notices", http.StatusInternalServerError)
 		return
@@ -205,10 +219,16 @@ func (h *ContestNoticeHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	contestID := chi.URLParam(r, "contestId")
+	contestSlug := chi.URLParam(r, "contestId")
 	noticeID := chi.URLParam(r, "id")
 
-	if claims.Role != "admin" && !h.contestStore.HasAccess(r.Context(), contestID, claims.UserID, "manager") {
+	contest, err := h.contestStore.GetByID(r.Context(), contestSlug)
+	if err != nil || contest == nil {
+		http.Error(w, "contest not found", http.StatusNotFound)
+		return
+	}
+
+	if claims.Role != "admin" && !h.contestStore.HasAccess(r.Context(), contest.ID, claims.UserID, "manager") {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
