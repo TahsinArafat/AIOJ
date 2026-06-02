@@ -126,7 +126,7 @@ function FormatBadge({ format }: { format?: string }) {
 }
 
 function TypeBadge({ type }: { type?: string }) {
-    if (!type || type === 'standard') return null
+    if (!type || type === 'standard' || type === 'acm' || type === 'oi' || type === 'ioi' || type === 'practice') return null
     const cls: Record<string, string> = {
         educational: 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-700',
         open: 'bg-teal-50 text-teal-700 border-teal-200',
@@ -493,7 +493,7 @@ export default function ContestDetail() {
                             {tab.icon === 'clarifications' && <MessageSquare className="w-4 h-4" />}
                             {tab.icon === 'announcements' && <Megaphone className="w-4 h-4" />}
                             {tab.label}
-                            {tab.unread && tab.unread > 0 ? (
+                            {tab.unread !== undefined && tab.unread > 0 ? (
                                 <span className="ml-1 px-1.5 py-0.5 text-xs font-bold bg-red-50 dark:bg-red-900/200 text-white rounded-full min-w-[18px] text-center">{tab.unread}</span>
                             ) : null}
                         </button>
