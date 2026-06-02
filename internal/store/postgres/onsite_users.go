@@ -47,9 +47,9 @@ func (s *OnsiteUserStoreImpl) CreateBatch(ctx context.Context, contestID string,
 		}
 
 		_, err = tx.ExecContext(ctx,
-			`INSERT INTO onsite_batch_users (id, contest_id, team_name, institution, username, password_hash)
-			 VALUES ($1, $2, $3, $4, $5, $6)`,
-			user.ID, user.ContestID, user.TeamName, user.Institution, user.Username, user.PasswordHash,
+			`INSERT INTO onsite_batch_users (id, contest_id, team_name, institution, username, password, password_hash)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+			user.ID, user.ContestID, user.TeamName, user.Institution, user.Username, user.Password, user.PasswordHash,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("insert user: %w", err)
@@ -91,7 +91,7 @@ func (s *OnsiteUserStoreImpl) MarkUsed(ctx context.Context, id string, userID st
 
 func (s *OnsiteUserStoreImpl) ListByContest(ctx context.Context, contestID string) ([]model.OnsiteBatchUser, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, contest_id, team_name, institution, username, is_used, used_by, created_at
+		`SELECT id, contest_id, team_name, institution, username, password, is_used, used_by, created_at
 		 FROM onsite_batch_users WHERE contest_id = $1 ORDER BY created_at`,
 		contestID,
 	)
@@ -103,7 +103,7 @@ func (s *OnsiteUserStoreImpl) ListByContest(ctx context.Context, contestID strin
 	var users []model.OnsiteBatchUser
 	for rows.Next() {
 		var u model.OnsiteBatchUser
-		if err := rows.Scan(&u.ID, &u.ContestID, &u.TeamName, &u.Institution, &u.Username, &u.IsUsed, &u.UsedBy, &u.CreatedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.ContestID, &u.TeamName, &u.Institution, &u.Username, &u.Password, &u.IsUsed, &u.UsedBy, &u.CreatedAt); err != nil {
 			return nil, err
 		}
 		users = append(users, u)

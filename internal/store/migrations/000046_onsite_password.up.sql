@@ -1,0 +1,1 @@
+ALTER TABLE onsite_batch_users ADD COLUMN IF NOT EXISTS password VARCHAR(64) NOT NULL DEFAULT '';
