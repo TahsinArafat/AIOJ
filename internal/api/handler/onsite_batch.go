@@ -150,7 +150,7 @@ func (h *OnsiteBatchHandler) LoginAsTeam(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if !auth.CheckPassword(user.PasswordHash, req.Password) {
+	if !auth.CheckPassword(req.Password, user.PasswordHash) {
 		http.Error(w, "invalid credentials", http.StatusUnauthorized)
 		return
 	}
