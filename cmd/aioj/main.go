@@ -194,7 +194,7 @@ func main() {
 	mediaH := handler.NewMediaHandler("./media")
 	onsiteH := handler.NewOnsiteHandler(balloonStore, printStore, contestStore)
 	onsiteUserStore := postgres.NewOnsiteUserStore(db)
-	onsiteBatchH := handler.NewOnsiteBatchHandler(contestStore, onsiteUserStore, userStore)
+	onsiteBatchH := handler.NewOnsiteBatchHandler(contestStore, onsiteUserStore, userStore, refreshTokenStore, jwtManager)
 
 	clarificationStore := postgres.NewClarificationStore(db)
 	clarificationH := handler.NewClarificationHandler(clarificationStore, contestStore)

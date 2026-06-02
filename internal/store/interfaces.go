@@ -76,6 +76,7 @@ type ContestStore interface {
 	RemovePermission(ctx context.Context, contestID, userID string) error
 	GetPermissions(ctx context.Context, contestID string) ([]model.ContestPermission, error)
 	HasAccess(ctx context.Context, contestID, userID string, requiredLevels ...string) bool
+	CheckGroupRestriction(ctx context.Context, contestID, userID string) (bool, error)
 }
 
 type RatingStore interface {
@@ -325,6 +326,7 @@ type OnsiteUserStore interface {
 	MarkUsed(ctx context.Context, id string, userID string) error
 	ListByContest(ctx context.Context, contestID string) ([]model.OnsiteBatchUser, error)
 	DeleteByContest(ctx context.Context, contestID string) error
+	AutoRegister(ctx context.Context, contestID, userID string) error
 }
 
 type ClarificationStore interface {

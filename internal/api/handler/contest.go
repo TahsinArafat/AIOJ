@@ -125,6 +125,7 @@ func (h *ContestHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Password:     req.Password,
 		Description:  req.Description,
 		Visible:      true,
+		GroupID:      req.GroupID,
 		CreatedBy:    claims.UserID,
 	}
 	if err := h.store.Create(r.Context(), c); err != nil {
@@ -148,10 +149,27 @@ func (h *ContestHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
+
+	claims := middleware.GetUserClaims(r)
+	userID := ""
+	if claims != nil {
+		userID = claims.UserID
+	}
+
+	allowed, err := h.store.CheckGroupRestriction(r.Context(), c.ID, userID)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	isManager := claims != nil && (claims.Role == "admin" || h.store.HasAccess(r.Context(), c.ID, claims.UserID, "manager", "tester", "judge"))
+	if !allowed && !isManager {
+		http.Error(w, "forbidden: restricted to group members", http.StatusForbidden)
+		return
+	}
+
 	now := time.Now()
 	if !c.Visible || now.Before(c.StartTime) {
-		claims := middleware.GetUserClaims(r)
-		if claims == nil || (claims.Role != "admin" && !h.store.HasAccess(r.Context(), c.ID, claims.UserID, "manager", "tester")) {
+		if claims == nil || !isManager {
 			http.Error(w, "forbidden", http.StatusForbidden)
 			return
 		}
@@ -237,6 +255,7 @@ func (h *ContestHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if req.VirtualContestEnabled != nil {
 		c.VirtualContestEnabled = *req.VirtualContestEnabled
 	}
+	c.GroupID = req.GroupID
 	if req.Slug != "" {
 		c.Slug = req.Slug
 	}

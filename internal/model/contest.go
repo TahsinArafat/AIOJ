@@ -33,6 +33,7 @@ type Contest struct {
 	VirtualContestEnabled bool      `json:"virtual_contest_enabled"`
 	PDFEnabled           bool       `json:"pdf_enabled"`
 	StatementHidden      bool       `json:"statement_hidden"`
+	GroupID              string     `json:"group_id,omitempty"`
 	CreatedBy            string     `json:"created_by"`
 	CreatedAt            time.Time  `json:"created_at"`
 }
@@ -95,6 +96,7 @@ type CreateContestRequest struct {
 	StatementHidden *bool  `json:"statement_hidden,omitempty"`
 	UpsolvingEnabled *bool `json:"upsolving_enabled,omitempty"`
 	VirtualContestEnabled *bool `json:"virtual_contest_enabled,omitempty"`
+	GroupID      string          `json:"group_id,omitempty"`
 }
 
 type ContestRegistration struct {

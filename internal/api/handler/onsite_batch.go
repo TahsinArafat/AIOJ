@@ -4,8 +4,10 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
 	"github.com/tahsinarafat/aioj/internal/auth"
 	"github.com/tahsinarafat/aioj/internal/model"
@@ -16,13 +18,17 @@ type OnsiteBatchHandler struct {
 	contestStore store.ContestStore
 	onsiteStore  store.OnsiteUserStore
 	userStore    store.UserStore
+	refreshToks  store.RefreshTokenStore
+	jwtManager   *auth.JWTManager
 }
 
-func NewOnsiteBatchHandler(cs store.ContestStore, os store.OnsiteUserStore, us store.UserStore) *OnsiteBatchHandler {
+func NewOnsiteBatchHandler(cs store.ContestStore, os store.OnsiteUserStore, us store.UserStore, rt store.RefreshTokenStore, jwtManager *auth.JWTManager) *OnsiteBatchHandler {
 	return &OnsiteBatchHandler{
 		contestStore: cs,
 		onsiteStore:  os,
 		userStore:    us,
+		refreshToks:  rt,
+		jwtManager:   jwtManager,
 	}
 }
 
@@ -144,20 +150,52 @@ func (h *OnsiteBatchHandler) LoginAsTeam(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if user.IsUsed {
-		http.Error(w, "credentials already used", http.StatusForbidden)
-		return
-	}
-
 	if !auth.CheckPassword(user.PasswordHash, req.Password) {
 		http.Error(w, "invalid credentials", http.StatusUnauthorized)
 		return
 	}
 
+	var dbUser *model.User
+	if user.IsUsed && user.UsedBy != nil {
+		dbUser, err = h.userStore.GetByID(r.Context(), *user.UsedBy)
+		if err != nil || dbUser == nil {
+			http.Error(w, "failed to retrieve user", http.StatusInternalServerError)
+			return
+		}
+	} else {
+		dbUser = &model.User{
+			ID:           uuid.New().String(),
+			Username:     user.Username,
+			Email:        user.Username + "@onsite.aioj",
+			PasswordHash: user.PasswordHash,
+			Role:         "user",
+			IsBot:        false,
+		}
+		if err := h.userStore.Create(r.Context(), dbUser); err != nil {
+			http.Error(w, "failed to create user", http.StatusInternalServerError)
+			return
+		}
+		if err := h.onsiteStore.MarkUsed(r.Context(), user.ID, dbUser.ID); err != nil {
+			http.Error(w, "failed to update credential state", http.StatusInternalServerError)
+			return
+		}
+		_ = h.onsiteStore.AutoRegister(r.Context(), user.ContestID, dbUser.ID)
+	}
+
+	accessToken, err := h.jwtManager.GenerateAccessToken(dbUser.ID, dbUser.Username, dbUser.Role)
+	if err != nil {
+		http.Error(w, "failed to generate tokens", http.StatusInternalServerError)
+		return
+	}
+	rawRefresh, hashedRefresh := h.jwtManager.GenerateRefreshToken()
+	if err := h.refreshToks.Create(r.Context(), dbUser.ID, hashedRefresh, time.Now().Add(h.jwtManager.RefreshTTL())); err != nil {
+		http.Error(w, "failed to save refresh token", http.StatusInternalServerError)
+		return
+	}
+
 	respondJSON(w, http.StatusOK, map[string]interface{}{
-		"team_name":   user.TeamName,
-		"institution": user.Institution,
-		"contest_id":  user.ContestID,
-		"user_id":     user.ID,
+		"access_token":  accessToken,
+		"refresh_token": rawRefresh,
+		"user":          dbUser,
 	})
 }

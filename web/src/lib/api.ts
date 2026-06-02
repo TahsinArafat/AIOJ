@@ -405,6 +405,12 @@ export const api = {
             request<{ data: any[] }>(`/contests/${contestId}/onsite/prints`),
         updatePrintStatus: (contestId: string, printId: string, status: string) =>
             request(`/contests/${contestId}/onsite/prints/${printId}/status`, { method: 'POST', body: JSON.stringify({ status }) }),
+        loginAsTeam: (contestId: string, d: any) =>
+            request<any>(`/contests/${contestId}/onsite/login`, { method: 'POST', body: JSON.stringify(d) }),
+        generateBatch: (contestId: string, d: any) =>
+            request<any>(`/contests/${contestId}/onsite/generate`, { method: 'POST', body: JSON.stringify(d) }),
+        listBatch: (contestId: string) =>
+            request<any>(`/contests/${contestId}/onsite/users`),
     },
     permissions: {
         list: (contestId: string) =>

@@ -35,6 +35,16 @@ func (h *RegistrationHandler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	allowed, err := h.contestStore.CheckGroupRestriction(r.Context(), contest.ID, claims.UserID)
+	if err != nil {
+		http.Error(w, "failed to verify group restriction", http.StatusInternalServerError)
+		return
+	}
+	if !allowed && claims.Role != "admin" {
+		http.Error(w, "this contest is restricted to group members only", http.StatusForbidden)
+		return
+	}
+
 	if !contest.RegistrationRequired {
 		http.Error(w, "registration not required for this contest", http.StatusBadRequest)
 		return

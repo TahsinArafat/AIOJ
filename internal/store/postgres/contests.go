@@ -56,6 +56,14 @@ func (s *ContestStore) Create(ctx context.Context, c *model.Contest) error {
 	if err != nil {
 		return err
 	}
+	if c.GroupID != "" {
+		_, err = tx.ExecContext(ctx,
+			`INSERT INTO group_contests (group_id, contest_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+			c.GroupID, c.ID)
+		if err != nil {
+			return err
+		}
+	}
 	return tx.Commit()
 }
 
@@ -81,22 +89,27 @@ func (s *ContestStore) getByWhere(ctx context.Context, where string, args ...int
 	var configJSON []byte
 	var formatConfigJSON []byte
 	var slug sql.NullString
+	var groupID sql.NullString
 	err := s.db.QueryRowContext(ctx,
 		`SELECT id,display_id,slug,title,type,format,format_config,start_time,end_time,freeze_time,visible,description,
 		        registration_required,registration_deadline,max_participants,division,educational_config,
-		        upsolving_enabled,virtual_contest_enabled,pdf_enabled,statement_hidden,created_by,created_at
+		        upsolving_enabled,virtual_contest_enabled,pdf_enabled,statement_hidden,created_by,created_at,
+		        (SELECT group_id::text FROM group_contests WHERE contest_id = id LIMIT 1) AS group_id
 		 FROM contests WHERE `+where, args...).Scan(
 		&c.ID, &c.DisplayID, &slug, &c.Title, &c.Type, &c.Format, &formatConfigJSON, &c.StartTime, &c.EndTime, &c.FreezeTime,
 		&c.Visible, &c.Description,
 		&c.RegistrationRequired, &c.RegistrationDeadline, &c.MaxParticipants,
 		&c.Division, &configJSON,
 		&c.UpsolvingEnabled, &c.VirtualContestEnabled, &c.PDFEnabled, &c.StatementHidden,
-		&c.CreatedBy, &c.CreatedAt)
+		&c.CreatedBy, &c.CreatedAt, &groupID)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
+	}
+	if groupID.Valid {
+		c.GroupID = groupID.String
 	}
 	if slug.Valid {
 		c.Slug = slug.String
@@ -193,7 +206,16 @@ func (s *ContestStore) Update(ctx context.Context, c *model.Contest) error {
 	 slug=$14, upsolving_enabled=$15, virtual_contest_enabled=$16
 	 WHERE id=$13`,
 		c.Title, c.Type, c.Format, formatConfigJSON, c.StartTime, c.EndTime, c.FreezeTime, c.Password, c.Description, c.Visible, c.PDFEnabled, c.StatementHidden, c.ID, slug, c.UpsolvingEnabled, c.VirtualContestEnabled)
-	return err
+	if err != nil {
+		return err
+	}
+
+	_, _ = s.db.ExecContext(ctx, `DELETE FROM group_contests WHERE contest_id = $1`, c.ID)
+	if c.GroupID != "" {
+		_, _ = s.db.ExecContext(ctx, `INSERT INTO group_contests (group_id, contest_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, c.GroupID, c.ID)
+	}
+
+	return nil
 }
 
 func (s *ContestStore) Delete(ctx context.Context, id string) error {
@@ -549,4 +571,20 @@ func (s *ContestStore) GetContestStats(ctx context.Context, contestID string) (*
 	}
 
 	return stats, nil
+}
+
+func (s *ContestStore) CheckGroupRestriction(ctx context.Context, contestID, userID string) (bool, error) {
+	var restricted bool
+	err := s.db.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM group_contests WHERE contest_id = $1)`, contestID).Scan(&restricted)
+	if err != nil || !restricted {
+		return true, err
+	}
+	var allowed bool
+	err = s.db.QueryRowContext(ctx,
+		`SELECT EXISTS(
+			SELECT 1 FROM group_members gm
+			JOIN group_contests gc ON gm.group_id = gc.group_id
+			WHERE gc.contest_id = $1 AND gm.user_id = $2
+		)`, contestID, userID).Scan(&allowed)
+	return allowed, err
 }

@@ -6,7 +6,7 @@ import { useTheme } from '../context/ThemeContext'
 import {
     FileText, FileDown, MessageSquare, Users, FileCode, Printer,
     Trophy, BarChart3, Search, CircleDot, Megaphone, Shield, Settings,
-    Loader2, Play, Check, EyeOff
+    Loader2, Play, Check, EyeOff, UserPlus
 } from 'lucide-react'
 
 function indexLabel(i: number): string {
@@ -32,6 +32,7 @@ const TABS = [
     { key: 'balloons', label: 'Balloons', Icon: CircleDot },
     { key: 'announcements', label: 'Announcements', Icon: Megaphone },
     { key: 'moderators', label: 'Moderators', Icon: Shield },
+    { key: 'onsite-teams', label: 'Onsite Teams', Icon: UserPlus },
     { key: 'settings', label: 'Settings', Icon: Settings },
 ] as const
 
@@ -47,7 +48,7 @@ export default function ContestManage() {
         const validTabs: TabKey[] = [
             'challenges', 'booklet', 'clarifications', 'participants', 'submissions',
             'prints', 'standings', 'statistics', 'plagiarisms', 'balloons',
-            'announcements', 'moderators', 'settings'
+            'announcements', 'moderators', 'onsite-teams', 'settings'
         ]
         return validTabs.includes(hash) ? hash : 'challenges'
     })
@@ -118,6 +119,7 @@ export default function ContestManage() {
                     {tab === 'balloons' && <BalloonsTab contestId={id!} />}
                     {tab === 'announcements' && <AnnouncementsTab contestId={id!} />}
                     {tab === 'moderators' && <ModeratorsTab contestId={id!} />}
+                    {tab === 'onsite-teams' && <OnsiteTeamsTab contestId={id!} />}
                     {tab === 'settings' && <SettingsTab contestId={id!} />}
                 </main>
             </div>
@@ -784,6 +786,105 @@ function ModeratorsTab({ contestId }: { contestId: string }) {
 }
 
 // ═══════════════════════════════════════════════
+// ONSITE TEAMS TAB
+// ═══════════════════════════════════════════════
+function OnsiteTeamsTab({ contestId }: { contestId: string }) {
+    const [teams, setTeams] = useState<any[]>([])
+    const [loading, setLoading] = useState(true)
+    const [generating, setGenerating] = useState(false)
+    const [teamInput, setTeamInput] = useState('')
+
+    const load = useCallback(() => {
+        api.onsite.listBatch(contestId).then(d => setTeams(d.data || [])).finally(() => setLoading(false))
+    }, [contestId])
+    useEffect(() => { load() }, [load])
+
+    const generateFromText = async () => {
+        if (!teamInput.trim()) return
+        const lines = teamInput.trim().split('\n').filter(l => l.trim())
+        const teams = lines.map(line => {
+            const parts = line.split(',').map(s => s.trim())
+            return { team_name: parts[0], institution: parts[1] || '' }
+        })
+        if (teams.length === 0) return
+        setGenerating(true)
+        try {
+            await api.onsite.generateBatch(contestId, teams)
+            setTeamInput('')
+            load()
+        } catch (e: any) { alert(e.message) }
+        finally { setGenerating(false) }
+    }
+
+    const copyAllCredentials = () => {
+        const text = teams.map(t => `Team: ${t.team_name}${t.institution ? ' (' + t.institution + ')' : ''}\nUsername: ${t.username}\nPassword: ${t.password}\n`).join('\n---\n')
+        navigator.clipboard.writeText(text).then(() => alert('Credentials copied to clipboard'))
+    }
+
+    if (loading) return <TabLoading />
+
+    return (
+        <TabShell title="Onsite Teams" subtitle={`${teams.length} generated`}>
+            <div className="space-y-4 mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <h3 className="text-sm font-semibold text-blue-800">Generate Team Credentials</h3>
+                <p className="text-xs text-blue-600">Enter one team per line: <code>TeamName, Institution</code></p>
+                <textarea
+                    value={teamInput}
+                    onChange={e => setTeamInput(e.target.value)}
+                    rows={5}
+                    placeholder={"Team Alpha, MIT\nTeam Beta, Stanford\nTeam Gamma"}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono"
+                />
+                <button onClick={generateFromText} disabled={generating || !teamInput.trim()}
+                    className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                    {generating ? 'Generating...' : 'Generate Credentials'}
+                </button>
+            </div>
+
+            {teams.length > 0 && (
+                <>
+                    <div className="flex justify-end mb-3">
+                        <button onClick={copyAllCredentials}
+                            className="px-3 py-1.5 bg-gray-100 text-gray-700 text-xs rounded-lg hover:bg-gray-200">
+                            Copy All to Clipboard
+                        </button>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead><tr className="border-b border-gray-200 dark:border-gray-700 text-left text-xs text-gray-500 uppercase">
+                                <th className="py-2 pr-3">Team Name</th>
+                                <th className="py-2 pr-3">Institution</th>
+                                <th className="py-2 pr-3">Username</th>
+                                <th className="py-2 pr-3">Password</th>
+                                <th className="py-2">Used</th>
+                            </tr></thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {teams.map((t: any) => (
+                                    <tr key={t.id} className="hover:bg-gray-50">
+                                        <td className="py-2 pr-3 font-medium">{t.team_name}</td>
+                                        <td className="py-2 pr-3 text-gray-500">{t.institution || '—'}</td>
+                                        <td className="py-2 pr-3 font-mono text-xs">{t.username}</td>
+                                        <td className="py-2 pr-3 font-mono text-xs">{t.password}</td>
+                                        <td className="py-2">
+                                            {t.is_used ? (
+                                                <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">Used</span>
+                                            ) : (
+                                                <span className="text-xs px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full">New</span>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </>
+            )}
+            {teams.length === 0 && <EmptyState icon={<UserPlus className="w-5 h-5 text-gray-400" />} text="No team credentials generated yet" />}
+        </TabShell>
+    )
+}
+
+// ═══════════════════════════════════════════════
 // SETTINGS TAB (full edit form)
 // ═══════════════════════════════════════════════
 function SettingsTab({ contestId }: { contestId: string }) {
@@ -791,7 +892,10 @@ function SettingsTab({ contestId }: { contestId: string }) {
         title: '', description: '', start_time: '', end_time: '', freeze_time: '',
         password: '', pdf_enabled: true, statement_hidden: false,
         upsolving_enabled: true, virtual_contest_enabled: true,
+        visibility: 'public',
+        group_id: '',
     })
+    const [groups, setGroups] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
     const [error, setError] = useState('')
@@ -799,25 +903,39 @@ function SettingsTab({ contestId }: { contestId: string }) {
     useEffect(() => {
         api.contests.get(contestId).then(d => {
             const c = d.contest
+            let vis = 'public'
+            if (c.group_id) {
+                vis = 'group'
+            } else if (c.password) {
+                vis = 'private'
+            }
             setForm({
                 title: c.title || '',
                 description: c.description || '',
                 start_time: c.start_time ? new Date(c.start_time).toISOString().slice(0, 16) : '',
                 end_time: c.end_time ? new Date(c.end_time).toISOString().slice(0, 16) : '',
                 freeze_time: c.freeze_time ? new Date(c.freeze_time).toISOString().slice(0, 16) : '',
-                password: '',
+                password: c.password || '',
                 pdf_enabled: c.pdf_enabled ?? true,
                 statement_hidden: c.statement_hidden ?? false,
                 upsolving_enabled: c.upsolving_enabled ?? true,
                 virtual_contest_enabled: c.virtual_contest_enabled ?? true,
+                visibility: vis,
+                group_id: c.group_id || '',
             })
         }).finally(() => setLoading(false))
+
+        api.groups.list(0, 100).then(res => {
+            setGroups(res.data || [])
+        }).catch(() => {})
     }, [contestId])
 
     const handleSave = async () => {
         if (!form.title.trim()) { setError('Title is required'); return }
         if (!form.start_time || !form.end_time) { setError('Start and end time required'); return }
         if (new Date(form.end_time) <= new Date(form.start_time)) { setError('End must be after start'); return }
+        if (form.visibility === 'private' && !form.password.trim()) { setError('Password is required for Private contests'); return }
+        if (form.visibility === 'group' && !form.group_id) { setError('Please select a group'); return }
         setError('')
         setSaving(true)
         try {
@@ -827,7 +945,8 @@ function SettingsTab({ contestId }: { contestId: string }) {
                 start_time: new Date(form.start_time).toISOString(),
                 end_time: new Date(form.end_time).toISOString(),
                 freeze_time: form.freeze_time ? new Date(form.freeze_time).toISOString() : undefined,
-                password: form.password || undefined,
+                password: form.visibility === 'private' ? form.password : '',
+                group_id: form.visibility === 'group' ? form.group_id : '',
                 pdf_enabled: form.pdf_enabled,
                 statement_hidden: form.statement_hidden,
                 upsolving_enabled: form.upsolving_enabled,
@@ -880,13 +999,38 @@ function SettingsTab({ contestId }: { contestId: string }) {
                     </div>
                 </div>
 
-                {/* Password */}
+                {/* Visibility Settings */}
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Password <span className="text-gray-400">(empty = public)</span></label>
-                    <input value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))}
-                        placeholder="Leave empty for public contest"
-                        className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Visibility Mode</label>
+                    <select value={form.visibility} onChange={e => setForm(p => ({ ...p, visibility: e.target.value }))}
+                        className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white">
+                        <option value="public">Public (Anyone can join)</option>
+                        <option value="private">Private (Password/Invite required)</option>
+                        <option value="group">Specific Group</option>
+                    </select>
                 </div>
+
+                {form.visibility === 'private' && (
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Contest Password</label>
+                        <input value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))}
+                            placeholder="Enter password for private access..."
+                            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required />
+                    </div>
+                )}
+
+                {form.visibility === 'group' && (
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Select Restricted Group</label>
+                        <select value={form.group_id} onChange={e => setForm(p => ({ ...p, group_id: e.target.value }))}
+                            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white">
+                            <option value="">-- Choose Group --</option>
+                            {groups.map(g => (
+                                <option key={g.id} value={g.id}>{g.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                )}
 
                 {/* Options */}
                 <div>
