@@ -167,6 +167,7 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 		r.Post("/prints/{printId}/status", onsiteH.UpdatePrintStatus)
 		r.Post("/generate", onsiteBatchH.GenerateBatch)
 		r.Get("/users", onsiteBatchH.ListBatch)
+		r.Delete("/users/{userId}", onsiteBatchH.DeleteUser)
 	})
 
 	r.Post("/api/contests/{id}/onsite/login", onsiteBatchH.LoginAsTeam)

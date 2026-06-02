@@ -326,6 +326,7 @@ type OnsiteUserStore interface {
 	MarkUsed(ctx context.Context, id string, userID string) error
 	ListByContest(ctx context.Context, contestID string) ([]model.OnsiteBatchUser, error)
 	DeleteByContest(ctx context.Context, contestID string) error
+	DeleteByID(ctx context.Context, id string) error
 	AutoRegister(ctx context.Context, contestID, userID string) error
 }
 

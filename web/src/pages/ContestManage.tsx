@@ -822,6 +822,14 @@ function OnsiteTeamsTab({ contestId }: { contestId: string }) {
         navigator.clipboard.writeText(text).then(() => alert('Credentials copied to clipboard'))
     }
 
+    const deleteUser = async (userId: string) => {
+        if (!confirm('Delete these credentials?')) return
+        try {
+            await api.onsite.deleteUser(contestId, userId)
+            setTeams(prev => prev.filter(t => t.id !== userId))
+        } catch (e: any) { alert(e.message) }
+    }
+
     if (loading) return <TabLoading />
 
     return (
@@ -858,6 +866,7 @@ function OnsiteTeamsTab({ contestId }: { contestId: string }) {
                                 <th className="py-2 pr-3">Username</th>
                                 <th className="py-2 pr-3">Password</th>
                                 <th className="py-2">Used</th>
+                                <th className="py-2 w-16"></th>
                             </tr></thead>
                             <tbody className="divide-y divide-gray-100">
                                 {teams.map((t: any) => (
@@ -872,6 +881,12 @@ function OnsiteTeamsTab({ contestId }: { contestId: string }) {
                                             ) : (
                                                 <span className="text-xs px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full">New</span>
                                             )}
+                                        </td>
+                                        <td className="py-2">
+                                            <button onClick={() => deleteUser(t.id)}
+                                                className="text-red-400 hover:text-red-600 text-xs font-medium">
+                                                Del
+                                            </button>
                                         </td>
                                     </tr>
                                 ))}

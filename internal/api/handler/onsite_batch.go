@@ -199,3 +199,32 @@ func (h *OnsiteBatchHandler) LoginAsTeam(w http.ResponseWriter, r *http.Request)
 		"user":          dbUser,
 	})
 }
+
+func (h *OnsiteBatchHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r)
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	userID := chi.URLParam(r, "userId")
+
+	contestID := chi.URLParam(r, "id")
+	contest, err := h.contestStore.GetByID(r.Context(), contestID)
+	if err != nil || contest == nil {
+		http.Error(w, "contest not found", http.StatusNotFound)
+		return
+	}
+
+	if claims.Role != "admin" && !h.contestStore.HasAccess(r.Context(), contest.ID, claims.UserID, "manager") {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	if err := h.onsiteStore.DeleteByID(r.Context(), userID); err != nil {
+		http.Error(w, "failed to delete", http.StatusInternalServerError)
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+}

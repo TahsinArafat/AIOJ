@@ -122,6 +122,11 @@ func (s *OnsiteUserStoreImpl) DeleteByContest(ctx context.Context, contestID str
 	return err
 }
 
+func (s *OnsiteUserStoreImpl) DeleteByID(ctx context.Context, id string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM onsite_batch_users WHERE id = $1`, id)
+	return err
+}
+
 func (s *OnsiteUserStoreImpl) AutoRegister(ctx context.Context, contestID, userID string) error {
 	_, err := s.db.ExecContext(ctx,
 		`INSERT INTO contest_registrations (contest_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,

@@ -411,6 +411,8 @@ export const api = {
             request<any>(`/contests/${contestId}/onsite/generate`, { method: 'POST', body: JSON.stringify(d) }),
         listBatch: (contestId: string) =>
             request<any>(`/contests/${contestId}/onsite/users`),
+        deleteUser: (contestId: string, userId: string) =>
+            request(`/contests/${contestId}/onsite/users/${userId}`, { method: 'DELETE' }),
     },
     permissions: {
         list: (contestId: string) =>
