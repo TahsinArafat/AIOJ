@@ -6,56 +6,53 @@ import (
 	"github.com/go-chi/chi/v5"
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/tahsinarafat/aioj/internal/api/handler"
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
 	"github.com/tahsinarafat/aioj/internal/auth"
 )
 
-func NewRouter(
-	authH *handler.AuthHandler,
-	problemH *handler.ProblemHandler,
-	submissionH *handler.SubmissionHandler,
-	contestH *handler.ContestHandler,
-	contestProblemH *handler.ContestProblemHandler,
-	vjudgeH *handler.VJudgeHandler,
-	adminH *handler.AdminHandler,
-	testcaseH *handler.TestcaseHandler,
-	wsManager *handler.WSManager,
-	jwtManager *auth.JWTManager,
-	ratingH *handler.RatingHandler,
-	registrationH *handler.RegistrationHandler,
-	virtualH *handler.VirtualHandler,
-	gymH *handler.GymHandler,
-	hackH *handler.HackHandler,
-	statsH *handler.StatsHandler,
-	notifH *handler.NotificationHandler,
-	groupH *handler.GroupHandler,
-	teamH *handler.TeamHandler,
-	blogH *handler.BlogHandler,
-	editorialH *handler.EditorialHandler,
-	apiKeyH *handler.APIKeyHandler,
-	webhookH *handler.WebhookHandler,
-	recommendationH *handler.RecommendationHandler,
-	rankingsH *handler.RankingsHandler,
-	usersH *handler.UsersHandler,
-	searchH *handler.SearchHandler,
-	langLimitH *handler.LanguageLimitHandler,
-	importH *handler.ImportHandler,
-	orgH *handler.OrganizationHandler,
-	classH *handler.ClassHandler,
-	trainingH *handler.TrainingHandler,
-	plagiarismH *handler.PlagiarismHandler,
-	mediaH *handler.MediaHandler,
-	onsiteH *handler.OnsiteHandler,
-	onsiteBatchH *handler.OnsiteBatchHandler,
-	clarificationH *handler.ClarificationHandler,
-	noticeH *handler.ContestNoticeHandler,
-	botAccountH *handler.AdminBotAccountHandler,
-	settingsH *handler.AdminSystemSettingsHandler,
-	langAdminH *handler.AdminLanguageHandler,
-	remoteLangH *handler.RemoteLanguageHandler,
-	adminSubH *handler.AdminSubmissionHandler,
-) http.Handler {
+func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
+	authH := d.Auth
+	problemH := d.Problem
+	submissionH := d.Submission
+	contestH := d.Contest
+	contestProblemH := d.ContestProblem
+	vjudgeH := d.VJudge
+	adminH := d.Admin
+	testcaseH := d.Testcase
+	wsManager := d.WS
+	ratingH := d.Rating
+	registrationH := d.Registration
+	virtualH := d.Virtual
+	gymH := d.Gym
+	hackH := d.Hack
+	statsH := d.Stats
+	notifH := d.Notification
+	groupH := d.Group
+	teamH := d.Team
+	blogH := d.Blog
+	editorialH := d.Editorial
+	apiKeyH := d.APIKey
+	webhookH := d.Webhook
+	recommendationH := d.Recommendation
+	rankingsH := d.Rankings
+	usersH := d.Users
+	searchH := d.Search
+	langLimitH := d.LangLimit
+	importH := d.Import
+	orgH := d.Org
+	classH := d.Class
+	trainingH := d.Training
+	plagiarismH := d.Plagiarism
+	mediaH := d.Media
+	onsiteH := d.Onsite
+	onsiteBatchH := d.OnsiteBatch
+	clarificationH := d.Clarification
+	noticeH := d.Notice
+	botAccountH := d.BotAccount
+	settingsH := d.Settings
+	langAdminH := d.LangAdmin
+	remoteLangH := d.RemoteLang
+	adminSubH := d.AdminSub
 	r := chi.NewRouter()
 	rl := middleware.NewRateLimiter()
 	r.Use(middleware.RateLimit(rl, "/api/health", "/api/ws", "/metrics"), chiMiddleware.RequestID, chiMiddleware.RealIP, middleware.Logging, chiMiddleware.Recoverer)
@@ -113,6 +110,7 @@ func NewRouter(
 		r.Get("/formats", contestH.ListAvailableFormats)
 		r.With(middleware.OptionalAuthMiddleware(jwtManager)).Get("/{id}", contestH.GetByID)
 		r.With(middleware.OptionalAuthMiddleware(jwtManager)).Get("/{id}/scoreboard", contestH.Scoreboard)
+		r.With(middleware.OptionalAuthMiddleware(jwtManager)).Get("/{id}/stats", contestH.ContestStats)
 		r.With(middleware.OptionalAuthMiddleware(jwtManager)).Get("/{contestId}/problems/{index}", contestProblemH.GetByIndex)
 		r.With(middleware.OptionalAuthMiddleware(jwtManager)).Get("/{id}/pdf", contestH.DownloadPDF)
 		r.Group(func(r chi.Router) {
@@ -126,6 +124,7 @@ func NewRouter(
 			r.Delete("/{id}/permissions/{userId}", contestH.RemovePermission)
 			r.Post("/{id}/problems", contestH.AddProblem)
 			r.Delete("/{id}/problems/{problemId}", contestH.RemoveProblem)
+			r.Get("/{id}/submissions", submissionH.ListByContest)
 		})
 		r.Post("/{id}/calculate-ratings", contestH.CalculateRatings)
 		r.Post("/{id}/register-team", contestH.RegisterTeam)
