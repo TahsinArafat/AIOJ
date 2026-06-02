@@ -802,22 +802,23 @@ function OnsiteTeamsTab({ contestId }: { contestId: string }) {
     const generateFromText = async () => {
         if (!teamInput.trim()) return
         const lines = teamInput.trim().split('\n').filter(l => l.trim())
-        const teams = lines.map(line => {
+        const teamList = lines.map(line => {
             const parts = line.split(',').map(s => s.trim())
             return { team_name: parts[0], institution: parts[1] || '' }
         })
-        if (teams.length === 0) return
+        if (teamList.length === 0) return
         setGenerating(true)
         try {
-            await api.onsite.generateBatch(contestId, teams)
+            const res = await api.onsite.generateBatch(contestId, teamList)
+            const created = res.users || []
+            setTeams(prev => [...created, ...prev])
             setTeamInput('')
-            load()
         } catch (e: any) { alert(e.message) }
         finally { setGenerating(false) }
     }
 
     const copyAllCredentials = () => {
-        const text = teams.map(t => `Team: ${t.team_name}${t.institution ? ' (' + t.institution + ')' : ''}\nUsername: ${t.username}\nPassword: ${t.password}\n`).join('\n---\n')
+        const text = teams.map(t => `Team: ${t.team_name}${t.institution ? ' (' + t.institution + ')' : ''}\nUsername: ${t.username}\nPassword: ${t.password || '—'}\n`).join('\n---\n')
         navigator.clipboard.writeText(text).then(() => alert('Credentials copied to clipboard'))
     }
 
@@ -864,7 +865,7 @@ function OnsiteTeamsTab({ contestId }: { contestId: string }) {
                                         <td className="py-2 pr-3 font-medium">{t.team_name}</td>
                                         <td className="py-2 pr-3 text-gray-500">{t.institution || '—'}</td>
                                         <td className="py-2 pr-3 font-mono text-xs">{t.username}</td>
-                                        <td className="py-2 pr-3 font-mono text-xs">{t.password}</td>
+                                        <td className="py-2 pr-3 font-mono text-xs">{t.password || '—'}</td>
                                         <td className="py-2">
                                             {t.is_used ? (
                                                 <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">Used</span>

@@ -39,7 +39,7 @@ func (h *OnsiteBatchHandler) GenerateBatch(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	contestID := chi.URLParam(r, "contestId")
+	contestID := chi.URLParam(r, "id")
 
 	contest, err := h.contestStore.GetByID(r.Context(), contestID)
 	if err != nil || contest == nil {
@@ -47,7 +47,7 @@ func (h *OnsiteBatchHandler) GenerateBatch(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	if claims.Role != "admin" && !h.contestStore.HasAccess(r.Context(), contestID, claims.UserID, "manager") {
+	if claims.Role != "admin" && !h.contestStore.HasAccess(r.Context(), contest.ID, claims.UserID, "manager") {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
@@ -90,7 +90,7 @@ func (h *OnsiteBatchHandler) GenerateBatch(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	created, err := h.onsiteStore.CreateBatch(r.Context(), contestID, teams)
+	created, err := h.onsiteStore.CreateBatch(r.Context(), contest.ID, teams)
 	if err != nil {
 		http.Error(w, "failed to generate users", http.StatusInternalServerError)
 		return
@@ -109,7 +109,7 @@ func (h *OnsiteBatchHandler) ListBatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	contestID := chi.URLParam(r, "contestId")
+	contestID := chi.URLParam(r, "id")
 
 	contest, err := h.contestStore.GetByID(r.Context(), contestID)
 	if err != nil || contest == nil {
@@ -117,12 +117,12 @@ func (h *OnsiteBatchHandler) ListBatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if claims.Role != "admin" && !h.contestStore.HasAccess(r.Context(), contestID, claims.UserID, "manager") {
+	if claims.Role != "admin" && !h.contestStore.HasAccess(r.Context(), contest.ID, claims.UserID, "manager") {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
 
-	users, err := h.onsiteStore.ListByContest(r.Context(), contestID)
+	users, err := h.onsiteStore.ListByContest(r.Context(), contest.ID)
 	if err != nil {
 		http.Error(w, "failed to list users", http.StatusInternalServerError)
 		return
