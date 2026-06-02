@@ -231,6 +231,12 @@ func (h *ContestHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if req.StatementHidden != nil {
 		c.StatementHidden = *req.StatementHidden
 	}
+	if req.UpsolvingEnabled != nil {
+		c.UpsolvingEnabled = *req.UpsolvingEnabled
+	}
+	if req.VirtualContestEnabled != nil {
+		c.VirtualContestEnabled = *req.VirtualContestEnabled
+	}
 	if req.Slug != "" {
 		c.Slug = req.Slug
 	}

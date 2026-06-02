@@ -190,9 +190,9 @@ func (s *ContestStore) Update(ctx context.Context, c *model.Contest) error {
 	_, err := s.db.ExecContext(ctx,
 		`UPDATE contests SET title=$1, type=$2, format=$3, format_config=$4, start_time=$5, end_time=$6,
 	 freeze_time=$7, password=$8, description=$9, visible=$10, pdf_enabled=$11, statement_hidden=$12,
-	 slug=$14
+	 slug=$14, upsolving_enabled=$15, virtual_contest_enabled=$16
 	 WHERE id=$13`,
-		c.Title, c.Type, c.Format, formatConfigJSON, c.StartTime, c.EndTime, c.FreezeTime, c.Password, c.Description, c.Visible, c.PDFEnabled, c.StatementHidden, c.ID, slug)
+		c.Title, c.Type, c.Format, formatConfigJSON, c.StartTime, c.EndTime, c.FreezeTime, c.Password, c.Description, c.Visible, c.PDFEnabled, c.StatementHidden, c.ID, slug, c.UpsolvingEnabled, c.VirtualContestEnabled)
 	return err
 }
 

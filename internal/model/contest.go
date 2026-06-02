@@ -93,6 +93,8 @@ type CreateContestRequest struct {
 	ProblemIDs  []string   `json:"problem_ids"`
 	PDFEnabled  *bool      `json:"pdf_enabled,omitempty"`
 	StatementHidden *bool  `json:"statement_hidden,omitempty"`
+	UpsolvingEnabled *bool `json:"upsolving_enabled,omitempty"`
+	VirtualContestEnabled *bool `json:"virtual_contest_enabled,omitempty"`
 }
 
 type ContestRegistration struct {

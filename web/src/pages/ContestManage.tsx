@@ -500,6 +500,9 @@ function StatisticsTab({ contestId }: { contestId: string }) {
     if (error) return <TabShell title="Statistics"><div className="text-red-500 text-sm p-4">{error}</div></TabShell>
     if (!stats) return null
 
+    const languagesArray = stats.languages ? Object.entries(stats.languages).map(([language, count]) => ({ language, count: count as number })) : []
+    const verdictsArray = stats.verdicts ? Object.entries(stats.verdicts).map(([status, count]) => ({ status, count: count as number })) : []
+
     return (
         <TabShell title="Statistics">
             {/* Summary Cards */}
@@ -531,11 +534,11 @@ function StatisticsTab({ contestId }: { contestId: string }) {
             )}
 
             {/* Language distribution */}
-            {stats.languages && stats.languages.length > 0 && (
+            {languagesArray.length > 0 && (
                 <div className="mb-6">
                     <h3 className="text-sm font-semibold text-gray-700 mb-3">Languages</h3>
                     <div className="flex gap-2 flex-wrap">
-                        {stats.languages.map((l: any) => (
+                        {languagesArray.map((l: any) => (
                             <span key={l.language} className="text-xs bg-gray-100 px-3 py-1.5 rounded-full">
                                 {l.language}: <strong>{l.count}</strong>
                             </span>
@@ -545,11 +548,11 @@ function StatisticsTab({ contestId }: { contestId: string }) {
             )}
 
             {/* Verdict distribution */}
-            {stats.verdicts && stats.verdicts.length > 0 && (
+            {verdictsArray.length > 0 && (
                 <div>
                     <h3 className="text-sm font-semibold text-gray-700 mb-3">Verdicts</h3>
                     <div className="flex gap-2 flex-wrap">
-                        {stats.verdicts.map((v: any) => {
+                        {verdictsArray.map((v: any) => {
                             const color = v.status === 'ACCEPTED' ? 'bg-green-100 text-green-800' :
                                 v.status?.includes('PENDING') ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
                             return <span key={v.status} className={`text-xs px-3 py-1.5 rounded-full ${color}`}>{v.status}: <strong>{v.count}</strong></span>
