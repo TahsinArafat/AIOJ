@@ -452,7 +452,7 @@ export default function ContestDetail() {
                     <StatusBadge status={status} />
                     {contest.format && <FormatBadge format={contest.format} />}
                     {contest.type && <TypeBadge type={contest.type} />}
-                    {contest.division && <DivisionBadge division={contest.division} />}
+                    {contest.division !== undefined && <DivisionBadge division={contest.division} />}
                 </div>
             </div>
 
