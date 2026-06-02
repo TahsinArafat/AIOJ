@@ -168,7 +168,7 @@ func (h *OnsiteBatchHandler) LoginAsTeam(w http.ResponseWriter, r *http.Request)
 			Username:     user.Username,
 			Email:        user.Username + "@onsite.aioj",
 			PasswordHash: user.PasswordHash,
-			Role:         "user",
+			Role:         "contestant",
 			IsBot:        false,
 		}
 		if err := h.userStore.Create(r.Context(), dbUser); err != nil {
