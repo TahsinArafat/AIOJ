@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Link } from 'react-router-dom'
 import { api } from './lib/api'
+import { ThemeProvider } from './context/ThemeContext'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import ForgotPassword from './pages/ForgotPassword'
@@ -52,6 +53,7 @@ import TrainingPlanDetail from './pages/TrainingPlanDetail'
 import ContestPlagiarism from './pages/ContestPlagiarism'
 import ContestProblem from './pages/ContestProblem'
 import ContestEdit from './pages/ContestEdit'
+import ContestManage from './pages/ContestManage'
 import './global.css'
 
 function Home() {
@@ -76,9 +78,9 @@ function Home() {
         const now = Date.now()
         const start = new Date(c.start_time).getTime()
         const end = new Date(c.end_time).getTime()
-        if (now < start) return { text: 'Upcoming', cls: 'text-blue-600 bg-blue-50' }
-        if (now < end) return { text: 'Running', cls: 'text-green-600 bg-green-50' }
-        return { text: 'Ended', cls: 'text-gray-500 bg-gray-100' }
+        if (now < start) return { text: 'Upcoming', cls: 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20' }
+        if (now < end) return { text: 'Running', cls: 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20' }
+        return { text: 'Ended', cls: 'text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700' }
     }
 
     return (
@@ -88,8 +90,8 @@ function Home() {
                 <h1 className="text-3xl font-bold mb-2">Welcome to AIOJ</h1>
                 <p className="text-blue-100 mb-6 max-w-lg">A lightweight online judge for competitive programming. Practice problems, join contests, and improve your skills.</p>
                 <div className="flex gap-3">
-                    <Link to="/problems" className="bg-white text-blue-700 px-5 py-2 rounded font-medium hover:bg-blue-50 transition-colors">Browse Problems</Link>
-                    <Link to="/contests" className="border border-white/40 px-5 py-2 rounded font-medium hover:bg-white/10 transition-colors">View Contests</Link>
+                    <Link to="/problems" className="bg-white dark:bg-gray-800 text-blue-700 dark:text-blue-300 px-5 py-2 rounded font-medium hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">Browse Problems</Link>
+                    <Link to="/contests" className="border border-white/40 px-5 py-2 rounded font-medium hover:bg-white dark:hover:bg-gray-700/10 transition-colors">View Contests</Link>
                 </div>
             </section>
 
@@ -100,9 +102,9 @@ function Home() {
                     { label: 'Users', value: stats.users },
                     { label: 'Submissions', value: stats.submissions },
                 ].map(s => (
-                    <div key={s.label} className="border border-gray-200 rounded-lg p-5 text-center bg-white">
-                        <div className="text-2xl font-bold text-gray-900">{s.value.toLocaleString()}</div>
-                        <div className="text-sm text-gray-500 mt-1">{s.label}</div>
+                    <div key={s.label} className="border border-gray-200 dark:border-gray-700 rounded-lg p-5 text-center bg-white dark:bg-gray-800">
+                        <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">{s.value.toLocaleString()}</div>
+                        <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">{s.label}</div>
                     </div>
                 ))}
             </section>
@@ -111,24 +113,24 @@ function Home() {
             <section>
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-xl font-bold">Recent Contests</h2>
-                    <Link to="/contests" className="text-sm text-blue-600 hover:underline">View all</Link>
+                    <Link to="/contests" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">View all</Link>
                 </div>
                 {loading ? (
-                    <div className="text-center py-8 text-gray-400">Loading...</div>
+                    <div className="text-center py-8 text-gray-400 dark:text-gray-500">Loading...</div>
                 ) : contests.length === 0 ? (
-                    <div className="text-center py-8 text-gray-400">No contests yet.</div>
+                    <div className="text-center py-8 text-gray-400 dark:text-gray-500">No contests yet.</div>
                 ) : (
                     <div className="space-y-2">
                         {contests.map(c => {
                             const status = contestStatus(c)
                             return (
                                 <Link key={c.id} to={`/contests/${c.id}`}
-                                    className="block border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors bg-white">
+                                    className="block border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors bg-white dark:bg-gray-800">
                                     <div className="flex items-center justify-between">
                                         <span className="font-medium">{c.title}</span>
                                         <span className={`text-xs px-2 py-0.5 rounded font-medium ${status.cls}`}>{status.text}</span>
                                     </div>
-                                    <div className="text-xs text-gray-400 mt-1">
+                                    <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                                         {new Date(c.start_time).toLocaleDateString()} — {new Date(c.end_time).toLocaleDateString()}
                                     </div>
                                 </Link>
@@ -142,20 +144,20 @@ function Home() {
             <section>
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-xl font-bold">Latest Posts</h2>
-                    <Link to="/blog" className="text-sm text-blue-600 hover:underline">View all</Link>
+                    <Link to="/blog" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">View all</Link>
                 </div>
                 {loading ? (
-                    <div className="text-center py-8 text-gray-400">Loading...</div>
+                    <div className="text-center py-8 text-gray-400 dark:text-gray-500">Loading...</div>
                 ) : posts.length === 0 ? (
-                    <div className="text-center py-8 text-gray-400">No posts yet.</div>
+                    <div className="text-center py-8 text-gray-400 dark:text-gray-500">No posts yet.</div>
                 ) : (
                     <div className="space-y-2">
                         {posts.map(p => (
                             <Link key={p.id} to={`/blog/${p.id}`}
-                                className="block border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors bg-white">
+                                className="block border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors bg-white dark:bg-gray-800">
                                 <h3 className="font-medium">{p.title}</h3>
-                                <div className="text-xs text-gray-400 mt-1 flex gap-3">
-                                    <span className="text-gray-600">{p.username}</span>
+                                <div className="text-xs text-gray-400 dark:text-gray-500 mt-1 flex gap-3">
+                                    <span className="text-gray-600 dark:text-gray-400">{p.username}</span>
                                     <span>{p.upvotes} votes</span>
                                     <span>{new Date(p.created_at).toLocaleDateString()}</span>
                                 </div>
@@ -177,7 +179,7 @@ function Home() {
                         { to: '/rankings', label: 'Rankings' },
                     ].map(link => (
                         <Link key={link.to} to={link.to}
-                            className="border border-gray-200 rounded-lg p-4 text-center text-sm font-medium hover:bg-gray-50 transition-colors bg-white">
+                            className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 text-center text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors bg-white dark:bg-gray-800">
                             {link.label}
                         </Link>
                     ))}
@@ -190,10 +192,11 @@ function Home() {
 export default function App() {
     return (
         <BrowserRouter>
-            <div className="min-h-screen bg-white">
-                <Navbar />
-                <main className="max-w-[1400px] mx-auto px-6 py-6">
-                    <Routes>
+            <ThemeProvider>
+                <div className="min-h-screen bg-white dark:bg-gray-800">
+                    <Navbar />
+                    <main className="max-w-[1400px] mx-auto px-6 py-6">
+                        <Routes>
                         <Route path="/" element={<Home />} />
                         <Route path="/problems" element={<ProblemList />} />
                         <Route path="/problems/:slug" element={<ProblemDetail />} />
@@ -207,6 +210,7 @@ export default function App() {
                         <Route path="/contests/:id/plagiarism" element={<ContestPlagiarism />} />
                         <Route path="/contests/:contestId/problem/:index" element={<ContestProblem />} />
                         <Route path="/setter/contest/:id/edit" element={<ContestEdit />} />
+                        <Route path="/setter/contest/:id/manage" element={<ContestManage />} />
                         <Route path="/gym" element={<GymList />} />
                         <Route path="/gym/:id" element={<GymDetail />} />
                         <Route path="/hack/:contestId/:problemId" element={<HackPanel />} />
@@ -245,10 +249,11 @@ export default function App() {
                         <Route path="/rating-history" element={<RatingHistory />} />
                         <Route path="/rankings" element={<Rankings />} />
                         <Route path="/user/:username" element={<UserPublicProfile />} />
-                        <Route path="*" element={<div className="text-center py-20 text-gray-400">404 Not Found</div>} />
+                        <Route path="*" element={<div className="text-center py-20 text-gray-400 dark:text-gray-500">404 Not Found</div>} />
                     </Routes>
                 </main>
             </div>
+            </ThemeProvider>
         </BrowserRouter>
     )
 }
