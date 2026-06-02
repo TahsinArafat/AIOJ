@@ -210,3 +210,30 @@ func TestDivisionNames(t *testing.T) {
 		})
 	}
 }
+
+func TestRoleConstants(t *testing.T) {
+	// These must match the DB CHECK constraint in 000001_init.up.sql
+	roles := []string{RoleAdmin, RoleTeacher, RoleUser, RoleBot}
+	for _, r := range roles {
+		if r == "" {
+			t.Errorf("role constant is empty string")
+		}
+	}
+	if RoleAdmin != "admin" {
+		t.Errorf("RoleAdmin = %q, want %q", RoleAdmin, "admin")
+	}
+}
+
+func TestAccessLevelConstants(t *testing.T) {
+	levels := []string{AccessLevelOwner, AccessLevelCoAuthor, AccessLevelManager, AccessLevelJudge, AccessLevelTester}
+	seen := map[string]bool{}
+	for _, l := range levels {
+		if l == "" {
+			t.Errorf("access level constant is empty string")
+		}
+		if seen[l] {
+			t.Errorf("duplicate access level constant: %q", l)
+		}
+		seen[l] = true
+	}
+}

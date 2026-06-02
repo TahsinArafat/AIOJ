@@ -7,6 +7,7 @@ import (
 
 type Contest struct {
 	ID                   string     `json:"id"`
+	DisplayID            int        `json:"display_id"`
 	Slug                 string     `json:"slug,omitempty"`
 	Title                string     `json:"title"`
 	Type                 string     `json:"type"`
@@ -46,6 +47,7 @@ type ContestProblem struct {
 	ContestID string `json:"contest_id"`
 	ProblemID string `json:"problem_id"`
 	Index     string `json:"index"`
+	Title     string `json:"title,omitempty"`
 	Score     int    `json:"score"`
 	SortOrder int    `json:"sort_order"`
 }
@@ -106,14 +108,6 @@ type TeamRegistration struct {
 	TeamName     string    `json:"team_name,omitempty"`
 	RegisteredAt time.Time `json:"registered_at"`
 }
-
-const (
-	ContestTypeACM         = "acm"
-	ContestTypeOI          = "oi"
-	ContestTypeIOI         = "ioi"
-	ContestTypePractice    = "practice"
-	ContestTypeEducational = "educational"
-)
 
 const (
 	DivisionNone = 0
