@@ -60,28 +60,16 @@ func normalizeOutput(s string) string {
 	return s
 }
 
-func (h *SubmissionHandler) Create(w http.ResponseWriter, r *http.Request) {
-	claims := middleware.GetUserClaims(r)
-	if claims == nil {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
-		return
-	}
+type submissionBuildRequest struct {
+	ProblemID  string
+	Language   string
+	SourceCode string
+	ContestID  string
+	UserID     string
+	Upsolving  bool
+}
 
-	var req struct {
-		ProblemID  string `json:"problem_id"`
-		Language   string `json:"language"`
-		SourceCode string `json:"source_code"`
-		ContestID  string `json:"contest_id,omitempty"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid body", http.StatusBadRequest)
-		return
-	}
-	if req.ProblemID == "" || req.Language == "" || req.SourceCode == "" {
-		http.Error(w, "problem_id, language, and source_code are required", http.StatusBadRequest)
-		return
-	}
-
+func (h *SubmissionHandler) buildAndEnqueue(r *http.Request, w http.ResponseWriter, req submissionBuildRequest) {
 	prob, err := h.probStore.GetByID(r.Context(), req.ProblemID)
 	if err != nil || prob == nil {
 		http.Error(w, "problem not found", http.StatusNotFound)
@@ -91,7 +79,7 @@ func (h *SubmissionHandler) Create(w http.ResponseWriter, r *http.Request) {
 	sub := &model.Submission{
 		ID:         uuid.New().String(),
 		ProblemID:  req.ProblemID,
-		UserID:     claims.UserID,
+		UserID:     req.UserID,
 		Language:   req.Language,
 		SourceCode: req.SourceCode,
 		CodeSize:   len(req.SourceCode),
@@ -126,6 +114,37 @@ func (h *SubmissionHandler) Create(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusCreated, sub)
 }
 
+func (h *SubmissionHandler) Create(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r)
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	var req struct {
+		ProblemID  string `json:"problem_id"`
+		Language   string `json:"language"`
+		SourceCode string `json:"source_code"`
+		ContestID  string `json:"contest_id,omitempty"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	if req.ProblemID == "" || req.Language == "" || req.SourceCode == "" {
+		http.Error(w, "problem_id, language, and source_code are required", http.StatusBadRequest)
+		return
+	}
+
+	h.buildAndEnqueue(r, w, submissionBuildRequest{
+		ProblemID:  req.ProblemID,
+		Language:   req.Language,
+		SourceCode: req.SourceCode,
+		ContestID:  req.ContestID,
+		UserID:     claims.UserID,
+	})
+}
+
 func (h *SubmissionHandler) CreateUpsolving(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetUserClaims(r)
 	if claims == nil {
@@ -148,46 +167,14 @@ func (h *SubmissionHandler) CreateUpsolving(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	prob, err := h.probStore.GetByID(r.Context(), req.ProblemID)
-	if err != nil || prob == nil {
-		http.Error(w, "problem not found", http.StatusNotFound)
-		return
-	}
-
-	sub := &model.Submission{
-		ID:         uuid.New().String(),
+	h.buildAndEnqueue(r, w, submissionBuildRequest{
 		ProblemID:  req.ProblemID,
-		UserID:     claims.UserID,
 		Language:   req.Language,
 		SourceCode: req.SourceCode,
-		CodeSize:   len(req.SourceCode),
-		Status:     model.StatusPending,
 		ContestID:  req.ContestID,
-	}
-
-	if err := h.subStore.Create(r.Context(), sub); err != nil {
-		http.Error(w, "create failed", http.StatusInternalServerError)
-		return
-	}
-
-	if prob.Source != "" && prob.Source != "local" && h.vjudgeSvc != nil {
-		vjReq := vjudge.SubmitRequest{
-			ID:              sub.ID,
-			ProblemRemoteID: prob.RemoteID,
-			SourceCode:      req.SourceCode,
-			Language:        req.Language,
-			RemoteOJ:        prob.Source,
-		}
-		if err := h.vjudgeSvc.Submit(r.Context(), vjReq); err != nil {
-			slog.Error("vjudge submit failed", "sub", sub.ID, "err", err)
-			sub.Status = model.StatusSE
-			respondJSON(w, http.StatusCreated, sub)
-			return
-		}
-	} else {
-		h.queue.Enqueue(r.Context(), sub.ID)
-	}
-	respondJSON(w, http.StatusCreated, sub)
+		UserID:     claims.UserID,
+		Upsolving:  true,
+	})
 }
 
 func (h *SubmissionHandler) GetByID(w http.ResponseWriter, r *http.Request) {
@@ -252,6 +239,55 @@ func (h *SubmissionHandler) ListByProblem(w http.ResponseWriter, r *http.Request
 		return
 	}
 	respondJSON(w, http.StatusOK, map[string]interface{}{"data": items, "total": total})
+}
+
+func (h *SubmissionHandler) ListByContest(w http.ResponseWriter, r *http.Request) {
+	contestID := chi.URLParam(r, "contestId")
+	if contestID == "" {
+		contestID = chi.URLParam(r, "id")
+	}
+	claims := middleware.GetUserClaims(r)
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
+	// Resolve contest (display_id -> UUID) and check permissions
+	contest, _ := h.contestStore.GetByID(r.Context(), contestID)
+	if contest == nil {
+		http.Error(w, "contest not found", http.StatusNotFound)
+		return
+	}
+	isAdmin := claims.Role == "admin"
+	isJudge := isAdmin || h.contestStore.HasAccess(r.Context(), contest.ID, claims.UserID, "manager", "judge")
+
+	// Build filter
+	filter := model.SubmissionFilter{
+		ProblemID: r.URL.Query().Get("problem_id"),
+		Language:  r.URL.Query().Get("language"),
+		Status:    r.URL.Query().Get("status"),
+	}
+
+	// mine=true (or default) means only current user's submissions
+	// mine=false means all submissions in the contest (for everyone)
+	mine := r.URL.Query().Get("mine")
+	if mine == "false" {
+		// Show all — no user filter
+	} else {
+		// Default: show only user's own
+		filter.UserID = claims.UserID
+	}
+
+	subs, total, err := h.subStore.ListByContest(r.Context(), contest.ID, offset, limit, filter)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	respondJSON(w, http.StatusOK, map[string]interface{}{"data": subs, "total": total, "is_judge": isJudge})
 }
 
 func (h *SubmissionHandler) CustomRun(w http.ResponseWriter, r *http.Request) {
