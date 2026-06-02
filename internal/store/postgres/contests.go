@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -62,16 +63,30 @@ func (s *ContestStore) GetByID(ctx context.Context, id string) (*model.Contest, 
 	if _, err := uuid.Parse(id); err != nil {
 		return s.GetBySlug(ctx, id)
 	}
+	return s.getByWhere(ctx, "id=$1", id)
+}
+
+func (s *ContestStore) GetBySlug(ctx context.Context, slug string) (*model.Contest, error) {
+	// Try numeric display_id first
+	if num, err := strconv.Atoi(slug); err == nil {
+		if c, err := s.getByWhere(ctx, "display_id=$1", num); err == nil && c != nil {
+			return c, nil
+		}
+	}
+	return s.getByWhere(ctx, "slug=$1", slug)
+}
+
+func (s *ContestStore) getByWhere(ctx context.Context, where string, args ...interface{}) (*model.Contest, error) {
 	var c model.Contest
 	var configJSON []byte
 	var formatConfigJSON []byte
 	var slug sql.NullString
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id,slug,title,type,format,format_config,start_time,end_time,freeze_time,visible,description,
+		`SELECT id,display_id,slug,title,type,format,format_config,start_time,end_time,freeze_time,visible,description,
 		        registration_required,registration_deadline,max_participants,division,educational_config,
 		        upsolving_enabled,virtual_contest_enabled,pdf_enabled,statement_hidden,created_by,created_at
-		 FROM contests WHERE id=$1`, id).Scan(
-		&c.ID, &slug, &c.Title, &c.Type, &c.Format, &formatConfigJSON, &c.StartTime, &c.EndTime, &c.FreezeTime,
+		 FROM contests WHERE `+where, args...).Scan(
+		&c.ID, &c.DisplayID, &slug, &c.Title, &c.Type, &c.Format, &formatConfigJSON, &c.StartTime, &c.EndTime, &c.FreezeTime,
 		&c.Visible, &c.Description,
 		&c.RegistrationRequired, &c.RegistrationDeadline, &c.MaxParticipants,
 		&c.Division, &configJSON,
@@ -85,43 +100,6 @@ func (s *ContestStore) GetByID(ctx context.Context, id string) (*model.Contest, 
 	}
 	if slug.Valid {
 		c.Slug = slug.String
-	}
-	if len(configJSON) > 0 {
-		var config model.EducationalRoundConfig
-		if err := json.Unmarshal(configJSON, &config); err == nil {
-			c.EducationalConfig = &config
-		}
-	}
-	if len(formatConfigJSON) > 0 {
-		c.FormatConfig = formatConfigJSON
-	}
-	return &c, nil
-}
-
-func (s *ContestStore) GetBySlug(ctx context.Context, slug string) (*model.Contest, error) {
-	var c model.Contest
-	var configJSON []byte
-	var formatConfigJSON []byte
-	var slugDB sql.NullString
-	err := s.db.QueryRowContext(ctx,
-		`SELECT id,slug,title,type,format,format_config,start_time,end_time,freeze_time,visible,description,
-		        registration_required,registration_deadline,max_participants,division,educational_config,
-		        upsolving_enabled,virtual_contest_enabled,pdf_enabled,statement_hidden,created_by,created_at
-		 FROM contests WHERE slug=$1`, slug).Scan(
-		&c.ID, &slugDB, &c.Title, &c.Type, &c.Format, &formatConfigJSON, &c.StartTime, &c.EndTime, &c.FreezeTime,
-		&c.Visible, &c.Description,
-		&c.RegistrationRequired, &c.RegistrationDeadline, &c.MaxParticipants,
-		&c.Division, &configJSON,
-		&c.UpsolvingEnabled, &c.VirtualContestEnabled, &c.PDFEnabled, &c.StatementHidden,
-		&c.CreatedBy, &c.CreatedAt)
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	if slugDB.Valid {
-		c.Slug = slugDB.String
 	}
 	if len(configJSON) > 0 {
 		var config model.EducationalRoundConfig
@@ -152,7 +130,7 @@ func (s *ContestStore) ListWithDivision(ctx context.Context, offset, limit int, 
 	}
 	s.db.QueryRowContext(ctx, countQuery, args...).Scan(&total)
 
-	rowsQuery := `SELECT id,title,type,format,format_config,start_time,end_time,visible,description,
+	rowsQuery := `SELECT id,display_id,slug,title,type,format,format_config,start_time,end_time,visible,description,
 	              registration_required,registration_deadline,max_participants,division,educational_config,
 	              created_at
 	              FROM contests WHERE visible=true`
@@ -173,8 +151,12 @@ func (s *ContestStore) ListWithDivision(ctx context.Context, offset, limit int, 
 		var c model.Contest
 		var configJSON []byte
 		var formatConfigJSON []byte
-		rows.Scan(&c.ID, &c.Title, &c.Type, &c.Format, &formatConfigJSON, &c.StartTime, &c.EndTime, &c.Visible, &c.Description,
+		var slug sql.NullString
+		rows.Scan(&c.ID, &c.DisplayID, &slug, &c.Title, &c.Type, &c.Format, &formatConfigJSON, &c.StartTime, &c.EndTime, &c.Visible, &c.Description,
 			&c.RegistrationRequired, &c.RegistrationDeadline, &c.MaxParticipants, &c.Division, &configJSON, &c.CreatedAt)
+		if slug.Valid {
+			c.Slug = slug.String
+		}
 		if len(configJSON) > 0 {
 			var config model.EducationalRoundConfig
 			if err := json.Unmarshal(configJSON, &config); err == nil {
@@ -200,11 +182,17 @@ func (s *ContestStore) Update(ctx context.Context, c *model.Contest) error {
 		formatConfigJSON = []byte("{}")
 	}
 
+	var slug interface{}
+	if c.Slug != "" {
+		slug = c.Slug
+	}
+
 	_, err := s.db.ExecContext(ctx,
 		`UPDATE contests SET title=$1, type=$2, format=$3, format_config=$4, start_time=$5, end_time=$6,
-		 freeze_time=$7, password=$8, description=$9, visible=$10, pdf_enabled=$11, statement_hidden=$12, updated_at=NOW()
-		 WHERE id=$13`,
-		c.Title, c.Type, c.Format, formatConfigJSON, c.StartTime, c.EndTime, c.FreezeTime, c.Password, c.Description, c.Visible, c.PDFEnabled, c.StatementHidden, c.ID)
+	 freeze_time=$7, password=$8, description=$9, visible=$10, pdf_enabled=$11, statement_hidden=$12,
+	 slug=$14
+	 WHERE id=$13`,
+		c.Title, c.Type, c.Format, formatConfigJSON, c.StartTime, c.EndTime, c.FreezeTime, c.Password, c.Description, c.Visible, c.PDFEnabled, c.StatementHidden, c.ID, slug)
 	return err
 }
 
@@ -220,6 +208,13 @@ func (s *ContestStore) AddProblem(ctx context.Context, contestID, problemID, ind
 	return err
 }
 
+func (s *ContestStore) UpdateProblem(ctx context.Context, contestID, problemID, index string, score, sortOrder int) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE contest_problems SET index=$3, score=$4, sort_order=$5 WHERE contest_id=$1 AND problem_id=$2`,
+		contestID, problemID, index, score, sortOrder)
+	return err
+}
+
 func (s *ContestStore) RemoveProblem(ctx context.Context, contestID, problemID string) error {
 	_, err := s.db.ExecContext(ctx,
 		`DELETE FROM contest_problems WHERE contest_id=$1 AND problem_id=$2`,
@@ -229,8 +224,8 @@ func (s *ContestStore) RemoveProblem(ctx context.Context, contestID, problemID s
 
 func (s *ContestStore) GetProblems(ctx context.Context, contestID string) ([]model.ContestProblem, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT cp.contest_id,cp.problem_id,cp.index,cp.score,cp.sort_order
-		 FROM contest_problems cp WHERE cp.contest_id=$1 ORDER BY cp.sort_order`, contestID)
+		`SELECT cp.contest_id,cp.problem_id,cp.index,cp.score,cp.sort_order,COALESCE(p.title,''),COALESCE(p.slug,'')
+		 FROM contest_problems cp LEFT JOIN problems p ON p.id=cp.problem_id WHERE cp.contest_id=$1 ORDER BY cp.sort_order`, contestID)
 	if err != nil {
 		return nil, err
 	}
@@ -238,7 +233,7 @@ func (s *ContestStore) GetProblems(ctx context.Context, contestID string) ([]mod
 	var items []model.ContestProblem
 	for rows.Next() {
 		var cp model.ContestProblem
-		rows.Scan(&cp.ContestID, &cp.ProblemID, &cp.Index, &cp.Score, &cp.SortOrder)
+		rows.Scan(&cp.ContestID, &cp.ProblemID, &cp.Index, &cp.Score, &cp.SortOrder, &cp.Title, &cp.Slug)
 		items = append(items, cp)
 	}
 	return items, nil
@@ -388,6 +383,7 @@ func (s *ContestStore) GetContestProblemByIndex(ctx context.Context, contestID, 
 	query := `
 		SELECT p.id, p.slug, p.title, p.description, p.input_format, p.output_format,
 		       p.hint, p.time_limit, p.memory_limit, p.difficulty, p.tags,
+		       p.sample_cases,
 		       p.visible, p.spj, p.spj_language, p.spj_source_code, p.checker_type,
 		       p.float_epsilon, p.interactive, p.interactor_language, p.interactor_source_code,
 		       p.scoring_mode, p.subtask_aggregation, p.submission_count, p.accepted_count,
@@ -398,9 +394,11 @@ func (s *ContestStore) GetContestProblemByIndex(ctx context.Context, contestID, 
 
 	var p model.Problem
 	var tags []byte
+	var samples []byte
 	err := s.db.QueryRowContext(ctx, query, contestID, index).Scan(
 		&p.ID, &p.Slug, &p.Title, &p.Description, &p.InputFormat, &p.OutputFormat,
 		&p.Hint, &p.TimeLimit, &p.MemoryLimit, &p.Difficulty, &tags,
+		&samples,
 		&p.Visible, &p.SPJ, &p.SPJLanguage, &p.SPJSourceCode, &p.CheckerType,
 		&p.FloatEpsilon, &p.Interactive, &p.InteractorLanguage, &p.InteractorSourceCode,
 		&p.ScoringMode, &p.SubtaskAggregation, &p.SubmissionCount, &p.AcceptedCount,
@@ -419,6 +417,12 @@ func (s *ContestStore) GetContestProblemByIndex(ctx context.Context, contestID, 
 		}
 	}
 
+	if len(samples) > 0 {
+		if err := json.Unmarshal(samples, &p.SampleCases); err != nil {
+			p.SampleCases = []model.SampleCase{}
+		}
+	}
+
 	return &p, nil
 }
 
@@ -434,4 +438,115 @@ func (s *ContestStore) IsParticipant(ctx context.Context, contestID, userID stri
 		contestID, userID,
 	).Scan(&exists)
 	return exists, err
+}
+
+// ContestProblemStats holds per-problem statistics for a contest.
+type ContestProblemStats struct {
+	ProblemID      string  `json:"problem_id"`
+	Index          string  `json:"index"`
+	Title          string  `json:"title"`
+	TotalSubs      int     `json:"total_submissions"`
+	Accepted       int     `json:"accepted"`
+	SolveRate      float64 `json:"solve_rate"`
+}
+
+// ContestStats holds aggregate statistics for a contest.
+type ContestStats struct {
+	TotalParticipants    int                          `json:"total_participants"`
+	TotalSubmissions     int                          `json:"total_submissions"`
+	AcceptedSubmissions  int                          `json:"accepted_submissions"`
+	Problems             []ContestProblemStats        `json:"problems"`
+	Languages            map[string]int               `json:"languages"`
+	Verdicts             map[string]int               `json:"verdicts"`
+}
+
+// GetContestStats returns aggregate statistics for a contest.
+func (s *ContestStore) GetContestStats(ctx context.Context, contestID string) (*ContestStats, error) {
+	stats := &ContestStats{
+		Languages: make(map[string]int),
+		Verdicts:  make(map[string]int),
+	}
+
+	// Total participants: count distinct users who submitted in this contest.
+	err := s.db.QueryRowContext(ctx,
+		`SELECT COUNT(DISTINCT user_id) FROM submissions WHERE contest_id=$1`, contestID,
+	).Scan(&stats.TotalParticipants)
+	if err != nil {
+		return nil, fmt.Errorf("count participants: %w", err)
+	}
+
+	// Total submissions and accepted submissions.
+	err = s.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FILTER (WHERE status='ac'), COUNT(*)
+		 FROM submissions WHERE contest_id=$1`, contestID,
+	).Scan(&stats.AcceptedSubmissions, &stats.TotalSubmissions)
+	if err != nil {
+		return nil, fmt.Errorf("count submissions: %w", err)
+	}
+
+	// Per-problem stats.
+	probRows, err := s.db.QueryContext(ctx,
+		`SELECT cp.problem_id, cp.index, p.title,
+		        COUNT(s.id) AS total_subs,
+		        COUNT(s.id) FILTER (WHERE s.status='ac') AS accepted
+		 FROM contest_problems cp
+		 JOIN problems p ON cp.problem_id = p.id
+		 LEFT JOIN submissions s ON s.contest_id = cp.contest_id AND s.problem_id = cp.problem_id
+		 WHERE cp.contest_id = $1
+		 GROUP BY cp.problem_id, cp.index, p.title, cp.sort_order
+		 ORDER BY cp.sort_order`, contestID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("query problem stats: %w", err)
+	}
+	defer probRows.Close()
+	for probRows.Next() {
+		var ps ContestProblemStats
+		if err := probRows.Scan(&ps.ProblemID, &ps.Index, &ps.Title, &ps.TotalSubs, &ps.Accepted); err != nil {
+			return nil, fmt.Errorf("scan problem stats: %w", err)
+		}
+		if ps.TotalSubs > 0 {
+			ps.SolveRate = float64(ps.Accepted) / float64(ps.TotalSubs)
+		}
+		stats.Problems = append(stats.Problems, ps)
+	}
+	if stats.Problems == nil {
+		stats.Problems = []ContestProblemStats{}
+	}
+
+	// Submissions grouped by language.
+	langRows, err := s.db.QueryContext(ctx,
+		`SELECT language, COUNT(*) FROM submissions WHERE contest_id=$1 GROUP BY language`, contestID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("query language stats: %w", err)
+	}
+	defer langRows.Close()
+	for langRows.Next() {
+		var lang string
+		var count int
+		if err := langRows.Scan(&lang, &count); err != nil {
+			return nil, fmt.Errorf("scan language stats: %w", err)
+		}
+		stats.Languages[lang] = count
+	}
+
+	// Submissions grouped by status (verdict).
+	verdictRows, err := s.db.QueryContext(ctx,
+		`SELECT status, COUNT(*) FROM submissions WHERE contest_id=$1 GROUP BY status`, contestID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("query verdict stats: %w", err)
+	}
+	defer verdictRows.Close()
+	for verdictRows.Next() {
+		var status string
+		var count int
+		if err := verdictRows.Scan(&status, &count); err != nil {
+			return nil, fmt.Errorf("scan verdict stats: %w", err)
+		}
+		stats.Verdicts[status] = count
+	}
+
+	return stats, nil
 }

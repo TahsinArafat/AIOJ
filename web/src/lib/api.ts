@@ -8,6 +8,20 @@ export interface TestCaseResult {
     detail?: string
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/** Returns true if the string looks like a UUID — auto-generated slugs that aren't "real". */
+export function isUuid(v: string): boolean {
+    return UUID_RE.test(v)
+}
+
+/** Get the best human-readable contest identifier for URLs: real slug > display_id > UUID id */
+export function contestSlug(c: { slug?: string; display_id?: number; id: string }): string {
+    if (c.slug && !isUuid(c.slug)) return c.slug
+    if (c.display_id) return String(c.display_id)
+    return c.id
+}
+
 export interface ProblemDetail {
     id: string
     title: string
@@ -313,7 +327,13 @@ export const api = {
         get: (id: string) => request<any>(`/contests/${id}`),
         create: (d: any) => request<any>('/contests', { method: 'POST', body: JSON.stringify(d) }),
         getFormats: () => request<{ formats: string[] }>('/contests/formats'),
-        scoreboard: (id: string) => request<any>(`/contests/${id}/scoreboard`),
+        scoreboard: (id: string, view?: string, page?: number) => {
+          const params = new URLSearchParams();
+          if (view) params.set('view', view);
+          if (page && page > 1) params.set('page', String(page));
+          const qs = params.toString();
+          return request<any>(`/contests/${id}/scoreboard${qs ? '?' + qs : ''}`);
+        },
         register: (id: string) => request(`/contests/${id}/register`, { method: 'POST' }),
         unregister: (id: string) => request(`/contests/${id}/register`, { method: 'DELETE' }),
         checkRegistration: (id: string) => request<{ registered: boolean }>(`/contests/${id}/register`),
@@ -322,10 +342,35 @@ export const api = {
             request<{ problem: any; contest: any; can_submit?: boolean; upsolving_disabled?: boolean; statement_hidden?: boolean }>(`/contests/${contestId}/problems/${index}`),
         addProblem: (contestId: string, d: { problem_id: string; index: string; score?: number }) =>
             request<any>(`/contests/${contestId}/problems`, { method: 'POST', body: JSON.stringify(d) }),
+        updateProblem: (contestId: string, problemId: string, d: { index: string; score: number; sort_order: number }) =>
+            request<any>(`/contests/${contestId}/problems/${problemId}`, { method: 'PUT', body: JSON.stringify(d) }),
         removeProblem: (contestId: string, problemId: string) =>
             request(`/contests/${contestId}/problems/${problemId}`, { method: 'DELETE' }),
         update: (id: string, d: any) =>
             request<any>(`/contests/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
+        stats: (id: string) => request<any>(`/contests/${id}/stats`),
+        standings: (id: string, page?: number) => {
+          const params = new URLSearchParams();
+          if (page && page > 1) params.set('page', String(page));
+          const qs = params.toString();
+          return request<any>(`/contests/${id}/scoreboard${qs ? '?' + qs : ''}`);
+        },
+        problems: (id: string) => request<any[]>(`/contests/${id}/problems`),
+        announcements: (id: string) => request<any[]>(`/contests/${id}/notices`),
+        postAnnouncement: (id: string, message: string) =>
+            request<any>(`/contests/${id}/notices`, { method: 'POST', body: JSON.stringify({ content: message }) }),
+        deleteAnnouncement: (id: string, announcementId: string) =>
+            request(`/contests/${id}/notices/${announcementId}`, { method: 'DELETE' }),
+        submissions: (id: string, offset?: number, limit?: number, filters?: { mine?: boolean; problem_id?: string; language?: string; status?: string }) => {
+            const params = new URLSearchParams();
+            if (offset) params.set('offset', String(offset));
+            if (limit) params.set('limit', String(limit));
+            if (filters?.mine !== undefined) params.set('mine', String(filters.mine));
+            if (filters?.problem_id) params.set('problem_id', filters.problem_id);
+            if (filters?.language) params.set('language', filters.language);
+            if (filters?.status) params.set('status', filters.status);
+            return request<any>(`/contests/${id}/submissions${params.toString() ? '?' + params : ''}`);
+        },
     },
     clarifications: {
         list: (contestId: string) =>
@@ -348,6 +393,26 @@ export const api = {
             request<any>('/virtual/start', { method: 'POST', body: JSON.stringify({ contest_id: contestId, duration_minutes: durationMinutes }) }),
         status: () => request<any>('/virtual/status'),
         complete: (id: string) => request(`/virtual/${id}/complete`, { method: 'POST' }),
+    },
+    onsite: {
+        listBalloons: (contestId: string) =>
+            request<{ data: any[] }>(`/contests/${contestId}/onsite/balloons`),
+        dispatchBalloon: (contestId: string, balloonId: string) =>
+            request(`/contests/${contestId}/onsite/balloons/${balloonId}/dispatch`, { method: 'POST' }),
+        requestPrint: (contestId: string, d: { filename: string; content: string }) =>
+            request(`/contests/${contestId}/onsite/print`, { method: 'POST', body: JSON.stringify(d) }),
+        listPrints: (contestId: string) =>
+            request<{ data: any[] }>(`/contests/${contestId}/onsite/prints`),
+        updatePrintStatus: (contestId: string, printId: string, status: string) =>
+            request(`/contests/${contestId}/onsite/prints/${printId}/status`, { method: 'POST', body: JSON.stringify({ status }) }),
+    },
+    permissions: {
+        list: (contestId: string) =>
+            request<{ data: any[] }>(`/contests/${contestId}/permissions`),
+        add: (contestId: string, d: { user_id: string; access_level: string }) =>
+            request<any>(`/contests/${contestId}/permissions`, { method: 'POST', body: JSON.stringify(d) }),
+        remove: (contestId: string, userId: string) =>
+            request(`/contests/${contestId}/permissions/${userId}`, { method: 'DELETE' }),
     },
     gym: {
         list: (offset = 0, limit = 20, filters?: { category?: string; search?: string }) => {

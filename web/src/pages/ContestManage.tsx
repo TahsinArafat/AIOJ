@@ -9,6 +9,16 @@ import {
     Loader2, Play, Check, EyeOff
 } from 'lucide-react'
 
+function indexLabel(i: number): string {
+    let s = ''
+    let n = i
+    do {
+        s = String.fromCharCode(65 + (n % 26)) + s
+        n = Math.floor(n / 26) - 1
+    } while (n >= 0)
+    return s
+}
+
 const TABS = [
     { key: 'challenges', label: 'Challenges', Icon: FileText },
     { key: 'booklet', label: 'Booklet', Icon: FileDown },
@@ -31,12 +41,16 @@ export default function ContestManage() {
     const { id } = useParams()
     const nav = useNavigate()
     const [contest, setContest] = useState<any>(null)
+    const [problems, setProblems] = useState<any[]>([])
     const [tab, setTab] = useState<TabKey>('challenges')
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
         if (!id) return
-        api.contests.get(id).then(d => setContest(d.contest || d)).catch(() => nav('/contests')).finally(() => setLoading(false))
+        api.contests.get(id).then(d => {
+            setContest(d.contest || d)
+            setProblems(d.problems || [])
+        }).catch(() => nav('/contests')).finally(() => setLoading(false))
     }, [id])
 
     if (loading) return <div className="flex items-center justify-center h-screen"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>
@@ -68,13 +82,13 @@ export default function ContestManage() {
                                 {t.label}
                             </button>
                         ))}
-                        <a
-                            href={`/contests/${id}/problem/A`}
+                        <Link
+                            to={`/contests/${id}/problem/${problems[0]?.index || 'A'}`}
                             className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-600 hover:bg-green-50 hover:text-green-700 transition-colors border-t border-gray-100 border-l-3 border-transparent"
                         >
                             <span className="text-base"><Play className="w-4 h-4" /></span>
                             Arena
-                        </a>
+                        </Link>
                     </nav>
                 </aside>
 
@@ -125,7 +139,7 @@ function ChallengesTab({ contestId }: { contestId: string }) {
     }
 
     const addProblem = async (problemId: string) => {
-        const idx = String.fromCharCode(65 + problems.length)
+        const idx = indexLabel(problems.length)
         await api.contests.addProblem(contestId, { problem_id: problemId, index: idx })
         load()
         setShowAdd(false)
@@ -135,6 +149,31 @@ function ChallengesTab({ contestId }: { contestId: string }) {
         if (!confirm('Remove this problem?')) return
         await api.contests.removeProblem(contestId, problemId)
         load()
+    }
+
+    const moveProblem = async (idx: number, dir: -1 | 1) => {
+        const target = idx + dir
+        if (target < 0 || target >= problems.length) return
+        const next = [...problems]
+        ;[next[idx], next[target]] = [next[target], next[idx]]
+        
+        next.forEach((p, i) => {
+            p.index = indexLabel(i)
+            p.sort_order = i
+        })
+        
+        try {
+            await Promise.all(next.map((p, i) => 
+                api.contests.updateProblem(contestId, p.problem_id, {
+                    index: p.index,
+                    score: p.score || 100,
+                    sort_order: i
+                })
+            ))
+            load()
+        } catch (e: any) {
+            alert('Failed to reorder: ' + e.message)
+        }
     }
 
     if (loading) return <TabLoading />
@@ -155,22 +194,50 @@ function ChallengesTab({ contestId }: { contestId: string }) {
                     {allProblems.map((p: any) => (
                         <div key={p.id} className="flex items-center justify-between py-1.5 text-sm">
                             <span>{p.title} <span className="text-gray-400">({p.difficulty})</span></span>
-                            <button onClick={() => addProblem(p.id)} className="text-blue-600 hover:underline text-xs">Add</button>
+                            <button onClick={() => addProblem(p.id)} className="text-blue-600 hover:underline text-xs font-semibold">Add</button>
                         </div>
                     ))}
                 </div>
             )}
             <table className="w-full text-sm">
                 <thead><tr className="border-b border-gray-200 dark:border-gray-700 text-left text-xs text-gray-500 uppercase">
-                    <th className="py-2 pr-4 w-12">#</th><th className="py-2 pr-4">Problem</th><th className="py-2 pr-4 w-20">Score</th><th className="py-2 w-20">Action</th>
+                    <th className="py-2 pr-4 w-12">#</th><th className="py-2 pr-4">Problem</th><th className="py-2 pr-4 w-20">Score</th><th className="py-2 w-32 text-right">Actions</th>
                 </tr></thead>
                 <tbody className="divide-y divide-gray-100">
-                    {problems.map((p: any) => (
-                        <tr key={p.problem_id} className="hover:bg-gray-50">
-                            <td className="py-2.5 pr-4 font-mono font-bold text-blue-600">{p.index}</td>
-                            <td className="py-2.5 pr-4">{p.title || p.problem_id}</td>
-                            <td className="py-2.5 pr-4">{p.score ?? '—'}</td>
-                            <td className="py-2.5"><button onClick={() => removeProblem(p.problem_id)} className="text-red-500 hover:text-red-700 text-xs">Remove</button></td>
+                    {problems.map((p: any, idx: number) => (
+                        <tr key={p.problem_id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                            <td className="py-2.5 pr-4 font-mono font-bold text-blue-600">{indexLabel(idx)}</td>
+                            <td className="py-2.5 pr-4">
+                                <div className="flex flex-col">
+                                    {p.slug ? (
+                                        <Link to={`/problems/${p.slug}`} className="font-semibold text-blue-600 hover:underline">{p.title || p.problem_id}</Link>
+                                    ) : (
+                                        <span className="font-semibold text-gray-800">{p.title || p.problem_id}</span>
+                                    )}
+                                    <span className="text-xs text-gray-400 font-mono">{p.problem_id}</span>
+                                </div>
+                            </td>
+                            <td className="py-2.5 pr-4">{p.score ?? 100}</td>
+                            <td className="py-2.5 text-right">
+                                <div className="flex items-center justify-end gap-2">
+                                    <button onClick={() => moveProblem(idx, -1)} disabled={idx === 0}
+                                        className="p-1 border rounded text-xs text-gray-400 hover:text-gray-700 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed">
+                                        ▲
+                                    </button>
+                                    <button onClick={() => moveProblem(idx, 1)} disabled={idx === problems.length - 1}
+                                        className="p-1 border rounded text-xs text-gray-400 hover:text-gray-700 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed">
+                                        ▼
+                                    </button>
+                                    {p.slug && (
+                                        <Link to={`/setter/${p.slug}`} className="px-2 py-1 bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200 text-xs rounded">
+                                            Edit
+                                        </Link>
+                                    )}
+                                    <button onClick={() => removeProblem(p.problem_id)} className="px-2 py-1 bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 text-xs rounded">
+                                        Remove
+                                    </button>
+                                </div>
+                            </td>
                         </tr>
                     ))}
                 </tbody>
@@ -301,7 +368,7 @@ function SubmissionsTab({ contestId }: { contestId: string }) {
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
-        api.submissions.list(0, 100, undefined, contestId).then(d => setItems(d.data || [])).finally(() => setLoading(false))
+        api.contests.submissions(contestId, 0, 100, { mine: false }).then(d => setItems(d.data || [])).finally(() => setLoading(false))
     }, [contestId])
 
     if (loading) return <TabLoading />

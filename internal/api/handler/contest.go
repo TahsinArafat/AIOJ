@@ -2,10 +2,10 @@ package handler
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -24,14 +24,46 @@ import (
 	"github.com/tahsinarafat/aioj/internal/store/postgres"
 )
 
+type scoreboardCacheEntry struct {
+	data      []byte
+	expiresAt time.Time
+}
+
+type scoreboardCache struct {
+	mu      sync.RWMutex
+	entries map[string]scoreboardCacheEntry
+	ttl     time.Duration
+}
+
+func newScoreboardCache(ttl time.Duration) *scoreboardCache {
+	return &scoreboardCache{entries: make(map[string]scoreboardCacheEntry), ttl: ttl}
+}
+
+func (c *scoreboardCache) get(key string) ([]byte, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	e, ok := c.entries[key]
+	if !ok || time.Now().After(e.expiresAt) {
+		return nil, false
+	}
+	return e.data, true
+}
+
+func (c *scoreboardCache) set(key string, data []byte) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.entries[key] = scoreboardCacheEntry{data: data, expiresAt: time.Now().Add(c.ttl)}
+}
+
 type ContestHandler struct {
 	store        *postgres.ContestStore
 	ratingStore  *postgres.RatingStore
 	problemStore store.ProblemStore
+	cache        *scoreboardCache
 }
 
 func NewContestHandler(s *postgres.ContestStore, rs *postgres.RatingStore, ps store.ProblemStore) *ContestHandler {
-	return &ContestHandler{store: s, ratingStore: rs, problemStore: ps}
+	return &ContestHandler{store: s, ratingStore: rs, problemStore: ps, cache: newScoreboardCache(30 * time.Second)}
 }
 
 func (h *ContestHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -199,6 +231,9 @@ func (h *ContestHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if req.StatementHidden != nil {
 		c.StatementHidden = *req.StatementHidden
 	}
+	if req.Slug != "" {
+		c.Slug = req.Slug
+	}
 	if err := h.store.Update(r.Context(), c); err != nil {
 		http.Error(w, "update failed", http.StatusInternalServerError)
 		return
@@ -242,8 +277,26 @@ func (h *ContestHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	isJudge := claims != nil && (claims.Role == "admin" || h.store.HasAccess(r.Context(), contest.ID, claims.UserID, "manager", "judge"))
+	canSeeJudge := isJudge // preserve original capability before view override
 
-	problems, _ := h.store.GetProblems(r.Context(), id)
+	// Allow admins/judges to explicitly request the public (frozen) view via ?view=public
+	viewParam := r.URL.Query().Get("view")
+	if viewParam == "public" && isJudge {
+		isJudge = false
+	}
+
+	// Check cache (key: contestID:view:page:limit)
+	pageStr := r.URL.Query().Get("page")
+	limitStr := r.URL.Query().Get("limit")
+	cacheKey := contest.ID + ":" + viewParam + ":" + pageStr + ":" + limitStr
+	if cached, ok := h.cache.get(cacheKey); ok {
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("X-Cache", "HIT")
+		w.Write(cached)
+		return
+	}
+
+	problems, _ := h.store.GetProblems(r.Context(), contest.ID)
 
 	frozen := contest.FreezeTime != nil && now.After(*contest.FreezeTime) && now.Before(contest.EndTime)
 
@@ -252,8 +305,8 @@ func (h *ContestHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 		beforeTime = contest.FreezeTime
 	}
 
-	rows, _ := h.store.GetScoreboardRows(r.Context(), id, nil)
-	participants, _ := h.store.GetParticipants(r.Context(), id)
+	rows, _ := h.store.GetScoreboardRows(r.Context(), contest.ID, nil)
+	participants, _ := h.store.GetParticipants(r.Context(), contest.ID)
 
 	fmtName := contest.Format
 	if fmtName == "" {
@@ -375,11 +428,50 @@ func (h *ContestHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	respondJSON(w, http.StatusOK, map[string]interface{}{
-		"entries": entries, "problems": problems,
+	// Pagination
+	totalEntries := len(entries)
+	page := 1
+	limit := 100
+	if p, err := strconv.Atoi(r.URL.Query().Get("page")); err == nil && p > 1 {
+		page = p
+	}
+	if l, err := strconv.Atoi(r.URL.Query().Get("limit")); err == nil && l > 0 && l <= 500 {
+		limit = l
+	}
+	totalPages := (totalEntries + limit - 1) / limit
+	if totalPages < 1 {
+		totalPages = 1
+	}
+	if page > totalPages {
+		page = totalPages
+	}
+	start := (page - 1) * limit
+	end := start + limit
+	if start > totalEntries {
+		start = totalEntries
+	}
+	if end > totalEntries {
+		end = totalEntries
+	}
+	pagedEntries := entries[start:end]
+
+	respondData := map[string]interface{}{
+		"entries": pagedEntries, "problems": problems,
 		"frozen": frozen, "contest": contest,
-		"is_judge": isJudge,
-	})
+		"is_judge": isJudge, "can_see_judge": canSeeJudge,
+		"pagination": map[string]interface{}{
+			"page":        page,
+			"limit":       limit,
+			"total":       totalEntries,
+			"total_pages": totalPages,
+		},
+	}
+	jsonBytes, _ := json.Marshal(respondData)
+	h.cache.set(cacheKey, jsonBytes)
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("X-Cache", "MISS")
+	w.WriteHeader(http.StatusOK)
+	w.Write(jsonBytes)
 }
 
 func (h *ContestHandler) ListPermissions(w http.ResponseWriter, r *http.Request) {
@@ -471,7 +563,7 @@ func (h *ContestHandler) CalculateRatings(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	participants, _ := h.store.GetParticipants(r.Context(), contestID)
+	participants, _ := h.store.GetParticipants(r.Context(), contest.ID)
 
 	standings := make([]rating.ContestStanding, 0, len(participants))
 	for i, uid := range participants {
@@ -680,11 +772,6 @@ func (h *ContestHandler) DownloadPDF(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !isJudge {
-		http.Error(w, "forbidden", http.StatusForbidden)
-		return
-	}
-
 	contestProblems, _ := h.store.GetProblems(r.Context(), id)
 
 	var problems []model.ProblemWithSamples
@@ -705,7 +792,72 @@ func (h *ContestHandler) DownloadPDF(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/pdf")
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s.pdf\"", contest.Title))
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Write(pdfBytes)
+}
+
+func (h *ContestHandler) ContestStats(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r)
+	id := chi.URLParam(r, "id")
+
+	contest, err := h.store.GetByID(r.Context(), id)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if contest == nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	// Require auth: admin or contest manager/judge.
+	// Stats are public like scoreboard — no auth check needed.
+	_ = claims
+
+	stats, err := h.store.GetContestStats(r.Context(), id)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	respondJSON(w, http.StatusOK, stats)
+}
+
+func (h *ContestHandler) UpdateProblem(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r)
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	id := chi.URLParam(r, "id")
+	c, err := h.store.GetByID(r.Context(), id)
+	if err != nil || c == nil {
+		http.Error(w, "contest not found", http.StatusNotFound)
+		return
+	}
+
+	if claims.Role != "admin" && !h.store.HasAccess(r.Context(), c.ID, claims.UserID, "manager", "judge") {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	problemID := chi.URLParam(r, "problemId")
+
+	var req struct {
+		Index     string `json:"index"`
+		Score     int    `json:"score"`
+		SortOrder int    `json:"sort_order"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.store.UpdateProblem(r.Context(), id, problemID, req.Index, req.Score, req.SortOrder); err != nil {
+		http.Error(w, "failed to update problem", http.StatusInternalServerError)
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]string{"status": "updated"})
 }

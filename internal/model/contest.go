@@ -48,6 +48,7 @@ type ContestProblem struct {
 	ProblemID string `json:"problem_id"`
 	Index     string `json:"index"`
 	Title     string `json:"title,omitempty"`
+	Slug      string `json:"slug,omitempty"`
 	Score     int    `json:"score"`
 	SortOrder int    `json:"sort_order"`
 }

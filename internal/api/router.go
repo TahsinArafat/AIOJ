@@ -123,6 +123,7 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 			r.Post("/{id}/permissions", contestH.AddPermission)
 			r.Delete("/{id}/permissions/{userId}", contestH.RemovePermission)
 			r.Post("/{id}/problems", contestH.AddProblem)
+			r.Put("/{id}/problems/{problemId}", contestH.UpdateProblem)
 			r.Delete("/{id}/problems/{problemId}", contestH.RemoveProblem)
 			r.Get("/{id}/submissions", submissionH.ListByContest)
 		})

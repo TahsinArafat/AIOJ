@@ -40,6 +40,7 @@ type SubmissionStore interface {
 	GetByID(ctx context.Context, id string) (*model.Submission, error)
 	ListByProblem(ctx context.Context, problemID string, offset, limit int) ([]model.Submission, int, error)
 	ListByUser(ctx context.Context, userID string, offset, limit int, problemID, contestID string) ([]model.Submission, int, error)
+	ListByContest(ctx context.Context, contestID string, offset, limit int, filter model.SubmissionFilter) ([]model.Submission, int, error)
 	UpdateStatus(ctx context.Context, id string, status model.SubmissionStatus)
 	UpdateResult(ctx context.Context, id string, status model.SubmissionStatus, score, timeUsed, memoryUsed int, compileOutput string, results []model.TestCaseResult) error
 	UpdateRemoteID(ctx context.Context, id string, remoteID string, remoteURL string) error
@@ -64,6 +65,7 @@ type ContestStore interface {
 	Update(ctx context.Context, c *model.Contest) error
 	Delete(ctx context.Context, id string) error
 	AddProblem(ctx context.Context, contestID, problemID, index string, score, sortOrder int) error
+	UpdateProblem(ctx context.Context, contestID, problemID, index string, score, sortOrder int) error
 	RemoveProblem(ctx context.Context, contestID, problemID string) error
 	GetProblems(ctx context.Context, contestID string) ([]model.ContestProblem, error)
 	GetContestProblemByIndex(ctx context.Context, contestID, index string) (*model.Problem, error)
