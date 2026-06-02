@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { api, getAccessToken } from '../lib/api'
+import { api, getAccessToken, setTokens } from '../lib/api'
 import DivisionBadge from '../components/DivisionBadge'
 import {
     Trophy, FileText, MessageSquare, Users, Zap, FileDown, Pencil, Gamepad2,
@@ -297,6 +297,11 @@ export default function ContestDetail() {
     const [subFilterLang, setSubFilterLang] = useState('')
     const [subFilterStatus, setSubFilterStatus] = useState('')
     const [isJudge, setIsJudge] = useState(false)
+    const [showTeamLogin, setShowTeamLogin] = useState(false)
+    const [teamUser, setTeamUser] = useState('')
+    const [teamPass, setTeamPass] = useState('')
+    const [teamLoading, setTeamLoading] = useState(false)
+    const [teamError, setTeamError] = useState('')
 
     useEffect(() => {
         if (!id) return
@@ -432,6 +437,21 @@ export default function ContestDetail() {
             await api.contests.deleteAnnouncement(id, announcementId)
             setAnnouncements(a => a.filter((x: any) => x.id !== announcementId))
         } catch (e: any) { alert(e.message) }
+    }
+
+    const handleTeamLogin = async () => {
+        if (!id || !teamUser.trim() || !teamPass.trim()) return
+        setTeamError('')
+        setTeamLoading(true)
+        try {
+            const d = await api.onsite.loginAsTeam(id, { username: teamUser, password: teamPass })
+            setTokens(d.access_token, d.refresh_token)
+            window.location.reload()
+        } catch (e: any) {
+            setTeamError(e.message || 'Login failed')
+        } finally {
+            setTeamLoading(false)
+        }
     }
 
     if (loading) return <div className="text-center py-20 text-gray-500 dark:text-gray-400">Loading...</div>
@@ -1129,6 +1149,37 @@ export default function ContestDetail() {
                                     </button>
                                 )}
                             </div>
+                        </SidebarBox>
+                    )}
+
+                    {/* Team Login */}
+                    {!getAccessToken() && (
+                        <SidebarBox title="Team Login" icon="users" accent="green">
+                            {!showTeamLogin ? (
+                                <button onClick={() => setShowTeamLogin(true)}
+                                    className="flex items-center gap-2 w-full px-3 py-1.5 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 transition-colors text-center justify-center">
+                                    Login as Contestant
+                                </button>
+                            ) : (
+                                <div className="space-y-2">
+                                    <input value={teamUser} onChange={e => setTeamUser(e.target.value)}
+                                        placeholder="Username" className="w-full border rounded-lg px-3 py-1.5 text-sm" />
+                                    <input type="password" value={teamPass} onChange={e => setTeamPass(e.target.value)}
+                                        onKeyDown={e => e.key === 'Enter' && handleTeamLogin()}
+                                        placeholder="Password" className="w-full border rounded-lg px-3 py-1.5 text-sm" />
+                                    {teamError && <p className="text-xs text-red-600">{teamError}</p>}
+                                    <div className="flex gap-2">
+                                        <button onClick={handleTeamLogin} disabled={teamLoading}
+                                            className="flex-1 px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50">
+                                            {teamLoading ? '...' : 'Login'}
+                                        </button>
+                                        <button onClick={() => { setShowTeamLogin(false); setTeamError('') }}
+                                            className="px-3 py-1.5 bg-gray-100 text-gray-600 text-sm rounded-lg hover:bg-gray-200">
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </SidebarBox>
                     )}
 
