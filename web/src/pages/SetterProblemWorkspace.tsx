@@ -12,7 +12,18 @@ export default function SetterProblemWorkspace() {
   const { slug } = useParams<{ slug: string }>()
   const navigate = useNavigate()
   const [problem, setProblem] = useState<any>(null)
-  const [activeTab, setActiveTab] = useState<'statement' | 'testcases' | 'checker' | 'permissions' | 'settings'>('statement')
+  type WorkspaceTab = 'statement' | 'testcases' | 'checker' | 'permissions' | 'settings'
+
+  const [activeTab, setActiveTab] = useState<WorkspaceTab>(() => {
+    const hash = window.location.hash.replace('#', '') as WorkspaceTab
+    const validTabs: WorkspaceTab[] = ['statement', 'testcases', 'checker', 'permissions', 'settings']
+    return validTabs.includes(hash) ? hash : 'statement'
+  })
+
+  useEffect(() => {
+    window.location.hash = activeTab
+  }, [activeTab])
+
   const [saving, setSaving] = useState(false)
   const [uploadingImage, setUploadingImage] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -293,27 +304,27 @@ export default function SetterProblemWorkspace() {
   }
 
   if (!problem) {
-    return <div className="text-center py-20 text-gray-400">Loading problem workspace...</div>
+    return <div className="text-center py-20 text-gray-400 dark:text-gray-500">Loading problem workspace...</div>
   }
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-gray-200 pb-4">
+      <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 pb-4">
         <div>
-          <span className="text-xs text-gray-400 uppercase tracking-wider font-semibold">Polygon Workspace</span>
-          <h1 className="text-2xl font-bold text-gray-900">{problem.title as string}</h1>
+          <span className="text-xs text-gray-400 dark:text-gray-500 uppercase tracking-wider font-semibold">Polygon Workspace</span>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{problem.title as string}</h1>
         </div>
         <div className="flex gap-3">
           <Link
             to={`/problems/${problem.slug as string}`}
-            className="border border-gray-300 text-gray-700 px-4 py-2 rounded text-sm hover:bg-gray-50 transition-colors"
+            className="border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 px-4 py-2 rounded text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
           >
             View Public
           </Link>
           <Link
             to="/setter"
-            className="bg-gray-100 border border-gray-200 text-gray-700 px-4 py-2 rounded text-sm hover:bg-gray-200 transition-colors"
+            className="bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 px-4 py-2 rounded text-sm hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
           >
             Back to Setter Workspace
           </Link>
@@ -322,12 +333,12 @@ export default function SetterProblemWorkspace() {
 
       {/* Status messages */}
       {error && (
-        <div className="bg-red-50 border-l-4 border-red-500 p-4 text-sm text-red-700 rounded-r">
+        <div className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-4 text-sm text-red-700 dark:text-red-300 rounded-r">
           {error}
         </div>
       )}
       {success && (
-        <div className="bg-green-50 border-l-4 border-green-500 p-4 text-sm text-green-700 rounded-r">
+        <div className="bg-green-50 dark:bg-green-900/20 border-l-4 border-green-500 p-4 text-sm text-green-700 dark:text-green-300 rounded-r">
           {success}
         </div>
       )}
@@ -335,41 +346,41 @@ export default function SetterProblemWorkspace() {
       {/* Main content */}
       <div className="flex gap-6 items-start">
         {/* Tabs Sidebar */}
-        <div className="w-56 shrink-0 flex flex-col border border-gray-200 rounded-lg bg-white overflow-hidden text-sm">
+        <div className="w-56 shrink-0 flex flex-col border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 overflow-hidden text-sm">
           <button
             onClick={() => setActiveTab('statement')}
-            className={`px-4 py-3 text-left border-b border-gray-100 font-medium ${activeTab === 'statement' ? 'bg-blue-50 text-blue-600 border-l-4 border-l-blue-600' : 'text-gray-600 hover:bg-gray-50 hover:text-black'}`}
+            className={`px-4 py-3 text-left border-b border-gray-100 dark:border-gray-700 font-medium ${activeTab === 'statement' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-l-4 border-l-blue-600' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-black dark:hover:text-white'}`}
           >
             Statement & Details
           </button>
           <button
             onClick={() => setActiveTab('testcases')}
-            className={`px-4 py-3 text-left border-b border-gray-100 font-medium ${activeTab === 'testcases' ? 'bg-blue-50 text-blue-600 border-l-4 border-l-blue-600' : 'text-gray-600 hover:bg-gray-50 hover:text-black'}`}
+            className={`px-4 py-3 text-left border-b border-gray-100 dark:border-gray-700 font-medium ${activeTab === 'testcases' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-l-4 border-l-blue-600' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-black dark:hover:text-white'}`}
           >
             Test Cases / Data
           </button>
           <button
             onClick={() => setActiveTab('checker')}
-            className={`px-4 py-3 text-left border-b border-gray-100 font-medium ${activeTab === 'checker' ? 'bg-blue-50 text-blue-600 border-l-4 border-l-blue-600' : 'text-gray-600 hover:bg-gray-50 hover:text-black'}`}
+            className={`px-4 py-3 text-left border-b border-gray-100 dark:border-gray-700 font-medium ${activeTab === 'checker' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-l-4 border-l-blue-600' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-black dark:hover:text-white'}`}
           >
             Checker / Special Judge
           </button>
           <button
             onClick={() => setActiveTab('permissions')}
-            className={`px-4 py-3 text-left border-b border-gray-100 font-medium ${activeTab === 'permissions' ? 'bg-blue-50 text-blue-600 border-l-4 border-l-blue-600' : 'text-gray-600 hover:bg-gray-50 hover:text-black'}`}
+            className={`px-4 py-3 text-left border-b border-gray-100 dark:border-gray-700 font-medium ${activeTab === 'permissions' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-l-4 border-l-blue-600' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-black dark:hover:text-white'}`}
           >
             Collaborators
           </button>
           <button
             onClick={() => setActiveTab('settings')}
-            className={`px-4 py-3 text-left font-medium ${activeTab === 'settings' ? 'bg-blue-50 text-blue-600 border-l-4 border-l-blue-600' : 'text-gray-600 hover:bg-gray-50 hover:text-black'}`}
+            className={`px-4 py-3 text-left font-medium ${activeTab === 'settings' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-l-4 border-l-blue-600' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-black dark:hover:text-white'}`}
           >
             Workspace Settings
           </button>
         </div>
 
         {/* Tab Content Panels */}
-        <div className="flex-1 bg-white border border-gray-200 rounded-lg p-6 min-h-[500px]">
+        <div className="flex-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 min-h-[500px]">
           {activeTab === 'statement' && (
             <StatementTab
               formState={formState}

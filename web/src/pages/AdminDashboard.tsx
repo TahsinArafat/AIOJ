@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Users, FileText, Bot, Settings, Code, Globe, Send } from 'lucide-react'
 import UsersPanel from './admin/UsersPanel'
 import SetterAppsPanel from './admin/SetterAppsPanel'
@@ -21,7 +21,15 @@ const tabs: { key: AdminTab; label: string; icon: typeof Users }[] = [
 ]
 
 export default function AdminDashboard() {
-    const [activeTab, setActiveTab] = useState<AdminTab>('users')
+    const [activeTab, setActiveTab] = useState<AdminTab>(() => {
+        const hash = window.location.hash.replace('#', '') as AdminTab
+        const validTabs: AdminTab[] = ['users', 'applications', 'bots', 'languages', 'remote-languages', 'submissions', 'settings']
+        return validTabs.includes(hash) ? hash : 'users'
+    })
+
+    useEffect(() => {
+        window.location.hash = activeTab
+    }, [activeTab])
 
     return (
         <div>
@@ -36,8 +44,8 @@ export default function AdminDashboard() {
                                 onClick={() => setActiveTab(t.key)}
                                 className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors text-left ${
                                     activeTab === t.key
-                                        ? 'bg-blue-50 text-blue-700 font-medium'
-                                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                                        ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium'
+                                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100'
                                 }`}
                             >
                                 <t.icon className="w-4 h-4" />

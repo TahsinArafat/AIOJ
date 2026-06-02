@@ -820,7 +820,7 @@ func (h *ContestHandler) ContestStats(w http.ResponseWriter, r *http.Request) {
 	// Stats are public like scoreboard — no auth check needed.
 	_ = claims
 
-	stats, err := h.store.GetContestStats(r.Context(), id)
+	stats, err := h.store.GetContestStats(r.Context(), contest.ID)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return

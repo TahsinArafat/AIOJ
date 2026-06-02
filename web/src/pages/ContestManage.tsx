@@ -42,8 +42,20 @@ export default function ContestManage() {
     const nav = useNavigate()
     const [contest, setContest] = useState<any>(null)
     const [problems, setProblems] = useState<any[]>([])
-    const [tab, setTab] = useState<TabKey>('challenges')
+    const [tab, setTab] = useState<TabKey>(() => {
+        const hash = window.location.hash.replace('#', '') as TabKey
+        const validTabs: TabKey[] = [
+            'challenges', 'booklet', 'clarifications', 'participants', 'submissions',
+            'prints', 'standings', 'statistics', 'plagiarisms', 'balloons',
+            'announcements', 'moderators', 'settings'
+        ]
+        return validTabs.includes(hash) ? hash : 'challenges'
+    })
     const [loading, setLoading] = useState(true)
+
+    useEffect(() => {
+        window.location.hash = tab
+    }, [tab])
 
     useEffect(() => {
         if (!id) return

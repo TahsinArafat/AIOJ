@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -13,12 +14,13 @@ import (
 )
 
 type PlagiarismHandler struct {
-	service *plagiarism.Service
-	store   *postgres.PlagiarismStore
+	service      *plagiarism.Service
+	store        *postgres.PlagiarismStore
+	contestStore *postgres.ContestStore
 }
 
-func NewPlagiarismHandler(s *plagiarism.Service, store *postgres.PlagiarismStore) *PlagiarismHandler {
-	return &PlagiarismHandler{service: s, store: store}
+func NewPlagiarismHandler(s *plagiarism.Service, store *postgres.PlagiarismStore, contestStore *postgres.ContestStore) *PlagiarismHandler {
+	return &PlagiarismHandler{service: s, store: store, contestStore: contestStore}
 }
 
 func (h *PlagiarismHandler) RunCheck(w http.ResponseWriter, r *http.Request) {
@@ -34,13 +36,20 @@ func (h *PlagiarismHandler) RunCheck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	contest, err := h.contestStore.GetByID(r.Context(), req.ContestID)
+	if err != nil || contest == nil {
+		http.Error(w, "contest not found", http.StatusNotFound)
+		return
+	}
+	resolvedContestID := contest.ID
+
 	threshold := req.Threshold
 	if threshold <= 0 {
 		threshold = 0.70
 	}
 
 	report := &model.PlagiarismReport{
-		ContestID: req.ContestID,
+		ContestID: resolvedContestID,
 		Threshold: threshold,
 		CreatedBy: claims.UserID,
 	}
@@ -50,14 +59,20 @@ func (h *PlagiarismHandler) RunCheck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	go h.service.RunCheck(r.Context(), report.ID, req.ContestID, threshold)
+	go h.service.RunCheck(context.Background(), report.ID, resolvedContestID, threshold)
 
 	respondJSON(w, http.StatusAccepted, report)
 }
 
 func (h *PlagiarismHandler) GetReportByContest(w http.ResponseWriter, r *http.Request) {
 	contestID := chi.URLParam(r, "contestId")
-	report, err := h.store.GetReportByContest(r.Context(), contestID)
+	contest, err := h.contestStore.GetByID(r.Context(), contestID)
+	if err != nil || contest == nil {
+		http.Error(w, "contest not found", http.StatusNotFound)
+		return
+	}
+
+	report, err := h.store.GetReportByContest(r.Context(), contest.ID)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return

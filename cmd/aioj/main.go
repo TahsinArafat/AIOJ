@@ -189,7 +189,7 @@ func main() {
 
 	plagiarismStore := postgres.NewPlagiarismStore(db)
 	plagiarismService := plagiarism.NewService(plagiarismStore, contestStore, submissionStore)
-	plagiarismH := handler.NewPlagiarismHandler(plagiarismService, plagiarismStore)
+	plagiarismH := handler.NewPlagiarismHandler(plagiarismService, plagiarismStore, contestStore)
 
 	mediaH := handler.NewMediaHandler("./media")
 	onsiteH := handler.NewOnsiteHandler(balloonStore, printStore, contestStore)
