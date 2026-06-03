@@ -16,14 +16,16 @@ import (
 )
 
 type AuthHandler struct {
-	users            store.UserStore
-	refreshToks      store.RefreshTokenStore
+	users             store.UserStore
+	refreshToks       store.RefreshTokenStore
 	passwordResetToks store.PasswordResetTokenStore
-	jwt              *auth.JWTManager
+	onsiteStore       store.OnsiteUserStore
+	contestStore      store.ContestStore
+	jwt               *auth.JWTManager
 }
 
-func NewAuthHandler(users store.UserStore, refreshToks store.RefreshTokenStore, passwordResetToks store.PasswordResetTokenStore, jwt *auth.JWTManager) *AuthHandler {
-	return &AuthHandler{users: users, refreshToks: refreshToks, passwordResetToks: passwordResetToks, jwt: jwt}
+func NewAuthHandler(users store.UserStore, refreshToks store.RefreshTokenStore, passwordResetToks store.PasswordResetTokenStore, onsiteStore store.OnsiteUserStore, contestStore store.ContestStore, jwt *auth.JWTManager) *AuthHandler {
+	return &AuthHandler{users: users, refreshToks: refreshToks, passwordResetToks: passwordResetToks, onsiteStore: onsiteStore, contestStore: contestStore, jwt: jwt}
 }
 
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
@@ -70,12 +72,62 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid body", http.StatusBadRequest)
 		return
 	}
+
 	user, err := h.users.GetByUsername(r.Context(), req.Username)
-	if err != nil || user == nil || !auth.CheckPassword(req.Password, user.PasswordHash) {
+	if err == nil && user != nil && auth.CheckPassword(req.Password, user.PasswordHash) {
+		respondJSON(w, http.StatusOK, h.tokenResp(r.Context(), user))
+		return
+	}
+
+	onsiteUser, err := h.onsiteStore.GetByUsername(r.Context(), req.Username)
+	if err != nil || onsiteUser == nil || !auth.CheckPassword(req.Password, onsiteUser.PasswordHash) {
 		http.Error(w, "invalid credentials", http.StatusUnauthorized)
 		return
 	}
-	respondJSON(w, http.StatusOK, h.tokenResp(r.Context(), user))
+
+	var dbUser *model.User
+	if onsiteUser.IsUsed && onsiteUser.UsedBy != nil {
+		dbUser, err = h.users.GetByID(r.Context(), *onsiteUser.UsedBy)
+		if err != nil || dbUser == nil {
+			http.Error(w, "failed to retrieve user", http.StatusInternalServerError)
+			return
+		}
+	} else {
+		dbUser = &model.User{
+			ID:           uuid.New().String(),
+			Username:     onsiteUser.Username,
+			Email:        onsiteUser.Username + "@onsite.aioj",
+			PasswordHash: onsiteUser.PasswordHash,
+			Role:         "contestant",
+			IsBot:        false,
+		}
+		if err := h.users.Create(r.Context(), dbUser); err != nil {
+			http.Error(w, "failed to create user", http.StatusInternalServerError)
+			return
+		}
+		if err := h.onsiteStore.MarkUsed(r.Context(), onsiteUser.ID, dbUser.ID); err != nil {
+			http.Error(w, "failed to update credential state", http.StatusInternalServerError)
+			return
+		}
+		_ = h.onsiteStore.AutoRegister(r.Context(), onsiteUser.ContestID, dbUser.ID)
+	}
+
+	accessToken, err := h.jwt.GenerateAccessToken(dbUser.ID, dbUser.Username, dbUser.Role)
+	if err != nil {
+		http.Error(w, "failed to generate tokens", http.StatusInternalServerError)
+		return
+	}
+	rawRefresh, hashedRefresh := h.jwt.GenerateRefreshToken()
+	if err := h.refreshToks.Create(r.Context(), dbUser.ID, hashedRefresh, time.Now().Add(h.jwt.RefreshTTL())); err != nil {
+		http.Error(w, "failed to save refresh token", http.StatusInternalServerError)
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"access_token":  accessToken,
+		"refresh_token": rawRefresh,
+		"user":          dbUser,
+	})
 }
 
 func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {

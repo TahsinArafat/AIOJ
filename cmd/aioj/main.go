@@ -100,7 +100,8 @@ func main() {
 
 	wsManager := handler.NewWSManager()
 	passwordResetTokenStore := postgres.NewPasswordResetTokenStore(db)
-	authH := handler.NewAuthHandler(userStore, refreshTokenStore, passwordResetTokenStore, jwtManager)
+	onsiteUserStore := postgres.NewOnsiteUserStore(db)
+	authH := handler.NewAuthHandler(userStore, refreshTokenStore, passwordResetTokenStore, onsiteUserStore, contestStore, jwtManager)
 	problemH := handler.NewProblemHandler(problemStore)
 
 	botAccountStore := postgres.NewBotAccountStore(db)
@@ -193,7 +194,6 @@ func main() {
 
 	mediaH := handler.NewMediaHandler("./media")
 	onsiteH := handler.NewOnsiteHandler(balloonStore, printStore, contestStore)
-	onsiteUserStore := postgres.NewOnsiteUserStore(db)
 	onsiteBatchH := handler.NewOnsiteBatchHandler(contestStore, onsiteUserStore, userStore, refreshTokenStore, jwtManager)
 
 	clarificationStore := postgres.NewClarificationStore(db)
