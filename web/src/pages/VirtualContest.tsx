@@ -1,7 +1,8 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { api, getAccessToken } from '../lib/api'
+import { api, getAccessToken, contestSlug } from '../lib/api'
 import { resolveProblemSlug, resolveProblemTitle } from '../lib/problemSlugResolver'
+import { useTheme } from '../context/ThemeContext'
 
 function formatTime(seconds: number): string {
     const h = Math.floor(seconds / 3600)
@@ -11,17 +12,17 @@ function formatTime(seconds: number): string {
 }
 
 function timerColor(remainingSeconds: number): string {
-    if (remainingSeconds > 1800) return 'text-emerald-600'
-    if (remainingSeconds > 300) return 'text-amber-500'
-    if (remainingSeconds > 60) return 'text-red-500'
-    return 'text-red-600 animate-pulse'
+    if (remainingSeconds > 1800) return 'text-emerald-600 dark:text-emerald-400'
+    if (remainingSeconds > 300) return 'text-amber-500 dark:text-amber-400'
+    if (remainingSeconds > 60) return 'text-red-500 dark:text-red-400'
+    return 'text-red-600 dark:text-red-400 animate-pulse'
 }
 
 function timerBg(remainingSeconds: number): string {
-    if (remainingSeconds > 1800) return 'bg-emerald-50 border-emerald-200'
-    if (remainingSeconds > 300) return 'bg-amber-50 border-amber-200'
-    if (remainingSeconds > 60) return 'bg-red-50 border-red-200'
-    return 'bg-red-100 border-red-300'
+    if (remainingSeconds > 1800) return 'bg-emerald-50 border-emerald-200 dark:bg-emerald-900/30 dark:border-emerald-700'
+    if (remainingSeconds > 300) return 'bg-amber-50 border-amber-200 dark:bg-amber-900/30 dark:border-amber-700'
+    if (remainingSeconds > 60) return 'bg-red-50 border-red-200 dark:bg-red-900/30 dark:border-red-700'
+    return 'bg-red-100 border-red-300 dark:bg-red-900/50 dark:border-red-700'
 }
 
 function progressBarColor(remainingSeconds: number): string {
@@ -31,8 +32,10 @@ function progressBarColor(remainingSeconds: number): string {
 }
 
 export default function VirtualContest() {
+    const { theme } = useTheme()
     const [virtualStatus, setVirtualStatus] = useState<any>(null)
     const [contestData, setContestData] = useState<any>(null)
+    const { contest, problems } = contestData || {}
     const [loading, setLoading] = useState(true)
     const [completed, setCompleted] = useState(false)
     const [problemSlugs, setProblemSlugs] = useState<Map<string, string>>(new Map())
@@ -149,10 +152,12 @@ export default function VirtualContest() {
     if (completed) {
         return (
             <div className="text-center py-16">
-                <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-10 max-w-lg mx-auto relative overflow-hidden">
+                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm p-10 max-w-lg mx-auto relative overflow-hidden">
                     <div className="absolute inset-0 pointer-events-none opacity-10"
                         style={{
-                            background: 'repeating-linear-gradient(45deg, transparent, transparent 10px, #f0abfc 10px, #f0abfc 20px), repeating-linear-gradient(-45deg, transparent, transparent 10px, #93c5fd 10px, #93c5fd 20px)',
+                            background: theme === 'dark'
+                                ? 'repeating-linear-gradient(45deg, transparent, transparent 10px, #a855f7 10px, #a855f7 20px), repeating-linear-gradient(-45deg, transparent, transparent 10px, #3b82f6 10px, #3b82f6 20px)'
+                                : 'repeating-linear-gradient(45deg, transparent, transparent 10px, #f0abfc 10px, #f0abfc 20px), repeating-linear-gradient(-45deg, transparent, transparent 10px, #93c5fd 10px, #93c5fd 20px)',
                         }}
                     />
                     <div className="relative">
@@ -171,9 +176,9 @@ export default function VirtualContest() {
                             </div>
                         </div>
                         <div className="flex gap-3 justify-center">
-                            {virtualStatus?.original_contest_id && (
+                            {contest && (
                                 <Link
-                                    to={`/contests/${virtualStatus.original_contest_id}/scoreboard`}
+                                    to={`/contests/${contestSlug(contest)}/scoreboard`}
                                     className="text-blue-600 hover:underline text-sm"
                                 >
                                     View Scoreboard
@@ -189,7 +194,6 @@ export default function VirtualContest() {
         )
     }
 
-    const { contest, problems } = contestData || {}
     const totalDuration = contest
         ? Math.floor((new Date(contest.end_time).getTime() - new Date(contest.start_time).getTime()) / 1000)
         : 1
