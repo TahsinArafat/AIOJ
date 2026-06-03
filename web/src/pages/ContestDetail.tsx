@@ -296,6 +296,7 @@ export default function ContestDetail() {
     const [subFilterProblem, setSubFilterProblem] = useState('')
     const [subFilterLang, setSubFilterLang] = useState('')
     const [subFilterStatus, setSubFilterStatus] = useState('')
+    const [subFilterId, setSubFilterId] = useState('')
     const [isJudge, setIsJudge] = useState(false)
 
     useEffect(() => {
@@ -359,6 +360,22 @@ export default function ContestDetail() {
             }).catch(() => {})
         }
     }, [activeTab, id, submissionsOffset, submissionsMine, subFilterProblem, subFilterLang, subFilterStatus])
+
+    const filteredSubmissions = useMemo(() => {
+        let result = submissions
+        if (subFilterId) {
+            result = result.filter((s: any) => s.id?.toLowerCase().includes(subFilterId.toLowerCase()))
+        }
+        if (contest?.freeze_time) {
+            const freezeTime = new Date(contest.freeze_time).getTime()
+            const now = Date.now()
+            const endTime = new Date(contest.end_time).getTime()
+            if (now >= freezeTime && now < endTime) {
+                result = result.filter((s: any) => new Date(s.created_at).getTime() < freezeTime)
+            }
+        }
+        return result
+    }, [submissions, subFilterId, contest])
 
     useEffect(() => {
         if (!id) return
@@ -502,9 +519,9 @@ export default function ContestDetail() {
             </div>
 
             {/* ── Main Layout: Content + Sidebar ───────────────────────────── */}
-            <div className={`items-start ${activeTab === 'standings' ? '' : 'flex gap-6'}`}>
+            <div className={`items-start ${activeTab === 'standings' || activeTab === 'submissions' ? '' : 'flex gap-6'}`}>
                 {/* Left: Main Content */}
-                <div className={activeTab === 'standings' ? '' : 'flex-1 min-w-0'}>
+                <div className={activeTab === 'standings' || activeTab === 'submissions' ? '' : 'flex-1 min-w-0'}>
                     {activeTab === 'problems' && (
                         <div>
                             <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">Problems</h2>
@@ -770,6 +787,13 @@ export default function ContestDetail() {
                                 )}
                             </div>
 
+                            {status === 'frozen' && (
+                                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-2">
+                                    <Clock className="w-4 h-4 text-blue-600" />
+                                    <span className="text-sm text-blue-700">Standings frozen — only submissions before freeze are shown.</span>
+                                </div>
+                            )}
+
                             {/* Filter controls */}
                             {getAccessToken() && (
                                 <div className="flex flex-wrap items-center gap-3 mb-4 p-3 bg-gray-50 dark:bg-gray-900/20 border border-gray-200 dark:border-gray-700 rounded-lg">
@@ -810,9 +834,16 @@ export default function ContestDetail() {
                                         <option value="pending">Pending</option>
                                         <option value="judging">Judging</option>
                                     </select>
-                                    {(subFilterProblem || subFilterLang || subFilterStatus) && (
+                                    <input
+                                        type="text"
+                                        value={subFilterId}
+                                        onChange={e => { setSubFilterId(e.target.value); setSubmissionsOffset(0) }}
+                                        placeholder="Submission ID..."
+                                        className="text-sm border border-gray-200 dark:border-gray-700 rounded-md px-2.5 py-1.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent w-44"
+                                    />
+                                    {(subFilterProblem || subFilterLang || subFilterStatus || subFilterId) && (
                                         <button
-                                            onClick={() => { setSubFilterProblem(''); setSubFilterLang(''); setSubFilterStatus(''); setSubmissionsOffset(0) }}
+                                            onClick={() => { setSubFilterProblem(''); setSubFilterLang(''); setSubFilterStatus(''); setSubFilterId(''); setSubmissionsOffset(0) }}
                                             className="text-xs text-gray-500 hover:text-red-600 font-medium"
                                         >
                                             Clear Filters
@@ -826,11 +857,11 @@ export default function ContestDetail() {
                                     <Send className="w-12 h-12 text-gray-700 dark:text-gray-300 mx-auto mb-3" />
                                     <p className="text-gray-500 dark:text-gray-400">Please log in to view submissions.</p>
                                 </div>
-                            ) : submissions.length === 0 ? (
+                            ) : filteredSubmissions.length === 0 ? (
                                 <div className="text-center py-16">
                                     <Send className="w-12 h-12 text-gray-700 dark:text-gray-300 mx-auto mb-3" />
                                     <p className="text-gray-500 font-medium">No submissions found</p>
-                                    {(subFilterProblem || subFilterLang || subFilterStatus) && (
+                                    {(subFilterProblem || subFilterLang || subFilterStatus || subFilterId) && (
                                         <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">Try adjusting your filters</p>
                                     )}
                                 </div>
@@ -852,7 +883,7 @@ export default function ContestDetail() {
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {submissions.map((s: any, i: number) => {
+                                                {filteredSubmissions.map((s: any, i: number) => {
                                                     const verdictCls: Record<string, string> = {
                                                         ac: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-300 dark:border-green-700',
                                                         wa: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-300 dark:border-red-700',
@@ -1053,8 +1084,8 @@ export default function ContestDetail() {
                     )}
                 </div>
 
-                {/* Right: Sidebar — hidden on standings tab to maximize table width */}
-                {activeTab !== 'standings' && (
+                {/* Right: Sidebar — hidden on standings/submissions tab to maximize table width */}
+                {activeTab !== 'standings' && activeTab !== 'submissions' && (
                 <div className="w-80 flex-shrink-0 space-y-4 hidden lg:block">
                     {/* Contest Info */}
                     <SidebarBox title="Contest Info" icon="info">
