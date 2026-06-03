@@ -906,7 +906,7 @@ function OnsiteTeamsTab({ contestId }: { contestId: string }) {
 function SettingsTab({ contestId }: { contestId: string }) {
     const [form, setForm] = useState({
         title: '', description: '', start_time: '', end_time: '', freeze_time: '',
-        password: '', pdf_enabled: true, statement_hidden: false,
+        password: '', has_password: false, pdf_enabled: true, statement_hidden: false,
         upsolving_enabled: true, virtual_contest_enabled: true,
         visibility: 'public',
         group_id: '',
@@ -922,7 +922,7 @@ function SettingsTab({ contestId }: { contestId: string }) {
             let vis = 'public'
             if (c.group_id) {
                 vis = 'group'
-            } else if (c.password) {
+            } else if (c.has_password) {
                 vis = 'private'
             }
             setForm({
@@ -931,7 +931,8 @@ function SettingsTab({ contestId }: { contestId: string }) {
                 start_time: c.start_time ? new Date(c.start_time).toISOString().slice(0, 16) : '',
                 end_time: c.end_time ? new Date(c.end_time).toISOString().slice(0, 16) : '',
                 freeze_time: c.freeze_time ? new Date(c.freeze_time).toISOString().slice(0, 16) : '',
-                password: c.password || '',
+                password: '',
+                has_password: !!c.has_password,
                 pdf_enabled: c.pdf_enabled ?? true,
                 statement_hidden: c.statement_hidden ?? false,
                 upsolving_enabled: c.upsolving_enabled ?? true,
@@ -950,7 +951,7 @@ function SettingsTab({ contestId }: { contestId: string }) {
         if (!form.title.trim()) { setError('Title is required'); return }
         if (!form.start_time || !form.end_time) { setError('Start and end time required'); return }
         if (new Date(form.end_time) <= new Date(form.start_time)) { setError('End must be after start'); return }
-        if (form.visibility === 'private' && !form.password.trim()) { setError('Password is required for Private contests'); return }
+        if (form.visibility === 'private' && !form.has_password && !form.password.trim()) { setError('Password is required for Private contests'); return }
         if (form.visibility === 'group' && !form.group_id) { setError('Please select a group'); return }
         setError('')
         setSaving(true)
@@ -961,7 +962,8 @@ function SettingsTab({ contestId }: { contestId: string }) {
                 start_time: new Date(form.start_time).toISOString(),
                 end_time: new Date(form.end_time).toISOString(),
                 freeze_time: form.freeze_time ? new Date(form.freeze_time).toISOString() : undefined,
-                password: form.visibility === 'private' ? form.password : '',
+                visible: true,
+                password: form.visibility === 'private' ? (form.password.trim() || undefined) : '',
                 group_id: form.visibility === 'group' ? form.group_id : '',
                 pdf_enabled: form.pdf_enabled,
                 statement_hidden: form.statement_hidden,
@@ -1030,8 +1032,8 @@ function SettingsTab({ contestId }: { contestId: string }) {
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Contest Password</label>
                         <input value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))}
-                            placeholder="Enter password for private access..."
-                            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" required />
+                            placeholder={form.has_password ? "•••••••• (leave blank to keep current)" : "Enter password for private access..."}
+                            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
                     </div>
                 )}
 

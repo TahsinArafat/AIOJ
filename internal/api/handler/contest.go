@@ -112,6 +112,11 @@ func (h *ContestHandler) Create(w http.ResponseWriter, r *http.Request) {
 		formatConfigJSON = f.DefaultConfig()
 	}
 
+	password := ""
+	if req.Password != nil {
+		password = *req.Password
+	}
+
 	c := &model.Contest{
 		ID:           uuid.New().String(),
 		Slug:         req.Slug,
@@ -122,7 +127,7 @@ func (h *ContestHandler) Create(w http.ResponseWriter, r *http.Request) {
 		StartTime:    req.StartTime,
 		EndTime:      req.EndTime,
 		FreezeTime:   req.FreezeTime,
-		Password:     req.Password,
+		Password:     password,
 		Description:  req.Description,
 		Visible:      true,
 		GroupID:      req.GroupID,
@@ -173,6 +178,9 @@ func (h *ContestHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "forbidden", http.StatusForbidden)
 			return
 		}
+	}
+	if !isManager {
+		c.Password = ""
 	}
 	problems, _ := h.store.GetProblems(r.Context(), c.ID)
 	respondJSON(w, http.StatusOK, map[string]interface{}{"contest": c, "problems": problems})
@@ -237,8 +245,8 @@ func (h *ContestHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if req.FreezeTime != nil {
 		c.FreezeTime = req.FreezeTime
 	}
-	if req.Password != "" {
-		c.Password = req.Password
+	if req.Password != nil {
+		c.Password = *req.Password
 	}
 	if req.Description != "" {
 		c.Description = req.Description
@@ -254,6 +262,9 @@ func (h *ContestHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.VirtualContestEnabled != nil {
 		c.VirtualContestEnabled = *req.VirtualContestEnabled
+	}
+	if req.Visible != nil {
+		c.Visible = *req.Visible
 	}
 	c.GroupID = req.GroupID
 	if req.Slug != "" {

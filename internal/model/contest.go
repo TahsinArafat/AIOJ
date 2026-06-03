@@ -17,6 +17,7 @@ type Contest struct {
 	EndTime              time.Time  `json:"end_time"`
 	FreezeTime           *time.Time `json:"freeze_time,omitempty"`
 	Password             string     `json:"-"`
+	HasPassword          bool       `json:"has_password"`
 	Visible              bool       `json:"visible"`
 	Description          string     `json:"description,omitempty"`
 	RegistrationRequired bool       `json:"registration_required"`
@@ -89,8 +90,9 @@ type CreateContestRequest struct {
 	StartTime   time.Time  `json:"start_time"`
 	EndTime     time.Time  `json:"end_time"`
 	FreezeTime  *time.Time `json:"freeze_time,omitempty"`
-	Password    string     `json:"password,omitempty"`
+	Password    *string    `json:"password"`
 	Description string     `json:"description,omitempty"`
+	Visible     *bool      `json:"visible,omitempty"`
 	ProblemIDs  []string   `json:"problem_ids"`
 	PDFEnabled  *bool      `json:"pdf_enabled,omitempty"`
 	StatementHidden *bool  `json:"statement_hidden,omitempty"`

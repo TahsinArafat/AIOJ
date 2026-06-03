@@ -91,13 +91,13 @@ func (s *ContestStore) getByWhere(ctx context.Context, where string, args ...int
 	var slug sql.NullString
 	var groupID sql.NullString
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id,display_id,slug,title,type,format,format_config,start_time,end_time,freeze_time,visible,description,
+		`SELECT id,display_id,slug,title,type,format,format_config,start_time,end_time,freeze_time,password,visible,description,
 		        registration_required,registration_deadline,max_participants,division,educational_config,
 		        upsolving_enabled,virtual_contest_enabled,pdf_enabled,statement_hidden,created_by,created_at,
 		        (SELECT group_id::text FROM group_contests WHERE contest_id = id LIMIT 1) AS group_id
 		 FROM contests WHERE `+where, args...).Scan(
 		&c.ID, &c.DisplayID, &slug, &c.Title, &c.Type, &c.Format, &formatConfigJSON, &c.StartTime, &c.EndTime, &c.FreezeTime,
-		&c.Visible, &c.Description,
+		&c.Password, &c.Visible, &c.Description,
 		&c.RegistrationRequired, &c.RegistrationDeadline, &c.MaxParticipants,
 		&c.Division, &configJSON,
 		&c.UpsolvingEnabled, &c.VirtualContestEnabled, &c.PDFEnabled, &c.StatementHidden,
@@ -123,6 +123,9 @@ func (s *ContestStore) getByWhere(ctx context.Context, where string, args ...int
 	if len(formatConfigJSON) > 0 {
 		c.FormatConfig = formatConfigJSON
 	}
+	if c.Password != "" {
+		c.HasPassword = true
+	}
 	return &c, nil
 }
 
@@ -143,7 +146,7 @@ func (s *ContestStore) ListWithDivision(ctx context.Context, offset, limit int, 
 	}
 	s.db.QueryRowContext(ctx, countQuery, args...).Scan(&total)
 
-	rowsQuery := `SELECT id,display_id,slug,title,type,format,format_config,start_time,end_time,visible,description,
+	rowsQuery := `SELECT id,display_id,slug,title,type,format,format_config,start_time,end_time,freeze_time,password,visible,description,
 	              registration_required,registration_deadline,max_participants,division,educational_config,
 	              created_at
 	              FROM contests WHERE visible=true`
@@ -165,7 +168,7 @@ func (s *ContestStore) ListWithDivision(ctx context.Context, offset, limit int, 
 		var configJSON []byte
 		var formatConfigJSON []byte
 		var slug sql.NullString
-		rows.Scan(&c.ID, &c.DisplayID, &slug, &c.Title, &c.Type, &c.Format, &formatConfigJSON, &c.StartTime, &c.EndTime, &c.Visible, &c.Description,
+		rows.Scan(&c.ID, &c.DisplayID, &slug, &c.Title, &c.Type, &c.Format, &formatConfigJSON, &c.StartTime, &c.EndTime, &c.FreezeTime, &c.Password, &c.Visible, &c.Description,
 			&c.RegistrationRequired, &c.RegistrationDeadline, &c.MaxParticipants, &c.Division, &configJSON, &c.CreatedAt)
 		if slug.Valid {
 			c.Slug = slug.String
@@ -178,6 +181,9 @@ func (s *ContestStore) ListWithDivision(ctx context.Context, offset, limit int, 
 		}
 		if len(formatConfigJSON) > 0 {
 			c.FormatConfig = formatConfigJSON
+		}
+		if c.Password != "" {
+			c.HasPassword = true
 		}
 		items = append(items, c)
 	}
