@@ -16,6 +16,8 @@ type GymContest struct {
 	ID               string    `json:"id"`
 	ContestID        string    `json:"contest_id"`
 	ContestTitle     string    `json:"contest_title,omitempty"`
+	ContestSlug      string    `json:"contest_slug,omitempty"`
+	ContestDisplayID int       `json:"contest_display_id,omitempty"`
 	DifficultyRating *int      `json:"difficulty_rating,omitempty"`
 	Category         string    `json:"category"`
 	Country          string    `json:"country,omitempty"`

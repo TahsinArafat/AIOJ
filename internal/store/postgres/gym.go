@@ -31,14 +31,15 @@ func (s *GymStore) GetByID(ctx context.Context, id string) (*model.GymContest, e
 		return nil, nil
 	}
 	var g model.GymContest
+	var slug sql.NullString
 	err := s.db.QueryRowContext(ctx,
-		`SELECT g.id, g.contest_id, c.title, g.difficulty_rating, g.category, g.country, g.season,
+		`SELECT g.id, g.contest_id, c.title, c.slug, c.display_id, g.difficulty_rating, g.category, g.country, g.season,
 		        g.description, g.is_public, g.solve_count, g.created_by, u.username, g.created_at
 		 FROM gym_contests g
 		 JOIN contests c ON g.contest_id = c.id
 		 JOIN users u ON g.created_by = u.id
 		 WHERE g.id = $1`,
-		id).Scan(&g.ID, &g.ContestID, &g.ContestTitle, &g.DifficultyRating, &g.Category,
+		id).Scan(&g.ID, &g.ContestID, &g.ContestTitle, &slug, &g.ContestDisplayID, &g.DifficultyRating, &g.Category,
 		&g.Country, &g.Season, &g.Description, &g.IsPublic, &g.SolveCount,
 		&g.CreatedBy, &g.CreatorName, &g.CreatedAt)
 	if err == sql.ErrNoRows {
@@ -46,6 +47,9 @@ func (s *GymStore) GetByID(ctx context.Context, id string) (*model.GymContest, e
 	}
 	if err != nil {
 		return nil, err
+	}
+	if slug.Valid {
+		g.ContestSlug = slug.String
 	}
 	return &g, nil
 }
@@ -92,7 +96,7 @@ func (s *GymStore) List(ctx context.Context, offset, limit int, filter model.Gym
 		"SELECT COUNT(*) FROM gym_contests g JOIN contests c ON g.contest_id = c.id WHERE "+whereClause,
 		args...).Scan(&total)
 
-	query := fmt.Sprintf(`SELECT g.id, g.contest_id, c.title, g.difficulty_rating, g.category, g.country,
+	query := fmt.Sprintf(`SELECT g.id, g.contest_id, c.title, c.slug, c.display_id, g.difficulty_rating, g.category, g.country,
 	                              g.season, g.description, g.is_public, g.solve_count, g.created_by, u.username, g.created_at
 	                      FROM gym_contests g
 	                      JOIN contests c ON g.contest_id = c.id
@@ -111,10 +115,14 @@ func (s *GymStore) List(ctx context.Context, offset, limit int, filter model.Gym
 	var items []model.GymContest
 	for rows.Next() {
 		var g model.GymContest
-		if err := rows.Scan(&g.ID, &g.ContestID, &g.ContestTitle, &g.DifficultyRating, &g.Category,
+		var slug sql.NullString
+		if err := rows.Scan(&g.ID, &g.ContestID, &g.ContestTitle, &slug, &g.ContestDisplayID, &g.DifficultyRating, &g.Category,
 			&g.Country, &g.Season, &g.Description, &g.IsPublic, &g.SolveCount,
 			&g.CreatedBy, &g.CreatorName, &g.CreatedAt); err != nil {
 			return nil, 0, err
+		}
+		if slug.Valid {
+			g.ContestSlug = slug.String
 		}
 		items = append(items, g)
 	}
