@@ -59,11 +59,12 @@ type ContestHandler struct {
 	store        *postgres.ContestStore
 	ratingStore  *postgres.RatingStore
 	problemStore store.ProblemStore
+	userStore    store.UserStore
 	cache        *scoreboardCache
 }
 
-func NewContestHandler(s *postgres.ContestStore, rs *postgres.RatingStore, ps store.ProblemStore) *ContestHandler {
-	return &ContestHandler{store: s, ratingStore: rs, problemStore: ps, cache: newScoreboardCache(30 * time.Second)}
+func NewContestHandler(s *postgres.ContestStore, rs *postgres.RatingStore, ps store.ProblemStore, us store.UserStore) *ContestHandler {
+	return &ContestHandler{store: s, ratingStore: rs, problemStore: ps, userStore: us, cache: newScoreboardCache(30 * time.Second)}
 }
 
 func (h *ContestHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -183,6 +184,8 @@ func (h *ContestHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 		c.Password = ""
 	}
 	problems, _ := h.store.GetProblems(r.Context(), c.ID)
+	ratings, _ := h.ratingStore.GetByContest(r.Context(), c.ID)
+	c.RatingCalculated = len(ratings) > 0
 	respondJSON(w, http.StatusOK, map[string]interface{}{"contest": c, "problems": problems})
 }
 
@@ -491,6 +494,9 @@ func (h *ContestHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 	}
 	pagedEntries := entries[start:end]
 
+	ratingsForSB, _ := h.ratingStore.GetByContest(r.Context(), contest.ID)
+	contest.RatingCalculated = len(ratingsForSB) > 0
+
 	respondData := map[string]interface{}{
 		"entries": pagedEntries, "problems": problems,
 		"frozen": frozen, "contest": contest,
@@ -604,7 +610,7 @@ func (h *ContestHandler) CalculateRatings(w http.ResponseWriter, r *http.Request
 	standings := make([]rating.ContestStanding, 0, len(participants))
 	for i, uid := range participants {
 		latest, _ := h.ratingStore.GetLatestByUser(r.Context(), uid)
-		oldRating := rating.DefaultRating
+		oldRating := 0
 		if latest != nil {
 			oldRating = latest.NewRating
 		}
@@ -617,8 +623,13 @@ func (h *ContestHandler) CalculateRatings(w http.ResponseWriter, r *http.Request
 		})
 	}
 
-	ratingService := rating.NewService(h.ratingStore, nil)
+	ratingService := rating.NewService(h.ratingStore, h.userStore)
 	changes := ratingService.CalculateContestRatings(standings)
+
+	if err := ratingService.ApplyContestRatings(r.Context(), contest.ID, changes); err != nil {
+		http.Error(w, "failed to apply ratings", http.StatusInternalServerError)
+		return
+	}
 
 	respondJSON(w, http.StatusOK, map[string]interface{}{
 		"changes": changes,

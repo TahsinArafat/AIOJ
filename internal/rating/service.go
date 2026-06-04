@@ -64,6 +64,23 @@ func (s *Service) ApplyContestRatings(ctx context.Context, contestID string, cha
 		if err := s.ratingStore.CreateHistory(ctx, h); err != nil {
 			return err
 		}
+
+		if s.userStore != nil {
+			profile, err := s.userStore.GetProfile(ctx, change.UserID)
+			if err != nil {
+				return err
+			}
+			if profile != nil {
+				profile.Rating = change.NewRating
+				if change.NewRating > profile.MaxRating {
+					profile.MaxRating = change.NewRating
+				}
+				profile.ContestCount++
+				if err := s.userStore.UpdateRating(ctx, change.UserID, profile.Rating, profile.MaxRating, profile.ContestCount); err != nil {
+					return err
+				}
+			}
+		}
 	}
 
 	return nil

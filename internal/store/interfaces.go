@@ -13,9 +13,12 @@ type UserStore interface {
 	GetByUsername(ctx context.Context, username string) (*model.User, error)
 	GetByEmail(ctx context.Context, email string) (*model.User, error)
 	GetPublicProfile(ctx context.Context, username string) (*model.PublicProfile, error)
+	GetProfile(ctx context.Context, userID string) (*model.UserProfile, error)
+	UpdateProfile(ctx context.Context, userID string, p *model.UserProfile) error
 	ListUsers(ctx context.Context, offset, limit int) ([]model.User, int, error)
 	UpdateRole(ctx context.Context, id, role string) error
 	UpdatePassword(ctx context.Context, id, passwordHash string) error
+	UpdateRating(ctx context.Context, userID string, rating, maxRating, contestCount int) error
 }
 
 type ProblemStore interface {
@@ -142,6 +145,7 @@ type NotificationStore interface {
 type GroupStore interface {
 	Create(ctx context.Context, g *model.Group) error
 	GetByID(ctx context.Context, id string) (*model.Group, error)
+	GetByInviteCode(ctx context.Context, code string) (*model.Group, error)
 	List(ctx context.Context, offset, limit int) ([]model.GroupListItem, int, error)
 	ListByUser(ctx context.Context, userID string) ([]model.GroupListItem, error)
 	Update(ctx context.Context, id string, g *model.Group) error
@@ -154,6 +158,10 @@ type GroupStore interface {
 	AddContest(ctx context.Context, groupID, contestID string) error
 	RemoveContest(ctx context.Context, groupID, contestID string) error
 	GetContests(ctx context.Context, groupID string) ([]model.Contest, error)
+	GetMemberRole(ctx context.Context, groupID, userID string) (string, error)
+	UpdateMemberRole(ctx context.Context, groupID, userID, role string) error
+	GetPendingMembers(ctx context.Context, groupID string) ([]model.GroupMember, error)
+	GetUserPendingInvites(ctx context.Context, userID string) ([]model.GroupPendingInvite, error)
 }
 
 type TeamStore interface {
@@ -168,6 +176,10 @@ type TeamStore interface {
 	IsMember(ctx context.Context, teamID, userID string) (bool, error)
 	GetUserTeams(ctx context.Context, userID string) ([]model.TeamListItem, error)
 	UpdateRating(ctx context.Context, teamID string, newRating int) error
+	GetMemberRole(ctx context.Context, teamID, userID string) (string, error)
+	UpdateMemberRole(ctx context.Context, teamID, userID, role string) error
+	GetPendingMembers(ctx context.Context, teamID string) ([]model.TeamMember, error)
+	GetUserPendingInvites(ctx context.Context, userID string) ([]model.PendingInvite, error)
 }
 
 type BlogStore interface {

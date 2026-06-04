@@ -35,6 +35,7 @@ type Contest struct {
 	PDFEnabled           bool       `json:"pdf_enabled"`
 	StatementHidden      bool       `json:"statement_hidden"`
 	GroupID              string     `json:"group_id,omitempty"`
+	RatingCalculated     bool       `json:"rating_calculated"`
 	CreatedBy            string     `json:"created_by"`
 	CreatedAt            time.Time  `json:"created_at"`
 }

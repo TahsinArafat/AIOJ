@@ -111,7 +111,7 @@ func main() {
 	cfSubmit := vjudge.NewCFSubmitClient("http://host.docker.internal:8003")
 
 	submissionH := handler.NewSubmissionHandler(submissionStore, problemStore, contestStore, judgeQueue, wsManager, execClient, cfg.LangDir, vjService)
-	contestH := handler.NewContestHandler(contestStore, ratingStore, problemStore)
+contestH := handler.NewContestHandler(contestStore, ratingStore, problemStore, userStore)
 	contestProblemH := handler.NewContestProblemHandler(contestStore, problemStore)
 
 	platforms := []string{"codeforces", "atcoder", "cses", "toph", "qoj"}
@@ -164,9 +164,9 @@ func main() {
 	notifStore := postgres.NewNotificationStore(db)
 	notifH := handler.NewNotificationHandler(notifStore)
 	groupStore := postgres.NewGroupStore(db)
-	groupH := handler.NewGroupHandler(groupStore)
+	groupH := handler.NewGroupHandler(groupStore, userStore)
 	teamStore := postgres.NewTeamStore(db)
-	teamH := handler.NewTeamHandler(teamStore)
+	teamH := handler.NewTeamHandler(teamStore, userStore)
 	blogStore := postgres.NewBlogStore(db)
 	blogH := handler.NewBlogHandler(blogStore)
 	editorialStore := postgres.NewEditorialStore(db)
@@ -177,7 +177,7 @@ func main() {
 	webhookH := handler.NewWebhookHandler(webhookStore)
 	recommendationH := handler.NewRecommendationHandler(problemStore, ratingStore)
 	rankingsH := handler.NewRankingsHandler(userStore)
-	usersH := handler.NewUsersHandler(userStore, blogStore, submissionStore)
+	usersH := handler.NewUsersHandler(userStore, blogStore, submissionStore, teamStore, groupStore)
 	searchStore := postgres.NewSearchStore(db)
 	searchH := handler.NewSearchHandler(searchStore)
 

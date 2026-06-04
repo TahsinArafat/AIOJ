@@ -73,6 +73,10 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 	r.Get("/api/users/{username}/submissions", usersH.GetUserSubmissions)
 	r.Get("/api/users/{username}/blogs", usersH.GetUserBlogs)
 	r.Get("/api/users/{username}/comments", usersH.GetUserComments)
+	r.With(middleware.AuthMiddleware(jwtManager)).Get("/api/users/profile/edit", usersH.GetProfile)
+	r.With(middleware.AuthMiddleware(jwtManager)).Put("/api/users/profile/edit", usersH.UpdateProfile)
+	r.With(middleware.AuthMiddleware(jwtManager)).Put("/api/users/profile/password", usersH.UpdatePassword)
+	r.With(middleware.AuthMiddleware(jwtManager)).Get("/api/users/profile/invites", usersH.GetUserPendingInvites)
 
 	r.Route("/api/problems", func(r chi.Router) {
 		r.Get("/", problemH.List)
@@ -250,6 +254,7 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 	r.Route("/api/rating", func(r chi.Router) {
 		r.Get("/user/{userId}", ratingH.GetByUser)
 		r.Get("/contest/{contestId}", ratingH.GetByContest)
+		r.Post("/calculate/{id}", contestH.CalculateRatings)
 	})
 
 	r.Get("/api/rankings", rankingsH.List)
@@ -298,6 +303,7 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 
 	r.Route("/api/groups", func(r chi.Router) {
 		r.Get("/", groupH.List)
+		r.With(middleware.AuthMiddleware(jwtManager)).Post("/join-code", groupH.JoinByCode)
 		r.Get("/{id}", groupH.GetByID)
 		r.Get("/{id}/members", groupH.GetMembers)
 		r.Get("/{id}/contests", groupH.GetContests)
@@ -311,6 +317,9 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 			r.Post("/{id}/leave", groupH.Leave)
 			r.Post("/{id}/contests", groupH.AddContest)
 			r.Delete("/{id}/contests/{contestId}", groupH.RemoveContest)
+			r.Post("/{id}/invite", groupH.InviteMember)
+			r.Post("/{id}/respond", groupH.RespondInviteRequest)
+			r.Get("/{id}/pending", groupH.GetPendingMembers)
 		})
 	})
 
@@ -323,6 +332,12 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 			r.Post("/", teamH.Create)
 			r.Post("/{id}/join", teamH.Join)
 			r.Post("/{id}/leave", teamH.Leave)
+			r.Put("/{id}", teamH.UpdateTeam)
+			r.Delete("/{id}", teamH.DeleteTeam)
+			r.Post("/{id}/invite", teamH.InviteMember)
+			r.Post("/{id}/request", teamH.RequestJoin)
+			r.Post("/{id}/respond", teamH.RespondInviteRequest)
+			r.Get("/{id}/pending", teamH.GetPendingMembers)
 		})
 	})
 
