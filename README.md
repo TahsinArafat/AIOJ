@@ -179,7 +179,7 @@ To                         Action      From
 #### 4d. Clone AIOJ
 
 ```bash
-git clone https://github.com/yourusername/AIOJ.git /opt/aioj
+git clone https://github.com/TahsinArafat/AIOJ.git /opt/aioj
 cd /opt/aioj
 ```
 
@@ -289,7 +289,12 @@ Open your browser and go to `https://myoj.com`. You should see:
 - The AIOJ login page
 - A **padlock icon** (🔒) in the address bar — means HTTPS is working
 
-**If you see a "Secure Connection Failed" error:** wait 1–2 minutes, then try again. Let's Encrypt takes a moment to issue the certificate on first run.
+**If you see a "Secure Connection Failed" error or `ERR_SSL_PROTOCOL_ERROR`:**
+
+- Wait 1–2 minutes, then refresh. Let's Encrypt takes a moment to issue the certificate on first run.
+- Check Caddy's logs for the exact error: `docker compose logs caddy --tail 20`
+- **Let's Encrypt rate limit?** If you see `too many certificates (50) already issued for "example.tld"`, the domain suffix has hit its weekly limit. Common with cheap/free subdomain providers. Either wait (up to 7 days) or use a different domain. To switch domains: edit `deploy/Caddyfile` → run `docker compose stop caddy && docker compose rm -f caddy` → `docker volume rm aioj_caddy_data aioj_caddy_config` → restart.
+- If you just want to run on plain HTTP temporarily, skip Caddy entirely: `docker compose stop caddy && docker compose rm -f caddy`, then uncomment `80:80` under the `frontend` service and run `docker compose up -d frontend`.
 
 ---
 
@@ -551,7 +556,8 @@ cat > ~/Library/LaunchAgents/com.aioj.cf-submit.plist << 'EOF'
     <key>ProgramArguments</key>
     <array>
         <string>/usr/bin/python3</string>
-        <string>/path/to/AIOJ/deploy/cf-submit/server.py</string>
+        <!-- ⚠️ Replace /opt/aioj with your actual AIOJ path below -->
+        <string>/opt/aioj/deploy/cf-submit/server.py</string>
     </array>
     <key>EnvironmentVariables</key>
     <dict>
@@ -570,7 +576,9 @@ cat > ~/Library/LaunchAgents/com.aioj.cf-submit.plist << 'EOF'
 </plist>
 EOF
 
-# Replace /path/to/AIOJ with the actual path, then load:
+# ⚠️ After creating the file, edit it and replace /opt/aioj with your actual path:
+# nano ~/Library/LaunchAgents/com.aioj.cf-submit.plist
+
 launchctl load ~/Library/LaunchAgents/com.aioj.cf-submit.plist
 ```
 
@@ -581,20 +589,34 @@ Make sure `cmd/aioj/main.go` points to `http://host.docker.internal:8003`.
 On a VPS, Cloudflare blocks the datacenter IP. Set `CF_PROXY` to a residential proxy:
 
 ```bash
-pip install cloakbrowser fastapi uvicorn requests
+# On Ubuntu 24.04+ use --break-system-packages (pip is externally managed)
+pip install cloakbrowser fastapi uvicorn requests --break-system-packages
+# On older Ubuntu (22.04), omit the flag:
+# pip install cloakbrowser fastapi uvicorn requests
 
 # Install Chromium runtime deps and fonts
+# Ubuntu 24.04 package names (t64 suffix):
 sudo apt-get install -y xvfb \
-    libglib2.0-0 libgobject-2.0-0 libnspr4 libnss3 \
-    libatk1.0-0 libatk-bridge2.0-0 libcups2 libxkbcommon0 \
-    libatspi2.0-0 libxcomposite1 libxdamage1 libxfixes3 \
-    libcairo2 libpango-1.0-0 libasound2 \
+    libglib2.0-0t64 libgobject-2.0-0 libnspr4 libnss3 \
+    libatk1.0-0t64 libatk-bridge2.0-0t64 libcups2t64 libxkbcommon0 \
+    libatspi2.0-0t64 libxcomposite1 libxdamage1 libxfixes3 \
+    libcairo2 libpango-1.0-0 libasound2t64 \
     fonts-noto-color-emoji fonts-freefont-ttf fonts-unifont
+
+# For Ubuntu 22.04, use instead:
+# sudo apt-get install -y xvfb \
+#     libglib2.0-0 libgobject-2.0-0 libnspr4 libnss3 \
+#     libatk1.0-0 libatk-bridge2.0-0 libcups2 libxkbcommon0 \
+#     libatspi2.0-0 libxcomposite1 libxdamage1 libxfixes3 \
+#     libcairo2 libpango-1.0-0 libasound2 \
+#     fonts-noto-color-emoji fonts-freefont-ttf fonts-unifont
 
 python -m cloakbrowser install
 ```
 
 Create a systemd service at `/etc/systemd/system/cf-submit.service`:
+
+> ⚠️ **Replace `/opt/aioj` below** with the actual path where you cloned AIOJ. Use the **exact same case** — Linux paths are case-sensitive.
 
 ```ini
 [Unit]
@@ -603,13 +625,15 @@ After=network.target
 
 [Service]
 Type=simple
-User=ubuntu
-WorkingDirectory=/path/to/AIOJ/deploy/cf-submit
+# Change User to whoever owns the AIOJ directory (run `whoami` to check)
+User=root
+WorkingDirectory=/opt/aioj/deploy/cf-submit
 ExecStartPre=/bin/bash -c 'rm -f /tmp/.X99-lock && Xvfb :99 -screen 0 1920x1080x24 -ac &'
 ExecStart=/usr/bin/python3 server.py
 Environment=PORT=8003
 Environment=DISPLAY=:99
-Environment=CF_PROXY=http://user:pass@residential-proxy-host:port
+# Uncomment and set if using a residential proxy:
+# Environment=CF_PROXY=http://user:pass@residential-proxy-host:port
 Restart=always
 RestartSec=10
 
