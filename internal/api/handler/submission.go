@@ -97,18 +97,20 @@ func (h *SubmissionHandler) buildAndEnqueue(r *http.Request, w http.ResponseWrit
 		return
 	}
 
+	if prob.Source != "" && prob.Source != "local" && h.vjudgeSvc != nil {
+		respondJSON(w, http.StatusCreated, sub)
+		return
+	}
+
 	priority := req.Priority
 	if priority == 0 {
 		priority = 1
-		if prob.Source != "" && prob.Source != "local" && h.vjudgeSvc != nil {
-		} else {
-			if req.ContestID != "" && !req.Upsolving {
-				contest, cerr := h.contestStore.GetByID(r.Context(), req.ContestID)
-				if cerr == nil && contest != nil {
-					now := time.Now()
-					if now.After(contest.StartTime) && now.Before(contest.EndTime) {
-						priority = 0
-					}
+		if req.ContestID != "" && !req.Upsolving {
+			contest, cerr := h.contestStore.GetByID(r.Context(), req.ContestID)
+			if cerr == nil && contest != nil {
+				now := time.Now()
+				if now.After(contest.StartTime) && now.Before(contest.EndTime) {
+					priority = 0
 				}
 			}
 		}
