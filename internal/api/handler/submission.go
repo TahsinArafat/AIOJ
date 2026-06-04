@@ -36,10 +36,12 @@ func NewSubmissionHandler(sub store.SubmissionStore, prob store.ProblemStore, co
 }
 
 type CustomRunRequest struct {
-	SourceCode string `json:"source_code"`
-	Language   string `json:"language"`
-	Input      string `json:"input"`
-	Expected   string `json:"expected,omitempty"`
+	SourceCode   string `json:"source_code"`
+	Language     string `json:"language"`
+	Input        string `json:"input"`
+	Expected     string `json:"expected,omitempty"`
+	TimeLimitMs  int    `json:"time_limit_ms,omitempty"`
+	MemoryLimitKB int   `json:"memory_limit_kb,omitempty"`
 }
 
 type CustomRunResponse struct {
@@ -419,6 +421,12 @@ func (h *SubmissionHandler) CustomRun(w http.ResponseWriter, r *http.Request) {
 
 	cpuNs := uint64(5.0 * 1e9 * cfg.TimeLimitMultiplier)
 	memBytes := uint64(256.0 * 1024 * 1024 * cfg.MemoryLimitMultiplier)
+	if req.TimeLimitMs > 0 {
+		cpuNs = uint64(req.TimeLimitMs) * 1e6
+	}
+	if req.MemoryLimitKB > 0 {
+		memBytes = uint64(req.MemoryLimitKB) * 1024
+	}
 
 	start := time.Now()
 	resp, err := h.exec.Run(&executor.ExecRequest{
@@ -467,13 +475,20 @@ func (h *SubmissionHandler) CustomRun(w http.ResponseWriter, r *http.Request) {
 		if compileOutput == "" {
 			compileOutput = cr.Error
 		}
-		if compileOutput != "" {
-			respondJSON(w, http.StatusOK, CustomRunResponse{
-				Status:        "CE",
-				CompileOutput: compileOutput,
-			})
-			return
+		if compileOutput == "" {
+			// Some compilers write errors to stdout
+			if out, ok := cr.Files["output.txt"]; ok {
+				compileOutput = out
+			}
 		}
+		if compileOutput == "" {
+			compileOutput = "Compilation failed (no error output captured)"
+		}
+		respondJSON(w, http.StatusOK, CustomRunResponse{
+			Status:        "CE",
+			CompileOutput: compileOutput,
+		})
+		return
 	}
 
 	status := "success"

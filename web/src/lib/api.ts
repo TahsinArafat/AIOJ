@@ -274,7 +274,7 @@ export const api = {
     submissions: {
         create: (d: any) => request<any>('/submissions', { method: 'POST', body: JSON.stringify(d) }),
         createUpsolving: (d: any) => request<any>('/submissions/upsolving', { method: 'POST', body: JSON.stringify(d) }),
-        run: (d: { source_code: string; language: string; input: string; expected?: string }) => 
+        run: (d: { source_code: string; language: string; input: string; expected?: string; time_limit_ms?: number; memory_limit_kb?: number }) => 
             request<{
                 status: string;
                 stdout: string;

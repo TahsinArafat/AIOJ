@@ -1,7 +1,13 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { Link } from 'react-router-dom'
 import CodeEditor from '../components/CodeEditor'
-import { api } from '../lib/api'
-import { Play, Clock, Cpu } from 'lucide-react'
+import { api, getAccessToken } from '../lib/api'
+import { Play, Clock, Cpu, AlertTriangle, Maximize2, Minimize2 } from 'lucide-react'
+
+const IDE_TIME_LIMIT_MS = 5000
+const IDE_MEMORY_LIMIT_KB = 524288
+const COOLDOWN_MS = 5000
+const MAX_OUTPUT_LENGTH = 100000
 
 const LANGS = [
     { value: 'cpp-gpp-64', label: 'GNU G++17 7.3.0 (64 bit)' },
@@ -72,6 +78,30 @@ export default function IDE() {
     const [output, setOutput] = useState<any>(null)
     const [running, setRunning] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [lastRunTime, setLastRunTime] = useState(0)
+    const [cooldownRemaining, setCooldownRemaining] = useState(0)
+    const [isFullscreen, setIsFullscreen] = useState(false)
+    const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+    const isLoggedIn = !!getAccessToken()
+
+    useEffect(() => {
+        return () => { if (cooldownRef.current) clearInterval(cooldownRef.current) }
+    }, [])
+
+    useEffect(() => {
+        const handleKey = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && isFullscreen) setIsFullscreen(false)
+        }
+        window.addEventListener('keydown', handleKey)
+        return () => window.removeEventListener('keydown', handleKey)
+    }, [isFullscreen])
+
+    const truncate = (s: string): string => {
+        if (!s) return ''
+        if (s.length <= MAX_OUTPUT_LENGTH) return s
+        return s.slice(0, MAX_OUTPUT_LENGTH) + `\n\n... [truncated ${s.length - MAX_OUTPUT_LENGTH} more chars]`
+    }
 
     useEffect(() => {
         const saved = localStorage.getItem(`aioj_ide_code_${language}`)
@@ -90,16 +120,39 @@ export default function IDE() {
 
     const handleRun = async () => {
         if (!code.trim()) return
+        const now = Date.now()
+        const elapsed = now - lastRunTime
+        if (elapsed < COOLDOWN_MS) {
+            const remaining = Math.ceil((COOLDOWN_MS - elapsed) / 1000)
+            setError(`Please wait ${remaining}s before running again`)
+            return
+        }
         setRunning(true)
         setError(null)
         setOutput(null)
+        setLastRunTime(now)
+        if (cooldownRef.current) clearInterval(cooldownRef.current)
+        setCooldownRemaining(COOLDOWN_MS)
+        cooldownRef.current = setInterval(() => {
+            setCooldownRemaining(prev => {
+                if (prev <= 100) { if (cooldownRef.current) clearInterval(cooldownRef.current); return 0 }
+                return prev - 100
+            })
+        }, 100)
         try {
             const res = await api.submissions.run({
                 source_code: code,
                 language,
                 input: customInput,
+                time_limit_ms: IDE_TIME_LIMIT_MS,
+                memory_limit_kb: IDE_MEMORY_LIMIT_KB,
             })
-            setOutput(res)
+            setOutput({
+                ...res,
+                stdout: truncate(res.stdout),
+                stderr: truncate(res.stderr),
+                compile_output: truncate(res.compile_output),
+            })
         } catch (e: any) {
             setError(e.message || 'Run failed')
         } finally {
@@ -107,16 +160,44 @@ export default function IDE() {
         }
     }
 
-    return (
-        <div className="h-full flex flex-col">
+    if (!isLoggedIn) {
+        return (
+            <div className="flex items-center justify-center h-full">
+                <div className="text-center space-y-4 max-w-md">
+                    <AlertTriangle className="w-12 h-12 mx-auto text-yellow-500" />
+                    <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Login Required</h2>
+                    <p className="text-gray-500 dark:text-gray-400">You must be logged in to use the IDE.</p>
+                    <Link to="/login" className="inline-block bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors">
+                        Log In
+                    </Link>
+                </div>
+            </div>
+        )
+    }
+
+    const content = (
+        <>
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 flex-shrink-0">
                 <div className="flex items-center gap-4">
                     <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">IDE</h1>
-                    <span className="text-xs text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">
-                        Write, run, and test code instantly
+                    <span className="text-xs text-gray-400 dark:text-gray-500">|</span>
+                    <span className="text-xs text-gray-400 dark:text-gray-500">
+                        Limits: {IDE_TIME_LIMIT_MS / 1000}s / {IDE_MEMORY_LIMIT_KB / 1024}MB
                     </span>
+                    {cooldownRemaining > 0 && (
+                        <span className="text-xs text-yellow-600 dark:text-yellow-400">
+                            Cooldown: {Math.ceil(cooldownRemaining / 1000)}s
+                        </span>
+                    )}
                 </div>
+                <button
+                    onClick={() => setIsFullscreen(!isFullscreen)}
+                    className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-500 dark:text-gray-400 cursor-pointer"
+                    title={isFullscreen ? 'Exit fullscreen (Esc)' : 'Fullscreen'}
+                >
+                    {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                </button>
             </div>
 
             {/* Toolbar */}
@@ -176,58 +257,68 @@ export default function IDE() {
                         )}
 
                         {output ? (
-                            <div className="space-y-3">
-                                {/* Stats */}
-                                <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 rounded p-2">
-                                    <span className="flex items-center gap-1">
-                                        <Clock className="w-3.5 h-3.5" />
-                                        {output.time_used > 0 ? `${output.time_used}ms` : '—'}
-                                    </span>
-                                    <span className="flex items-center gap-1">
-                                        <Cpu className="w-3.5 h-3.5" />
-                                        {output.memory_used > 0 ? `${Math.round(output.memory_used / 1024)}MB` : '—'}
-                                    </span>
-                                    <span className={`ml-auto font-medium px-2 py-0.5 rounded text-xs ${
-                                        output.status === 'ac' || output.status === 'success' || !output.status
-                                            ? 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20'
-                                            : 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20'
-                                    }`}>
-                                        {output.status === 'ce' ? 'Compile Error' : 
-                                         output.status === 're' ? 'Runtime Error' :
-                                         output.status === 'tle' ? 'Time Limit Exceeded' :
-                                         output.status === 'mle' ? 'Memory Limit Exceeded' :
-                                         'Executed'}
-                                    </span>
-                                </div>
+                            (() => {
+                                const isError = output.status === 'CE' || output.status === 'RE' || output.status === 'TLE' || output.status === 'MLE' || output.status === 'SE'
+                                const errorText = output.compile_output || output.stderr
+                                return (
+                                    <div className="space-y-3">
+                                        {/* Stats */}
+                                        <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 rounded p-2">
+                                            <span className="flex items-center gap-1">
+                                                <Clock className="w-3.5 h-3.5" />
+                                                {output.time_used > 0 ? `${output.time_used}ms` : '—'}
+                                                {output.status === 'TLE' && <span className="text-red-500">(limit {IDE_TIME_LIMIT_MS / 1000}s)</span>}
+                                            </span>
+                                            <span className="flex items-center gap-1">
+                                                <Cpu className="w-3.5 h-3.5" />
+                                                {output.memory_used > 0 ? `${Math.round(output.memory_used / 1024)}MB` : '—'}
+                                                {output.status === 'MLE' && <span className="text-red-500">(limit {IDE_MEMORY_LIMIT_KB / 1024}MB)</span>}
+                                            </span>
+                                            <span className={`ml-auto font-medium px-2 py-0.5 rounded text-xs ${
+                                                isError
+                                                    ? 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20'
+                                                    : 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20'
+                                            }`}>
+                                                {output.status === 'CE' ? 'Compile Error' : 
+                                                 output.status === 'RE' ? 'Runtime Error' :
+                                                 output.status === 'TLE' ? 'Time Limit Exceeded' :
+                                                 output.status === 'MLE' ? 'Memory Limit Exceeded' :
+                                                 output.status === 'SE' ? 'System Error' :
+                                                 'Executed'}
+                                            </span>
+                                        </div>
 
-                                {/* Compile Output */}
-                                {output.compile_output && (
-                                    <div>
-                                        <span className="block text-xs font-semibold text-red-600 dark:text-red-400 mb-1">Compile Output</span>
-                                        <pre className="bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 text-xs p-3 rounded overflow-x-auto font-mono max-h-40">
-                                            {output.compile_output}
-                                        </pre>
+                                        {errorText && (
+                                            <div>
+                                                <span className="block text-xs font-semibold text-red-600 dark:text-red-400 mb-1">
+                                                    {output.status === 'CE' ? 'Compilation Error' : 'Error Output'}
+                                                </span>
+                                                <pre className="bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 text-xs p-3 rounded overflow-x-auto font-mono max-h-60 whitespace-pre-wrap">
+                                                    {errorText}
+                                                </pre>
+                                            </div>
+                                        )}
+
+                                        {(output.stdout || !isError) && (
+                                            <div>
+                                                <span className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">stdout</span>
+                                                <pre className="bg-gray-900 text-green-400 text-sm p-3 rounded overflow-x-auto font-mono max-h-60 whitespace-pre-wrap">
+                                                    {output.stdout || '(no output)'}
+                                                </pre>
+                                            </div>
+                                        )}
+
+                                        {output.stderr && output.stderr !== errorText && (
+                                            <div>
+                                                <span className="block text-xs font-semibold text-yellow-600 dark:text-yellow-400 mb-1">stderr</span>
+                                                <pre className="bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300 text-xs p-3 rounded overflow-x-auto font-mono max-h-60 whitespace-pre-wrap">
+                                                    {output.stderr}
+                                                </pre>
+                                            </div>
+                                        )}
                                     </div>
-                                )}
-
-                                {/* Stdout */}
-                                <div>
-                                    <span className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">stdout</span>
-                                    <pre className="bg-gray-900 text-green-400 text-sm p-3 rounded overflow-x-auto font-mono max-h-60 whitespace-pre-wrap">
-                                        {output.stdout || '(no output)'}
-                                    </pre>
-                                </div>
-
-                                {/* Stderr */}
-                                {output.stderr && (
-                                    <div>
-                                        <span className="block text-xs font-semibold text-yellow-600 dark:text-yellow-400 mb-1">stderr</span>
-                                        <pre className="bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300 text-xs p-3 rounded overflow-x-auto font-mono max-h-40">
-                                            {output.stderr}
-                                        </pre>
-                                    </div>
-                                )}
-                            </div>
+                                )
+                            })()
                         ) : (
                             <div className="text-center py-12 text-gray-400 dark:text-gray-500 text-sm">
                                 <Play className="w-8 h-8 mx-auto mb-2 opacity-50" />
@@ -238,6 +329,20 @@ export default function IDE() {
                     </div>
                 </div>
             </div>
+        </>
+    )
+
+    if (isFullscreen) {
+        return (
+            <div className="fixed inset-0 z-50 flex flex-col bg-white dark:bg-gray-950">
+                {content}
+            </div>
+        )
+    }
+
+    return (
+        <div className="h-full flex flex-col">
+            {content}
         </div>
     )
 }
