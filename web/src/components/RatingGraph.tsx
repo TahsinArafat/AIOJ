@@ -26,16 +26,16 @@ interface Props {
 }
 
 const BANDS = [
-  { min: 0,    max: 1200, color: '#80808015', label: 'Newbie' },
-  { min: 1200, max: 1400, color: '#00800015', label: 'Pupil' },
-  { min: 1400, max: 1600, color: '#03A89E15', label: 'Specialist' },
-  { min: 1600, max: 1900, color: '#0000FF15', label: 'Expert' },
-  { min: 1900, max: 2100, color: '#AA00AA15', label: 'Candidate Master' },
+  { min: 0,    max: 1200, color: '#80808015', label: 'Novice' },
+  { min: 1200, max: 1400, color: '#00800015', label: 'Apprentice' },
+  { min: 1400, max: 1600, color: '#03A89E15', label: 'Adept' },
+  { min: 1600, max: 1900, color: '#0000FF15', label: 'Elite' },
+  { min: 1900, max: 2100, color: '#AA00AA15', label: 'Champion' },
   { min: 2100, max: 2300, color: '#FFD70015', label: 'Master' },
-  { min: 2300, max: 2400, color: '#FF8C0015', label: 'Int. Master' },
-  { min: 2400, max: 2600, color: '#FF8C0015', label: 'Grandmaster' },
-  { min: 2600, max: 2900, color: '#FF000015', label: 'Int. GM' },
-  { min: 2900, max: 4000, color: '#FF000015', label: 'LGM' },
+  { min: 2300, max: 2400, color: '#FF8C0015', label: 'Grandmaster' },
+  { min: 2400, max: 2600, color: '#FF8C0015', label: 'Titan' },
+  { min: 2600, max: 2900, color: '#FF000015', label: 'Immortal' },
+  { min: 2900, max: 4000, color: '#FF000015', label: 'Apex' },
 ]
 
 export default function RatingGraph({ history, width = 600, height = 200 }: Props) {

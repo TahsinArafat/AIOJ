@@ -38,12 +38,12 @@ const difficulties = [
 
 const ratings = [
     { value: '', label: 'All Ratings' },
-    { value: '800-1199', label: '800-1199 (Newbie-Pupil)' },
-    { value: '1200-1599', label: '1200-1599 (Specialist-Expert)' },
-    { value: '1600-1899', label: '1600-1899 (Expert-CM)' },
+    { value: '800-1199', label: '800-1199 (Novice-Apprentice)' },
+    { value: '1200-1599', label: '1200-1599 (Adept-Elite)' },
+    { value: '1600-1899', label: '1600-1899 (Elite-Champion)' },
     { value: '1900-2099', label: '1900-2099 (Master)' },
-    { value: '2100-2399', label: '2100-2399 (IM-GM)' },
-    { value: '2400+', label: '2400+ (IGM+)' },
+    { value: '2100-2399', label: '2100-2399 (Grandmaster-Titan)' },
+    { value: '2400+', label: '2400+ (Immortal+)' },
 ]
 
 const sortOptions = [
