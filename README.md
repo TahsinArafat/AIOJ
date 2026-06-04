@@ -364,6 +364,119 @@ certbot renew --dry-run
 
 ---
 
+### Visual Management Panels (Easiest GUI Option — No Config Files)
+
+If you prefer clicking buttons over editing config files, use this combo:
+
+| Panel | What You Do With It | Access At |
+|-------|-------------------|-----------|
+| **Nginx Proxy Manager** | Add domains, get SSL certs, manage redirects — all from a web UI | `http://your-ip:81` |
+| **Dockge** | Start/stop containers, view logs, edit docker-compose, update images — all visually | `http://your-ip:5001` |
+
+Both are free, open-source, and run as Docker containers. **You never touch a config file for domains or SSL again.**
+
+#### Step-by-Step Setup
+
+**1. Prepare docker-compose.yml**
+
+Before starting, open `docker-compose.yml` and **comment out** these lines (NPM will handle ports 80/443 instead):
+
+```yaml
+  frontend:
+    # ports:           # ← COMMENT THIS OUT
+    #   - "80:80"      # ← COMMENT THIS OUT
+```
+
+If you previously added Caddy, you can leave it or remove it — NPM replaces both Caddy and the frontend's public port. Just don't use `--profile production`.
+
+**2. Start AIOJ + the management panels**
+
+```bash
+# Start core services first
+docker compose up -d postgres judge redis backend judge-worker frontend
+
+# Wait 10 seconds, then run migrations
+make migrate-up
+
+# Now add NPM + Dockge using the override file
+docker compose -f docker-compose.yml -f deploy/docker-compose.npm.yml up -d
+```
+
+**3. Open firewall for the admin UIs (temporary)**
+
+The admin panels run on ports 81 and 5001. Open them temporarily while you configure things:
+
+```bash
+ufw allow 81/tcp
+ufw allow 5001/tcp
+```
+
+> **After setup is complete, close these ports:** `ufw delete allow 81/tcp && ufw delete allow 5001/tcp`. Your admin panels should NOT be publicly accessible long-term.
+
+**4. Configure Nginx Proxy Manager**
+
+Open your browser and go to `http://YOUR_SERVER_IP:81`
+
+- **Default login:** `admin@example.com` / `changeme`
+- It will immediately ask you to change email and password — **do this first.**
+
+Now add your domain with SSL:
+
+1. Click **Hosts** → **Proxy Hosts** → **Add Proxy Host**
+2. Fill in:
+   - **Domain Names:** `myoj.com` (and optionally `www.myoj.com`)
+   - **Scheme:** `http`
+   - **Forward Hostname / IP:** `frontend` (the Docker service name)
+   - **Forward Port:** `80`
+   - **Block Common Exploits:** ✅ Check this
+3. Click the **SSL** tab:
+   - **SSL Certificate:** Select "Request a new SSL Certificate"
+   - **Force SSL:** ✅ Check this
+   - **HTTP/2 Support:** ✅ Check this
+   - **Email Address:** Enter your email (Let's Encrypt needs this)
+   - **Agree to Terms:** ✅ Check this
+4. Click **Save**
+
+NPM will obtain a free Let's Encrypt certificate within ~30 seconds. Visit `https://myoj.com` — you'll see the green lock.
+
+**Renewals are automatic.** NPM renews certificates 30 days before expiry. Zero maintenance.
+
+**5. (Optional) Explore Dockge**
+
+Go to `http://YOUR_SERVER_IP:5001`. Dockge shows:
+
+- **All your containers** with status, CPU, memory usage
+- **One-click start/stop/restart** for any service
+- **Live log viewer** — see what's happening in real time
+- **docker-compose editor** — modify your compose file from the browser
+- **Image update checker** — see when new versions are available
+
+To view AIOJ in Dockge, click the "Scan" button at the bottom of the sidebar — it auto-discovers your existing compose file.
+
+**6. Lock down admin panels**
+
+Once everything is working, close the admin ports:
+
+```bash
+ufw delete allow 81/tcp
+ufw delete allow 5001/tcp
+```
+
+To access the panels later, use an **SSH tunnel** (secure — no open ports needed):
+
+```bash
+# Run this on YOUR local machine (not the VPS):
+ssh -L 81:localhost:81 -L 5001:localhost:5001 root@YOUR_SERVER_IP
+
+# Then open in your browser:
+# http://localhost:81      → Nginx Proxy Manager
+# http://localhost:5001    → Dockge
+```
+
+This tunnels traffic through SSH — the admin panels are only accessible from your computer, not the internet.
+
+---
+
 ### Step 7: Log In and Secure Admin
 
 1. Go to `https://myoj.com`
@@ -376,13 +489,15 @@ certbot renew --dry-run
 
 ### Port Reference (Production)
 
-When deployed behind Caddy or Nginx, only these ports should be open to the internet:
+When deployed behind Caddy, Nginx, or NPM, only these ports should be open to the internet:
 
 | Port | Service | Public? | Purpose |
 |------|---------|---------|---------|
 | 22 | SSH | ✅ Yes | Server management |
-| 80 | Caddy/Nginx | ✅ Yes | HTTP → HTTPS redirect |
-| 443 | Caddy/Nginx | ✅ Yes | HTTPS (your site) |
+| 80 | Caddy/Nginx/NPM | ✅ Yes | HTTP → HTTPS redirect |
+| 443 | Caddy/Nginx/NPM | ✅ Yes | HTTPS (your site) |
+| 81 | NPM Admin (optional) | ⚠️ Setup only | Nginx Proxy Manager UI — close after setup, use SSH tunnel instead |
+| 5001 | Dockge (optional) | ⚠️ Setup only | Docker management UI — close after setup, use SSH tunnel instead |
 | 8080 | Backend (Go) | ❌ No | Internal API |
 | 5432 | PostgreSQL | ❌ No | Database |
 | 6379 | Redis | ❌ No | Job queue |
@@ -398,7 +513,10 @@ When deployed behind Caddy or Nginx, only these ports should be open to the inte
 | "Connection refused" | Firewall blocking port 80/443 | Run `ufw status`. Make sure 80/tcp and 443/tcp are ALLOW. |
 | "Secure Connection Failed" on first Caddy run | SSL cert still being issued | Wait 1–2 min, refresh. Check `docker compose logs caddy`. |
 | Caddy fails to start | Port 80 already in use by frontend | Did you comment out `80:80` in docker-compose.yml? (Step 6b) |
-| "SSL certificate error" after domain change | Old cert cached | `docker compose stop caddy && docker compose rm caddy` then restart. |
+| NPM shows "502 Bad Gateway" | NPM can't reach the frontend container | In NPM, set Forward Hostname to `frontend` (Docker service name), not `localhost`. |
+| NPM SSL fails ("Internal error") | Port 80 or 443 blocked by another service | Make sure you commented out `80:80` in frontend AND are not running Caddy alongside NPM. |
+| NPM admin UI not loading | Firewall blocking port 81 | `ufw allow 81/tcp`. Remember to close it after setup. |
+| "SSL certificate error" after domain change | Old cert cached | Delete the cert in NPM (SSL Certificates tab), request new one. Or for Caddy: `docker compose stop caddy && docker compose rm caddy`. |
 | Migrations fail | Database not ready | Wait longer after `docker compose up`. Check: `docker compose logs postgres`. |
 | 502 Bad Gateway | Backend container not running | `docker compose ps` — all services should be "Up". |
 

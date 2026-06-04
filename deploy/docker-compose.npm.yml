@@ -1,0 +1,49 @@
+# AIOJ Visual Management Override
+# =================================
+# Adds Nginx Proxy Manager (domains + SSL GUI) and Dockge (Docker GUI).
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f deploy/docker-compose.npm.yml up -d
+#
+# Important: When using NPM, you MUST comment out these lines in docker-compose.yml:
+#   1. frontend service → "80:80" port mapping (NPM takes port 80/443)
+#   2. caddy service → entire block or just don't use --profile production
+# NPM's web UI will be at: http://YOUR_SERVER_IP:81
+# Dockge's web UI will be at: http://YOUR_SERVER_IP:5001
+#
+# After first login to NPM (admin@example.com / changeme), change the default
+# credentials immediately.
+
+services:
+  npm:
+    image: jc21/nginx-proxy-manager:latest
+    container_name: npm
+    ports:
+      - "80:80"        # HTTP  → auto-redirects to HTTPS
+      - "443:443"      # HTTPS → your site with SSL
+      - "81:81"        # NPM Admin UI
+    volumes:
+      - npm_data:/data
+      - npm_letsencrypt:/etc/letsencrypt
+    restart: unless-stopped
+    depends_on:
+      - frontend
+
+  dockge:
+    image: louislam/dockge:latest
+    container_name: dockge
+    ports:
+      - "5001:5001"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - dockge_data:/app/data
+      - ./docker-compose.yml:/opt/aioj/docker-compose.yml:ro
+      - ./deploy/docker-compose.npm.yml:/opt/aioj/deploy/docker-compose.npm.yml:ro
+    environment:
+      DOCKGE_STACKS_DIR: /opt/aioj
+    restart: unless-stopped
+
+volumes:
+  npm_data:
+  npm_letsencrypt:
+  dockge_data:
