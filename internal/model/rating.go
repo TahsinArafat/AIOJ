@@ -2,18 +2,18 @@ package model
 
 import "time"
 
-// Rating colors matching Codeforces
+// Rating color tiers
 const (
-	ColorNewbie                = "newbie"                 // < 1200
-	ColorPupil                 = "pupil"                  // 1200-1399
-	ColorSpecialist            = "specialist"             // 1400-1599
-	ColorExpert                = "expert"                 // 1600-1899
-	ColorCandidateMaster       = "candidate-master"       // 1900-2099
-	ColorMaster                = "master"                 // 2100-2299
-	ColorInternationalMaster   = "international-master"   // 2300-2399
-	ColorGrandmaster           = "grandmaster"            // 2400-2599
-	ColorInternationalGrandmaster = "international-grandmaster" // 2600-2899
-	ColorLegendaryGrandmaster  = "legendary-grandmaster"  // 2900+
+	ColorNovice      = "novice"      // < 1200
+	ColorApprentice  = "apprentice"  // 1200-1399
+	ColorAdept       = "adept"       // 1400-1599
+	ColorElite       = "elite"       // 1600-1899
+	ColorChampion    = "champion"    // 1900-2099
+	ColorMaster      = "master"      // 2100-2299
+	ColorGrandmaster = "grandmaster" // 2300-2399
+	ColorTitan       = "titan"       // 2400-2599
+	ColorImmortal    = "immortal"    // 2600-2899
+	ColorApex        = "apex"        // 2900+
 )
 
 type RatingHistory struct {
@@ -45,25 +45,25 @@ type ContestRatingRequest struct {
 func GetColor(rating int) string {
 	switch {
 	case rating >= 2900:
-		return ColorLegendaryGrandmaster
+		return ColorApex
 	case rating >= 2600:
-		return ColorInternationalGrandmaster
+		return ColorImmortal
 	case rating >= 2400:
-		return ColorGrandmaster
+		return ColorTitan
 	case rating >= 2300:
-		return ColorInternationalMaster
+		return ColorGrandmaster
 	case rating >= 2100:
 		return ColorMaster
 	case rating >= 1900:
-		return ColorCandidateMaster
+		return ColorChampion
 	case rating >= 1600:
-		return ColorExpert
+		return ColorElite
 	case rating >= 1400:
-		return ColorSpecialist
+		return ColorAdept
 	case rating >= 1200:
-		return ColorPupil
+		return ColorApprentice
 	default:
-		return ColorNewbie
+		return ColorNovice
 	}
 }
 

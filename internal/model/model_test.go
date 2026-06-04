@@ -9,29 +9,29 @@ func TestGetColor(t *testing.T) {
 		expected string
 	}{
 		// Boundary edges
-		{name: "legendary grandmaster high-end", rating: 3500, expected: ColorLegendaryGrandmaster},
-		{name: "legendary grandmaster threshold", rating: 2900, expected: ColorLegendaryGrandmaster},
-		{name: "international grandmaster low-end", rating: 2899, expected: ColorInternationalGrandmaster},
-		{name: "international grandmaster threshold", rating: 2600, expected: ColorInternationalGrandmaster},
-		{name: "grandmaster low-end", rating: 2599, expected: ColorGrandmaster},
-		{name: "grandmaster threshold", rating: 2400, expected: ColorGrandmaster},
-		{name: "international master low-end", rating: 2399, expected: ColorInternationalMaster},
-		{name: "international master threshold", rating: 2300, expected: ColorInternationalMaster},
+		{name: "apex high-end", rating: 3500, expected: ColorApex},
+		{name: "apex threshold", rating: 2900, expected: ColorApex},
+		{name: "immortal low-end", rating: 2899, expected: ColorImmortal},
+		{name: "immortal threshold", rating: 2600, expected: ColorImmortal},
+		{name: "titan low-end", rating: 2599, expected: ColorTitan},
+		{name: "titan threshold", rating: 2400, expected: ColorTitan},
+		{name: "grandmaster low-end", rating: 2399, expected: ColorGrandmaster},
+		{name: "grandmaster threshold", rating: 2300, expected: ColorGrandmaster},
 		{name: "master low-end", rating: 2299, expected: ColorMaster},
 		{name: "master threshold", rating: 2100, expected: ColorMaster},
-		{name: "candidate master low-end", rating: 2099, expected: ColorCandidateMaster},
-		{name: "candidate master threshold", rating: 1900, expected: ColorCandidateMaster},
-		{name: "expert low-end", rating: 1899, expected: ColorExpert},
-		{name: "expert threshold", rating: 1600, expected: ColorExpert},
-		{name: "specialist low-end", rating: 1599, expected: ColorSpecialist},
-		{name: "specialist threshold", rating: 1400, expected: ColorSpecialist},
-		{name: "pupil low-end", rating: 1399, expected: ColorPupil},
-		{name: "pupil threshold", rating: 1200, expected: ColorPupil},
-		{name: "newbie low-end", rating: 1199, expected: ColorNewbie},
+		{name: "champion low-end", rating: 2099, expected: ColorChampion},
+		{name: "champion threshold", rating: 1900, expected: ColorChampion},
+		{name: "elite low-end", rating: 1899, expected: ColorElite},
+		{name: "elite threshold", rating: 1600, expected: ColorElite},
+		{name: "adept low-end", rating: 1599, expected: ColorAdept},
+		{name: "adept threshold", rating: 1400, expected: ColorAdept},
+		{name: "apprentice low-end", rating: 1399, expected: ColorApprentice},
+		{name: "apprentice threshold", rating: 1200, expected: ColorApprentice},
+		{name: "novice low-end", rating: 1199, expected: ColorNovice},
 		// Extreme values
-		{name: "zero rating", rating: 0, expected: ColorNewbie},
-		{name: "negative rating", rating: -100, expected: ColorNewbie},
-		{name: "typical newbie", rating: 500, expected: ColorNewbie},
+		{name: "zero rating", rating: 0, expected: ColorNovice},
+		{name: "negative rating", rating: -100, expected: ColorNovice},
+		{name: "typical novice", rating: 500, expected: ColorNovice},
 	}
 
 	for _, tt := range tests {
@@ -50,14 +50,14 @@ func TestGetColorHex(t *testing.T) {
 		rating   int
 		expected string
 	}{
-		{name: "legendary grandmaster", rating: 3000, expected: "#FF0000"},
-		{name: "grandmaster", rating: 2500, expected: "#FF8C00"},
+		{name: "apex", rating: 3000, expected: "#FF0000"},
+		{name: "titan", rating: 2500, expected: "#FF8C00"},
 		{name: "master", rating: 2200, expected: "#FFD700"},
-		{name: "candidate master", rating: 2000, expected: "#AA00AA"},
-		{name: "expert", rating: 1700, expected: "#0000FF"},
-		{name: "specialist", rating: 1500, expected: "#03A89E"},
-		{name: "pupil", rating: 1300, expected: "#008000"},
-		{name: "newbie", rating: 1000, expected: "#808080"},
+		{name: "champion", rating: 2000, expected: "#AA00AA"},
+		{name: "elite", rating: 1700, expected: "#0000FF"},
+		{name: "adept", rating: 1500, expected: "#03A89E"},
+		{name: "apprentice", rating: 1300, expected: "#008000"},
+		{name: "novice", rating: 1000, expected: "#808080"},
 	}
 
 	for _, tt := range tests {
