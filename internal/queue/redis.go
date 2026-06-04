@@ -26,8 +26,11 @@ func (q *RedisQueue) Enqueue(ctx context.Context, id string) error {
 }
 
 func (q *RedisQueue) Dequeue(ctx context.Context) (string, error) {
-	result, err := q.client.BRPop(ctx, 5*time.Second, q.queueName).Result()
+	result, err := q.client.BRPop(ctx, 2*time.Second, q.queueName).Result()
 	if err != nil {
+		if err == redis.Nil {
+			return "", nil
+		}
 		return "", err
 	}
 	return result[1], nil

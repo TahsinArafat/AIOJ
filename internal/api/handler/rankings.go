@@ -24,7 +24,9 @@ func (h *RankingsHandler) List(w http.ResponseWriter, r *http.Request) {
 	if limit <= 0 || limit > 100 {
 		limit = 50
 	}
-	users, total, err := h.userStore.ListUsersByRating(r.Context(), offset, limit)
+	country := r.URL.Query().Get("country")
+	organization := r.URL.Query().Get("organization")
+	users, total, err := h.userStore.ListUsersByRating(r.Context(), offset, limit, country, organization)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return

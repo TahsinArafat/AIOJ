@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
 import RatingBadge from '../components/RatingBadge'
@@ -15,29 +15,69 @@ const MEDALS: Record<number, string> = {
     3: '\u{1F949}',
 }
 
+const COUNTRIES = [
+    'All Countries',
+    'Afghanistan', 'Albania', 'Algeria', 'Angola', 'Argentina', 'Armenia', 'Australia', 'Austria', 'Azerbaijan',
+    'Bahrain', 'Bangladesh', 'Belarus', 'Belgium', 'Bolivia', 'Bosnia and Herzegovina', 'Brazil', 'Brunei', 'Bulgaria',
+    'Cambodia', 'Cameroon', 'Canada', 'Chile', 'China', 'Colombia', 'Costa Rica', 'Croatia', 'Cuba', 'Cyprus', 'Czech Republic',
+    'Denmark', 'Dominican Republic',
+    'Ecuador', 'Egypt', 'El Salvador', 'Estonia', 'Ethiopia',
+    'Finland', 'France',
+    'Georgia', 'Germany', 'Ghana', 'Greece', 'Guatemala',
+    'Honduras', 'Hong Kong', 'Hungary',
+    'Iceland', 'India', 'Indonesia', 'Iran', 'Iraq', 'Ireland', 'Israel', 'Italy',
+    'Jamaica', 'Japan', 'Jordan',
+    'Kazakhstan', 'Kenya', 'Kuwait', 'Kyrgyzstan',
+    'Laos', 'Latvia', 'Lebanon', 'Libya', 'Lithuania', 'Luxembourg',
+    'Macau', 'Madagascar', 'Malaysia', 'Maldives', 'Mali', 'Malta', 'Mexico', 'Moldova', 'Mongolia', 'Montenegro', 'Morocco', 'Myanmar',
+    'Nepal', 'Netherlands', 'New Zealand', 'Nicaragua', 'Nigeria', 'North Korea', 'North Macedonia', 'Norway',
+    'Oman',
+    'Pakistan', 'Palestine', 'Panama', 'Paraguay', 'Peru', 'Philippines', 'Poland', 'Portugal', 'Puerto Rico',
+    'Qatar',
+    'Romania', 'Russia', 'Rwanda',
+    'Saudi Arabia', 'Senegal', 'Serbia', 'Singapore', 'Slovakia', 'Slovenia', 'South Africa', 'South Korea', 'Spain', 'Sri Lanka', 'Sudan', 'Sweden', 'Switzerland', 'Syria',
+    'Taiwan', 'Tajikistan', 'Tanzania', 'Thailand', 'Trinidad and Tobago', 'Tunisia', 'Turkey', 'Turkmenistan',
+    'Uganda', 'Ukraine', 'United Arab Emirates', 'United Kingdom', 'United States', 'Uruguay', 'Uzbekistan',
+    'Venezuela', 'Vietnam',
+    'Yemen',
+    'Zambia', 'Zimbabwe',
+]
+
 export default function Rankings() {
     const [users, setUsers] = useState<any[]>([])
     const [total, setTotal] = useState(0)
     const [offset, setOffset] = useState(0)
     const [loading, setLoading] = useState(false)
+    const [country, setCountry] = useState('')
+    const [organization, setOrganization] = useState('')
     const limit = 50
 
-    const fetchRankings = (off: number, append = false) => {
+    const fetchRankings = useCallback((off: number, append = false, co?: string, org?: string) => {
         setLoading(true)
-        api.rankings.list(off, limit).then(d => {
+        api.rankings.list(off, limit, co || undefined, org || undefined).then(d => {
             setUsers(prev => append ? [...prev, ...(d.data || [])] : (d.data || []))
             setTotal(d.total || 0)
         }).catch(() => {}).finally(() => setLoading(false))
-    }
+    }, [])
 
     useEffect(() => {
-        fetchRankings(0)
-    }, [])
+        fetchRankings(0, false, country, organization)
+    }, [country, organization, fetchRankings])
+
+    const handleCountryChange = (val: string) => {
+        setCountry(val === 'All Countries' ? '' : val)
+        setOffset(0)
+    }
+
+    const handleOrgChange = (val: string) => {
+        setOrganization(val)
+        setOffset(0)
+    }
 
     const handleLoadMore = () => {
         const nextOffset = offset + limit
         setOffset(nextOffset)
-        fetchRankings(nextOffset, true)
+        fetchRankings(nextOffset, true, country, organization)
     }
 
     const hasMore = users.length < total
@@ -45,6 +85,34 @@ export default function Rankings() {
     return (
         <div>
             <h1 className="text-2xl font-bold mb-4">Rankings</h1>
+
+            {/* Filter Bar */}
+            <div className="flex flex-wrap gap-3 mb-4">
+                <select
+                    value={country || 'All Countries'}
+                    onChange={e => handleCountryChange(e.target.value)}
+                    className="border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                >
+                    {COUNTRIES.map(c => (
+                        <option key={c} value={c}>{c}</option>
+                    ))}
+                </select>
+                <input
+                    type="text"
+                    placeholder="Filter by organization..."
+                    value={organization}
+                    onChange={e => handleOrgChange(e.target.value)}
+                    className="border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 min-w-[180px]"
+                />
+                {(country || organization) && (
+                    <button
+                        onClick={() => { setCountry(''); setOrganization(''); setOffset(0); }}
+                        className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                    >
+                        Clear filters
+                    </button>
+                )}
+            </div>
 
             <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
                 <div className="overflow-x-auto">

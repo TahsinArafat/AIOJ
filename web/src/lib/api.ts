@@ -521,6 +521,14 @@ export const api = {
             request(`/groups/${id}/contests`, { method: 'POST', body: JSON.stringify({ contest_id: contestId }) }),
         removeContest: (id: string, contestId: string) =>
             request(`/groups/${id}/contests/${contestId}`, { method: 'DELETE' }),
+        invite: (id: string, d: { username: string }) =>
+            request<any>(`/groups/${id}/invite`, { method: 'POST', body: JSON.stringify(d) }),
+        respond: (id: string, d: { user_id: string; action: string }) =>
+            request<any>(`/groups/${id}/respond`, { method: 'POST', body: JSON.stringify(d) }),
+        pending: (id: string) =>
+            request<{ data: any[] }>(`/groups/${id}/pending`),
+        joinByCode: (code: string) =>
+            request<any>('/groups/join-code', { method: 'POST', body: JSON.stringify({ invite_code: code }) }),
     },
     teams: {
         list: (offset = 0, limit = 20) =>
@@ -530,6 +538,16 @@ export const api = {
         join: (id: string) => request(`/teams/${id}/join`, { method: 'POST' }),
         leave: (id: string) => request(`/teams/${id}/leave`, { method: 'POST' }),
         members: (id: string) => request<any>(`/teams/${id}/members`),
+        update: (id: string, d: any) => request<any>(`/teams/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
+        delete: (id: string) => request<any>(`/teams/${id}`, { method: 'DELETE' }),
+        invite: (id: string, d: { username: string }) =>
+            request<any>(`/teams/${id}/invite`, { method: 'POST', body: JSON.stringify(d) }),
+        requestJoin: (id: string) =>
+            request<any>(`/teams/${id}/request`, { method: 'POST' }),
+        respond: (id: string, d: { user_id: string; action: string }) =>
+            request<any>(`/teams/${id}/respond`, { method: 'POST', body: JSON.stringify(d) }),
+        pending: (id: string) =>
+            request<{ data: any[] }>(`/teams/${id}/pending`),
     },
     blog: {
         list: (offset = 0, limit = 20, tag?: string) => {
@@ -655,8 +673,12 @@ export const api = {
             }),
     },
     rankings: {
-        list: (offset = 0, limit = 50) =>
-            request<{ data: any[]; total: number }>(`/rankings?offset=${offset}&limit=${limit}`),
+        list: (offset = 0, limit = 50, country?: string, organization?: string) => {
+            let url = `/rankings?offset=${offset}&limit=${limit}`;
+            if (country) url += `&country=${encodeURIComponent(country)}`;
+            if (organization) url += `&organization=${encodeURIComponent(organization)}`;
+            return request<{ data: any[]; total: number }>(url);
+        },
     },
     users: {
         getByUsername: (username: string) =>
@@ -667,6 +689,14 @@ export const api = {
             request<{ data: any[]; total: number }>(`/users/${encodeURIComponent(username)}/blogs?offset=${offset}&limit=${limit}`),
         getComments: (username: string, offset = 0, limit = 20) =>
             request<{ data: any[]; total: number }>(`/users/${encodeURIComponent(username)}/comments?offset=${offset}&limit=${limit}`),
+        getProfile: () =>
+            request<any>('/users/profile/edit'),
+        updateProfile: (d: { first_name?: string; last_name?: string; country?: string; city?: string; organization?: string; github_url?: string; bio?: string; avatar_url?: string; show_email?: boolean; show_tags?: boolean }) =>
+            request<any>('/users/profile/edit', { method: 'PUT', body: JSON.stringify(d) }),
+        updatePassword: (d: { current_password: string; new_password: string }) =>
+            request<{ message: string }>('/users/profile/password', { method: 'PUT', body: JSON.stringify(d) }),
+        getPendingInvites: () =>
+            request<{ teams: any[]; groups: any[] }>('/users/profile/invites'),
     },
     search: {
         global: (q: string, limit = 10) =>

@@ -47,7 +47,15 @@ func (wp *WorkerPool) Start(ctx context.Context) {
 	for {
 		subID, err := wp.queue.Dequeue(ctx)
 		if err != nil {
-			return
+			if ctx.Err() != nil {
+				return
+			}
+			slog.Error("dequeue failed", "error", err)
+			time.Sleep(1 * time.Second)
+			continue
+		}
+		if subID == "" {
+			continue
 		}
 		select {
 		case wp.sem <- struct{}{}:
@@ -176,8 +184,26 @@ func (wp *WorkerPool) judge(ctx context.Context, submissionID string) {
 	cpuNs := uint64(float64(timeLimitMs)*cfg.TimeLimitMultiplier) * 1_000_000
 	memBytes := uint64(float64(memoryLimitKB)*cfg.MemoryLimitMultiplier) * 1024
 
+	var compiledResult *CompileResult
+	if compileCmdStr != "" {
+		var err error
+		compiledResult, err = wp.compileContestantCode(ctx, sub, cfg, compileCmdStr)
+		if err != nil {
+			wp.subStore.UpdateResult(ctx, submissionID, model.StatusSE, 0, 0, 0, "compilation failed: "+err.Error(), nil)
+			return
+		}
+		if !compiledResult.Success {
+			wp.subStore.UpdateResult(ctx, submissionID, model.StatusCE, 0, 0, 0, compiledResult.Output, nil)
+			wp.probStore.UpdateCounts(ctx, prob.ID, 1, 0)
+			return
+		}
+	}
+	if compiledResult != nil {
+		compileOutput = compiledResult.Output
+	}
+
 	if prob.HasSubtasks() && prob.ScoringMode == "partial" {
-		wp.evaluateSubtasks(ctx, sub, prob, cfg, copyIn, compileCmdStr, spjExeDir, spjBinContent)
+		wp.evaluateSubtasks(ctx, sub, prob, cfg, copyIn, compiledResult, spjExeDir, spjBinContent)
 		return
 	}
 
@@ -186,7 +212,7 @@ func (wp *WorkerPool) judge(ctx context.Context, submissionID string) {
 	maxTime, maxMem, totalScore := 0, 0, 0
 
 	for _, tc := range prob.TestCaseScore {
-		r := wp.runTestCase(ctx, prob, cfg, tc, copyIn, compileCmdStr, spjExeDir, spjBinContent, cpuNs, memBytes)
+		r := wp.runTestCase(ctx, prob, cfg, tc, copyIn, compiledResult, spjExeDir, spjBinContent, cpuNs, memBytes)
 		results = append(results, r)
 		if r.Time > maxTime {
 			maxTime = r.Time
@@ -247,13 +273,87 @@ func (wp *WorkerPool) getEffectiveLimits(prob *model.Problem, language string) (
 	return
 }
 
+type CompileResult struct {
+	Success bool
+	Output  string
+	Files   map[string]executor.CmdFile
+	TarMode bool
+}
+
+func (wp *WorkerPool) compileContestantCode(
+	ctx context.Context,
+	sub *model.Submission,
+	cfg *compiler.LangConfig,
+	compileCmdStr string,
+) (*CompileResult, error) {
+	srcName := "Main" + cfg.Extensions[0]
+	copyIn := map[string]executor.CmdFile{srcName: {Content: sub.SourceCode}}
+
+	tarMode := cfg.Key == "java"
+	var cmdArgs []string
+	var copyOut []string
+
+	if tarMode {
+		cmdArgs = []string{"/bin/sh", "-c", compileCmdStr + " && tar -cf compile.tar --exclude=compile.tar --exclude=" + srcName + " ."}
+		copyOut = []string{"compile.tar"}
+	} else {
+		cmdArgs = []string{"/bin/sh", "-c", compileCmdStr}
+		copyOut = []string{"Main"}
+	}
+
+	resp, err := wp.exec.Run(&executor.ExecRequest{
+		Cmd: []executor.Cmd{{
+			Args:        cmdArgs,
+			Env:         []string{"PATH=/usr/bin:/bin", "HOME=/tmp"},
+			CPULimit:    30_000_000_000, // 30s CPU limit
+			MemoryLimit: 536_870_912,    // 512MB RAM limit
+			ProcLimit:   64,
+			CopyIn:      copyIn,
+			CopyOut:     copyOut,
+		}},
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(resp) == 0 {
+		return &CompileResult{Success: false, Output: "no result"}, nil
+	}
+
+	cr := resp[0]
+	if cr.Status != "Accepted" {
+		compileOutput := cr.Error
+		if fileErr, ok := cr.Files["error.txt"]; ok && fileErr != "" {
+			compileOutput = fileErr
+		} else if fileOut, ok := cr.Files["output.txt"]; ok && fileOut != "" {
+			compileOutput = fileOut
+		}
+		if compileOutput == "" {
+			compileOutput = "compile error: nonzero exit status"
+		}
+		return &CompileResult{Success: false, Output: compileOutput}, nil
+	}
+
+	compiledFiles := make(map[string]executor.CmdFile)
+	for fname, content := range cr.Files {
+		if fname != srcName {
+			compiledFiles[fname] = executor.CmdFile{Content: content}
+		}
+	}
+
+	return &CompileResult{
+		Success: true,
+		Files:   compiledFiles,
+		TarMode: tarMode,
+	}, nil
+}
+
 func (wp *WorkerPool) runTestCase(
 	ctx context.Context,
 	prob *model.Problem,
 	langCfg *compiler.LangConfig,
 	tc model.TestCaseScore,
 	copyIn map[string]executor.CmdFile,
-	compileCmdStr string,
+	compiledResult *CompileResult,
 	spjExeDir string,
 	spjBinContent string,
 	cpuLimitNs uint64,
@@ -261,21 +361,34 @@ func (wp *WorkerPool) runTestCase(
 ) model.TestCaseResult {
 	srcName := "Main" + langCfg.Extensions[0]
 	var args []string
-	if langCfg.CompileCmd != "" && langCfg.Runtime != "" {
-		compileCmd := compileCmdStr
-		rtParts := strings.Fields(langCfg.Runtime)
-		for i, p := range rtParts {
-			rtParts[i] = strings.ReplaceAll(p, "{{dir}}", ".")
-			rtParts[i] = strings.ReplaceAll(rtParts[i], "{{exe}}", "Main")
+
+	if compiledResult != nil && compiledResult.Success {
+		for fname, file := range compiledResult.Files {
+			copyIn[fname] = file
 		}
-		runCmd := compileCmd + " && " + strings.Join(rtParts, " ") + " < input.txt > output.txt 2> error.txt"
-		args = []string{"/bin/sh", "-c", runCmd}
+
+		if langCfg.Runtime != "" {
+			rtParts := strings.Fields(langCfg.Runtime)
+			for i, p := range rtParts {
+				rtParts[i] = strings.ReplaceAll(p, "{{dir}}", ".")
+				rtParts[i] = strings.ReplaceAll(rtParts[i], "{{exe}}", "Main")
+			}
+			runCmd := strings.Join(rtParts, " ") + " < input.txt > output.txt 2> error.txt"
+			if compiledResult.TarMode {
+				runCmd = "tar -xf compile.tar && " + runCmd
+			}
+			args = []string{"/bin/sh", "-c", runCmd}
+		} else {
+			runCmd := "./Main < input.txt > output.txt 2> error.txt"
+			if compiledResult.TarMode {
+				runCmd = "tar -xf compile.tar && " + runCmd
+			}
+			args = []string{"/bin/sh", "-c", runCmd}
+		}
 	} else if langCfg.Runtime != "" {
 		rtParts := strings.Fields(langCfg.Runtime)
 		runCmd := strings.Join(rtParts, " ") + " " + srcName + " < input.txt > output.txt 2> error.txt"
 		args = []string{"/bin/sh", "-c", runCmd}
-	} else if compileCmdStr != "" {
-		args = []string{"/bin/sh", "-c", compileCmdStr + " && ./Main < input.txt > output.txt 2> error.txt"}
 	} else {
 		args = []string{"/bin/sh", "-c", "./Main < input.txt > output.txt 2> error.txt"}
 	}
@@ -312,16 +425,6 @@ func (wp *WorkerPool) runTestCase(
 
 	cr := resp[0]
 	r.Memory = int(cr.Memory / 1024)
-
-	if compileCmdStr != "" && cr.Status == "Nonzero Exit Status" {
-		r.Status = model.StatusCE
-		if errOut, ok := cr.Files["error.txt"]; ok && errOut != "" {
-			r.Detail = errOut
-		} else {
-			r.Detail = cr.Error
-		}
-		return r
-	}
 
 	switch cr.Status {
 	case "Accepted":
@@ -385,6 +488,13 @@ func (wp *WorkerPool) runTestCase(
 				r.Detail = ck.Message
 			}
 		}
+	case "Nonzero Exit Status":
+		r.Status = model.StatusRE
+		if errOut, ok := cr.Files["error.txt"]; ok && errOut != "" {
+			r.Detail = errOut
+		} else {
+			r.Detail = cr.Error
+		}
 	case "TimeLimitExceeded":
 		r.Status = model.StatusTLE
 	case "MemoryLimitExceeded":
@@ -406,7 +516,7 @@ func (wp *WorkerPool) evaluateSubtasks(
 	prob *model.Problem,
 	langCfg *compiler.LangConfig,
 	copyIn map[string]executor.CmdFile,
-	compileCmdStr string,
+	compiledResult *CompileResult,
 	spjExeDir string,
 	spjBinContent string,
 ) {
@@ -434,7 +544,7 @@ func (wp *WorkerPool) evaluateSubtasks(
 
 		for _, tc := range cases {
 			maxScore += tc.Score
-			result := wp.runTestCase(ctx, prob, langCfg, tc, copyIn, compileCmdStr, spjExeDir, spjBinContent, cpuLimitNs, memLimitBytes)
+			result := wp.runTestCase(ctx, prob, langCfg, tc, copyIn, compiledResult, spjExeDir, spjBinContent, cpuLimitNs, memLimitBytes)
 			allResults = append(allResults, result)
 
 			if result.Time > maxTime {

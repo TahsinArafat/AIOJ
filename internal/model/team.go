@@ -13,6 +13,7 @@ type Team struct {
 	MemberCount  int       `json:"member_count"`
 	CreatedBy    string    `json:"created_by"`
 	CreatorName  string    `json:"creator_name,omitempty"`
+	IsPublic     bool      `json:"is_public"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }
@@ -39,6 +40,14 @@ type TeamContest struct {
 type CreateTeamRequest struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
+	IsPublic    *bool  `json:"is_public"`
+}
+
+type UpdateTeamRequest struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	AvatarURL   string `json:"avatar_url"`
+	IsPublic    *bool  `json:"is_public"`
 }
 
 type TeamListItem struct {
@@ -46,5 +55,22 @@ type TeamListItem struct {
 	Name        string    `json:"name"`
 	Rating      int       `json:"rating"`
 	MemberCount int       `json:"member_count"`
+	IsPublic    bool      `json:"is_public"`
 	CreatedAt   time.Time `json:"created_at"`
+}
+
+type TeamInviteRequest struct {
+	Username string `json:"username"`
+}
+
+type TeamRespondRequest struct {
+	UserID string `json:"user_id"`
+	Action string `json:"action"` // "accept", "decline", "approve", "reject"
+}
+
+type PendingInvite struct {
+	TeamID   string    `json:"team_id"`
+	TeamName string    `json:"team_name"`
+	Role     string    `json:"role"` // "invited" or "requested"
+	JoinedAt time.Time `json:"joined_at"`
 }

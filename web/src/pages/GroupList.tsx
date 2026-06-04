@@ -6,6 +6,9 @@ export default function GroupList() {
     const [groups, setGroups] = useState<any[]>([])
     const [total, setTotal] = useState(0)
     const [activeTab, setActiveTab] = useState<'all' | 'my'>('all')
+    const [joinCode, setJoinCode] = useState('')
+    const [joining, setJoining] = useState(false)
+    const [joinMessage, setJoinMessage] = useState('')
 
     useEffect(() => {
         if (activeTab === 'all') {
@@ -20,6 +23,27 @@ export default function GroupList() {
             }).catch(console.error)
         }
     }, [activeTab])
+
+    const handleJoinByCode = async () => {
+        if (!joinCode.trim()) return
+        setJoining(true)
+        setJoinMessage('')
+        try {
+            await api.groups.joinByCode(joinCode.trim())
+            setJoinMessage('Joined successfully!')
+            setJoinCode('')
+            if (activeTab === 'my') {
+                api.groups.my().then(d => {
+                    setGroups(d.data || [])
+                    setTotal(d.data?.length || 0)
+                }).catch(console.error)
+            }
+        } catch (e: any) {
+            setJoinMessage('Failed: ' + e.message)
+        } finally {
+            setJoining(false)
+        }
+    }
 
     return (
         <div>
@@ -49,6 +73,24 @@ export default function GroupList() {
                     >
                         My Groups
                     </button>
+                </div>
+            )}
+
+            {/* Join by Code */}
+            {getAccessToken() && (
+                <div className="flex gap-2 items-center mb-6 p-3 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg">
+                    <label className="text-sm font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">Join with Code:</label>
+                    <input type="text" placeholder="Enter invite code..." value={joinCode}
+                        onChange={e => setJoinCode(e.target.value)}
+                        className="flex-1 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 rounded px-3 py-2 text-sm"
+                        onKeyDown={e => e.key === 'Enter' && handleJoinByCode()} />
+                    <button onClick={handleJoinByCode} disabled={joining || !joinCode.trim()}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm font-medium disabled:opacity-50 cursor-pointer">
+                        {joining ? 'Joining...' : 'Join'}
+                    </button>
+                    {joinMessage && (
+                        <span className={`text-sm ${joinMessage.startsWith('Failed') ? 'text-red-600' : 'text-green-600'}`}>{joinMessage}</span>
+                    )}
                 </div>
             )}
 

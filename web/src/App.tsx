@@ -29,6 +29,7 @@ import HackPanel from './pages/HackPanel'
 import GroupList from './pages/GroupList'
 import GroupCreate from './pages/GroupCreate'
 import GroupDetail from './pages/GroupDetail'
+import GroupJoin from './pages/GroupJoin'
 import TeamList from './pages/TeamList'
 import TeamCreate from './pages/TeamCreate'
 import TeamDetail from './pages/TeamDetail'
@@ -278,6 +279,7 @@ export default function App() {
                         <Route path="/hack/:contestId/:problemId" element={<HackPanel />} />
                         <Route path="/groups" element={<GroupList />} />
                         <Route path="/groups/create" element={<GroupCreate />} />
+                        <Route path="/groups/join" element={<GroupJoin />} />
                         <Route path="/groups/:id" element={<GroupDetail />} />
                         <Route path="/teams" element={<TeamList />} />
                         <Route path="/teams/create" element={<TeamCreate />} />

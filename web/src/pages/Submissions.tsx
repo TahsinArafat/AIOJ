@@ -55,8 +55,12 @@ export default function Submissions() {
                                         {STATUS_LABEL[s.status] || s.status}
                                     </span>
                                 </td>
-                                <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{s.time_used > 0 ? `${s.time_used}ms` : '—'}</td>
-                                <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{s.memory_used > 0 ? `${Math.round(s.memory_used / 1024)}MB` : '—'}</td>
+                                <td className="px-4 py-3 text-gray-500 dark:text-gray-400">
+                                    {s.status !== "pending" && s.status !== "judging" && s.status !== "ce" && s.status !== "se" ? `${s.time_used}ms` : "—"}
+                                </td>
+                                <td className="px-4 py-3 text-gray-500 dark:text-gray-400">
+                                    {s.status !== "pending" && s.status !== "judging" && s.status !== "ce" && s.status !== "se" ? `${Math.round(s.memory_used / 1024)}MB` : "—"}
+                                </td>
                             </tr>
                         ))}
                         {subs.length === 0 && (

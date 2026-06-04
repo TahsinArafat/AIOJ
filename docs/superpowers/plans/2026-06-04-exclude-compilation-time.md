@@ -2,15 +2,80 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Exclude compilation time from standard judging and evaluateSubtasks execution limits and reported execution time.
+**Goal:** Exclude compilation time from standard judging and evaluateSubtasks execution limits and reported execution time. Also fix the Redis queue timeout bug that stops the judge worker after 5 seconds of idle.
 
-**Architecture:** Separate compilation and execution phases for standard submissions:
-1. Compile contestant code once at the beginning of the `judge` function (with a separate Go-Judge client run call).
-2. If compilation fails, mark submission as CE and exit immediately.
-3. If compilation succeeds, capture the compiled files (either `Main` executable for C/C++/Rust/C#, or a packaged `compile.tar` for Java) and pass them as `CopyIn` files to each testcase execution.
-4. Update `runTestCase` to only execute the compiled binary, completely omitting compile commands from runtime limits and calculations.
+**Architecture:** 
+1. Fix Redis Queue `Dequeue` and `Start` worker loop to handle redis timeout (`redis.Nil`) without stopping the worker pool.
+2. Separate compilation and execution phases for standard submissions:
+   - Compile contestant code once at the beginning of the `judge` function (with a separate Go-Judge client run call).
+   - If compilation fails, mark submission as CE and exit immediately.
+   - If compilation succeeds, capture the compiled files (either `Main` executable for C/C++/Rust/C#, or a packaged `compile.tar` for Java) and pass them as `CopyIn` files to each testcase execution.
+   - Update `runTestCase` to only execute the compiled binary, completely omitting compile commands from runtime limits and calculations.
 
-**Tech Stack:** Go (Backend/Judge Worker), Go-Judge (Sandbox REST API)
+**Tech Stack:** Go (Backend/Judge Worker), Go-Judge (Sandbox REST API), Redis
+
+---
+
+### Task 0: Fix Redis Queue Timeout Bug
+
+**Files:**
+- Modify: `internal/queue/redis.go`
+- Modify: `internal/judge/worker.go`
+
+- [ ] **Step 1: Modify `internal/queue/redis.go` to handle `redis.Nil`**
+
+In `internal/queue/redis.go`, update `Dequeue` to return empty string and `nil` error if `err == redis.Nil`:
+
+```go
+func (q *RedisQueue) Dequeue(ctx context.Context) (string, error) {
+	result, err := q.client.BRPop(ctx, 5*time.Second, q.queueName).Result()
+	if err != nil {
+		if err == redis.Nil {
+			return "", nil
+		}
+		return "", err
+	}
+	return result[1], nil
+}
+```
+
+- [ ] **Step 2: Update `Start` loop in `internal/judge/worker.go` to continue on empty subID**
+
+In `internal/judge/worker.go`, modify `Start` method to check for empty `subID` and continue the loop:
+
+```go
+func (wp *WorkerPool) Start(ctx context.Context) {
+	for {
+		subID, err := wp.queue.Dequeue(ctx)
+		if err != nil {
+			return
+		}
+		if subID == "" {
+			continue
+		}
+		select {
+		case wp.sem <- struct{}{}:
+			go func(id string) {
+				defer func() { <-wp.sem }()
+				wp.judge(ctx, id)
+			}(subID)
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+```
+
+- [ ] **Step 3: Run build and verify tests pass**
+
+Run: `go test ./internal/judge/...`
+Expected: PASS
+
+- [ ] **Step 4: Rebuild and restart services to test queue fix**
+
+Restart the worker container to make it process the pending submission:
+Run: `docker compose build judge-worker && docker compose restart judge-worker`
+Verify that the worker processes the pending submission and it is judged.
 
 ---
 

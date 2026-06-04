@@ -180,11 +180,15 @@ export default function SubmissionDetail() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
                         <p className="text-sm text-gray-500 dark:text-gray-400">Time Used</p>
-                        <p className="text-xl font-bold mt-1">{sub.time_used > 0 ? `${sub.time_used}ms` : '—'}</p>
+                        <p className="text-xl font-bold mt-1">
+                            {sub.status !== "pending" && sub.status !== "judging" && sub.status !== "ce" && sub.status !== "se" ? `${sub.time_used}ms` : "—"}
+                        </p>
                     </div>
                     <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
                         <p className="text-sm text-gray-500 dark:text-gray-400">Memory Used</p>
-                        <p className="text-xl font-bold mt-1">{sub.memory_used > 0 ? `${Math.round(sub.memory_used / 1024)}MB` : '—'}</p>
+                        <p className="text-xl font-bold mt-1">
+                            {sub.status !== "pending" && sub.status !== "judging" && sub.status !== "ce" && sub.status !== "se" ? `${Math.round(sub.memory_used / 1024)}MB` : "—"}
+                        </p>
                     </div>
                     <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
                         <p className="text-sm text-gray-500 dark:text-gray-400">Score</p>
@@ -250,8 +254,8 @@ export default function SubmissionDetail() {
                                                         </span>
                                                     </div>
                                                     <div className="flex gap-4 text-xs text-gray-500 dark:text-gray-400">
-                                                        {c.time !== undefined && <span>Time: {c.time > 0 ? `${c.time}ms` : '—'}</span>}
-                                                        {c.memory !== undefined && <span>Memory: {c.memory > 0 ? `${Math.round(c.memory / 1024)}MB` : '—'}</span>}
+                                                        {c.time !== undefined && c.time !== null && <span>Time: {c.time}ms</span>}
+                                                        {c.memory !== undefined && c.memory !== null && <span>Memory: {Math.round(c.memory / 1024)}MB</span>}
                                                         {(c.score ?? 0) > 0 && <span>Score: {c.score}pts</span>}
                                                     </div>
                                                     {c.detail && (
@@ -281,8 +285,8 @@ export default function SubmissionDetail() {
                                     </span>
                                 </div>
                                 <div className="grid grid-cols-3 gap-4 text-xs text-gray-500 dark:text-gray-400 mb-2">
-                                    <span>Time: {r.time > 0 ? `${r.time}ms` : '—'}</span>
-                                    <span>Memory: {r.memory > 0 ? `${Math.round(r.memory / 1024)}MB` : '—'}</span>
+                                    <span>Time: {r.time !== undefined && r.time !== null ? `${r.time}ms` : "—"}</span>
+                                    <span>Memory: {r.memory !== undefined && r.memory !== null ? `${Math.round(r.memory / 1024)}MB` : "—"}</span>
                                     <span>Score: {r.score}</span>
                                 </div>
                                 {r.detail && (
