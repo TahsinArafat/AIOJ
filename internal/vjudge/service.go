@@ -29,13 +29,16 @@ type Service struct {
 	mu              sync.RWMutex
 	bots            map[string]Bot
 	subStore        store.SubmissionStore
+	probStore       store.ProblemStore
 	botAccStore     store.BotAccountStore
 	remoteLangStore store.RemoteLanguageStore
 	pollCancel      context.CancelFunc
+	submitCancel    context.CancelFunc
+	activeSubmits   sync.Map
 }
 
-func NewService(subStore store.SubmissionStore, botAccStore store.BotAccountStore, remoteLangStore store.RemoteLanguageStore) *Service {
-	return &Service{bots: make(map[string]Bot), subStore: subStore, botAccStore: botAccStore, remoteLangStore: remoteLangStore}
+func NewService(subStore store.SubmissionStore, probStore store.ProblemStore, botAccStore store.BotAccountStore, remoteLangStore store.RemoteLanguageStore) *Service {
+	return &Service{bots: make(map[string]Bot), subStore: subStore, probStore: probStore, botAccStore: botAccStore, remoteLangStore: remoteLangStore}
 }
 
 func (s *Service) RegisterBot(name string, bot Bot) {
@@ -71,6 +74,12 @@ func (s *Service) SetCookies(platform string, cookies map[string]string) {
 	if bot, ok := s.bots[platform]; ok {
 		if cfBot, ok := bot.(*CodeforcesBot); ok {
 			cfBot.SetCookies(cookies)
+		} else if atCoderBot, ok := bot.(*AtCoderBot); ok {
+			atCoderBot.SetCookies(cookies)
+		} else if tophBot, ok := bot.(*TophBot); ok {
+			tophBot.SetCookies(cookies)
+		} else if qojBot, ok := bot.(*QOJBot); ok {
+			qojBot.SetCookies(cookies)
 		}
 	}
 }
@@ -138,8 +147,24 @@ func (s *Service) Submit(ctx context.Context, req SubmitRequest) error {
 			continue
 		}
 
+		cfg := BotConfig{
+			Username:     acc.PlatformUser,
+			Password:     acc.PlatformPass,
+			APIKey:       acc.APIKey,
+			APISecret:    acc.APISecret,
+			Cookies:      acc.SessionData,
+			ProxyURL:     acc.ProxyURL,
+			ProxyEnabled: acc.ProxyEnabled,
+		}
+
 		if cfBot, ok := bot.(*CodeforcesBot); ok {
-			cfBot.SetCookies(acc.SessionData)
+			cfBot.Configure(acc)
+		} else if atCoderBot, ok := bot.(*AtCoderBot); ok {
+			atCoderBot.Configure(cfg)
+		} else if tophBot, ok := bot.(*TophBot); ok {
+			tophBot.Configure(cfg)
+		} else if qojBot, ok := bot.(*QOJBot); ok {
+			qojBot.Configure(cfg)
 		}
 
 		remoteID, err := bot.Submit(context.Background(), req.ProblemRemoteID, sourceCode, req.Language)
@@ -179,6 +204,65 @@ func (s *Service) StartPollWorkers() {
 		go s.pollWorker(ctx, platform)
 	}
 	slog.Info("vjudge poll workers started")
+}
+
+func (s *Service) StartSubmitWorkers() {
+	ctx, cancel := context.WithCancel(context.Background())
+	s.submitCancel = cancel
+	go s.submitWorker(ctx)
+	slog.Info("vjudge submit workers started")
+}
+
+func (s *Service) submitWorker(ctx context.Context) {
+	ticker := time.NewTicker(3 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			s.processUnsubmitted(ctx)
+		}
+	}
+}
+
+func (s *Service) processUnsubmitted(ctx context.Context) {
+	subs, err := s.subStore.GetUnsubmittedRemoteSubmissions(ctx)
+	if err != nil || len(subs) == 0 {
+		return
+	}
+
+	for _, sub := range subs {
+		if _, loaded := s.activeSubmits.LoadOrStore(sub.ID, true); loaded {
+			continue
+		}
+
+		go func(sub model.Submission) {
+			defer s.activeSubmits.Delete(sub.ID)
+
+			prob, err := s.probStore.GetByID(ctx, sub.ProblemID)
+			if err != nil || prob == nil {
+				slog.Error("async submit: problem not found", "sub", sub.ID, "prob", sub.ProblemID)
+				s.subStore.UpdateStatus(ctx, sub.ID, model.StatusSE)
+				return
+			}
+
+			vjReq := SubmitRequest{
+				ID:              sub.ID,
+				ProblemRemoteID: prob.RemoteID,
+				SourceCode:      sub.SourceCode,
+				Language:        sub.Language,
+				RemoteOJ:        prob.Source,
+			}
+
+			slog.Info("async submit: submitting to remote OJ", "sub", sub.ID, "platform", prob.Source, "remote_id", prob.RemoteID)
+			err = s.Submit(ctx, vjReq)
+			if err != nil {
+				slog.Error("async submit: remote submission failed", "sub", sub.ID, "err", err)
+				s.subStore.UpdateStatus(ctx, sub.ID, model.StatusSE)
+			}
+		}(sub)
+	}
 }
 
 func (s *Service) ForcePoll(ctx context.Context, platform, remoteID, submissionID string) {

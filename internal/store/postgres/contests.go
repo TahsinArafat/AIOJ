@@ -594,3 +594,53 @@ func (s *ContestStore) CheckGroupRestriction(ctx context.Context, contestID, use
 		)`, contestID, userID).Scan(&allowed)
 	return allowed, err
 }
+
+func (s *ContestStore) ListByCreatedBy(ctx context.Context, userID string, offset, limit int) ([]model.Contest, int, error) {
+	var total int
+	s.db.QueryRowContext(ctx,
+		`SELECT COUNT(DISTINCT c.id) FROM contests c
+		 LEFT JOIN contest_permissions perm ON c.id = perm.contest_id
+		 WHERE c.created_by = $1 OR perm.user_id = $1`, userID).Scan(&total)
+
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT DISTINCT c.id, c.display_id, c.slug, c.title, c.type, c.format, c.format_config, c.start_time, c.end_time, c.freeze_time, c.password, c.visible, c.description,
+		                 c.registration_required, c.registration_deadline, c.max_participants, c.division, c.educational_config,
+		                 c.created_at
+		 FROM contests c
+		 LEFT JOIN contest_permissions perm ON c.id = perm.contest_id
+		 WHERE c.created_by = $1 OR perm.user_id = $1
+		 ORDER BY c.start_time DESC OFFSET $2 LIMIT $3`, userID, offset, limit)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	var items []model.Contest
+	for rows.Next() {
+		var c model.Contest
+		var configJSON []byte
+		var formatConfigJSON []byte
+		var slug sql.NullString
+		rows.Scan(&c.ID, &c.DisplayID, &slug, &c.Title, &c.Type, &c.Format, &formatConfigJSON, &c.StartTime, &c.EndTime, &c.FreezeTime, &c.Password, &c.Visible, &c.Description,
+			&c.RegistrationRequired, &c.RegistrationDeadline, &c.MaxParticipants, &c.Division, &configJSON, &c.CreatedAt)
+		if slug.Valid {
+			c.Slug = slug.String
+		}
+		if len(configJSON) > 0 {
+			var config model.EducationalRoundConfig
+			if err := json.Unmarshal(configJSON, &config); err == nil {
+				c.EducationalConfig = &config
+			}
+		}
+		if len(formatConfigJSON) > 0 {
+			c.FormatConfig = formatConfigJSON
+		}
+		if c.Password != "" {
+			c.HasPassword = true
+		}
+		items = append(items, c)
+	}
+	if items == nil {
+		items = []model.Contest{}
+	}
+	return items, total, nil
+}

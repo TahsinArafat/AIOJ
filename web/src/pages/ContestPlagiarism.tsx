@@ -90,15 +90,15 @@ export default function ContestPlagiarism() {
 						{ label: 'Total Pairs', value: report.total_pairs },
 						{ label: 'Flagged Pairs', value: pairs.filter((p: any) => p.status === 'flagged').length },
 					].map(s => (
-						<div key={s.label} className="bg-white border border-gray-200 rounded-lg px-4 py-3 text-center">
+						<div key={s.label} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-3 text-center">
 							<div className="text-xs text-gray-500 uppercase mb-1">{s.label}</div>
-							<div className={`font-bold text-lg ${s.cls || 'text-gray-900'}`}>{s.value}</div>
+							<div className={`font-bold text-lg ${s.cls || 'text-gray-900 dark:text-gray-100'}`}>{s.value}</div>
 						</div>
 					))}
 				</div>
 			)}
 
-			<div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+			<div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
 				<table className="w-full text-sm">
 					<thead className="bg-gray-50 text-gray-500 text-xs font-medium border-b">
 						<tr>
@@ -114,9 +114,9 @@ export default function ContestPlagiarism() {
 						{pairs.map((p: any) => (
 							<tr key={p.id} className="hover:bg-gray-50">
 								<td className="px-4 py-3 font-mono text-xs">
-									<span className="font-semibold text-gray-900">{p.user_a_username}</span>
+									<span className="font-semibold text-gray-900 dark:text-gray-100">{p.user_a_username}</span>
 									<span className="text-gray-400 mx-1">↔</span>
-									<span className="font-semibold text-gray-900">{p.user_b_username}</span>
+									<span className="font-semibold text-gray-900 dark:text-gray-100">{p.user_b_username}</span>
 									<div className="text-gray-400 mt-0.5">{p.submission_a_lang} / {p.submission_b_lang}</div>
 								</td>
 								<td className="px-4 py-3 text-xs text-gray-700">{p.problem_title}</td>
@@ -143,7 +143,7 @@ export default function ContestPlagiarism() {
 											<button onClick={() => handleFlag(p.id)} className="text-xs bg-red-50 text-red-600 px-2 py-1 rounded hover:bg-red-100 border border-red-100 font-medium">
 												Flag
 											</button>
-											<button onClick={() => handleIgnore(p.id)} className="text-xs bg-gray-50 text-gray-600 px-2 py-1 rounded hover:bg-gray-100 border border-gray-200 font-medium">
+											<button onClick={() => handleIgnore(p.id)} className="text-xs bg-gray-50 text-gray-600 px-2 py-1 rounded hover:bg-gray-100 border border-gray-200 dark:border-gray-700 font-medium">
 												Ignore
 											</button>
 										</>

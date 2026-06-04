@@ -19,11 +19,11 @@ function formatTime(seconds: number): string {
 }
 
 function getColorClass(seconds: number): string {
-  if (seconds === 0) return 'text-red-700 font-bold';
-  if (seconds < 300) return 'text-red-600';
-  if (seconds < 600) return 'text-orange-600';
-  if (seconds < 1800) return 'text-yellow-600';
-  return 'text-green-600';
+  if (seconds === 0) return 'text-red-700 dark:text-red-300 font-bold';
+  if (seconds < 300) return 'text-red-600 dark:text-red-400';
+  if (seconds < 600) return 'text-orange-600 dark:text-orange-400';
+  if (seconds < 1800) return 'text-yellow-600 dark:text-yellow-400';
+  return 'text-green-600 dark:text-green-400';
 }
 
 export default function VirtualTimer({ endsAt, onComplete, size = 'md' }: VirtualTimerProps) {

@@ -1,11 +1,33 @@
 @import "tailwindcss";
 
+/* Tailwind v4: make `dark:` utilities react to the `.dark` class on <html>.
+   Without this, `dark:bg-gray-950` etc. only trigger on the OS dark-mode
+   preference (prefers-color-scheme: dark), so the React theme toggle
+   appears broken even though the class is being toggled correctly. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
     --background: #ffffff;
     --foreground: #0a0a0a;
     --primary: #2563eb;
     --border: #e5e7eb;
     --muted: #6b7280;
+}
+
+/* Eye-comfortable dark palette (not AMOLED pure black).
+   Gray-800 #1f2937 is widely used for "comfortable dark" — soft enough
+   to reduce eye strain, dark enough for OLED contrast, with ~13:1 text
+   contrast ratio (WCAG AAA) against gray-100 foreground. */
+.dark {
+    --background: #1f2937;
+    --foreground: #f3f4f6;
+    --primary: #60a5fa;
+    --border: #374151;
+    --muted: #9ca3af;
+}
+
+html {
+    transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 body {

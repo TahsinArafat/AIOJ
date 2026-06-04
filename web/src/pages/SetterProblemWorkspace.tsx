@@ -7,16 +7,28 @@ import TestCasesTab from '../components/SetterWorkspace/TestCasesTab'
 import CheckerTab from '../components/SetterWorkspace/CheckerTab'
 import PermissionsTab from '../components/SetterWorkspace/PermissionsTab'
 import SettingsTab from '../components/SetterWorkspace/SettingsTab'
+import EditorialTab from '../components/SetterWorkspace/EditorialTab'
+
+function decodeRole(): string | null {
+  const token = localStorage.getItem('access_token')
+  if (!token) return null
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    return payload.role ?? null
+  } catch {
+    return null
+  }
+}
 
 export default function SetterProblemWorkspace() {
   const { slug } = useParams<{ slug: string }>()
   const navigate = useNavigate()
   const [problem, setProblem] = useState<any>(null)
-  type WorkspaceTab = 'statement' | 'testcases' | 'checker' | 'permissions' | 'settings'
+  type WorkspaceTab = 'statement' | 'testcases' | 'checker' | 'permissions' | 'settings' | 'editorial'
 
   const [activeTab, setActiveTab] = useState<WorkspaceTab>(() => {
     const hash = window.location.hash.replace('#', '') as WorkspaceTab
-    const validTabs: WorkspaceTab[] = ['statement', 'testcases', 'checker', 'permissions', 'settings']
+    const validTabs: WorkspaceTab[] = ['statement', 'testcases', 'checker', 'permissions', 'settings', 'editorial']
     return validTabs.includes(hash) ? hash : 'statement'
   })
 
@@ -373,9 +385,15 @@ export default function SetterProblemWorkspace() {
           </button>
           <button
             onClick={() => setActiveTab('settings')}
-            className={`px-4 py-3 text-left font-medium ${activeTab === 'settings' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-l-4 border-l-blue-600' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-black dark:hover:text-white'}`}
+            className={`px-4 py-3 text-left border-b border-gray-100 dark:border-gray-700 font-medium ${activeTab === 'settings' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-l-4 border-l-blue-600' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-black dark:hover:text-white'}`}
           >
             Workspace Settings
+          </button>
+          <button
+            onClick={() => setActiveTab('editorial')}
+            className={`px-4 py-3 text-left font-medium ${activeTab === 'editorial' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-l-4 border-l-blue-600' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-black dark:hover:text-white'}`}
+          >
+            Editorials
           </button>
         </div>
 
@@ -435,6 +453,13 @@ export default function SetterProblemWorkspace() {
               onUpdateVisibility={handleUpdateVisibility}
               onToggleVisibility={(v) => updateField('visible', v)}
               onDelete={handleDeleteProblem}
+            />
+          )}
+
+          {activeTab === 'editorial' && (
+            <EditorialTab
+              problemId={problem.id}
+              isUserAdmin={decodeRole() === 'admin'}
             />
           )}
         </div>

@@ -1,0 +1,1 @@
+-- No-op: we cannot restore the original UUID slugs

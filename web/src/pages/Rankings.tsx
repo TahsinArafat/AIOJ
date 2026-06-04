@@ -5,8 +5,8 @@ import RatingBadge from '../components/RatingBadge'
 
 const RANK_STYLES: Record<number, string> = {
     1: 'text-amber-700 bg-amber-50 font-bold',
-    2: 'text-gray-600 bg-gray-100 font-bold',
-    3: 'text-orange-700 bg-orange-50 font-bold',
+    2: 'text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 font-bold',
+    3: 'text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-900/20 font-bold',
 }
 
 const MEDALS: Record<number, string> = {
@@ -46,10 +46,10 @@ export default function Rankings() {
         <div>
             <h1 className="text-2xl font-bold mb-4">Rankings</h1>
 
-            <div className="border border-gray-200 rounded-lg overflow-hidden">
+            <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm">
-                        <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                        <thead className="bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-xs uppercase">
                             <tr>
                                 <th className="px-4 py-3 text-left w-16">Rank</th>
                                 <th className="px-4 py-3 text-left">Username</th>
@@ -58,17 +58,17 @@ export default function Rankings() {
                                 <th className="px-4 py-3 text-right">Contests</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100">
+                        <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                             {users.map((u, i) => {
                                 const rank = offset + i + 1
                                 const rankStyle = RANK_STYLES[rank] || ''
                                 return (
-                                    <tr key={u.username} className={`hover:bg-gray-50 transition-colors ${rankStyle}`}>
+                                    <tr key={u.username} className={`hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${rankStyle}`}>
                                         <td className="px-4 py-3 text-center">
                                             {MEDALS[rank] || rank}
                                         </td>
                                         <td className="px-4 py-3">
-                                            <Link to={`/user/${u.username}`} className="font-medium text-blue-600 hover:underline">
+                                            <Link to={`/user/${u.username}`} className="font-medium text-blue-600 dark:text-blue-400 hover:underline">
                                                 {u.username}
                                             </Link>
                                         </td>
@@ -76,18 +76,18 @@ export default function Rankings() {
                                             <RatingBadge rating={u.rating} size="sm" />
                                         </td>
                                         <td className="px-4 py-3 text-right">
-                                            <span className={u.rating_change >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                            <span className={u.rating_change >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
                                                 {u.rating_change >= 0 ? '+' : ''}{u.rating_change}
                                             </span>
                                         </td>
-                                        <td className="px-4 py-3 text-right text-gray-500">
+                                        <td className="px-4 py-3 text-right text-gray-500 dark:text-gray-400">
                                             {u.contests_played}
                                         </td>
                                     </tr>
                                 )
                             })}
                             {users.length === 0 && !loading && (
-                                <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400">No rankings yet.</td></tr>
+                                <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400 dark:text-gray-500">No rankings yet.</td></tr>
                             )}
                         </tbody>
                     </table>
@@ -95,14 +95,14 @@ export default function Rankings() {
             </div>
 
             {loading && (
-                <div className="text-center py-4 text-gray-400">Loading...</div>
+                <div className="text-center py-4 text-gray-400 dark:text-gray-500">Loading...</div>
             )}
 
             {hasMore && !loading && (
                 <div className="flex justify-center mt-4">
                     <button
                         onClick={handleLoadMore}
-                        className="px-6 py-2 border border-gray-300 rounded text-sm hover:bg-gray-50 transition-colors"
+                        className="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                     >
                         Load More
                     </button>
@@ -110,7 +110,7 @@ export default function Rankings() {
             )}
 
             {total > 0 && (
-                <p className="text-sm text-gray-400 mt-3 text-center">{users.length} of {total} users</p>
+                <p className="text-sm text-gray-400 dark:text-gray-500 mt-3 text-center">{users.length} of {total} users</p>
             )}
         </div>
     )

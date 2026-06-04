@@ -130,6 +130,21 @@ func (h *GroupHandler) AddContest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	groupID := chi.URLParam(r, "id")
+	g, err := h.store.GetByID(r.Context(), groupID)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if g == nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	if g.CreatedBy != claims.UserID && claims.Role != "admin" {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
 	var req struct {
 		ContestID string `json:"contest_id"`
 	}
@@ -144,4 +159,139 @@ func (h *GroupHandler) AddContest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondJSON(w, http.StatusOK, map[string]string{"status": "added"})
+}
+
+func (h *GroupHandler) ListByUser(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r)
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	items, err := h.store.ListByUser(r.Context(), claims.UserID)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{"data": items})
+}
+
+func (h *GroupHandler) Update(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r)
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	groupID := chi.URLParam(r, "id")
+	g, err := h.store.GetByID(r.Context(), groupID)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if g == nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	if g.CreatedBy != claims.UserID && claims.Role != "admin" {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	var req model.CreateGroupRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+
+	if req.Name != "" {
+		g.Name = req.Name
+	}
+	g.Description = req.Description
+	g.IsPublic = req.IsPublic
+	g.MaxMembers = req.MaxMembers
+
+	if err := h.store.Update(r.Context(), groupID, g); err != nil {
+		http.Error(w, "update failed", http.StatusInternalServerError)
+		return
+	}
+
+	respondJSON(w, http.StatusOK, g)
+}
+
+func (h *GroupHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r)
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	groupID := chi.URLParam(r, "id")
+	g, err := h.store.GetByID(r.Context(), groupID)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if g == nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	if g.CreatedBy != claims.UserID && claims.Role != "admin" {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	if err := h.store.Delete(r.Context(), groupID); err != nil {
+		http.Error(w, "delete failed", http.StatusInternalServerError)
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+}
+
+func (h *GroupHandler) GetContests(w http.ResponseWriter, r *http.Request) {
+	groupID := chi.URLParam(r, "id")
+	contests, err := h.store.GetContests(r.Context(), groupID)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{"data": contests})
+}
+
+func (h *GroupHandler) RemoveContest(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r)
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	groupID := chi.URLParam(r, "id")
+	contestID := chi.URLParam(r, "contestId")
+
+	g, err := h.store.GetByID(r.Context(), groupID)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if g == nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	if g.CreatedBy != claims.UserID && claims.Role != "admin" {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	if err := h.store.RemoveContest(r.Context(), groupID, contestID); err != nil {
+		http.Error(w, "remove contest failed", http.StatusInternalServerError)
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]string{"status": "removed"})
 }

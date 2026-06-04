@@ -13,6 +13,8 @@ interface BotAccount {
     session_data?: Record<string, string>
     status: string
     rate_limit_rps: number
+    proxy_url: string
+    proxy_enabled: boolean
     last_used_at: string | null
     created_at: string
 }
@@ -26,9 +28,34 @@ interface BotForm {
     api_secret: string
     rate_limit_rps: string
     session_data: string
+    proxy_url: string
+    proxy_enabled: boolean
 }
 
-const emptyForm: BotForm = { user_id: '', platform: 'codeforces', platform_user: '', platform_pass: '', api_key: '', api_secret: '', rate_limit_rps: '1.0', session_data: '' }
+const emptyForm: BotForm = { user_id: '', platform: 'codeforces', platform_user: '', platform_pass: '', api_key: '', api_secret: '', rate_limit_rps: '1.0', session_data: '', proxy_url: '', proxy_enabled: false }
+
+const getCookieValue = (sessionDataStr: string, key: string): string => {
+    if (!sessionDataStr) return ''
+    try {
+        const parsed = JSON.parse(sessionDataStr)
+        return parsed[key] || ''
+    } catch {
+        return ''
+    }
+}
+
+const updateCookieValue = (sessionDataStr: string, key: string, val: string): string => {
+    let current: Record<string, string> = {}
+    try {
+        current = JSON.parse(sessionDataStr || '{}')
+    } catch {}
+    if (val) {
+        current[key] = val
+    } else {
+        delete current[key]
+    }
+    return JSON.stringify(current)
+}
 
 const PLATFORMS = [
     { value: 'codeforces', label: 'Codeforces', hint: 'Username + Password for web auth, API Key + Secret for verdict polling' },
@@ -87,6 +114,8 @@ export default function BotAccountsPanel() {
             api_secret: '',
             rate_limit_rps: String(bot.rate_limit_rps),
             session_data: bot.session_data ? JSON.stringify(bot.session_data) : '',
+            proxy_url: bot.proxy_url || '',
+            proxy_enabled: bot.proxy_enabled || false,
         })
         setShowForm(true)
     }
@@ -102,6 +131,8 @@ export default function BotAccountsPanel() {
                 if (form.api_key) update.api_key = form.api_key
                 if (form.api_secret) update.api_secret = form.api_secret
                 update.rate_limit_rps = parseFloat(form.rate_limit_rps) || 1.0
+                update.proxy_url = form.proxy_url
+                update.proxy_enabled = form.proxy_enabled
                 if (form.session_data) {
                     try {
                         update.session_data = JSON.parse(form.session_data)
@@ -117,6 +148,8 @@ export default function BotAccountsPanel() {
                     api_key: form.api_key,
                     api_secret: form.api_secret,
                     rate_limit_rps: parseFloat(form.rate_limit_rps) || 1.0,
+                    proxy_url: form.proxy_url,
+                    proxy_enabled: form.proxy_enabled,
                 }
                 if (form.session_data) {
                     try {
@@ -155,22 +188,22 @@ export default function BotAccountsPanel() {
     }
 
     const statusColor = (s: string) =>
-        s === 'active' ? 'bg-green-100 text-green-800' :
-        s === 'expired' ? 'bg-yellow-100 text-yellow-800' :
-        s === 'error' ? 'bg-red-100 text-red-800' :
-        s === 'banned' ? 'bg-red-100 text-red-800' :
-        'bg-gray-100 text-gray-800'
+        s === 'active' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' :
+        s === 'expired' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300' :
+        s === 'error' ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300' :
+        s === 'banned' ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300' :
+        'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200'
 
     const platformHint = PLATFORMS.find(p => p.value === form.platform)?.hint || ''
 
-    if (loading) return <div className="text-center py-8 text-gray-400">Loading...</div>
+    if (loading) return <div className="text-center py-8 text-gray-400 dark:text-gray-500">Loading...</div>
 
     return (
         <div>
             <div className="flex items-center justify-between mb-4">
                 <div>
                     <h2 className="text-lg font-semibold">VJudge Bot Accounts</h2>
-                    <p className="text-sm text-gray-500 mt-1">Manage credentials for remote OJ platforms (Codeforces, AtCoder, etc.)</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Manage credentials for remote OJ platforms (Codeforces, AtCoder, etc.)</p>
                 </div>
                 <button onClick={() => { resetForm(); setShowForm(true) }}
                     className="flex items-center gap-1.5 bg-blue-600 text-white px-3 py-1.5 rounded text-sm hover:bg-blue-700 transition-colors">
@@ -179,15 +212,15 @@ export default function BotAccountsPanel() {
             </div>
 
             {showForm && (
-                <div className="bg-white border border-gray-200 rounded-lg p-5 mb-6">
+                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-5 mb-6">
                     <div className="flex items-center justify-between mb-4">
                         <h3 className="font-semibold text-sm">{editingId ? 'Edit Bot Account' : 'Add New Bot Account'}</h3>
-                        <button onClick={resetForm} className="text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button>
+                        <button onClick={resetForm} className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"><X className="w-4 h-4" /></button>
                     </div>
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-xs font-medium text-gray-500 mb-1">Platform</label>
+                                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Platform</label>
                                 <select
                                     required
                                     value={form.platform}
@@ -198,10 +231,10 @@ export default function BotAccountsPanel() {
                                         <option key={p.value} value={p.value}>{p.label}</option>
                                     ))}
                                 </select>
-                                {platformHint && <p className="text-xs text-gray-400 mt-1">{platformHint}</p>}
+                                {platformHint && <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{platformHint}</p>}
                             </div>
                             <div ref={userDropdownRef}>
-                                <label className="block text-xs font-medium text-gray-500 mb-1">Owner</label>
+                                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Owner</label>
                                 <div className="relative">
                                     <input
                                         type="text"
@@ -216,10 +249,10 @@ export default function BotAccountsPanel() {
                                         className="w-full border rounded px-3 py-2 text-sm"
                                     />
                                     {showUserDropdown && (
-                                        <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                                        <div className="absolute z-10 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg max-h-48 overflow-y-auto">
                                             <div
                                                 onClick={() => { setForm({ ...form, user_id: '' }); setUserSearch(''); setShowUserDropdown(false) }}
-                                                className="px-3 py-2 text-sm text-gray-500 hover:bg-gray-50 cursor-pointer"
+                                                className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
                                             >
                                                 System-owned (no user)
                                             </div>
@@ -227,45 +260,45 @@ export default function BotAccountsPanel() {
                                                 <div
                                                     key={u.id}
                                                     onClick={() => { setForm({ ...form, user_id: u.id }); setUserSearch(u.username); setShowUserDropdown(false) }}
-                                                    className={`px-3 py-2 text-sm cursor-pointer hover:bg-gray-50 ${form.user_id === u.id ? 'bg-blue-50 text-blue-700' : ''}`}
+                                                    className={`px-3 py-2 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 ${form.user_id === u.id ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300' : ''}`}
                                                 >
                                                     {u.username}
                                                 </div>
                                             ))}
                                             {users.filter(u => u.username.toLowerCase().includes(userSearch.toLowerCase())).length === 0 && (
-                                                <div className="px-3 py-2 text-sm text-gray-400">No users found</div>
+                                                <div className="px-3 py-2 text-sm text-gray-400 dark:text-gray-500">No users found</div>
                                             )}
                                         </div>
                                     )}
                                 </div>
                             </div>
                         </div>
-                        <div className="border-t border-gray-100 pt-4">
-                            <h4 className="text-xs font-semibold text-gray-500 uppercase mb-3">Authentication</h4>
+                        <div className="border-t border-gray-100 dark:border-gray-700 pt-4">
+                            <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-3">Authentication</h4>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-xs font-medium text-gray-500 mb-1">Username</label>
+                                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Username</label>
                                     <input type="text" value={form.platform_user} onChange={e => setForm({ ...form, platform_user: e.target.value })}
                                         placeholder="Remote OJ username" className="w-full border rounded px-3 py-2 text-sm" />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-gray-500 mb-1">Password</label>
+                                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Password</label>
                                     <input type="password" value={form.platform_pass} onChange={e => setForm({ ...form, platform_pass: e.target.value })}
                                         placeholder="Leave empty to keep existing" className="w-full border rounded px-3 py-2 text-sm" />
                                 </div>
                             </div>
                         </div>
                         {form.platform === 'codeforces' && (
-                            <div className="border-t border-gray-100 pt-4">
-                                <h4 className="text-xs font-semibold text-gray-500 uppercase mb-3">Codeforces API Key (Optional, for verdict polling)</h4>
+                            <div className="border-t border-gray-100 dark:border-gray-700 pt-4">
+                                <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-3">Codeforces API Key (Optional, for verdict polling)</h4>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label className="block text-xs font-medium text-gray-500 mb-1">API Key</label>
+                                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">API Key</label>
                                         <input type="text" value={form.api_key} onChange={e => setForm({ ...form, api_key: e.target.value })}
                                             placeholder="From https://codeforces.com/settings/api" className="w-full border rounded px-3 py-2 text-sm" />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-medium text-gray-500 mb-1">API Secret</label>
+                                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">API Secret</label>
                                         <input type="password" value={form.api_secret} onChange={e => setForm({ ...form, api_secret: e.target.value })}
                                             placeholder="Leave empty to keep existing" className="w-full border rounded px-3 py-2 text-sm" />
                                     </div>
@@ -273,59 +306,106 @@ export default function BotAccountsPanel() {
                             </div>
                         )}
                         {form.platform === 'codeforces' && (
-                            <div className="border-t border-gray-100 pt-4">
-                                <h4 className="text-xs font-semibold text-gray-500 uppercase mb-3">Browser Cookies (paste from DevTools)</h4>
+                            <div className="border-t border-gray-100 dark:border-gray-700 pt-4">
+                                <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-3">Browser Cookies (paste from DevTools)</h4>
                                 <div className="space-y-3">
                                     <div>
-                                        <label className="block text-xs font-medium text-gray-500 mb-1">JSESSIONID</label>
-                                        <input type="text" value={form.session_data ? JSON.parse(form.session_data || '{}').JSESSIONID || '' : ''}
-                                            onChange={e => {
-                                                try {
-                                                    const current = JSON.parse(form.session_data || '{}')
-                                                    current.JSESSIONID = e.target.value
-                                                    setForm({ ...form, session_data: JSON.stringify(current) })
-                                                } catch { setForm({ ...form, session_data: JSON.stringify({ JSESSIONID: e.target.value }) }) }
-                                            }}
+                                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">JSESSIONID</label>
+                                        <input type="text" value={getCookieValue(form.session_data, 'JSESSIONID')}
+                                            onChange={e => setForm({ ...form, session_data: updateCookieValue(form.session_data, 'JSESSIONID', e.target.value) })}
                                             placeholder="Copy from browser DevTools (F12) → Application → Cookies → JSESSIONID"
                                             className="w-full border rounded px-3 py-2 text-sm font-mono" />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-medium text-gray-500 mb-1">39ce7</label>
-                                        <input type="text" value={form.session_data ? JSON.parse(form.session_data || '{}')['39ce7'] || '' : ''}
-                                            onChange={e => {
-                                                try {
-                                                    const current = JSON.parse(form.session_data || '{}')
-                                                    current['39ce7'] = e.target.value
-                                                    setForm({ ...form, session_data: JSON.stringify(current) })
-                                                } catch { setForm({ ...form, session_data: JSON.stringify({ '39ce7': e.target.value }) }) }
-                                            }}
+                                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">39ce7</label>
+                                        <input type="text" value={getCookieValue(form.session_data, '39ce7')}
+                                            onChange={e => setForm({ ...form, session_data: updateCookieValue(form.session_data, '39ce7', e.target.value) })}
                                             placeholder="Copy from browser DevTools (F12) → Application → Cookies → 39ce7"
                                             className="w-full border rounded px-3 py-2 text-sm font-mono" />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-medium text-gray-500 mb-1">cf_clearance (optional, auto-generated by bypass proxy)</label>
-                                        <input type="text" value={form.session_data ? JSON.parse(form.session_data || '{}').cf_clearance || '' : ''}
-                                            onChange={e => {
-                                                try {
-                                                    const current = JSON.parse(form.session_data || '{}')
-                                                    current.cf_clearance = e.target.value
-                                                    setForm({ ...form, session_data: JSON.stringify(current) })
-                                                } catch { setForm({ ...form, session_data: JSON.stringify({ cf_clearance: e.target.value }) }) }
-                                            }}
+                                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">cf_clearance (optional, auto-generated by bypass proxy)</label>
+                                        <input type="text" value={getCookieValue(form.session_data, 'cf_clearance')}
+                                            onChange={e => setForm({ ...form, session_data: updateCookieValue(form.session_data, 'cf_clearance', e.target.value) })}
                                             placeholder="Auto-filled by bypass proxy, or paste from browser"
                                             className="w-full border rounded px-3 py-2 text-sm font-mono" />
                                     </div>
-                                    <p className="text-xs text-gray-400 mt-1">
+                                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                                         Get cookies from browser: DevTools (F12) → Application → Cookies → codeforces.com. 
                                         The bypass proxy auto-generates cf_clearance for the server IP.
                                     </p>
                                 </div>
                             </div>
                         )}
-                        <div className="border-t border-gray-100 pt-4">
+                        {form.platform === 'atcoder' && (
+                            <div className="border-t border-gray-100 dark:border-gray-700 pt-4">
+                                <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-3">AtCoder Cookies</h4>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">REPSESSID</label>
+                                    <input type="text" value={getCookieValue(form.session_data, 'REPSESSID')}
+                                        onChange={e => setForm({ ...form, session_data: updateCookieValue(form.session_data, 'REPSESSID', e.target.value) })}
+                                        placeholder="Copy from browser DevTools → Application → Cookies → REPSESSID"
+                                        className="w-full border rounded px-3 py-2 text-sm font-mono" />
+                                </div>
+                            </div>
+                        )}
+                        {form.platform === 'toph' && (
+                            <div className="border-t border-gray-100 dark:border-gray-700 pt-4">
+                                <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-3">Toph Cookies</h4>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">t (Session Cookie)</label>
+                                    <input type="text" value={getCookieValue(form.session_data, 't')}
+                                        onChange={e => setForm({ ...form, session_data: updateCookieValue(form.session_data, 't', e.target.value) })}
+                                        placeholder="Copy from browser DevTools → Application → Cookies → t"
+                                        className="w-full border rounded px-3 py-2 text-sm font-mono" />
+                                </div>
+                            </div>
+                        )}
+                        {form.platform === 'qoj' && (
+                            <div className="border-t border-gray-100 dark:border-gray-700 pt-4">
+                                <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-3">QOJ Cookies</h4>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">UOJSESSID</label>
+                                    <input type="text" value={getCookieValue(form.session_data, 'UOJSESSID')}
+                                        onChange={e => setForm({ ...form, session_data: updateCookieValue(form.session_data, 'UOJSESSID', e.target.value) })}
+                                        placeholder="Copy from browser DevTools → Application → Cookies → UOJSESSID"
+                                        className="w-full border rounded px-3 py-2 text-sm font-mono" />
+                                </div>
+                            </div>
+                        )}
+                        {form.platform === 'cses' && (
+                            <div className="border-t border-gray-100 dark:border-gray-700 pt-4">
+                                <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-3">CSES Cookies</h4>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">PHPSESSID</label>
+                                    <input type="text" value={getCookieValue(form.session_data, 'PHPSESSID')}
+                                        onChange={e => setForm({ ...form, session_data: updateCookieValue(form.session_data, 'PHPSESSID', e.target.value) })}
+                                        placeholder="Copy from browser DevTools → Application → Cookies → PHPSESSID"
+                                        className="w-full border rounded px-3 py-2 text-sm font-mono" />
+                                </div>
+                            </div>
+                        )}
+                        <div className="border-t border-gray-100 dark:border-gray-700 pt-4">
+                            <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-3">Proxy Configuration (Optional, for Cloudflare bypass)</h4>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-xs font-medium text-gray-500 mb-1">Rate Limit (requests/sec)</label>
+                                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Proxy URL</label>
+                                    <input type="text" value={form.proxy_url} onChange={e => setForm({ ...form, proxy_url: e.target.value })}
+                                        placeholder="http://user:pass@host:port" className="w-full border rounded px-3 py-2 text-sm font-mono" />
+                                </div>
+                                <div className="flex items-center pt-6">
+                                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer">
+                                        <input type="checkbox" checked={form.proxy_enabled} onChange={e => setForm({ ...form, proxy_enabled: e.target.checked })}
+                                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4" />
+                                        Enable Proxy for this Account
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="border-t border-gray-100 dark:border-gray-700 pt-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Rate Limit (requests/sec)</label>
                                     <input type="number" step="0.1" min="0.1" value={form.rate_limit_rps} onChange={e => setForm({ ...form, rate_limit_rps: e.target.value })}
                                         className="w-full border rounded px-3 py-2 text-sm" />
                                 </div>
@@ -333,7 +413,7 @@ export default function BotAccountsPanel() {
                         </div>
                         <div className="flex justify-end gap-2 pt-2">
                             <button type="button" onClick={resetForm}
-                                className="px-4 py-2 text-sm text-gray-600 hover:text-black transition-colors">Cancel</button>
+                                className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white transition-colors">Cancel</button>
                             <button type="button" onClick={async () => {
                                 try {
                                     let sessionData: Record<string, string> | undefined
@@ -351,7 +431,7 @@ export default function BotAccountsPanel() {
                                     alert('Test failed: ' + err.message)
                                 }
                             }}
-                                className="px-4 py-2 text-sm text-blue-600 hover:text-blue-800 border border-blue-300 rounded transition-colors">
+                                className="px-4 py-2 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 border border-blue-300 dark:border-blue-700 rounded transition-colors">
                                 Test Login
                             </button>
                             <button type="submit" disabled={saving}
@@ -363,19 +443,20 @@ export default function BotAccountsPanel() {
                 </div>
             )}
 
-            <div className="border border-gray-200 rounded-lg overflow-hidden">
+            <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
                 <table className="w-full text-sm">
-                    <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                    <thead className="bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-xs uppercase">
                         <tr>
                             <th className="px-4 py-3 text-left">Platform</th>
                             <th className="px-4 py-3 text-left">Username</th>
                             <th className="px-4 py-3 text-left">Status</th>
                             <th className="px-4 py-3 text-left">Rate Limit</th>
+                            <th className="px-4 py-3 text-left">Proxy</th>
                             <th className="px-4 py-3 text-left">Last Used</th>
                             <th className="px-4 py-3 text-right">Actions</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                         {bots.map(b => (
                             <tr key={b.id}>
                                 <td className="px-4 py-3">
@@ -388,16 +469,23 @@ export default function BotAccountsPanel() {
                                         {b.status}
                                     </button>
                                 </td>
-                                <td className="px-4 py-3 text-gray-500 text-xs">{b.rate_limit_rps} rps</td>
-                                <td className="px-4 py-3 text-gray-500 text-xs">
+                                <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs">{b.rate_limit_rps} rps</td>
+                                <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs max-w-[150px] truncate" title={b.proxy_url}>
+                                    {b.proxy_enabled ? (
+                                        <span className="text-green-600 dark:text-green-400 font-mono font-medium">Enabled</span>
+                                    ) : (
+                                        <span className="text-gray-400 dark:text-gray-500">Disabled</span>
+                                    )}
+                                </td>
+                                <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs">
                                     {b.last_used_at ? new Date(b.last_used_at).toLocaleString() : 'Never'}
                                 </td>
                                 <td className="px-4 py-3 text-right">
                                     <div className="flex justify-end gap-2">
-                                        <button onClick={() => startEdit(b)} className="text-blue-600 hover:text-blue-800" title="Edit">
+                                        <button onClick={() => startEdit(b)} className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300" title="Edit">
                                             <Pencil className="w-4 h-4" />
                                         </button>
-                                        <button onClick={() => handleDelete(b.id)} className="text-red-600 hover:text-red-800" title="Delete">
+                                        <button onClick={() => handleDelete(b.id)} className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300" title="Delete">
                                             <Trash2 className="w-4 h-4" />
                                         </button>
                                     </div>
@@ -406,7 +494,7 @@ export default function BotAccountsPanel() {
                         ))}
                         {bots.length === 0 && (
                             <tr>
-                                <td colSpan={6} className="px-4 py-8 text-center text-gray-400">
+                                <td colSpan={7} className="px-4 py-8 text-center text-gray-400 dark:text-gray-500">
                                     No bot accounts configured. Click "Add Bot Account" to add one.
                                 </td>
                             </tr>

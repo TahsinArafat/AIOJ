@@ -24,7 +24,7 @@ func (s *BotAccountStore) List(ctx context.Context, offset, limit int) ([]model.
 	}
 
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, platform, platform_user, status, rate_limit_rps, last_used_at, created_at
+		`SELECT id, platform, platform_user, status, rate_limit_rps, last_used_at, created_at, proxy_url, proxy_enabled
 		 FROM bot_accounts ORDER BY platform, created_at DESC OFFSET $1 LIMIT $2`,
 		offset, limit)
 	if err != nil {
@@ -35,7 +35,7 @@ func (s *BotAccountStore) List(ctx context.Context, offset, limit int) ([]model.
 	var items []model.BotAccount
 	for rows.Next() {
 		var ba model.BotAccount
-		if err := rows.Scan(&ba.ID, &ba.Platform, &ba.PlatformUser, &ba.Status, &ba.RateLimitRPS, &ba.LastUsedAt, &ba.CreatedAt); err != nil {
+		if err := rows.Scan(&ba.ID, &ba.Platform, &ba.PlatformUser, &ba.Status, &ba.RateLimitRPS, &ba.LastUsedAt, &ba.CreatedAt, &ba.ProxyURL, &ba.ProxyEnabled); err != nil {
 			return nil, 0, err
 		}
 		items = append(items, ba)
@@ -48,7 +48,7 @@ func (s *BotAccountStore) List(ctx context.Context, offset, limit int) ([]model.
 
 func (s *BotAccountStore) ListByPlatform(ctx context.Context, platform string) ([]model.BotAccount, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, platform, platform_user, platform_pass, api_key, api_secret, session_data, status, rate_limit_rps, last_used_at, created_at
+		`SELECT id, platform, platform_user, platform_pass, api_key, api_secret, session_data, status, rate_limit_rps, last_used_at, created_at, proxy_url, proxy_enabled
 		 FROM bot_accounts WHERE platform = $1 AND status = 'active' ORDER BY last_used_at ASC NULLS FIRST`, platform)
 	if err != nil {
 		return nil, err
@@ -58,7 +58,7 @@ func (s *BotAccountStore) ListByPlatform(ctx context.Context, platform string) (
 	for rows.Next() {
 		var ba model.BotAccount
 		var sd []byte
-		if err := rows.Scan(&ba.ID, &ba.Platform, &ba.PlatformUser, &ba.PlatformPass, &ba.APIKey, &ba.APISecret, &sd, &ba.Status, &ba.RateLimitRPS, &ba.LastUsedAt, &ba.CreatedAt); err != nil {
+		if err := rows.Scan(&ba.ID, &ba.Platform, &ba.PlatformUser, &ba.PlatformPass, &ba.APIKey, &ba.APISecret, &sd, &ba.Status, &ba.RateLimitRPS, &ba.LastUsedAt, &ba.CreatedAt, &ba.ProxyURL, &ba.ProxyEnabled); err != nil {
 			return nil, err
 		}
 		if len(sd) > 0 {
@@ -76,9 +76,9 @@ func (s *BotAccountStore) GetByID(ctx context.Context, id string) (*model.BotAcc
 	var ba model.BotAccount
 	var sd []byte
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, platform, platform_user, platform_pass, api_key, api_secret, session_data, status, rate_limit_rps, last_used_at, created_at
+		`SELECT id, platform, platform_user, platform_pass, api_key, api_secret, session_data, status, rate_limit_rps, last_used_at, created_at, proxy_url, proxy_enabled
 		 FROM bot_accounts WHERE id = $1`, id,
-	).Scan(&ba.ID, &ba.Platform, &ba.PlatformUser, &ba.PlatformPass, &ba.APIKey, &ba.APISecret, &sd, &ba.Status, &ba.RateLimitRPS, &ba.LastUsedAt, &ba.CreatedAt)
+	).Scan(&ba.ID, &ba.Platform, &ba.PlatformUser, &ba.PlatformPass, &ba.APIKey, &ba.APISecret, &sd, &ba.Status, &ba.RateLimitRPS, &ba.LastUsedAt, &ba.CreatedAt, &ba.ProxyURL, &ba.ProxyEnabled)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -94,18 +94,18 @@ func (s *BotAccountStore) GetByID(ctx context.Context, id string) (*model.BotAcc
 func (s *BotAccountStore) Create(ctx context.Context, ba *model.BotAccount) error {
 	sd, _ := json.Marshal(ba.SessionData)
 	return s.db.QueryRowContext(ctx,
-		`INSERT INTO bot_accounts (user_id, platform, platform_user, platform_pass, api_key, api_secret, session_data, status, rate_limit_rps)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		`INSERT INTO bot_accounts (user_id, platform, platform_user, platform_pass, api_key, api_secret, session_data, status, rate_limit_rps, proxy_url, proxy_enabled)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 		 RETURNING id, created_at`,
-		ba.UserID, ba.Platform, ba.PlatformUser, ba.PlatformPass, ba.APIKey, ba.APISecret, sd, ba.Status, ba.RateLimitRPS,
+		ba.UserID, ba.Platform, ba.PlatformUser, ba.PlatformPass, ba.APIKey, ba.APISecret, sd, ba.Status, ba.RateLimitRPS, ba.ProxyURL, ba.ProxyEnabled,
 	).Scan(&ba.ID, &ba.CreatedAt)
 }
 
 func (s *BotAccountStore) Update(ctx context.Context, id string, ba *model.BotAccount) error {
 	sd, _ := json.Marshal(ba.SessionData)
 	_, err := s.db.ExecContext(ctx,
-		`UPDATE bot_accounts SET platform=$1, platform_user=$2, platform_pass=$3, api_key=$4, api_secret=$5, session_data=$6, status=$7, rate_limit_rps=$8 WHERE id=$9`,
-		ba.Platform, ba.PlatformUser, ba.PlatformPass, ba.APIKey, ba.APISecret, sd, ba.Status, ba.RateLimitRPS, id)
+		`UPDATE bot_accounts SET platform=$1, platform_user=$2, platform_pass=$3, api_key=$4, api_secret=$5, session_data=$6, status=$7, rate_limit_rps=$8, proxy_url=$9, proxy_enabled=$10 WHERE id=$11`,
+		ba.Platform, ba.PlatformUser, ba.PlatformPass, ba.APIKey, ba.APISecret, sd, ba.Status, ba.RateLimitRPS, ba.ProxyURL, ba.ProxyEnabled, id)
 	return err
 }
 

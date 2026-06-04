@@ -1,12 +1,24 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { api } from '../lib/api'
+import { resolveProblemTitle } from '../lib/problemSlugResolver'
+
+function indexLabel(i: number): string {
+    let s = ''
+    let n = i
+    do {
+        s = String.fromCharCode(65 + (n % 26)) + s
+        n = Math.floor(n / 26) - 1
+    } while (n >= 0)
+    return s
+}
 
 export default function ContestEdit() {
     const { id } = useParams<{ id: string }>()
     const nav = useNavigate()
     const [contest, setContest] = useState<any>(null)
     const [problems, setProblems] = useState<any[]>([])
+    const [problemTitles, setProblemTitles] = useState<Record<string, string>>({})
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
     const [error, setError] = useState('')
@@ -37,7 +49,8 @@ export default function ContestEdit() {
         try {
             const data = await api.contests.get(id!)
             setContest(data.contest)
-            setProblems(data.problems || [])
+            const probs = data.problems || []
+            setProblems(probs)
             setForm({
                 title: data.contest.title || '',
                 description: data.contest.description || '',
@@ -50,6 +63,15 @@ export default function ContestEdit() {
                 upsolving_enabled: data.contest.upsolving_enabled ?? true,
                 virtual_contest_enabled: data.contest.virtual_contest_enabled ?? true,
             })
+            // Resolve titles for all problems
+            const titles: Record<string, string> = {}
+            await Promise.all(
+                probs.map(async (p: any) => {
+                    const title = await resolveProblemTitle(p.problem_id)
+                    titles[p.problem_id] = title || p.problem_id.substring(0, 8) + '...'
+                })
+            )
+            setProblemTitles(titles)
         } catch (err: any) {
             setError(err.message || 'Failed to load contest')
         } finally {
@@ -80,8 +102,7 @@ export default function ContestEdit() {
 
     const handleAddProblem = async (problemId: string) => {
         if (!id) return
-        const nextIndex = String.fromCharCode(65 + problems.length)
-        
+        const nextIndex = indexLabel(problems.length)
         try {
             await api.contests.addProblem(id, {
                 problem_id: problemId,
@@ -97,7 +118,7 @@ export default function ContestEdit() {
     }
 
     const handleRemoveProblem = async (problemId: string) => {
-        if (!id || !confirm('Remove this problem from contest?')) return
+        if (!id || !confirm('Remove this problem from the contest?')) return
         try {
             await api.contests.removeProblem(id, problemId)
             await loadData()
@@ -106,8 +127,31 @@ export default function ContestEdit() {
         }
     }
 
+    const handleMoveProblem = (idx: number, dir: -1 | 1) => {
+        const target = idx + dir
+        if (target < 0 || target >= problems.length) return
+        const next = [...problems]
+        ;[next[idx], next[target]] = [next[target], next[idx]]
+        // Reassign indices
+        next.forEach((p, i) => { p.index = indexLabel(i) })
+        setProblems(next)
+    }
+
+    const validate = (): string | null => {
+        if (!form.title.trim()) return 'Title is required'
+        if (!form.start_time) return 'Start time is required'
+        if (!form.end_time) return 'End time is required'
+        if (new Date(form.end_time) <= new Date(form.start_time)) return 'End time must be after start time'
+        if (form.freeze_time && new Date(form.freeze_time) <= new Date(form.start_time)) return 'Freeze time must be after start time'
+        if (form.freeze_time && new Date(form.freeze_time) >= new Date(form.end_time)) return 'Freeze time must be before end time'
+        return null
+    }
+
     const handleSave = async () => {
         if (!id) return
+        const err = validate()
+        if (err) { setError(err); return }
+        setError('')
         setSaving(true)
         try {
             await api.contests.update(id, {
@@ -134,117 +178,172 @@ export default function ContestEdit() {
     if (!contest) return <div className="text-center py-20 text-gray-400">Contest not found.</div>
 
     return (
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-6xl mx-auto">
+            {/* Header */}
             <div className="flex items-center justify-between mb-6">
                 <h1 className="text-2xl font-bold">Edit Contest</h1>
-                <Link to={`/contests/${id}`} className="text-sm text-blue-600 hover:underline">← Back to Contest</Link>
+                <Link to={`/contests/${id}`} className="text-sm text-blue-600 hover:underline">
+                    ← Back to Contest
+                </Link>
             </div>
 
-            {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded mb-4 text-sm">{error}</div>}
+            {error && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded mb-4 text-sm">
+                    {error}
+                </div>
+            )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Contest Settings */}
-                <div className="space-y-4">
-                    <div className="border border-gray-200 rounded-lg p-4">
+            {/* Two-column layout */}
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                {/* Left: Settings (60%) */}
+                <div className="lg:col-span-3 space-y-4">
+                    <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
                         <h2 className="font-semibold mb-3">Contest Settings</h2>
                         <div className="space-y-3">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
-                                <input value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))}
-                                    className="w-full border rounded px-3 py-2 text-sm" />
+                                <input
+                                    value={form.title}
+                                    onChange={e => setForm(p => ({ ...p, title: e.target.value }))}
+                                    className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                                <textarea value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
-                                    rows={3} className="w-full border rounded px-3 py-2 text-sm" />
+                                <textarea
+                                    value={form.description}
+                                    onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
+                                    rows={3}
+                                    className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Start Time</label>
-                                    <input type="datetime-local" value={form.start_time} onChange={e => setForm(p => ({ ...p, start_time: e.target.value }))}
-                                        className="w-full border rounded px-3 py-2 text-sm" />
+                                    <input
+                                        type="datetime-local"
+                                        value={form.start_time}
+                                        onChange={e => setForm(p => ({ ...p, start_time: e.target.value }))}
+                                        className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">End Time</label>
-                                    <input type="datetime-local" value={form.end_time} onChange={e => setForm(p => ({ ...p, end_time: e.target.value }))}
-                                        className="w-full border rounded px-3 py-2 text-sm" />
+                                    <input
+                                        type="datetime-local"
+                                        value={form.end_time}
+                                        onChange={e => setForm(p => ({ ...p, end_time: e.target.value }))}
+                                        className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Freeze Time</label>
-                                    <input type="datetime-local" value={form.freeze_time} onChange={e => setForm(p => ({ ...p, freeze_time: e.target.value }))}
-                                        className="w-full border rounded px-3 py-2 text-sm" />
+                                    <input
+                                        type="datetime-local"
+                                        value={form.freeze_time}
+                                        onChange={e => setForm(p => ({ ...p, freeze_time: e.target.value }))}
+                                        className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                                    <input value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))}
-                                        placeholder="Empty = public" className="w-full border rounded px-3 py-2 text-sm" />
+                                    <input
+                                        value={form.password}
+                                        onChange={e => setForm(p => ({ ...p, password: e.target.value }))}
+                                        placeholder="Empty = public"
+                                        className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    />
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <div className="border border-gray-200 rounded-lg p-4">
+                    {/* Options */}
+                    <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
                         <h2 className="font-semibold mb-3">Options</h2>
-                        <div className="space-y-2">
+                        <div className="grid grid-cols-2 gap-2">
                             <label className="flex items-center gap-2 cursor-pointer">
-                                <input type="checkbox" checked={form.pdf_enabled}
+                                <input
+                                    type="checkbox"
+                                    checked={form.pdf_enabled}
                                     onChange={e => setForm(p => ({ ...p, pdf_enabled: e.target.checked }))}
-                                    className="rounded" />
-                                <span className="text-sm">Enable PDF Generation</span>
+                                    className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+                                />
+                                <span className="text-sm">PDF Generation</span>
                             </label>
                             <label className="flex items-center gap-2 cursor-pointer">
-                                <input type="checkbox" checked={form.statement_hidden}
+                                <input
+                                    type="checkbox"
+                                    checked={form.statement_hidden}
                                     onChange={e => setForm(p => ({ ...p, statement_hidden: e.target.checked }))}
-                                    className="rounded" />
-                                <span className="text-sm">Hide Problem Statements (Onsite)</span>
+                                    className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+                                />
+                                <span className="text-sm">Hide Statements (Onsite)</span>
                             </label>
                             <label className="flex items-center gap-2 cursor-pointer">
-                                <input type="checkbox" checked={form.upsolving_enabled}
+                                <input
+                                    type="checkbox"
+                                    checked={form.upsolving_enabled}
                                     onChange={e => setForm(p => ({ ...p, upsolving_enabled: e.target.checked }))}
-                                    className="rounded" />
+                                    className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+                                />
                                 <span className="text-sm">Enable Upsolving</span>
                             </label>
                             <label className="flex items-center gap-2 cursor-pointer">
-                                <input type="checkbox" checked={form.virtual_contest_enabled}
+                                <input
+                                    type="checkbox"
+                                    checked={form.virtual_contest_enabled}
                                     onChange={e => setForm(p => ({ ...p, virtual_contest_enabled: e.target.checked }))}
-                                    className="rounded" />
-                                <span className="text-sm">Enable Virtual Contests</span>
+                                    className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500"
+                                />
+                                <span className="text-sm">Virtual Contests</span>
                             </label>
                         </div>
                     </div>
 
-                    <button onClick={handleSave} disabled={saving}
-                        className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:opacity-50">
+                    {/* Save button */}
+                    <button
+                        onClick={handleSave}
+                        disabled={saving}
+                        className="w-full bg-blue-600 text-white py-2.5 rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors font-medium"
+                    >
                         {saving ? 'Saving...' : 'Save Changes'}
                     </button>
                 </div>
 
-                {/* Problem Management */}
-                <div className="space-y-4">
-                    <div className="border border-gray-200 rounded-lg p-4">
+                {/* Right: Problem Management (40%) */}
+                <div className="lg:col-span-2 space-y-4">
+                    {/* Add Problems */}
+                    <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
                         <h2 className="font-semibold mb-3">Add Problems</h2>
                         <div className="relative">
                             <input
                                 value={searchQuery}
                                 onChange={e => setSearchQuery(e.target.value)}
-                                placeholder="Search problems by title or slug..."
-                                className="w-full border rounded px-3 py-2 text-sm"
+                                placeholder="Search by title or slug..."
+                                className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
-                            {searching && <div className="absolute right-3 top-2.5 text-gray-400 text-sm">Searching...</div>}
-                            
+                            {searching && (
+                                <div className="absolute right-3 top-2.5 text-gray-400 text-xs">Searching...</div>
+                            )}
                             {searchResults.length > 0 && (
-                                <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border rounded-lg shadow-lg max-h-60 overflow-y-auto">
                                     {searchResults.map(p => (
-                                        <div key={p.id} className="flex items-center justify-between px-3 py-2 hover:bg-gray-50 border-b last:border-0">
-                                            <div>
-                                                <div className="font-medium text-sm">{p.title}</div>
-                                                <div className="text-xs text-gray-500">{p.slug} • {p.difficulty}</div>
+                                        <div
+                                            key={p.id}
+                                            className="flex items-center justify-between px-3 py-2 hover:bg-gray-50 border-b last:border-0"
+                                        >
+                                            <div className="min-w-0">
+                                                <div className="font-medium text-sm truncate">{p.title}</div>
+                                                <div className="text-xs text-gray-500">
+                                                    {p.slug} · {p.difficulty}
+                                                </div>
                                             </div>
                                             <button
                                                 onClick={() => handleAddProblem(p.id)}
-                                                className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200"
+                                                className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200 shrink-0"
                                             >
                                                 Add
                                             </button>
@@ -253,27 +352,60 @@ export default function ContestEdit() {
                                 </div>
                             )}
                         </div>
-                        <p className="text-xs text-gray-500 mt-1">Search public problems and your private problems</p>
+                        <p className="text-xs text-gray-500 mt-1">Search public and your private problems</p>
                     </div>
 
-                    <div className="border border-gray-200 rounded-lg p-4">
+                    {/* Current Problems */}
+                    <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
                         <h2 className="font-semibold mb-3">Current Problems ({problems.length})</h2>
                         {problems.length === 0 ? (
-                            <p className="text-sm text-gray-500">No problems added yet.</p>
+                            <p className="text-sm text-gray-500 py-4 text-center">No problems added yet.</p>
                         ) : (
                             <div className="space-y-2">
-                                {problems.map((p: any) => (
-                                    <div key={p.problem_id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                                        <div>
-                                            <span className="font-bold text-blue-600 mr-2">{p.index}</span>
-                                            <span className="text-sm">{p.problem_id.substring(0, 8)}...</span>
+                                {problems.map((p: any, idx: number) => (
+                                    <div
+                                        key={p.problem_id}
+                                        className="flex items-center gap-2 p-2 bg-gray-50 rounded-md group"
+                                    >
+                                        <span className="font-bold text-blue-600 text-sm w-7 text-center shrink-0">
+                                            {indexLabel(idx)}
+                                        </span>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="text-sm font-medium truncate">
+                                                {problemTitles[p.problem_id] || 'Loading...'}
+                                            </div>
                                         </div>
-                                        <button
-                                            onClick={() => handleRemoveProblem(p.problem_id)}
-                                            className="text-xs text-red-600 hover:text-red-800"
-                                        >
-                                            Remove
-                                        </button>
+                                        <div className="flex items-center gap-1 shrink-0">
+                                            <button
+                                                onClick={() => handleMoveProblem(idx, -1)}
+                                                disabled={idx === 0}
+                                                className="p-1 text-gray-400 hover:text-gray-700 disabled:opacity-30 disabled:cursor-not-allowed"
+                                                title="Move up"
+                                            >
+                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                                                </svg>
+                                            </button>
+                                            <button
+                                                onClick={() => handleMoveProblem(idx, 1)}
+                                                disabled={idx === problems.length - 1}
+                                                className="p-1 text-gray-400 hover:text-gray-700 disabled:opacity-30 disabled:cursor-not-allowed"
+                                                title="Move down"
+                                            >
+                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                </svg>
+                                            </button>
+                                            <button
+                                                onClick={() => handleRemoveProblem(p.problem_id)}
+                                                className="p-1 text-gray-400 hover:text-red-600"
+                                                title="Remove"
+                                            >
+                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                </svg>
+                                            </button>
+                                        </div>
                                     </div>
                                 ))}
                             </div>

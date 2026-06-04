@@ -386,3 +386,25 @@ func (h *ProblemHandler) RemovePermission(w http.ResponseWriter, r *http.Request
 	}
 	w.WriteHeader(http.StatusOK)
 }
+
+func (h *ProblemHandler) ListMyProblems(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r)
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	if limit <= 0 || limit > 50 {
+		limit = 20
+	}
+
+	items, total, err := h.store.ListByCreatedBy(r.Context(), claims.UserID, offset, limit)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{"data": items, "total": total})
+}

@@ -41,7 +41,7 @@ func (h *ContestProblemHandler) GetByIndex(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	problem, err := h.contestStore.GetContestProblemByIndex(r.Context(), contestID, index)
+	problem, err := h.contestStore.GetContestProblemByIndex(r.Context(), contest.ID, index)
 	if err != nil || problem == nil {
 		http.Error(w, "problem not found in contest", http.StatusNotFound)
 		return
@@ -54,7 +54,7 @@ func (h *ContestProblemHandler) GetByIndex(w http.ResponseWriter, r *http.Reques
 				return
 			}
 
-			isParticipant, _ := h.contestStore.IsParticipant(r.Context(), contestID, claims.UserID)
+			isParticipant, _ := h.contestStore.IsParticipant(r.Context(), contest.ID, claims.UserID)
 			if !isParticipant && claims.Role != "admin" {
 				http.Error(w, "forbidden", http.StatusForbidden)
 				return
@@ -84,5 +84,6 @@ func (h *ContestProblemHandler) GetByIndex(w http.ResponseWriter, r *http.Reques
 		"contest":           contest,
 		"can_submit":        canSubmit,
 		"statement_hidden":  statementHidden,
+		"is_judge":          isJudge,
 	})
 }

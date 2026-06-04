@@ -17,6 +17,8 @@ type BotAccount struct {
 	ConsecutiveFailures int               `json:"consecutive_failures"`
 	LastErrorAt         *time.Time        `json:"last_error_at,omitempty"`
 	LastPollAt          *time.Time        `json:"last_poll_at,omitempty"`
+	ProxyURL            string            `json:"proxy_url"`
+	ProxyEnabled        bool              `json:"proxy_enabled"`
 	CreatedAt           time.Time         `json:"created_at"`
 }
 

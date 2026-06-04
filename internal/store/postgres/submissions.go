@@ -163,6 +163,34 @@ func (s *SubmissionStore) ListByUser(ctx context.Context, uid string, offset, li
 	return items, total, nil
 }
 
+// ListPublicByUser returns submissions for any user without authentication.
+func (s *SubmissionStore) ListPublicByUser(ctx context.Context, userID string, offset, limit int) ([]model.Submission, int, error) {
+	var total int
+	s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM submissions WHERE user_id=$1", userID).Scan(&total)
+
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT s.id, s.problem_id, s.language, s.status, s.score, s.time_used, s.memory_used, s.created_at, s.submission_type
+		 FROM submissions s
+		 WHERE s.user_id = $1
+		 ORDER BY s.created_at DESC OFFSET $2 LIMIT $3`,
+		userID, offset, limit)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var items []model.Submission
+	for rows.Next() {
+		var sub model.Submission
+		rows.Scan(&sub.ID, &sub.ProblemID, &sub.Language, &sub.Status, &sub.Score, &sub.TimeUsed, &sub.MemoryUsed, &sub.CreatedAt, &sub.SubmissionType)
+		items = append(items, sub)
+	}
+	if items == nil {
+		items = []model.Submission{}
+	}
+	return items, total, nil
+}
+
 func (s *SubmissionStore) UpdateStatus(_ context.Context, id string, status model.SubmissionStatus) {
 	s.db.Exec("UPDATE submissions SET status=$1 WHERE id=$2", status, id)
 }
@@ -210,10 +238,38 @@ func (s *SubmissionStore) UpdateBotID(ctx context.Context, id string, botID stri
 	return err
 }
 
+func (s *SubmissionStore) GetUnsubmittedRemoteSubmissions(ctx context.Context) ([]model.Submission, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT s.id, s.problem_id, s.language, s.source_code_gz, s.status, s.created_at
+		 FROM submissions s
+		 JOIN problems p ON s.problem_id = p.id
+		 WHERE s.status = 'pending' AND s.remote_id = '' AND p.source != '' AND p.source != 'local'
+		 ORDER BY s.created_at ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []model.Submission
+	for rows.Next() {
+		var sub model.Submission
+		var compressed []byte
+		if err := rows.Scan(&sub.ID, &sub.ProblemID, &sub.Language, &compressed, &sub.Status, &sub.CreatedAt); err != nil {
+			return nil, err
+		}
+		if len(compressed) > 0 {
+			sub.SourceCode = decompressCode(compressed)
+		}
+		items = append(items, sub)
+	}
+	return items, nil
+}
+
 func (s *SubmissionStore) GetPendingRemoteSubmissions(ctx context.Context) ([]model.PendingRemoteSubmission, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, remote_id, COALESCE(bot_id,''), COALESCE(bot_slug,''), status
-		 FROM submissions WHERE remote_id != '' AND status IN ('pending')`)
+		`SELECT s.id, s.remote_id, COALESCE(s.bot_id,''), COALESCE(s.bot_slug,''), s.status, COALESCE(p.source,'')
+		 FROM submissions s
+		 LEFT JOIN problems p ON s.problem_id = p.id
+		 WHERE s.remote_id != '' AND s.status IN ('pending')`)
 	if err != nil {
 		return nil, err
 	}
@@ -221,7 +277,7 @@ func (s *SubmissionStore) GetPendingRemoteSubmissions(ctx context.Context) ([]mo
 	var items []model.PendingRemoteSubmission
 	for rows.Next() {
 		var ps model.PendingRemoteSubmission
-		if err := rows.Scan(&ps.ID, &ps.RemoteID, &ps.BotID, &ps.BotSlug, &ps.Status); err != nil {
+		if err := rows.Scan(&ps.ID, &ps.RemoteID, &ps.BotID, &ps.BotSlug, &ps.Status, &ps.Platform); err != nil {
 			return nil, err
 		}
 		items = append(items, ps)
@@ -230,6 +286,52 @@ func (s *SubmissionStore) GetPendingRemoteSubmissions(ctx context.Context) ([]mo
 		items = []model.PendingRemoteSubmission{}
 	}
 	return items, nil
+}
+
+func (s *SubmissionStore) ListByContest(ctx context.Context, contestID string, offset, limit int, filter model.SubmissionFilter) ([]model.Submission, int, error) {
+	where := "s.contest_id=$1"
+	args := []interface{}{contestID}
+	argIdx := 2
+	if filter.UserID != "" {
+		where += fmt.Sprintf(" AND s.user_id=$%d", argIdx)
+		args = append(args, filter.UserID)
+		argIdx++
+	}
+	if filter.ProblemID != "" {
+		where += fmt.Sprintf(" AND s.problem_id=$%d", argIdx)
+		args = append(args, filter.ProblemID)
+		argIdx++
+	}
+	if filter.Language != "" {
+		where += fmt.Sprintf(" AND s.language=$%d", argIdx)
+		args = append(args, filter.Language)
+		argIdx++
+	}
+	if filter.Status != "" {
+		where += fmt.Sprintf(" AND s.status=$%d", argIdx)
+		args = append(args, filter.Status)
+		argIdx++
+	}
+	var total int
+	s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM submissions s WHERE "+where, args...).Scan(&total)
+	args = append(args, offset, limit)
+	rows, err := s.db.QueryContext(ctx,
+		fmt.Sprintf(`SELECT s.id,s.user_id,COALESCE(u.username,''),s.problem_id,s.language,s.status,s.score,s.time_used,s.memory_used,s.created_at,s.submission_type
+		 FROM submissions s LEFT JOIN users u ON s.user_id = u.id WHERE %s ORDER BY s.created_at DESC OFFSET $%d LIMIT $%d`, where, argIdx, argIdx+1), args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	var items []model.Submission
+	for rows.Next() {
+		var sub model.Submission
+		rows.Scan(&sub.ID, &sub.UserID, &sub.Username, &sub.ProblemID, &sub.Language, &sub.Status, &sub.Score, &sub.TimeUsed, &sub.MemoryUsed, &sub.CreatedAt, &sub.SubmissionType)
+		items = append(items, sub)
+	}
+	if items == nil {
+		items = []model.Submission{}
+	}
+	return items, total, nil
 }
 
 func (s *SubmissionStore) ListPending(_ context.Context, limit int) ([]string, error) {

@@ -70,10 +70,14 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 	r.Post("/api/auth/reset-password", authH.ResetPassword)
 
 	r.Get("/api/users/{username}", usersH.GetByUsername)
+	r.Get("/api/users/{username}/submissions", usersH.GetUserSubmissions)
+	r.Get("/api/users/{username}/blogs", usersH.GetUserBlogs)
+	r.Get("/api/users/{username}/comments", usersH.GetUserComments)
 
 	r.Route("/api/problems", func(r chi.Router) {
 		r.Get("/", problemH.List)
 		r.Get("/tags", problemH.ListTags)
+		r.With(middleware.AuthMiddleware(jwtManager)).Get("/my", problemH.ListMyProblems)
 		r.With(middleware.OptionalAuthMiddleware(jwtManager)).Get("/{slug}", problemH.GetBySlug)
 		r.Get("/{slug}/submissions", submissionH.ListByProblem)
 		r.Get("/{slug}/language-limits", langLimitH.List)
@@ -91,7 +95,10 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 			r.Get("/{slug}/export", problemH.Export)
 			r.Post("/import", importH.Import)
 			r.Post("/import/codeforces", importH.ImportCodeforces)
-		r.Post("/import/cses", importH.ImportCSES)
+			r.Post("/import/cses", importH.ImportCSES)
+			r.Post("/import/atcoder", importH.ImportAtCoder)
+			r.Post("/import/toph", importH.ImportToph)
+			r.Post("/import/qoj", importH.ImportQOJ)
 			r.Post("/{slug}/media", mediaH.Upload)
 		})
 	})
@@ -103,11 +110,14 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 		r.Post("/run", submissionH.CustomRun)
 		r.Get("/", submissionH.ListByUser)
 		r.Get("/{id}", submissionH.GetByID)
+		r.Post("/{id}/retry-remote", submissionH.RetryRemote)
+		r.Post("/{id}/recheck-remote", submissionH.RecheckRemote)
 	})
 
 	r.Route("/api/contests", func(r chi.Router) {
 		r.Get("/", contestH.List)
 		r.Get("/formats", contestH.ListAvailableFormats)
+		r.With(middleware.AuthMiddleware(jwtManager)).Get("/my", contestH.ListMyContests)
 		r.With(middleware.OptionalAuthMiddleware(jwtManager)).Get("/{id}", contestH.GetByID)
 		r.With(middleware.OptionalAuthMiddleware(jwtManager)).Get("/{id}/scoreboard", contestH.Scoreboard)
 		r.With(middleware.OptionalAuthMiddleware(jwtManager)).Get("/{id}/stats", contestH.ContestStats)
@@ -258,6 +268,7 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 			r.Use(middleware.AuthMiddleware(jwtManager))
 			r.Post("/", gymH.Create)
 			r.Post("/{id}/solve", gymH.MarkSolved)
+			r.Get("/{id}/solved", gymH.IsSolved)
 		})
 	})
 
@@ -289,12 +300,17 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 		r.Get("/", groupH.List)
 		r.Get("/{id}", groupH.GetByID)
 		r.Get("/{id}/members", groupH.GetMembers)
+		r.Get("/{id}/contests", groupH.GetContests)
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.AuthMiddleware(jwtManager))
 			r.Post("/", groupH.Create)
+			r.Get("/my", groupH.ListByUser)
+			r.Put("/{id}", groupH.Update)
+			r.Delete("/{id}", groupH.Delete)
 			r.Post("/{id}/join", groupH.Join)
 			r.Post("/{id}/leave", groupH.Leave)
 			r.Post("/{id}/contests", groupH.AddContest)
+			r.Delete("/{id}/contests/{contestId}", groupH.RemoveContest)
 		})
 	})
 
@@ -317,6 +333,9 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.AuthMiddleware(jwtManager))
 			r.Post("/", blogH.CreatePost)
+			r.Put("/{id}", blogH.UpdatePost)
+			r.Delete("/{id}", blogH.DeletePost)
+			r.Get("/{id}/vote", blogH.GetUserVote)
 			r.Post("/comments", blogH.CreateComment)
 			r.Post("/vote", blogH.Vote)
 		})

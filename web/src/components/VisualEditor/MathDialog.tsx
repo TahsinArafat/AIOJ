@@ -91,66 +91,66 @@ export default function MathDialog({ onInsert, onClose }: MathDialogProps) {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4" onClick={e => e.stopPropagation()}>
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full mx-4" onClick={e => e.stopPropagation()}>
         <div className="p-4 border-b">
           <h3 className="text-lg font-semibold">Insert Math Formula</h3>
         </div>
 
         <div className="p-4 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">LaTeX Input</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">LaTeX Input</label>
             <textarea
               ref={inputRef}
               value={latex}
               onChange={e => setLatex(e.target.value)}
               onKeyDown={handleKeyDown}
-              className="w-full border border-gray-300 rounded px-3 py-2 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
               rows={3}
               placeholder="e.g., \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Preview</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Preview</label>
             <div
               ref={previewRef}
-              className={`border rounded p-4 min-h-[60px] flex items-center justify-center ${error ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-gray-50'}`}
+              className={`border rounded p-4 min-h-[60px] flex items-center justify-center ${error ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20' : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800'}`}
             />
-            {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
+            {error && <p className="text-red-500 dark:text-red-400 text-xs mt-1">{error}</p>}
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Quick Insert</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Quick Insert</label>
             <div className="space-y-2">
               <div className="flex flex-wrap gap-1">
-                <span className="text-xs text-gray-500 w-12">Greek:</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400 w-12">Greek:</span>
                 {GREEK_LETTERS.map(l => (
-                  <button key={l} onClick={() => insertSymbol(l)} className="px-2 py-1 text-sm border rounded hover:bg-gray-100">{l}</button>
+                  <button key={l} onClick={() => insertSymbol(l)} className="px-2 py-1 text-sm border rounded hover:bg-gray-100 dark:hover:bg-gray-700">{l}</button>
                 ))}
               </div>
               <div className="flex flex-wrap gap-1">
-                <span className="text-xs text-gray-500 w-12">Ops:</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400 w-12">Ops:</span>
                 {OPERATORS.map(o => (
-                  <button key={o} onClick={() => insertSymbol(o)} className="px-2 py-1 text-sm border rounded hover:bg-gray-100">{o}</button>
+                  <button key={o} onClick={() => insertSymbol(o)} className="px-2 py-1 text-sm border rounded hover:bg-gray-100 dark:hover:bg-gray-700">{o}</button>
                 ))}
               </div>
               <div className="flex flex-wrap gap-1">
-                <span className="text-xs text-gray-500 w-12">Arrows:</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400 w-12">Arrows:</span>
                 {ARROWS.map(a => (
-                  <button key={a} onClick={() => insertSymbol(a)} className="px-2 py-1 text-sm border rounded hover:bg-gray-100">{a}</button>
+                  <button key={a} onClick={() => insertSymbol(a)} className="px-2 py-1 text-sm border rounded hover:bg-gray-100 dark:hover:bg-gray-700">{a}</button>
                 ))}
               </div>
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Templates</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Templates</label>
             <div className="flex flex-wrap gap-2">
               {TEMPLATES.map(t => (
                 <button
                   key={t.label}
                   onClick={() => insertTemplate(t.latex)}
-                  className="px-3 py-1 text-sm border rounded hover:bg-blue-50 hover:border-blue-300"
+                  className="px-3 py-1 text-sm border rounded hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300"
                 >
                   {t.label}
                 </button>
@@ -160,7 +160,7 @@ export default function MathDialog({ onInsert, onClose }: MathDialogProps) {
         </div>
 
         <div className="p-4 border-t flex justify-end gap-2">
-          <button onClick={onClose} className="px-4 py-2 text-sm border rounded hover:bg-gray-50">
+          <button onClick={onClose} className="px-4 py-2 text-sm border rounded hover:bg-gray-50 dark:hover:bg-gray-700">
             Cancel
           </button>
           <button

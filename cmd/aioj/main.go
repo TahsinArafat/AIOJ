@@ -106,9 +106,9 @@ func main() {
 
 	botAccountStore := postgres.NewBotAccountStore(db)
 	remoteLangStore := postgres.NewRemoteLanguageStore(db)
-	vjService := vjudge.NewService(submissionStore, botAccountStore, remoteLangStore)
+	vjService := vjudge.NewService(submissionStore, problemStore, botAccountStore, remoteLangStore)
 
-	cfSubmit := vjudge.NewCFSubmitClient("http://host.docker.internal:8002")
+	cfSubmit := vjudge.NewCFSubmitClient("http://host.docker.internal:8003")
 
 	submissionH := handler.NewSubmissionHandler(submissionStore, problemStore, contestStore, judgeQueue, wsManager, execClient, cfg.LangDir, vjService)
 	contestH := handler.NewContestHandler(contestStore, ratingStore, problemStore)
@@ -140,6 +140,7 @@ func main() {
 	}
 
 	vjService.StartPollWorkers()
+	vjService.StartSubmitWorkers()
 
 	vjH := handler.NewVJudgeHandler(vjService)
 
@@ -176,7 +177,7 @@ func main() {
 	webhookH := handler.NewWebhookHandler(webhookStore)
 	recommendationH := handler.NewRecommendationHandler(problemStore, ratingStore)
 	rankingsH := handler.NewRankingsHandler(userStore)
-	usersH := handler.NewUsersHandler(userStore)
+	usersH := handler.NewUsersHandler(userStore, blogStore, submissionStore)
 	searchStore := postgres.NewSearchStore(db)
 	searchH := handler.NewSearchHandler(searchStore)
 

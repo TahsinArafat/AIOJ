@@ -554,7 +554,7 @@ func renderNodeToMarkdown(n *html.Node) string {
 			for _, attr := range n.Attr {
 				if attr.Key == "src" {
 					src := attr.Val
-					if !strings.HasPrefix(src, "http") {
+					if !strings.HasPrefix(src, "http") && !strings.HasPrefix(src, "data:") {
 						src = "https://codeforces.com" + src
 					}
 					sb.WriteString(fmt.Sprintf("\n![image](%s)\n", src))
@@ -707,6 +707,395 @@ func parseMemoryLimit(s string) int {
 			return int(val * 1024) // assume MB
 		}
 		return int(val) // assume KB
+	}
+	return 0
+}
+
+func (p *ProblemParser) ParseAtCoderProblem(ctx context.Context, contestID, taskID string) (*model.Problem, error) {
+	problemURL := fmt.Sprintf("https://atcoder.jp/contests/%s/tasks/%s", contestID, taskID)
+	body, err := p.fetcher(ctx, problemURL)
+	if err != nil {
+		return nil, fmt.Errorf("fetch AtCoder problem page: %w", err)
+	}
+
+	prob := &model.Problem{
+		Source:   "atcoder",
+		RemoteID: contestID + "_" + taskID,
+	}
+
+	doc, err := html.Parse(strings.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("parse HTML: %w", err)
+	}
+
+	titleNode := findNode(doc, func(n *html.Node) bool {
+		return n.Type == html.ElementNode && n.Data == "h2"
+	})
+	if titleNode != nil {
+		prob.Title = strings.TrimSpace(extractText(titleNode))
+		if idx := strings.Index(prob.Title, " - "); idx != -1 {
+			prob.Title = strings.TrimSpace(prob.Title[idx+3:])
+		}
+	}
+	if prob.Title == "" {
+		prob.Title = fmt.Sprintf("AtCoder %s %s", contestID, taskID)
+	}
+
+	tlNode := findNode(doc, func(n *html.Node) bool {
+		if n.Type == html.ElementNode && n.Data == "span" && hasClass(n, "h2") {
+			text := extractText(n)
+			return strings.Contains(text, "Time Limit") || strings.Contains(text, "time limit")
+		}
+		return false
+	})
+	if tlNode != nil {
+		prob.TimeLimit = parseAtCoderTimeLimit(extractText(tlNode))
+	}
+	if prob.TimeLimit == 0 {
+		prob.TimeLimit = 2000
+	}
+
+	mlNode := findNode(doc, func(n *html.Node) bool {
+		if n.Type == html.ElementNode && n.Data == "span" && hasClass(n, "h2") {
+			text := extractText(n)
+			return strings.Contains(text, "Memory Limit") || strings.Contains(text, "memory limit")
+		}
+		return false
+	})
+	if mlNode != nil {
+		prob.MemoryLimit = parseAtCoderMemoryLimit(extractText(mlNode))
+	}
+	if prob.MemoryLimit == 0 {
+		prob.MemoryLimit = 1048576
+	}
+
+	prob.Description = extractAtCoderDescription(doc)
+	prob.InputFormat = extractSectionFromDescription(prob.Description, "Input")
+	prob.OutputFormat = extractSectionFromDescription(prob.Description, "Output")
+
+	return prob, nil
+}
+
+func (p *ProblemParser) ParseTophProblem(ctx context.Context, problemID string) (*model.Problem, error) {
+	problemURL := fmt.Sprintf("https://toph.co/p/%s", problemID)
+	body, err := p.fetcher(ctx, problemURL)
+	if err != nil {
+		return nil, fmt.Errorf("fetch Toph problem page: %w", err)
+	}
+
+	prob := &model.Problem{
+		Source:   "toph",
+		RemoteID: problemID,
+	}
+
+	doc, err := html.Parse(strings.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("parse HTML: %w", err)
+	}
+
+	titleNode := findNode(doc, func(n *html.Node) bool {
+		return n.Type == html.ElementNode && n.Data == "h1" && hasClass(n, "problem-title")
+	})
+	if titleNode == nil {
+		titleNode = findNode(doc, func(n *html.Node) bool {
+			return n.Type == html.ElementNode && n.Data == "h1"
+		})
+	}
+	if titleNode != nil {
+		prob.Title = strings.TrimSpace(extractText(titleNode))
+	}
+	if prob.Title == "" {
+		prob.Title = fmt.Sprintf("Toph %s", problemID)
+	}
+
+	tlNode := findNode(doc, func(n *html.Node) bool {
+		if n.Type == html.ElementNode && (n.Data == "span" || n.Data == "div") && hasClass(n, "time-limit") {
+			return true
+		}
+		if n.Type == html.ElementNode && (n.Data == "span" || n.Data == "div") {
+			text := extractText(n)
+			return strings.Contains(text, "Time Limit") || strings.Contains(text, "time limit")
+		}
+		return false
+	})
+	if tlNode != nil {
+		prob.TimeLimit = parseTophProblemTimeLimit(extractText(tlNode))
+	}
+	if prob.TimeLimit == 0 {
+		prob.TimeLimit = 1000
+	}
+
+	mlNode := findNode(doc, func(n *html.Node) bool {
+		if n.Type == html.ElementNode && (n.Data == "span" || n.Data == "div") && hasClass(n, "memory-limit") {
+			return true
+		}
+		if n.Type == html.ElementNode && (n.Data == "span" || n.Data == "div") {
+			text := extractText(n)
+			return strings.Contains(text, "Memory Limit") || strings.Contains(text, "memory limit")
+		}
+		return false
+	})
+	if mlNode != nil {
+		prob.MemoryLimit = parseTophProblemMemoryLimit(extractText(mlNode))
+	}
+	if prob.MemoryLimit == 0 {
+		prob.MemoryLimit = 262144
+	}
+
+	bodyDiv := findNode(doc, func(n *html.Node) bool {
+		return n.Type == html.ElementNode && n.Data == "div" && hasClass(n, "problem-body")
+	})
+	if bodyDiv != nil {
+		stripScriptAndStyle(bodyDiv)
+		prob.Description = renderNodeToMarkdown(bodyDiv)
+	} else {
+		for _, div := range findAllNodes(doc, func(n *html.Node) bool {
+			return n.Type == html.ElementNode && n.Data == "div"
+		}) {
+			text := strings.TrimSpace(extractText(div))
+			if len(text) > 50 {
+				stripScriptAndStyle(div)
+				prob.Description = renderNodeToMarkdown(div)
+				break
+			}
+		}
+	}
+
+	prob.InputFormat = extractSectionFromDescription(prob.Description, "Input")
+	prob.OutputFormat = extractSectionFromDescription(prob.Description, "Output")
+
+	return prob, nil
+}
+
+func (p *ProblemParser) ParseQOJProblem(ctx context.Context, problemID string) (*model.Problem, error) {
+	problemURL := fmt.Sprintf("https://qoj.ac/problem/%s", problemID)
+	body, err := p.fetcher(ctx, problemURL)
+	if err != nil {
+		return nil, fmt.Errorf("fetch QOJ problem page: %w", err)
+	}
+
+	prob := &model.Problem{
+		Source:   "qoj",
+		RemoteID: problemID,
+	}
+
+	doc, err := html.Parse(strings.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("parse HTML: %w", err)
+	}
+
+	h1s := findAllNodes(doc, func(n *html.Node) bool {
+		return n.Type == html.ElementNode && n.Data == "h1"
+	})
+	for _, n := range h1s {
+		txt := strings.TrimSpace(extractText(n))
+		if txt != "QOJ.ac" && txt != "QOJ" && txt != "" {
+			prob.Title = txt
+			break
+		}
+	}
+	if prob.Title == "" {
+		prob.Title = fmt.Sprintf("QOJ %s", problemID)
+	}
+
+	pdfURL := findQOJPDFLink(doc, problemID)
+	if pdfURL != "" {
+		prob.Description = pdfURL
+		return prob, nil
+	}
+
+	contentDiv := findNode(doc, func(n *html.Node) bool {
+		return n.Type == html.ElementNode && n.Data == "div" && hasClass(n, "problem-content")
+	})
+	if contentDiv == nil {
+		contentDiv = findNode(doc, func(n *html.Node) bool {
+			return n.Type == html.ElementNode && n.Data == "div"
+		})
+	}
+	if contentDiv != nil {
+		stripScriptAndStyle(contentDiv)
+		prob.Description = renderNodeToMarkdown(contentDiv)
+	} else {
+		prob.Description = renderNodeToMarkdown(doc)
+	}
+
+	prob.TimeLimit = 1000
+	prob.MemoryLimit = 262144
+
+	return prob, nil
+}
+
+func findQOJPDFLink(doc *html.Node, problemID string) string {
+	linkNodes := findAllNodes(doc, func(n *html.Node) bool {
+		if n.Type != html.ElementNode || n.Data != "a" {
+			return false
+		}
+		for _, attr := range n.Attr {
+			if attr.Key == "href" {
+				href := strings.ToLower(attr.Val)
+				return strings.HasSuffix(href, ".pdf") || strings.Contains(href, "/problem.pdf")
+			}
+		}
+		return false
+	})
+
+	for _, node := range linkNodes {
+		for _, attr := range node.Attr {
+			if attr.Key == "href" {
+				href := attr.Val
+				if strings.HasPrefix(href, "http://") || strings.HasPrefix(href, "https://") {
+					return href
+				}
+				if strings.HasPrefix(href, "//") {
+					return "https:" + href
+				}
+				if strings.HasPrefix(href, "/") {
+					return "https://qoj.ac" + href
+				}
+				return fmt.Sprintf("https://qoj.ac/problems/files/%s/problem.pdf", problemID)
+			}
+		}
+	}
+	return ""
+}
+
+func parseAtCoderTimeLimit(s string) int {
+	s = strings.ToLower(s)
+	s = strings.TrimPrefix(s, "time limit:")
+	s = strings.TrimPrefix(s, "time limit")
+	s = strings.TrimSpace(s)
+
+	re := regexp.MustCompile(`([\d.]+)\s*(milliseconds?|ms|seconds?|s)\b`)
+	matches := re.FindStringSubmatch(s)
+	if len(matches) >= 3 {
+		var val float64
+		fmt.Sscanf(matches[1], "%f", &val)
+		unit := matches[2]
+		if strings.HasPrefix(unit, "milli") || unit == "ms" {
+			return int(val)
+		}
+		return int(val * 1000)
+	}
+
+	var val float64
+	fmt.Sscanf(s, "%f", &val)
+	if val > 0 {
+		if val < 100 {
+			return int(val * 1000)
+		}
+		return int(val)
+	}
+	return 0
+}
+
+func parseAtCoderMemoryLimit(s string) int {
+	s = strings.ToLower(s)
+	s = strings.TrimPrefix(s, "memory limit:")
+	s = strings.TrimPrefix(s, "memory limit")
+	s = strings.TrimSpace(s)
+
+	re := regexp.MustCompile(`([\d.]+)\s*(megabytes?|mb|kilobytes?|kb|gigabytes?|gb)\b`)
+	matches := re.FindStringSubmatch(s)
+	if len(matches) >= 3 {
+		var val float64
+		fmt.Sscanf(matches[1], "%f", &val)
+		unit := matches[2]
+		switch {
+		case strings.HasPrefix(unit, "mega") || unit == "mb":
+			return int(val * 1024)
+		case strings.HasPrefix(unit, "giga") || unit == "gb":
+			return int(val * 1024 * 1024)
+		default:
+			return int(val)
+		}
+	}
+
+	var val float64
+	fmt.Sscanf(s, "%f", &val)
+	if val > 0 {
+		if val < 10000 {
+			return int(val * 1024)
+		}
+		return int(val)
+	}
+	return 0
+}
+
+func extractAtCoderDescription(doc *html.Node) string {
+	parts := findAllNodes(doc, func(n *html.Node) bool {
+		return n.Type == html.ElementNode && n.Data == "div" && hasClass(n, "part")
+	})
+
+	var sb strings.Builder
+	for _, part := range parts {
+		stripScriptAndStyle(part)
+		md := renderNodeToMarkdown(part)
+		if md != "" {
+			sb.WriteString(md)
+			sb.WriteString("\n\n")
+		}
+	}
+	return strings.TrimSpace(sb.String())
+}
+
+func parseTophProblemTimeLimit(s string) int {
+	s = strings.ToLower(s)
+	s = strings.TrimPrefix(s, "time limit:")
+	s = strings.TrimPrefix(s, "time limit")
+	s = strings.TrimSpace(s)
+
+	re := regexp.MustCompile(`([\d.]+)\s*(milliseconds?|ms|seconds?|s)\b`)
+	matches := re.FindStringSubmatch(s)
+	if len(matches) >= 3 {
+		var val float64
+		fmt.Sscanf(matches[1], "%f", &val)
+		unit := matches[2]
+		if strings.HasPrefix(unit, "milli") || unit == "ms" {
+			return int(val)
+		}
+		return int(val * 1000)
+	}
+
+	var val float64
+	fmt.Sscanf(s, "%f", &val)
+	if val > 0 {
+		if val < 100 {
+			return int(val * 1000)
+		}
+		return int(val)
+	}
+	return 0
+}
+
+func parseTophProblemMemoryLimit(s string) int {
+	s = strings.ToLower(s)
+	s = strings.TrimPrefix(s, "memory limit:")
+	s = strings.TrimPrefix(s, "memory limit")
+	s = strings.TrimSpace(s)
+
+	re := regexp.MustCompile(`([\d.]+)\s*(megabytes?|mb|kilobytes?|kb|gigabytes?|gb)\b`)
+	matches := re.FindStringSubmatch(s)
+	if len(matches) >= 3 {
+		var val float64
+		fmt.Sscanf(matches[1], "%f", &val)
+		unit := matches[2]
+		switch {
+		case strings.HasPrefix(unit, "mega") || unit == "mb":
+			return int(val * 1024)
+		case strings.HasPrefix(unit, "giga") || unit == "gb":
+			return int(val * 1024 * 1024)
+		default:
+			return int(val)
+		}
+	}
+
+	var val float64
+	fmt.Sscanf(s, "%f", &val)
+	if val > 0 {
+		if val < 10000 {
+			return int(val * 1024)
+		}
+		return int(val)
 	}
 	return 0
 }

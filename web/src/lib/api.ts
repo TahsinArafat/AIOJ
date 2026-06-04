@@ -137,6 +137,7 @@ export const api = {
             if (filters?.source) url += `&source=${encodeURIComponent(filters.source)}`;
             return request<{ data: any[]; total: number }>(url);
         },
+        listMy: (offset = 0, limit = 20) => request<{ data: any[]; total: number }>(`/problems/my?offset=${offset}&limit=${limit}`),
         listTags: () => request<{ data: string[] }>('/problems/tags'),
         get: (slug: string) => request<any>(`/problems/${slug}`),
         create: (d: any) => request<any>('/problems', { method: 'POST', body: JSON.stringify(d) }),
@@ -224,6 +225,51 @@ export const api = {
             }
             return res.json() as Promise<{ status: string; problem_id: string; slug: string }>
         },
+        importAtCoder: async (contestId: string, problemId: string) => {
+            const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+            const token = getAccessToken()
+            if (token) headers['Authorization'] = `Bearer ${token}`
+            const res = await fetch(BASE + '/problems/import/atcoder', {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ contest_id: contestId, problem_id: problemId })
+            })
+            if (!res.ok) {
+                const text = await res.text()
+                throw new Error(text || `HTTP ${res.status}`)
+            }
+            return res.json() as Promise<{ status: string; problem_id: string; slug: string }>
+        },
+        importToph: async (problemId: string) => {
+            const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+            const token = getAccessToken()
+            if (token) headers['Authorization'] = `Bearer ${token}`
+            const res = await fetch(BASE + '/problems/import/toph', {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ problem_id: problemId })
+            })
+            if (!res.ok) {
+                const text = await res.text()
+                throw new Error(text || `HTTP ${res.status}`)
+            }
+            return res.json() as Promise<{ status: string; problem_id: string; slug: string }>
+        },
+        importQOJ: async (problemId: string) => {
+            const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+            const token = getAccessToken()
+            if (token) headers['Authorization'] = `Bearer ${token}`
+            const res = await fetch(BASE + '/problems/import/qoj', {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ problem_id: problemId })
+            })
+            if (!res.ok) {
+                const text = await res.text()
+                throw new Error(text || `HTTP ${res.status}`)
+            }
+            return res.json() as Promise<{ status: string; problem_id: string; slug: string }>
+        },
     },
     submissions: {
         create: (d: any) => request<any>('/submissions', { method: 'POST', body: JSON.stringify(d) }),
@@ -240,6 +286,8 @@ export const api = {
                 expected: string;
             }>('/submissions/run', { method: 'POST', body: JSON.stringify(d) }),
         get: (id: string) => request<any>(`/submissions/${id}`),
+        retryRemote: (id: string) => request<any>(`/submissions/${id}/retry-remote`, { method: 'POST' }),
+        recheckRemote: (id: string) => request<any>(`/submissions/${id}/recheck-remote`, { method: 'POST' }),
         list: (offset = 0, limit = 20, problemId?: string, contestId?: string) => {
             let url = `/submissions?offset=${offset}&limit=${limit}`;
             if (problemId) url += `&problem_id=${problemId}`;
@@ -258,9 +306,9 @@ export const api = {
         botAccounts: {
             list: (offset = 0, limit = 20) =>
                 request<{ data: any[]; total: number }>(`/admin/bot-accounts?offset=${offset}&limit=${limit}`),
-            create: (d: { user_id?: string; platform: string; platform_user: string; platform_pass: string; api_key?: string; api_secret?: string; rate_limit_rps?: number; session_data?: Record<string, string> }) =>
+            create: (d: { user_id?: string; platform: string; platform_user: string; platform_pass: string; api_key?: string; api_secret?: string; rate_limit_rps?: number; session_data?: Record<string, string>; proxy_url?: string; proxy_enabled?: boolean }) =>
                 request<any>('/admin/bot-accounts', { method: 'POST', body: JSON.stringify(d) }),
-            update: (id: string, d: { platform_user?: string; platform_pass?: string; api_key?: string; api_secret?: string; status?: string; rate_limit_rps?: number; session_data?: Record<string, string> }) =>
+            update: (id: string, d: { platform_user?: string; platform_pass?: string; api_key?: string; api_secret?: string; status?: string; rate_limit_rps?: number; session_data?: Record<string, string>; proxy_url?: string; proxy_enabled?: boolean }) =>
                 request<any>(`/admin/bot-accounts/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
             delete: (id: string) =>
                 request(`/admin/bot-accounts/${id}`, { method: 'DELETE' }),
@@ -324,6 +372,7 @@ export const api = {
             if (division !== undefined) url += `&division=${division}`;
             return request<{ data: any[]; total: number }>(url);
         },
+        listMy: (offset = 0, limit = 20) => request<{ data: any[]; total: number }>(`/contests/my?offset=${offset}&limit=${limit}`),
         get: (id: string) => request<any>(`/contests/${id}`),
         create: (d: any) => request<any>('/contests', { method: 'POST', body: JSON.stringify(d) }),
         getFormats: () => request<{ formats: string[] }>('/contests/formats'),
@@ -339,7 +388,7 @@ export const api = {
         checkRegistration: (id: string) => request<{ registered: boolean }>(`/contests/${id}/register`),
         listRegistrations: (id: string) => request<{ data: any[]; count: number }>(`/contests/${id}/registrations`),
         getProblemByIndex: (contestId: string, index: string) =>
-            request<{ problem: any; contest: any; can_submit?: boolean; upsolving_disabled?: boolean; statement_hidden?: boolean }>(`/contests/${contestId}/problems/${index}`),
+            request<{ problem: any; contest: any; can_submit?: boolean; upsolving_disabled?: boolean; statement_hidden?: boolean; is_judge?: boolean }>(`/contests/${contestId}/problems/${index}`),
         addProblem: (contestId: string, d: { problem_id: string; index: string; score?: number }) =>
             request<any>(`/contests/${contestId}/problems`, { method: 'POST', body: JSON.stringify(d) }),
         updateProblem: (contestId: string, problemId: string, d: { index: string; score: number; sort_order: number }) =>
@@ -432,6 +481,7 @@ export const api = {
         get: (id: string) => request<any>(`/gym/${id}`),
         create: (d: any) => request<any>('/gym', { method: 'POST', body: JSON.stringify(d) }),
         markSolved: (id: string) => request(`/gym/${id}/solve`, { method: 'POST' }),
+        isSolved: (id: string) => request<{ solved: boolean }>(`/gym/${id}/solved`),
     },
     hacks: {
         submit: (d: { contest_id: string; problem_id: string; submission_id: string; test_input: string }) =>
@@ -458,13 +508,19 @@ export const api = {
     groups: {
         list: (offset = 0, limit = 20) =>
             request<{ data: any[]; total: number }>(`/groups?offset=${offset}&limit=${limit}`),
+        my: () => request<{ data: any[] }>('/groups/my'),
         get: (id: string) => request<any>(`/groups/${id}`),
         create: (d: any) => request<any>('/groups', { method: 'POST', body: JSON.stringify(d) }),
+        update: (id: string, d: any) => request<any>(`/groups/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
+        delete: (id: string) => request<any>(`/groups/${id}`, { method: 'DELETE' }),
         join: (id: string) => request(`/groups/${id}/join`, { method: 'POST' }),
         leave: (id: string) => request(`/groups/${id}/leave`, { method: 'POST' }),
         members: (id: string) => request<any>(`/groups/${id}/members`),
+        getContests: (id: string) => request<{ data: any[] }>(`/groups/${id}/contests`),
         addContest: (id: string, contestId: string) =>
             request(`/groups/${id}/contests`, { method: 'POST', body: JSON.stringify({ contest_id: contestId }) }),
+        removeContest: (id: string, contestId: string) =>
+            request(`/groups/${id}/contests/${contestId}`, { method: 'DELETE' }),
     },
     teams: {
         list: (offset = 0, limit = 20) =>
@@ -483,10 +539,13 @@ export const api = {
         },
         get: (id: string) => request<any>(`/blog/${id}`),
         create: (d: any) => request<any>('/blog', { method: 'POST', body: JSON.stringify(d) }),
+        update: (id: string, d: any) => request<any>(`/blog/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
+        delete: (id: string) => request<any>(`/blog/${id}`, { method: 'DELETE' }),
         getComments: (type: string, id: string) => request<{ data: any[] }>(`/blog/${type}/${id}/comments`),
         createComment: (d: any) => request<any>('/blog/comments', { method: 'POST', body: JSON.stringify(d) }),
         vote: (d: { target_type: string; target_id: string; value: number }) =>
             request('/blog/vote', { method: 'POST', body: JSON.stringify(d) }),
+        getVote: (id: string, type = 'blog') => request<{ value: number }>(`/blog/${id}/vote?type=${type}`),
     },
     editorials: {
         list: (offset = 0, limit = 20) =>
@@ -602,6 +661,12 @@ export const api = {
     users: {
         getByUsername: (username: string) =>
             request<any>(`/users/${encodeURIComponent(username)}`),
+        getSubmissions: (username: string, offset = 0, limit = 20) =>
+            request<{ data: any[]; total: number }>(`/users/${encodeURIComponent(username)}/submissions?offset=${offset}&limit=${limit}`),
+        getBlogs: (username: string, offset = 0, limit = 20) =>
+            request<{ data: any[]; total: number }>(`/users/${encodeURIComponent(username)}/blogs?offset=${offset}&limit=${limit}`),
+        getComments: (username: string, offset = 0, limit = 20) =>
+            request<{ data: any[]; total: number }>(`/users/${encodeURIComponent(username)}/comments?offset=${offset}&limit=${limit}`),
     },
     search: {
         global: (q: string, limit = 10) =>

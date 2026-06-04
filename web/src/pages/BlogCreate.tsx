@@ -32,17 +32,17 @@ export default function BlogCreate() {
             <h1 className="text-2xl font-bold mb-6">Write Blog Post</h1>
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1">Title</label>
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Title</label>
                     <input type="text" value={title} onChange={e => setTitle(e.target.value)} required
                         className="w-full border rounded px-3 py-2 text-sm" placeholder="Post title" />
                 </div>
                 <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1">Content</label>
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Content</label>
                     <textarea value={content} onChange={e => setContent(e.target.value)} required rows={10}
                         className="w-full border rounded px-3 py-2 text-sm" placeholder="Write your post content..." />
                 </div>
                 <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1">Tags (comma-separated)</label>
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Tags (comma-separated)</label>
                     <input type="text" value={tags} onChange={e => setTags(e.target.value)}
                         className="w-full border rounded px-3 py-2 text-sm" placeholder="e.g. tutorial, dp, graph" />
                 </div>

@@ -77,20 +77,20 @@ export default function TrainingPlanCreate() {
 
 	return (
 		<div className="max-w-2xl mx-auto space-y-6 my-10">
-			<h1 className="text-2xl font-bold text-gray-900">Create Training Plan</h1>
-			{error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded text-sm">{error}</div>}
-			<form onSubmit={handleSubmit} className="space-y-6 bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+			<h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Create Training Plan</h1>
+			{error && <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-2 rounded text-sm">{error}</div>}
+			<form onSubmit={handleSubmit} className="space-y-6 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 shadow-sm">
 				<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 					<div>
-						<label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+						<label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Title</label>
 						<input required value={title} onChange={e => setTitle(e.target.value)}
 							placeholder="e.g. Master DP in 30 Days"
-							className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
+							className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-800" />
 					</div>
 					<div>
-						<label className="block text-sm font-medium text-gray-700 mb-1">Organization Scope <span className="text-gray-400 font-normal">(optional)</span></label>
+						<label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Organization Scope <span className="text-gray-400 dark:text-gray-500 font-normal">(optional)</span></label>
 						<select value={orgId} onChange={e => setOrgId(e.target.value)}
-							className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+							className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-800">
 							<option value="">Public (Open to All)</option>
 							{myOrgs.map(o => (
 								<option key={o.id} value={o.id}>{o.name}</option>
@@ -99,27 +99,27 @@ export default function TrainingPlanCreate() {
 					</div>
 				</div>
 				<div>
-					<label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+					<label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
 					<textarea rows={3} value={desc} onChange={e => setDesc(e.target.value)}
 						placeholder="Add curriculum outline or guidelines..."
-						className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
+						className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-800" />
 				</div>
 
-				<div className="border-t border-gray-200 pt-6 space-y-4">
+				<div className="border-t border-gray-200 dark:border-gray-700 pt-6 space-y-4">
 					<div className="flex justify-between items-center">
-						<h2 className="text-lg font-bold text-gray-800">Sections & Curriculum</h2>
+						<h2 className="text-lg font-bold text-gray-800 dark:text-gray-200">Sections & Curriculum</h2>
 						<button type="button" onClick={handleAddSection}
-							className="text-xs bg-blue-50 hover:bg-blue-100 text-blue-600 px-3 py-1.5 rounded font-semibold border border-blue-100">
+							className="text-xs bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 text-blue-600 dark:text-blue-400 px-3 py-1.5 rounded font-semibold border border-blue-100">
 							Add Section
 						</button>
 					</div>
 
 					{sections.map((s, sIdx) => (
-						<div key={sIdx} className="border border-gray-200 rounded-lg p-5 bg-gray-50 space-y-3">
+						<div key={sIdx} className="border border-gray-200 dark:border-gray-700 rounded-lg p-5 bg-gray-50 dark:bg-gray-800 space-y-3">
 							<div className="flex justify-between items-center">
 								<input required value={s.title} onChange={e => handleSectionChange(sIdx, 'title', e.target.value)}
 									placeholder="Section Title"
-									className="border-b border-gray-300 font-semibold text-gray-800 focus:outline-none bg-transparent" />
+									className="border-b border-gray-300 dark:border-gray-600 font-semibold text-gray-800 dark:text-gray-200 focus:outline-none bg-transparent" />
 								<button type="button" onClick={() => handleAddProblem(sIdx)}
 									className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded">
 									+ Add Problem
@@ -127,17 +127,17 @@ export default function TrainingPlanCreate() {
 							</div>
 							<input value={s.description} onChange={e => handleSectionChange(sIdx, 'description', e.target.value)}
 								placeholder="Section description (optional)"
-								className="w-full border border-gray-200 rounded-md px-3 py-1.5 text-xs bg-white focus:outline-none" />
+								className="w-full border border-gray-200 dark:border-gray-700 rounded-md px-3 py-1.5 text-xs bg-white dark:bg-gray-800 focus:outline-none" />
 
 							<div className="space-y-2">
 								{s.problems.map((p: any, pIdx: number) => (
 									<div key={pIdx} className="flex gap-3 items-center">
 										<input required value={p.problem_id} onChange={e => handleProblemChange(sIdx, pIdx, 'problem_id', e.target.value)}
 											placeholder="Problem ID (e.g. p1)"
-											className="border border-gray-300 rounded-md px-3 py-1.5 text-xs bg-white focus:outline-none flex-1" />
+											className="border border-gray-300 dark:border-gray-600 rounded-md px-3 py-1.5 text-xs bg-white dark:bg-gray-800 focus:outline-none flex-1" />
 										<input type="number" value={p.points} onChange={e => handleProblemChange(sIdx, pIdx, 'points', e.target.value)}
 											placeholder="Points"
-											className="border border-gray-300 rounded-md px-3 py-1.5 text-xs bg-white focus:outline-none w-20" />
+											className="border border-gray-300 dark:border-gray-600 rounded-md px-3 py-1.5 text-xs bg-white dark:bg-gray-800 focus:outline-none w-20" />
 									</div>
 								))}
 							</div>

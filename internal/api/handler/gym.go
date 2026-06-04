@@ -111,3 +111,20 @@ func (h *GymHandler) MarkSolved(w http.ResponseWriter, r *http.Request) {
 
 	respondJSON(w, http.StatusOK, map[string]string{"status": "solved"})
 }
+
+func (h *GymHandler) IsSolved(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r)
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	id := chi.URLParam(r, "id")
+	solved, err := h.store.IsSolved(r.Context(), id, claims.UserID)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]bool{"solved": solved})
+}

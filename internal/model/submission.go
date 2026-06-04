@@ -44,6 +44,7 @@ type Submission struct {
 	ID             string           `json:"id"`
 	ProblemID      string           `json:"problem_id"`
 	UserID         string           `json:"user_id"`
+	Username       string           `json:"username,omitempty"`
 	ContestID      string           `json:"contest_id,omitempty"`
 	Language       string           `json:"language"`
 	SourceCode     string           `json:"source_code,omitempty"`
@@ -56,11 +57,13 @@ type Submission struct {
 	CompileOutput string           `json:"compile_output,omitempty"`
 	JudgeResult   []TestCaseResult `json:"judge_result,omitempty"`
 	JudgedBy      string           `json:"judged_by"`
-	RemoteID      string           `json:"remote_id,omitempty"`
-	RemoteURL     string           `json:"remote_url,omitempty"`
-	BotID         string           `json:"bot_id,omitempty"`
-	BotSlug       string           `json:"bot_slug,omitempty"`
-	CreatedAt     time.Time        `json:"created_at"`
+	RemoteID       string           `json:"remote_id,omitempty"`
+	RemoteURL      string           `json:"remote_url,omitempty"`
+	BotID          string           `json:"bot_id,omitempty"`
+	BotSlug        string           `json:"bot_slug,omitempty"`
+	IsRemote       bool             `json:"is_remote"`
+	RemoteOJ       string           `json:"remote_oj,omitempty"`
+	CreatedAt      time.Time        `json:"created_at"`
 	JudgedAt      *time.Time       `json:"judged_at,omitempty"`
 }
 
@@ -78,4 +81,12 @@ type PendingRemoteSubmission struct {
 	BotID    string `json:"bot_id"`
 	BotSlug  string `json:"bot_slug"`
 	Status   string `json:"status"`
+	Platform string `json:"platform"`
+}
+
+type SubmissionFilter struct {
+	UserID    string
+	ProblemID string
+	Language  string
+	Status    string
 }

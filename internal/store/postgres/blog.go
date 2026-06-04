@@ -90,6 +90,66 @@ func (s *BlogStore) ListPosts(ctx context.Context, offset, limit int, tag string
 	return items, total, nil
 }
 
+func (s *BlogStore) ListByUser(ctx context.Context, userID string, offset, limit int) ([]model.BlogListItem, int, error) {
+	var total int
+	s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM blog_posts WHERE user_id=$1", userID).Scan(&total)
+
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT bp.id, bp.user_id, u.username, bp.title, bp.tags, bp.upvotes, bp.comment_count, bp.created_at
+		 FROM blog_posts bp JOIN users u ON bp.user_id = u.id
+		 WHERE bp.user_id = $1
+		 ORDER BY bp.created_at DESC OFFSET $2 LIMIT $3`,
+		userID, offset, limit)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var items []model.BlogListItem
+	for rows.Next() {
+		var p model.BlogListItem
+		var tagArr []string
+		if err := rows.Scan(&p.ID, &p.UserID, &p.Username, &p.Title, pq.Array(&tagArr), &p.Upvotes, &p.CommentCount, &p.CreatedAt); err != nil {
+			return nil, 0, err
+		}
+		p.Tags = tagArr
+		items = append(items, p)
+	}
+	if items == nil {
+		items = []model.BlogListItem{}
+	}
+	return items, total, nil
+}
+
+func (s *BlogStore) GetCommentsByUser(ctx context.Context, userID string, offset, limit int) ([]model.Comment, int, error) {
+	var total int
+	s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM comments WHERE user_id=$1", userID).Scan(&total)
+
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT c.id, c.user_id, u.username, c.parent_type, c.parent_id, c.content, c.upvotes, c.created_at, c.updated_at
+		 FROM comments c JOIN users u ON c.user_id = u.id
+		 WHERE c.user_id = $1
+		 ORDER BY c.created_at DESC OFFSET $2 LIMIT $3`,
+		userID, offset, limit)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var comments []model.Comment
+	for rows.Next() {
+		var c model.Comment
+		if err := rows.Scan(&c.ID, &c.UserID, &c.Username, &c.ParentType, &c.ParentID, &c.Content, &c.Upvotes, &c.CreatedAt, &c.UpdatedAt); err != nil {
+			return nil, 0, err
+		}
+		comments = append(comments, c)
+	}
+	if comments == nil {
+		comments = []model.Comment{}
+	}
+	return comments, total, nil
+}
+
 func (s *BlogStore) CreateComment(ctx context.Context, c *model.Comment) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {

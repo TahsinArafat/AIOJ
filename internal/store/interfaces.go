@@ -24,6 +24,7 @@ type ProblemStore interface {
 	GetBySlug(ctx context.Context, slug string) (*model.Problem, error)
 	List(ctx context.Context, offset, limit int) ([]model.ProblemListItem, int, error)
 	ListWithFilter(ctx context.Context, offset, limit int, difficulty string, tags []string, search string, source string, rating string, sortBy string) ([]model.ProblemListItem, int, error)
+	ListByCreatedBy(ctx context.Context, userID string, offset, limit int) ([]model.ProblemListItem, int, error)
 	GetAllTags(ctx context.Context) ([]string, error)
 	UpdateCounts(ctx context.Context, id string, addSubmission, addAccepted int) error
 	Update(ctx context.Context, id string, p *model.Problem) error
@@ -40,12 +41,14 @@ type SubmissionStore interface {
 	GetByID(ctx context.Context, id string) (*model.Submission, error)
 	ListByProblem(ctx context.Context, problemID string, offset, limit int) ([]model.Submission, int, error)
 	ListByUser(ctx context.Context, userID string, offset, limit int, problemID, contestID string) ([]model.Submission, int, error)
+	ListPublicByUser(ctx context.Context, userID string, offset, limit int) ([]model.Submission, int, error)
 	ListByContest(ctx context.Context, contestID string, offset, limit int, filter model.SubmissionFilter) ([]model.Submission, int, error)
 	UpdateStatus(ctx context.Context, id string, status model.SubmissionStatus)
 	UpdateResult(ctx context.Context, id string, status model.SubmissionStatus, score, timeUsed, memoryUsed int, compileOutput string, results []model.TestCaseResult) error
 	UpdateRemoteID(ctx context.Context, id string, remoteID string, remoteURL string) error
 	UpdateBotID(ctx context.Context, id string, botID string, botSlug string) error
 	GetPendingRemoteSubmissions(ctx context.Context) ([]model.PendingRemoteSubmission, error)
+	GetUnsubmittedRemoteSubmissions(ctx context.Context) ([]model.Submission, error)
 	ListPending(ctx context.Context, limit int) ([]string, error)
 	GetProblemStats(ctx context.Context, problemID string) (*model.ProblemStats, error)
 	GetUserStats(ctx context.Context, userID string) (*model.UserProblemStats, error)
@@ -62,6 +65,7 @@ type ContestStore interface {
 	GetByID(ctx context.Context, id string) (*model.Contest, error)
 	GetBySlug(ctx context.Context, slug string) (*model.Contest, error)
 	List(ctx context.Context, offset, limit int) ([]model.Contest, int, error)
+	ListByCreatedBy(ctx context.Context, userID string, offset, limit int) ([]model.Contest, int, error)
 	Update(ctx context.Context, c *model.Contest) error
 	Delete(ctx context.Context, id string) error
 	AddProblem(ctx context.Context, contestID, problemID, index string, score, sortOrder int) error
@@ -170,6 +174,8 @@ type BlogStore interface {
 	CreatePost(ctx context.Context, p *model.BlogPost) error
 	GetPostByID(ctx context.Context, id string) (*model.BlogPost, error)
 	ListPosts(ctx context.Context, offset, limit int, tag string) ([]model.BlogListItem, int, error)
+	ListByUser(ctx context.Context, userID string, offset, limit int) ([]model.BlogListItem, int, error)
+	GetCommentsByUser(ctx context.Context, userID string, offset, limit int) ([]model.Comment, int, error)
 	UpdatePost(ctx context.Context, id string, p *model.BlogPost) error
 	DeletePost(ctx context.Context, id string) error
 	CreateComment(ctx context.Context, c *model.Comment) error

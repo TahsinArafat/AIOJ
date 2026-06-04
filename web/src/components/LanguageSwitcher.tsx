@@ -12,7 +12,7 @@ export default function LanguageSwitcher() {
     <select
       value={i18n.language}
       onChange={(e) => i18n.changeLanguage(e.target.value)}
-      className="border rounded px-2 py-1 text-xs bg-white cursor-pointer"
+      className="border rounded px-2 py-1 text-xs bg-white dark:bg-gray-800 cursor-pointer"
     >
       {languages.map((lang) => (
         <option key={lang.code} value={lang.code}>

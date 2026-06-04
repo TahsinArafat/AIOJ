@@ -74,7 +74,7 @@ func (s *SearchStore) SearchUsers(ctx context.Context, query string, limit int) 
 
 func (s *SearchStore) SearchContests(ctx context.Context, query string, limit int) ([]model.Contest, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, title, type, start_time, end_time, visible, description,
+		`SELECT id, display_id, slug, title, type, start_time, end_time, visible, description,
 		        registration_required, registration_deadline, max_participants, division,
 		        created_by, created_at
 		 FROM contests
@@ -90,10 +90,14 @@ func (s *SearchStore) SearchContests(ctx context.Context, query string, limit in
 	var items []model.Contest
 	for rows.Next() {
 		var c model.Contest
-		if err := rows.Scan(&c.ID, &c.Title, &c.Type, &c.StartTime, &c.EndTime,
+		var slug sql.NullString
+		if err := rows.Scan(&c.ID, &c.DisplayID, &slug, &c.Title, &c.Type, &c.StartTime, &c.EndTime,
 			&c.Visible, &c.Description, &c.RegistrationRequired, &c.RegistrationDeadline,
 			&c.MaxParticipants, &c.Division, &c.CreatedBy, &c.CreatedAt); err != nil {
 			return nil, err
+		}
+		if slug.Valid {
+			c.Slug = slug.String
 		}
 		items = append(items, c)
 	}

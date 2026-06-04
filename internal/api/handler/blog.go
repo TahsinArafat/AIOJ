@@ -151,3 +151,105 @@ func (h *BlogHandler) Vote(w http.ResponseWriter, r *http.Request) {
 
 	respondJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
+
+func (h *BlogHandler) UpdatePost(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r)
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	id := chi.URLParam(r, "id")
+	post, err := h.store.GetPostByID(r.Context(), id)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if post == nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	if post.UserID != claims.UserID && claims.Role != "admin" {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	var req model.CreateBlogRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+
+	if req.Title == "" || req.Content == "" {
+		http.Error(w, "title and content required", http.StatusBadRequest)
+		return
+	}
+
+	post.Title = req.Title
+	post.Content = req.Content
+	post.Tags = req.Tags
+	if post.Tags == nil {
+		post.Tags = []string{}
+	}
+
+	if err := h.store.UpdatePost(r.Context(), id, post); err != nil {
+		http.Error(w, "update failed", http.StatusInternalServerError)
+		return
+	}
+
+	respondJSON(w, http.StatusOK, post)
+}
+
+func (h *BlogHandler) DeletePost(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r)
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	id := chi.URLParam(r, "id")
+	post, err := h.store.GetPostByID(r.Context(), id)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if post == nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	if post.UserID != claims.UserID && claims.Role != "admin" {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	if err := h.store.DeletePost(r.Context(), id); err != nil {
+		http.Error(w, "delete failed", http.StatusInternalServerError)
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func (h *BlogHandler) GetUserVote(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r)
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	id := chi.URLParam(r, "id")
+	targetType := r.URL.Query().Get("type")
+	if targetType == "" {
+		targetType = "blog"
+	}
+
+	value, err := h.store.GetUserVote(r.Context(), claims.UserID, targetType, id)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{"value": value})
+}

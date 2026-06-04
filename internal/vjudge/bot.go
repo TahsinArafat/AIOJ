@@ -32,11 +32,13 @@ type Bot interface {
 }
 
 type BotConfig struct {
-	Username  string            `yaml:"username"`
-	Password  string            `yaml:"password"`
-	APIKey    string            `yaml:"api_key,omitempty"`
-	APISecret string            `yaml:"api_secret,omitempty"`
-	BaseURL   string            `yaml:"base_url,omitempty"`
-	Cookies   map[string]string `yaml:"cookies,omitempty"`
-	UserAgent string            `yaml:"user_agent,omitempty"`
+	Username     string            `yaml:"username"`
+	Password     string            `yaml:"password"`
+	APIKey       string            `yaml:"api_key,omitempty"`
+	APISecret    string            `yaml:"api_secret,omitempty"`
+	BaseURL      string            `yaml:"base_url,omitempty"`
+	Cookies      map[string]string `yaml:"cookies,omitempty"`
+	UserAgent    string            `yaml:"user_agent,omitempty"`
+	ProxyURL     string            `yaml:"proxy_url,omitempty"`
+	ProxyEnabled bool              `yaml:"proxy_enabled,omitempty"`
 }

@@ -61,9 +61,9 @@ export default function VisualEditor({ content, onChange, placeholder }: VisualE
   if (!editor) return null
 
   return (
-    <div className="border border-gray-300 rounded-lg overflow-hidden">
+    <div className="border border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden">
       <Toolbar editor={editor} />
-      <EditorContent editor={editor} className="prose prose-sm max-w-none p-4 min-h-[200px]" />
+      <EditorContent editor={editor} className="prose prose-sm dark:prose-invert max-w-none p-4 min-h-[200px]" />
     </div>
   )
 }

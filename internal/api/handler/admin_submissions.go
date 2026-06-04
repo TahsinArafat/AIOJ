@@ -35,10 +35,6 @@ func (h *AdminSubmissionHandler) Rejudge(w http.ResponseWriter, r *http.Request)
 		respondJSON(w, http.StatusNotFound, map[string]string{"error": "submission not found"})
 		return
 	}
-	if sub.RemoteID == "" {
-		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "not a remote submission"})
-		return
-	}
 
 	prob, err := h.probStore.GetByID(r.Context(), sub.ProblemID)
 	if err != nil || prob == nil || prob.Source == "" || prob.Source == "local" {
@@ -47,21 +43,8 @@ func (h *AdminSubmissionHandler) Rejudge(w http.ResponseWriter, r *http.Request)
 	}
 
 	h.subStore.UpdateStatus(r.Context(), id, model.StatusPending)
-
-	if h.vjudgeSvc != nil {
-		req := vjudge.SubmitRequest{
-			ID:              sub.ID,
-			ProblemRemoteID: prob.RemoteID,
-			SourceCode:      sub.SourceCode,
-			Language:        sub.Language,
-			RemoteOJ:        prob.Source,
-		}
-		if err := h.vjudgeSvc.Submit(r.Context(), req); err != nil {
-			h.subStore.UpdateStatus(r.Context(), id, model.StatusSE)
-			respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
-			return
-		}
-	}
+	h.subStore.UpdateRemoteID(r.Context(), id, "", "")
+	h.subStore.UpdateBotID(r.Context(), id, "", "")
 
 	respondJSON(w, http.StatusOK, map[string]string{"status": "rejudging"})
 }

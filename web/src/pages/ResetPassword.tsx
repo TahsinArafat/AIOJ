@@ -38,7 +38,7 @@ export default function ResetPassword() {
         return (
             <div className="max-w-sm mx-auto mt-20 text-center">
                 <h1 className="text-2xl font-bold mb-4">Password Reset</h1>
-                <p className="text-gray-600 mb-6">Your password has been reset successfully.</p>
+                <p className="text-gray-600 dark:text-gray-400 mb-6">Your password has been reset successfully.</p>
                 <Link to="/login" className="inline-block bg-blue-600 text-white px-5 py-2 rounded-md text-sm font-medium hover:bg-blue-700 transition-colors">
                     Go to Login
                 </Link>
@@ -50,8 +50,8 @@ export default function ResetPassword() {
         return (
             <div className="max-w-sm mx-auto mt-20 text-center">
                 <h1 className="text-2xl font-bold mb-4">Invalid Link</h1>
-                <p className="text-gray-600 mb-6">This reset link is invalid or missing a token.</p>
-                <Link to="/forgot-password" className="text-blue-600 hover:underline">Request a new reset link</Link>
+                <p className="text-gray-600 dark:text-gray-400 mb-6">This reset link is invalid or missing a token.</p>
+                <Link to="/forgot-password" className="text-blue-600 dark:text-blue-400 hover:underline">Request a new reset link</Link>
             </div>
         )
     }
@@ -59,26 +59,26 @@ export default function ResetPassword() {
     return (
         <div className="max-w-sm mx-auto mt-20">
             <h1 className="text-2xl font-bold mb-6">Reset Password</h1>
-            {err && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded mb-4 text-sm">{err}</div>}
+            {err && <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-2 rounded mb-4 text-sm">{err}</div>}
             <form onSubmit={handle} className="space-y-4">
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">New Password</label>
                     <input
                         type="password"
                         value={password}
                         onChange={e => setPassword(e.target.value)}
-                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                         required
                         minLength={6}
                     />
                 </div>
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Confirm Password</label>
                     <input
                         type="password"
                         value={confirm}
                         onChange={e => setConfirm(e.target.value)}
-                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                         required
                         minLength={6}
                     />

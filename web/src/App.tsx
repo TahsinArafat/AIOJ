@@ -63,7 +63,7 @@ function Home() {
     const [rankings, setRankings] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const token = localStorage.getItem('access_token')
-    const username = token ? JSON.parse(atob(token.split('.')[1])).sub : null
+    const username = token ? JSON.parse(atob(token.split('.')[1])).uname : null
 
     useEffect(() => {
         Promise.all([

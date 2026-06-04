@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/tahsinarafat/aioj/internal/model"
 	"golang.org/x/net/html"
 
 	cloudflare "github.com/sriharsha-y/go-cfscraper/lib"
@@ -62,9 +63,30 @@ func (b *CodeforcesBot) Name() string          { return "codeforces" }
 func (b *CodeforcesBot) State() BotState       { return b.state }
 func (b *CodeforcesBot) IsLoggedIn(ctx context.Context) bool { return len(b.config.Cookies) > 0 }
 func (b *CodeforcesBot) Login(ctx context.Context) (map[string]string, error) {
-	b.login(ctx)
-	return b.config.Cookies, nil
+	if b.cfSubmit != nil && b.config.Username != "" && b.config.Password != "" {
+		proxy := ""
+		if b.config.ProxyEnabled {
+			proxy = b.config.ProxyURL
+		}
+		cookies, err := b.cfSubmit.Login(ctx, b.config.Username, b.config.Password, proxy)
+		if err == nil && len(cookies) > 0 {
+			b.SetCookies(cookies)
+			return cookies, nil
+		}
+	}
+	err := b.login(ctx)
+	return b.config.Cookies, err
 }
+func (b *CodeforcesBot) Configure(acc model.BotAccount) {
+	b.config.Username = acc.PlatformUser
+	b.config.Password = acc.PlatformPass
+	b.config.APIKey = acc.APIKey
+	b.config.APISecret = acc.APISecret
+	b.config.ProxyURL = acc.ProxyURL
+	b.config.ProxyEnabled = acc.ProxyEnabled
+	b.SetCookies(acc.SessionData)
+}
+
 func (b *CodeforcesBot) SetCookies(cookies map[string]string) {
 	cfURL, _ := url.Parse("https://codeforces.com")
 	var js []*http.Cookie
@@ -215,7 +237,11 @@ func (b *CodeforcesBot) Submit(ctx context.Context, problemID, sourceCode, langu
 	}
 
 	if b.cfSubmit != nil && b.config.Username != "" && b.config.Password != "" {
-		subID, err := b.cfSubmit.Submit(ctx, problemID, sourceCode, langID, b.config.Username, "", b.config.Username, b.config.Password)
+		proxy := ""
+		if b.config.ProxyEnabled {
+			proxy = b.config.ProxyURL
+		}
+		subID, err := b.cfSubmit.Submit(ctx, problemID, sourceCode, langID, b.config.Username, "", b.config.Username, b.config.Password, nil, proxy)
 		if err == nil && subID != "" {
 			b.state = StateIdle
 			return subID, nil

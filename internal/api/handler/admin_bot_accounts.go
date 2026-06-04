@@ -59,6 +59,8 @@ func (h *AdminBotAccountHandler) Create(w http.ResponseWriter, r *http.Request) 
 		APISecret    string            `json:"api_secret"`
 		SessionData  map[string]string `json:"session_data"`
 		RateLimitRPS float32           `json:"rate_limit_rps"`
+		ProxyURL     string            `json:"proxy_url"`
+		ProxyEnabled bool              `json:"proxy_enabled"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid body", http.StatusBadRequest)
@@ -81,13 +83,15 @@ func (h *AdminBotAccountHandler) Create(w http.ResponseWriter, r *http.Request) 
 		SessionData:  req.SessionData,
 		Status:       "active",
 		RateLimitRPS: req.RateLimitRPS,
+		ProxyURL:     req.ProxyURL,
+		ProxyEnabled: req.ProxyEnabled,
 	}
 	if err := h.store.Create(r.Context(), ba); err != nil {
 		http.Error(w, "failed to create bot account: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	if h.vjudgeSvc != nil && ba.Platform == "codeforces" {
+	if h.vjudgeSvc != nil {
 		if len(ba.SessionData) > 0 {
 			h.vjudgeSvc.SetCookies(ba.Platform, ba.SessionData)
 			slog.Info("bot cookies loaded from session_data", "platform", ba.Platform)
@@ -128,6 +132,8 @@ func (h *AdminBotAccountHandler) Update(w http.ResponseWriter, r *http.Request) 
 		Status       *string            `json:"status"`
 		RateLimitRPS *float32           `json:"rate_limit_rps"`
 		SessionData  map[string]string  `json:"session_data"`
+		ProxyURL     *string            `json:"proxy_url"`
+		ProxyEnabled *bool              `json:"proxy_enabled"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid body", http.StatusBadRequest)
@@ -153,12 +159,18 @@ func (h *AdminBotAccountHandler) Update(w http.ResponseWriter, r *http.Request) 
 	if req.SessionData != nil {
 		existing.SessionData = req.SessionData
 	}
+	if req.ProxyURL != nil {
+		existing.ProxyURL = *req.ProxyURL
+	}
+	if req.ProxyEnabled != nil {
+		existing.ProxyEnabled = *req.ProxyEnabled
+	}
 	if err := h.store.Update(r.Context(), id, existing); err != nil {
 		http.Error(w, "failed to update bot account", http.StatusInternalServerError)
 		return
 	}
 
-	if h.vjudgeSvc != nil && existing.Platform == "codeforces" {
+	if h.vjudgeSvc != nil {
 		if req.SessionData != nil && len(req.SessionData) > 0 {
 			h.vjudgeSvc.SetCookies(existing.Platform, req.SessionData)
 			slog.Info("bot cookies updated from session_data", "platform", existing.Platform)
@@ -249,6 +261,28 @@ func (h *AdminBotAccountHandler) TestLogin(w http.ResponseWriter, r *http.Reques
 		respondJSON(w, http.StatusOK, map[string]interface{}{
 			"status":  "ok",
 			"message": "Credentials provided. Bot will attempt login via FlareSolverr on first submission.",
+		})
+		return
+	}
+
+	if req.Platform == "atcoder" || req.Platform == "toph" || req.Platform == "qoj" || req.Platform == "cses" {
+		if len(req.SessionData) > 0 {
+			respondJSON(w, http.StatusOK, map[string]interface{}{
+				"status":  "ok",
+				"message": "Cookies configured successfully.",
+				"cookies": len(req.SessionData),
+			})
+			return
+		}
+		
+		if req.PlatformUser == "" || req.PlatformPass == "" {
+			http.Error(w, "username and password are required", http.StatusBadRequest)
+			return
+		}
+
+		respondJSON(w, http.StatusOK, map[string]interface{}{
+			"status":  "ok",
+			"message": "Credentials configured. Bot will login on first submission.",
 		})
 		return
 	}

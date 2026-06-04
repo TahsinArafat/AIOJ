@@ -20,6 +20,15 @@
       font-size: 0.875rem; cursor: pointer;
     }
     button:hover { background: #1d4ed8; }
+
+    /* Dark mode — respects the OS preference since this page has no JS */
+    @media (prefers-color-scheme: dark) {
+      body { background: #1f2937; color: #f3f4f6; }
+      h1 { color: #60a5fa; }
+      p { color: #9ca3af; }
+      button { background: #60a5fa; color: #1f2937; }
+      button:hover { background: #93c5fd; }
+    }
   </style>
 </head>
 <body>

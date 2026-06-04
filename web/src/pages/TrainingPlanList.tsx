@@ -46,14 +46,14 @@ export default function TrainingPlanList() {
 			.finally(() => setLoading(false))
 	}, [activeTab, selectedOrg])
 
-	if (loading) return <div className="text-center py-20 text-gray-400">Loading training plans...</div>
+	if (loading) return <div className="text-center py-20 text-gray-400 dark:text-gray-500">Loading training plans...</div>
 
 	return (
 		<div className="space-y-6">
 			<div className="flex items-center justify-between">
 				<div>
 					<h1 className="text-2xl font-bold">Training Plans</h1>
-					<p className="text-gray-500 text-sm">Curated lists of problems organized into sections to improve your algorithmic skills.</p>
+					<p className="text-gray-500 dark:text-gray-400 text-sm">Curated lists of problems organized into sections to improve your algorithmic skills.</p>
 				</div>
 				{isAdmin && (
 					<Link to="/training/create" className="bg-blue-600 text-white px-4 py-2 rounded text-sm font-semibold hover:bg-blue-700 transition-colors">
@@ -62,15 +62,15 @@ export default function TrainingPlanList() {
 				)}
 			</div>
 
-			<div className="border-b border-gray-200 mb-6 flex items-center justify-between">
+			<div className="border-b border-gray-200 dark:border-gray-700 mb-6 flex items-center justify-between">
 				<nav className="flex gap-6">
 					<button onClick={() => setActiveTab('public')}
-						className={`pb-4 text-sm font-medium ${activeTab === 'public' ? 'border-b-2 border-blue-600 text-blue-600 font-semibold' : 'text-gray-500 hover:text-gray-700'}`}>
+						className={`pb-4 text-sm font-medium ${activeTab === 'public' ? 'border-b-2 border-blue-600 text-blue-600 dark:text-blue-400 font-semibold' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}>
 						Public Plans
 					</button>
 					{getAccessToken() && (
 						<button onClick={() => setActiveTab('org')}
-							className={`pb-4 text-sm font-medium ${activeTab === 'org' ? 'border-b-2 border-blue-600 text-blue-600 font-semibold' : 'text-gray-500 hover:text-gray-700'}`}>
+							className={`pb-4 text-sm font-medium ${activeTab === 'org' ? 'border-b-2 border-blue-600 text-blue-600 dark:text-blue-400 font-semibold' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}>
 							Organization Plans
 						</button>
 					)}
@@ -78,7 +78,7 @@ export default function TrainingPlanList() {
 
 				{activeTab === 'org' && myOrgs.length > 0 && (
 					<select value={selectedOrg} onChange={e => setSelectedOrg(e.target.value)}
-						className="border border-gray-300 rounded-md px-3 py-1 text-sm focus:outline-none bg-white">
+						className="border border-gray-300 dark:border-gray-600 rounded-md px-3 py-1 text-sm focus:outline-none bg-white dark:bg-gray-800">
 						{myOrgs.map(o => (
 							<option key={o.id} value={o.id}>{o.name}</option>
 						))}
@@ -88,14 +88,14 @@ export default function TrainingPlanList() {
 
 			<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 				{plans.map(p => (
-					<div key={p.id} className="border border-gray-200 rounded-lg p-5 bg-white hover:shadow-sm transition-shadow space-y-3">
+					<div key={p.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-5 bg-white dark:bg-gray-800 hover:shadow-sm transition-shadow space-y-3">
 						<div>
-							<h3 className="font-bold text-lg text-gray-900">
-								<Link to={`/training/${p.id}`} className="hover:underline text-blue-600">{p.title}</Link>
+							<h3 className="font-bold text-lg text-gray-900 dark:text-gray-100">
+								<Link to={`/training/${p.id}`} className="hover:underline text-blue-600 dark:text-blue-400">{p.title}</Link>
 							</h3>
-							<p className="text-gray-600 text-sm mt-1 line-clamp-2">{p.description || 'No description provided.'}</p>
+							<p className="text-gray-600 dark:text-gray-400 text-sm mt-1 line-clamp-2">{p.description || 'No description provided.'}</p>
 						</div>
-						<div className="flex justify-between items-center text-xs text-gray-400 border-t border-gray-100 pt-3">
+						<div className="flex justify-between items-center text-xs text-gray-400 dark:text-gray-500 border-t border-gray-100 dark:border-gray-700 pt-3">
 							<span className="flex gap-2">
 								<span>{p.section_count} Sections</span>
 								<span>•</span>
@@ -106,7 +106,7 @@ export default function TrainingPlanList() {
 					</div>
 				))}
 				{plans.length === 0 && (
-					<p className="text-gray-400 text-center py-10 w-full col-span-2">No training plans found.</p>
+					<p className="text-gray-400 dark:text-gray-500 text-center py-10 w-full col-span-2">No training plans found.</p>
 				)}
 			</div>
 		</div>

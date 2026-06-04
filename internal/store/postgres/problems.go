@@ -323,3 +323,36 @@ func (s *ProblemStore) GetAllTags(ctx context.Context) ([]string, error) {
 	}
 	return tags, nil
 }
+
+func (s *ProblemStore) ListByCreatedBy(ctx context.Context, userID string, offset, limit int) ([]model.ProblemListItem, int, error) {
+	var total int
+	s.db.QueryRowContext(ctx,
+		`SELECT COUNT(DISTINCT p.id) FROM problems p
+		 LEFT JOIN problem_permissions perm ON p.id = perm.problem_id
+		 WHERE p.created_by = $1 OR perm.user_id = $1`, userID).Scan(&total)
+
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT DISTINCT p.id, p.slug, p.title, p.difficulty, p.tags, p.submission_count, p.accepted_count, p.source, p.created_at
+		 FROM problems p
+		 LEFT JOIN problem_permissions perm ON p.id = perm.problem_id
+		 WHERE p.created_by = $1 OR perm.user_id = $1
+		 ORDER BY p.created_at DESC OFFSET $2 LIMIT $3`, userID, offset, limit)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	var items []model.ProblemListItem
+	for rows.Next() {
+		var item model.ProblemListItem
+		var tags []string
+		var createdAt interface{}
+		rows.Scan(&item.ID, &item.Slug, &item.Title, &item.Difficulty, pq.Array(&tags),
+			&item.SubmissionCount, &item.AcceptedCount, &item.Source, &createdAt)
+		item.Tags = tags
+		items = append(items, item)
+	}
+	if items == nil {
+		items = []model.ProblemListItem{}
+	}
+	return items, total, nil
+}

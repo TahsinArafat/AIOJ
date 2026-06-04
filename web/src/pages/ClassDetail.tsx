@@ -44,16 +44,16 @@ export default function ClassDetail() {
 		}
 	}
 
-	if (loading) return <div className="text-center py-20 text-gray-400">Loading class details...</div>
+	if (loading) return <div className="text-center py-20 text-gray-400 dark:text-gray-500">Loading class details...</div>
 	if (!c) return (
-		<div className="max-w-md mx-auto bg-white border border-gray-200 rounded-lg p-6 my-10 space-y-4">
+		<div className="max-w-md mx-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 my-10 space-y-4">
 			<h1 className="text-xl font-bold">Class Not Found</h1>
-			<p className="text-gray-500 text-sm">You might not be enrolled. Enter class invite code to join:</p>
-			{joinError && <div className="text-red-600 text-xs">{joinError}</div>}
+			<p className="text-gray-500 dark:text-gray-400 text-sm">You might not be enrolled. Enter class invite code to join:</p>
+			{joinError && <div className="text-red-600 dark:text-red-400 text-xs">{joinError}</div>}
 			<form onSubmit={handleJoinByCode} className="flex gap-2">
 				<input required value={joiningCode} onChange={e => setJoiningCode(e.target.value)}
 					placeholder="8-character code"
-					className="border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 flex-1" />
+					className="border border-gray-300 dark:border-gray-600 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 flex-1" />
 				<button type="submit" className="bg-blue-600 text-white px-4 py-1.5 rounded text-sm font-semibold hover:bg-blue-700">
 					Join
 				</button>
@@ -63,16 +63,16 @@ export default function ClassDetail() {
 
 	return (
 		<div className="space-y-6">
-			<div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm space-y-2">
+			<div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 shadow-sm space-y-2">
 				<div className="flex items-center gap-3">
-					<Link to={`/organizations/${c.organization_id}`} className="text-xs text-blue-600 hover:underline">
+					<Link to={`/organizations/${c.organization_id}`} className="text-xs text-blue-600 dark:text-blue-400 hover:underline">
 						← {c.org_name}
 					</Link>
 				</div>
-				<h1 className="text-2xl font-bold text-gray-900">{c.name}</h1>
-				<p className="text-gray-600 text-sm">{c.description || 'No class description.'}</p>
+				<h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{c.name}</h1>
+				<p className="text-gray-600 dark:text-gray-400 text-sm">{c.description || 'No class description.'}</p>
 				{isTeacher && (
-					<div className="bg-blue-50 border border-blue-100 rounded-md p-3 text-xs text-blue-800 font-mono mt-3 inline-block">
+					<div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 rounded-md p-3 text-xs text-blue-800 font-mono mt-3 inline-block">
 						INVITE CODE: <span className="font-bold text-blue-900 select-all">{c.invite_code}</span>
 					</div>
 				)}
@@ -80,21 +80,21 @@ export default function ClassDetail() {
 
 			<div>
 				<h2 className="text-lg font-semibold mb-3">Class Members</h2>
-				<div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+				<div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
 					<table className="w-full text-sm text-left">
-						<thead className="bg-gray-50 text-gray-500 text-xs uppercase font-medium">
+						<thead className="bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-xs uppercase font-medium">
 							<tr>
 								<th className="px-6 py-3">Student</th>
 								<th className="px-6 py-3">Role</th>
 								<th className="px-6 py-3">Joined</th>
 							</tr>
 						</thead>
-						<tbody className="divide-y divide-gray-100 font-mono text-xs">
+						<tbody className="divide-y divide-gray-100 dark:divide-gray-700 font-mono text-xs">
 							{members.map(m => (
-								<tr key={m.user_id} className="hover:bg-gray-50">
-									<td className="px-6 py-3 font-semibold text-gray-900">{m.username || m.user_id}</td>
+								<tr key={m.user_id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+									<td className="px-6 py-3 font-semibold text-gray-900 dark:text-gray-100">{m.username || m.user_id}</td>
 									<td className="px-6 py-3 uppercase">{m.role}</td>
-									<td className="px-6 py-3 text-gray-500">{new Date(m.joined_at).toLocaleDateString()}</td>
+									<td className="px-6 py-3 text-gray-500 dark:text-gray-400">{new Date(m.joined_at).toLocaleDateString()}</td>
 								</tr>
 							))}
 						</tbody>

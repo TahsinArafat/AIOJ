@@ -48,19 +48,19 @@ export default function TrainingPlanDetail() {
 		finally { setEnrolling(false) }
 	}
 
-	if (loading) return <div className="text-center py-20 text-gray-400">Loading training plan details...</div>
-	if (!data) return <div className="text-center py-20 text-gray-400">Training plan not found.</div>
+	if (loading) return <div className="text-center py-20 text-gray-400 dark:text-gray-500">Loading training plan details...</div>
+	if (!data) return <div className="text-center py-20 text-gray-400 dark:text-gray-500">Training plan not found.</div>
 
 	return (
 		<div className="max-w-3xl mx-auto space-y-6">
-			<div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm flex justify-between items-start">
+			<div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 shadow-sm flex justify-between items-start">
 				<div className="space-y-2 flex-1">
 					<div className="flex items-center gap-2">
-						<Link to="/training" className="text-xs text-blue-600 hover:underline">← Training Plans</Link>
+						<Link to="/training" className="text-xs text-blue-600 dark:text-blue-400 hover:underline">← Training Plans</Link>
 					</div>
-					<h1 className="text-2xl font-bold text-gray-900">{data.title}</h1>
-					<p className="text-gray-600 text-sm">{data.description || 'No description provided.'}</p>
-					<div className="text-xs text-gray-400 pt-1 flex gap-3">
+					<h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{data.title}</h1>
+					<p className="text-gray-600 dark:text-gray-400 text-sm">{data.description || 'No description provided.'}</p>
+					<div className="text-xs text-gray-400 dark:text-gray-500 pt-1 flex gap-3">
 						<span>{data.section_count} Sections</span>
 						<span>•</span>
 						<span>{data.problem_count} Problems</span>
@@ -72,7 +72,7 @@ export default function TrainingPlanDetail() {
 					<button onClick={handleEnrollToggle} disabled={enrolling}
 						className={`px-6 py-2 rounded font-semibold text-sm transition-colors ${
 							data.enrolled 
-								? 'bg-red-50 text-red-600 border border-red-100 hover:bg-red-100'
+								? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-100 hover:bg-red-100'
 								: 'bg-blue-600 text-white hover:bg-blue-700'
 						}`}>
 						{data.enrolled ? 'Leave Plan' : 'Enroll in Plan'}
@@ -94,35 +94,35 @@ export default function TrainingPlanDetail() {
 			)}
 
 			<div className="space-y-4">
-				<h2 className="text-lg font-bold text-gray-800">Curriculum</h2>
+				<h2 className="text-lg font-bold text-gray-800 dark:text-gray-200">Curriculum</h2>
 				{data.sections?.map((s: any) => (
-					<div key={s.id} className="bg-white border border-gray-200 rounded-lg p-5 space-y-3">
+					<div key={s.id} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-5 space-y-3">
 						<div>
-							<h3 className="font-bold text-base text-gray-900">{s.title}</h3>
-							{s.description && <p className="text-gray-500 text-sm mt-0.5">{s.description}</p>}
+							<h3 className="font-bold text-base text-gray-900 dark:text-gray-100">{s.title}</h3>
+							{s.description && <p className="text-gray-500 dark:text-gray-400 text-sm mt-0.5">{s.description}</p>}
 						</div>
 
-						<div className="divide-y divide-gray-100 border-t border-gray-100 pt-2">
+						<div className="divide-y divide-gray-100 dark:divide-gray-700 border-t border-gray-100 dark:border-gray-700 pt-2">
 							{s.problems?.map((p: any) => (
 								<div key={p.id} className="py-2.5 flex items-center justify-between text-sm">
 									<div className="flex items-center gap-2">
-										<Link to={`/problems/${p.problem_id}`} className="font-semibold text-blue-600 hover:underline">
+										<Link to={`/problems/${p.problem_id}`} className="font-semibold text-blue-600 dark:text-blue-400 hover:underline">
 											{p.problem_id}
 										</Link>
 									</div>
-									<span className="text-xs font-semibold px-2 py-0.5 rounded bg-gray-100 text-gray-600 font-mono">
+									<span className="text-xs font-semibold px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 font-mono">
 										{p.points} pts
 									</span>
 								</div>
 							))}
 							{(!s.problems || s.problems.length === 0) && (
-								<p className="text-xs text-gray-400 py-2">No problems in this section.</p>
+								<p className="text-xs text-gray-400 dark:text-gray-500 py-2">No problems in this section.</p>
 							)}
 						</div>
 					</div>
 				))}
 				{(!data.sections || data.sections.length === 0) && (
-					<p className="text-gray-400 text-center py-10">No sections added yet.</p>
+					<p className="text-gray-400 dark:text-gray-500 text-center py-10">No sections added yet.</p>
 				)}
 			</div>
 		</div>

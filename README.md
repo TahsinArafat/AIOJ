@@ -49,3 +49,126 @@ You can immediately log in and access the Admin Dashboard and Problem Setter wor
 - **Frontend:** `:80` (Nginx + React SPA)
 - **Database:** `:5432` (PostgreSQL 18)
 - **Sandbox:** `:5050` (go-judge)
+
+---
+
+## Codeforces VJudge Bot (cf-submit)
+
+The cf-submit service uses CloakBrowser to log into Codeforces and submit solutions on behalf of a bot account. Because Cloudflare's managed challenge blocks datacenter IPs (including Docker/VPS), **the service must run on a machine with a residential IP** — either your local machine or a VPS behind a residential proxy.
+
+### macOS (local development)
+
+Run the service directly on your Mac so CloakBrowser uses your residential IP:
+
+```bash
+pip install cloakbrowser fastapi uvicorn requests
+
+# Start on port 8003 (Docker backend reaches it via host.docker.internal:8003)
+PORT=8003 python3 deploy/cf-submit/server.py
+```
+
+To start automatically on login, create a LaunchAgent:
+
+```bash
+mkdir -p ~/Library/LaunchAgents
+cat > ~/Library/LaunchAgents/com.aioj.cf-submit.plist << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.aioj.cf-submit</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/python3</string>
+        <string>/path/to/AIOJ/deploy/cf-submit/server.py</string>
+    </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PORT</key>
+        <string>8003</string>
+    </dict>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/tmp/cf-submit.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/cf-submit.log</string>
+</dict>
+</plist>
+EOF
+
+# Replace /path/to/AIOJ with the actual path, then load:
+launchctl load ~/Library/LaunchAgents/com.aioj.cf-submit.plist
+```
+
+Make sure `cmd/aioj/main.go` points to `http://host.docker.internal:8003`.
+
+### Linux VPS (production)
+
+On a VPS, Cloudflare blocks the datacenter IP. Set `CF_PROXY` to a residential proxy:
+
+```bash
+pip install cloakbrowser fastapi uvicorn requests
+
+# Install Chromium runtime deps and fonts
+sudo apt-get install -y xvfb \
+    libglib2.0-0 libgobject-2.0-0 libnspr4 libnss3 \
+    libatk1.0-0 libatk-bridge2.0-0 libcups2 libxkbcommon0 \
+    libatspi2.0-0 libxcomposite1 libxdamage1 libxfixes3 \
+    libcairo2 libpango-1.0-0 libasound2 \
+    fonts-noto-color-emoji fonts-freefont-ttf fonts-unifont
+
+python -m cloakbrowser install
+```
+
+Create a systemd service at `/etc/systemd/system/cf-submit.service`:
+
+```ini
+[Unit]
+Description=AIOJ cf-submit service
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/path/to/AIOJ/deploy/cf-submit
+ExecStartPre=/bin/bash -c 'rm -f /tmp/.X99-lock && Xvfb :99 -screen 0 1920x1080x24 -ac &'
+ExecStart=/usr/bin/python3 server.py
+Environment=PORT=8003
+Environment=DISPLAY=:99
+Environment=CF_PROXY=http://user:pass@residential-proxy-host:port
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable cf-submit
+sudo systemctl start cf-submit
+sudo systemctl status cf-submit
+```
+
+Point the backend at `http://localhost:8003` (same machine) or update `CF_SUBMIT_URL` if running separately.
+
+### Proxy format
+
+`CF_PROXY` accepts HTTP and SOCKS5 proxies:
+
+```
+CF_PROXY=http://user:pass@host:port
+CF_PROXY=socks5://user:pass@host:port
+```
+
+When `CF_PROXY` is set, `geoip=True` is automatically enabled — CloakBrowser will match the browser's timezone and locale to the proxy's exit IP, making the session look more natural.
+
+Verify the proxy is active:
+```bash
+curl http://localhost:8003/health
+# {"status":"ok","proxy":true}
+```

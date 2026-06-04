@@ -801,14 +801,14 @@ func (h *ContestHandler) DownloadPDF(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	isJudge := claims != nil && (claims.Role == "admin" || h.store.HasAccess(r.Context(), id, claims.UserID, "manager", "judge"))
+	isJudge := claims != nil && (claims.Role == "admin" || h.store.HasAccess(r.Context(), contest.ID, claims.UserID, "manager", "judge"))
 
-	if !contest.PDFEnabled && !isJudge {
-		http.Error(w, "PDF generation is disabled for this contest", http.StatusForbidden)
+	if (contest.StatementHidden || !contest.PDFEnabled) && !isJudge {
+		http.Error(w, "PDF generation is disabled or hidden for this contest", http.StatusForbidden)
 		return
 	}
 
-	contestProblems, _ := h.store.GetProblems(r.Context(), id)
+	contestProblems, _ := h.store.GetProblems(r.Context(), contest.ID)
 
 	var problems []model.ProblemWithSamples
 	for _, cp := range contestProblems {
@@ -896,4 +896,26 @@ func (h *ContestHandler) UpdateProblem(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondJSON(w, http.StatusOK, map[string]string{"status": "updated"})
+}
+
+func (h *ContestHandler) ListMyContests(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r)
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	if limit <= 0 || limit > 50 {
+		limit = 20
+	}
+
+	items, total, err := h.store.ListByCreatedBy(r.Context(), claims.UserID, offset, limit)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{"data": items, "total": total})
 }

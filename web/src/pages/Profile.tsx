@@ -31,25 +31,25 @@ function SetterApplication() {
         }
     }
 
-    if (loading) return <p className="text-sm text-gray-400">Loading...</p>
-    if (status === 'approved') return <p className="text-green-600 text-sm">You are a problem setter!</p>
-    if (status === 'pending') return <p className="text-yellow-600 text-sm">Your application is pending review.</p>
+    if (loading) return <p className="text-sm text-gray-400 dark:text-gray-500">Loading...</p>
+    if (status === 'approved') return <p className="text-green-600 dark:text-green-400 text-sm">You are a problem setter!</p>
+    if (status === 'pending') return <p className="text-yellow-600 dark:text-yellow-400 text-sm">Your application is pending review.</p>
 
     return (
         <div>
-            {status === 'rejected' && <p className="text-red-600 text-sm mb-2">Your previous application was rejected. You can re-apply.</p>}
+            {status === 'rejected' && <p className="text-red-600 dark:text-red-400 text-sm mb-2">Your previous application was rejected. You can re-apply.</p>}
             {!submitted ? (
                 <div>
                     <textarea rows={3} value={reason} onChange={e => setReason(e.target.value)}
                         placeholder="Why do you want to become a setter?"
-                        className="w-full border rounded px-3 py-2 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                        className="w-full border rounded px-3 py-2 text-sm mb-2 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400" />
                     <button onClick={handleApply} disabled={!reason.trim()}
                         className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 disabled:opacity-50 transition-colors">
                         Apply as Problem Setter
                     </button>
                 </div>
             ) : (
-                <p className="text-green-600 text-sm">Application submitted!</p>
+                <p className="text-green-600 dark:text-green-400 text-sm">Application submitted!</p>
             )}
         </div>
     )
@@ -57,50 +57,50 @@ function SetterApplication() {
 
 export default function Profile() {
     const user = decodeUser()
-    if (!user) return <div className="text-center py-20 text-gray-400">Please log in to view your profile.</div>
+    if (!user) return <div className="text-center py-20 text-gray-400 dark:text-gray-500">Please log in to view your profile.</div>
 
     return (
         <div className="max-w-md mx-auto">
             <h1 className="text-2xl font-bold mb-6">Profile Settings</h1>
 
-            <div className="space-y-4 bg-white border border-gray-200 rounded-lg p-6 mb-8">
+            <div className="space-y-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 mb-8">
                 <div>
-                    <label className="block text-sm text-gray-500 mb-1">Username</label>
+                    <label className="block text-sm text-gray-500 dark:text-gray-400 mb-1">Username</label>
                     <p className="font-medium">{user.uname || '—'}</p>
                 </div>
                 <div>
-                    <label className="block text-sm text-gray-500 mb-1">Role</label>
+                    <label className="block text-sm text-gray-500 dark:text-gray-400 mb-1">Role</label>
                     <span className={`px-2 py-1 rounded text-xs font-medium ${
                         user.role === 'admin' ? 'bg-purple-100 text-purple-800' :
-                        user.role === 'teacher' ? 'bg-orange-100 text-orange-800' : 'bg-gray-100 text-gray-800'
+                        user.role === 'teacher' ? 'bg-orange-100 text-orange-800' : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200'
                     }`}>{user.role || 'user'}</span>
                 </div>
                 <div>
-                    <label className="block text-sm text-gray-500 mb-1">Rating</label>
+                    <label className="block text-sm text-gray-500 dark:text-gray-400 mb-1">Rating</label>
                     {user.rating ? (
                         <RatingBadge rating={user.rating} showTitle />
                     ) : (
-                        <span className="text-gray-400">Unrated</span>
+                        <span className="text-gray-400 dark:text-gray-500">Unrated</span>
                     )}
                 </div>
                 {user.rating && (
                     <div>
-                        <Link to="/rating-history" className="text-sm text-blue-600 hover:underline">
+                        <Link to="/rating-history" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">
                             View Rating History →
                         </Link>
                     </div>
                 )}
                 <div>
-                    <label className="block text-sm text-gray-500 mb-1">User ID</label>
-                    <p className="font-mono text-xs text-gray-400">{user.uid || '—'}</p>
+                    <label className="block text-sm text-gray-500 dark:text-gray-400 mb-1">User ID</label>
+                    <p className="font-mono text-xs text-gray-400 dark:text-gray-500">{user.uid || '—'}</p>
                 </div>
             </div>
 
             <div className="flex gap-4 mb-8">
-                <Link to="/settings/notifications" className="text-sm text-blue-600 hover:underline">
+                <Link to="/settings/notifications" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">
                     Notification Preferences →
                 </Link>
-                <Link to="/settings/api" className="text-sm text-blue-600 hover:underline">
+                <Link to="/settings/api" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">
                     API Keys →
                 </Link>
             </div>

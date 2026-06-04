@@ -11,6 +11,9 @@ export default function GymDetail() {
     useEffect(() => {
         if (!id) return
         api.gym.get(id).then(setGym).catch(console.error).finally(() => setLoading(false))
+        if (getAccessToken()) {
+            api.gym.isSolved(id).then(res => setSolved(res.solved)).catch(console.error)
+        }
     }, [id])
 
     const handleMarkSolved = async () => {

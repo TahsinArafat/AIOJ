@@ -95,19 +95,6 @@ func (h *SubmissionHandler) buildAndEnqueue(r *http.Request, w http.ResponseWrit
 	}
 
 	if prob.Source != "" && prob.Source != "local" && h.vjudgeSvc != nil {
-		vjReq := vjudge.SubmitRequest{
-			ID:              sub.ID,
-			ProblemRemoteID: prob.RemoteID,
-			SourceCode:      req.SourceCode,
-			Language:        req.Language,
-			RemoteOJ:        prob.Source,
-		}
-		if err := h.vjudgeSvc.Submit(r.Context(), vjReq); err != nil {
-			slog.Error("vjudge submit failed", "sub", sub.ID, "err", err)
-			sub.Status = model.StatusSE
-			respondJSON(w, http.StatusCreated, sub)
-			return
-		}
 	} else {
 		h.queue.Enqueue(r.Context(), sub.ID)
 	}
@@ -134,6 +121,43 @@ func (h *SubmissionHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if req.ProblemID == "" || req.Language == "" || req.SourceCode == "" {
 		http.Error(w, "problem_id, language, and source_code are required", http.StatusBadRequest)
 		return
+	}
+
+	if req.ContestID != "" {
+		contest, err := h.contestStore.GetByID(r.Context(), req.ContestID)
+		if err != nil || contest == nil {
+			http.Error(w, "contest not found", http.StatusNotFound)
+			return
+		}
+		req.ContestID = contest.ID
+
+		now := time.Now()
+		if now.After(contest.StartTime) && now.Before(contest.EndTime) {
+			isJudge := claims.Role == "admin" || contest.CreatedBy == claims.UserID || h.contestStore.HasAccess(r.Context(), contest.ID, claims.UserID, "manager", "judge", "tester")
+			if isJudge {
+				http.Error(w, "judges and admins cannot submit during the contest", http.StatusForbidden)
+				return
+			}
+
+			if contest.RegistrationRequired {
+				registered, err := h.contestStore.IsParticipant(r.Context(), contest.ID, claims.UserID)
+				if err != nil || !registered {
+					http.Error(w, "not registered for the contest", http.StatusForbidden)
+					return
+				}
+			}
+		} else if now.Before(contest.StartTime) {
+			http.Error(w, "contest has not started yet", http.StatusForbidden)
+			return
+		} else {
+			if !contest.UpsolvingEnabled {
+				isJudge := claims.Role == "admin" || contest.CreatedBy == claims.UserID || h.contestStore.HasAccess(r.Context(), contest.ID, claims.UserID, "manager", "judge", "tester")
+				if !isJudge {
+					http.Error(w, "upsolving is disabled", http.StatusForbidden)
+					return
+				}
+			}
+		}
 	}
 
 	h.buildAndEnqueue(r, w, submissionBuildRequest{
@@ -167,6 +191,21 @@ func (h *SubmissionHandler) CreateUpsolving(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	contest, err := h.contestStore.GetByID(r.Context(), req.ContestID)
+	if err != nil || contest == nil {
+		http.Error(w, "contest not found", http.StatusNotFound)
+		return
+	}
+	req.ContestID = contest.ID
+
+	if !contest.UpsolvingEnabled {
+		isJudge := claims.Role == "admin" || contest.CreatedBy == claims.UserID || h.contestStore.HasAccess(r.Context(), contest.ID, claims.UserID, "manager", "judge", "tester")
+		if !isJudge {
+			http.Error(w, "upsolving is disabled", http.StatusForbidden)
+			return
+		}
+	}
+
 	h.buildAndEnqueue(r, w, submissionBuildRequest{
 		ProblemID:  req.ProblemID,
 		Language:   req.Language,
@@ -183,6 +222,12 @@ func (h *SubmissionHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	if err != nil || sub == nil {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
+	}
+
+	prob, err := h.probStore.GetByID(r.Context(), sub.ProblemID)
+	if err == nil && prob != nil && prob.Source != "" && prob.Source != "local" {
+		sub.IsRemote = true
+		sub.RemoteOJ = prob.Source
 	}
 
 	if sub.ContestID != "" {
@@ -453,4 +498,81 @@ func compareOutput(status, stdout, expected string) *bool {
 	exp := normalizeOutput(expected)
 	result := actual == exp
 	return &result
+}
+
+func (h *SubmissionHandler) hasSubmissionAccess(r *http.Request, sub *model.Submission) bool {
+	claims := middleware.GetUserClaims(r)
+	if claims == nil {
+		return false
+	}
+	if claims.Role == "admin" {
+		return true
+	}
+	if sub.UserID == claims.UserID {
+		return true
+	}
+	if sub.ContestID != "" {
+		isJudge := h.contestStore.HasAccess(r.Context(), sub.ContestID, claims.UserID, "manager", "judge")
+		if isJudge {
+			return true
+		}
+	}
+	return false
+}
+
+func (h *SubmissionHandler) RetryRemote(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	sub, err := h.subStore.GetByID(r.Context(), id)
+	if err != nil || sub == nil {
+		http.Error(w, "submission not found", http.StatusNotFound)
+		return
+	}
+
+	if !h.hasSubmissionAccess(r, sub) {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	prob, err := h.probStore.GetByID(r.Context(), sub.ProblemID)
+	if err != nil || prob == nil || prob.Source == "" || prob.Source == "local" {
+		http.Error(w, "not a remote OJ problem", http.StatusBadRequest)
+		return
+	}
+
+	h.subStore.UpdateStatus(r.Context(), id, model.StatusPending)
+	h.subStore.UpdateRemoteID(r.Context(), id, "", "")
+	h.subStore.UpdateBotID(r.Context(), id, "", "")
+
+	respondJSON(w, http.StatusOK, map[string]string{"status": "retrying"})
+}
+
+func (h *SubmissionHandler) RecheckRemote(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	sub, err := h.subStore.GetByID(r.Context(), id)
+	if err != nil || sub == nil {
+		http.Error(w, "submission not found", http.StatusNotFound)
+		return
+	}
+
+	if !h.hasSubmissionAccess(r, sub) {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	if sub.RemoteID == "" {
+		http.Error(w, "no remote submission ID", http.StatusBadRequest)
+		return
+	}
+
+	prob, err := h.probStore.GetByID(r.Context(), sub.ProblemID)
+	if err != nil || prob == nil {
+		http.Error(w, "problem not found", http.StatusNotFound)
+		return
+	}
+
+	if h.vjudgeSvc != nil {
+		go h.vjudgeSvc.ForcePoll(r.Context(), prob.Source, sub.RemoteID, sub.ID)
+	}
+
+	respondJSON(w, http.StatusOK, map[string]string{"status": "refreshing"})
 }

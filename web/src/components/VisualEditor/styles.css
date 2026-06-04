@@ -33,3 +33,22 @@
 .ProseMirror-selectednode .math-node {
   outline: 2px solid #2563eb;
 }
+
+/* Dark mode overrides — applied when <html> has .dark class (mirrors the
+   Tailwind v4 @custom-variant dark selector in global.css). */
+.dark .tiptap p.is-editor-empty:first-child::before {
+  color: #6b7280;
+}
+
+.dark .tiptap .math-node {
+  background: #1e3a5f;
+  border: 1px solid #2563eb;
+}
+
+.dark .tiptap .math-node:hover {
+  background: #2563eb;
+}
+
+.dark .ProseMirror-selectednode .math-node {
+  outline: 2px solid #60a5fa;
+}

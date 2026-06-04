@@ -238,7 +238,7 @@ export default function ContestDetail() {
     const [loading, setLoading] = useState(true)
     const [activeTab, setActiveTab] = useState<Tab>(() => {
         const hash = window.location.hash.replace('#', '') as Tab
-        const validTabs: Tab[] = ['problems', 'standings', 'clarifications', 'announcements']
+        const validTabs: Tab[] = ['problems', 'standings', 'submissions', 'clarifications', 'announcements']
         return validTabs.includes(hash) ? hash : 'problems'
     })
 
@@ -465,7 +465,7 @@ export default function ContestDetail() {
             {/* ── Hero Header ──────────────────────────────────────────────── */}
             <div className="mb-6">
                 <div className="flex items-center gap-3 mb-2">
-                    <h1 className="text-3xl font-extrabold text-gray-900 dark:text-gray-100">{contest.name}</h1>
+                    <h1 className="text-3xl font-extrabold text-gray-900 dark:text-gray-100">{contest.title}</h1>
                     <StatusBadge status={status} />
                     {contest.format && <FormatBadge format={contest.format} />}
                     {contest.type && <TypeBadge type={contest.type} />}

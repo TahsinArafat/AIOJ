@@ -7,6 +7,7 @@ import { python } from '@codemirror/lang-python'
 import { java } from '@codemirror/lang-java'
 import { rust } from '@codemirror/lang-rust'
 import { javascript } from '@codemirror/lang-javascript'
+import { useTheme } from '../context/ThemeContext'
 
 interface CodeEditorProps {
     language: string
@@ -36,6 +37,7 @@ export default function CodeEditor({
     const editorRef = useRef<HTMLDivElement>(null)
     const viewRef = useRef<EditorView | null>(null)
     const onChangeRef = useRef(onChange)
+    const { theme } = useTheme()
 
     // Sync onChange callback ref to avoid effect trigger when it changes
     useEffect(() => {
@@ -58,7 +60,7 @@ export default function CodeEditor({
         // Config state extensions
         const extensions = [
             basicSetup,
-            oneDark,
+            ...(theme === 'dark' ? [oneDark] : []),
             getLangExtension(language),
             updateListener,
             EditorView.theme({
@@ -103,7 +105,7 @@ export default function CodeEditor({
     return (
         <div 
             ref={editorRef} 
-            className="border border-gray-300 rounded overflow-hidden text-left"
+            className="border border-gray-300 dark:border-gray-600 rounded overflow-hidden text-left"
             style={{ minHeight: height }}
         />
     )

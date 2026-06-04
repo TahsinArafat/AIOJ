@@ -7,6 +7,20 @@ import 'katex/dist/katex.min.css'
 import { api, getAccessToken } from '../lib/api'
 import ProblemStats from '../components/ProblemStats'
 import CodeEditor from '../components/CodeEditor'
+import AddEditorialModal from '../components/AddEditorialModal'
+import { Download } from 'lucide-react'
+
+function isPdfUrl(url: string | undefined | null): boolean {
+    if (!url) return false
+    try {
+        const parsed = new URL(url)
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false
+    } catch {
+        return false
+    }
+    const lower = url.toLowerCase()
+    return lower.endsWith('.pdf') || lower.includes('/problem.pdf')
+}
 
 function decodeRole(): string | null {
     const token = localStorage.getItem('access_token')
@@ -99,14 +113,14 @@ class Program {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-    ac: 'text-green-600', success: 'text-green-600',
-    wa: 'text-red-600',
-    tle: 'text-yellow-600', TLE: 'text-yellow-600',
-    mle: 'text-orange-600', MLE: 'text-orange-600',
-    re: 'text-red-700', RE: 'text-red-700',
-    ce: 'text-purple-600', CE: 'text-purple-600',
-    pending: 'text-blue-500', judging: 'text-blue-600',
-    se: 'text-gray-600', SE: 'text-gray-600',
+    ac: 'text-green-600 dark:text-green-400', success: 'text-green-600 dark:text-green-400',
+    wa: 'text-red-600 dark:text-red-400',
+    tle: 'text-yellow-600 dark:text-yellow-400', TLE: 'text-yellow-600 dark:text-yellow-400',
+    mle: 'text-orange-600 dark:text-orange-400', MLE: 'text-orange-600 dark:text-orange-400',
+    re: 'text-red-700 dark:text-red-300', RE: 'text-red-700 dark:text-red-300',
+    ce: 'text-purple-600 dark:text-purple-400', CE: 'text-purple-600 dark:text-purple-400',
+    pending: 'text-blue-500 dark:text-blue-400', judging: 'text-blue-600 dark:text-blue-400',
+    se: 'text-gray-600 dark:text-gray-400', SE: 'text-gray-600 dark:text-gray-400',
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -141,6 +155,7 @@ export default function ProblemDetail() {
     const [mySubs, setMySubs] = useState<any[]>([])
     const [loadingSubs, setLoadingSubs] = useState(false)
     const [editorials, setEditorials] = useState<any[]>([])
+    const [isAddModalOpen, setIsAddModalOpen] = useState(false)
     const isMountedRef = useRef(true)
 
     const [splitPos, setSplitPos] = useState(() => {
@@ -363,7 +378,7 @@ export default function ProblemDetail() {
     const canExport = role === 'admin' || role === 'teacher'
 
     if (!problem) {
-        return <div className="text-center py-20 text-gray-400">Loading...</div>
+        return <div className="text-center py-20 text-gray-400 dark:text-gray-500">Loading...</div>
     }
 
     return (
@@ -384,18 +399,18 @@ export default function ProblemDetail() {
                             </span>
                         )}
                         {problem.scoring_mode === 'partial' && (
-                            <span className="inline-flex items-center ml-2 px-2 py-0.5 text-xs font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded align-middle">
+                            <span className="inline-flex items-center ml-2 px-2 py-0.5 text-xs font-semibold bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded align-middle">
                                 Partial Scoring
                             </span>
                         )}
                     </h1>
-                    <div className="mt-3 text-sm text-gray-600 flex flex-wrap items-center gap-4">
-                        <span className="flex items-center gap-1.5"><span className="font-semibold text-gray-700">Time Limit:</span> {problem.time_limit} ms</span>
-                        <span className="flex items-center gap-1.5"><span className="font-semibold text-gray-700">Memory Limit:</span> {Math.round(problem.memory_limit / 1024)} MB</span>
-                        <span className="flex items-center gap-1.5"><span className="font-semibold text-gray-700">Difficulty:</span> <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wider ${
-                            problem.difficulty === 'easy' ? 'bg-green-100 text-green-800' :
-                            problem.difficulty === 'hard' ? 'bg-red-100 text-red-800' :
-                            'bg-yellow-100 text-yellow-800'
+                    <div className="mt-3 text-sm text-gray-600 dark:text-gray-400 flex flex-wrap items-center gap-4">
+                        <span className="flex items-center gap-1.5"><span className="font-semibold text-gray-700 dark:text-gray-300">Time Limit:</span> {problem.time_limit} ms</span>
+                        <span className="flex items-center gap-1.5"><span className="font-semibold text-gray-700 dark:text-gray-300">Memory Limit:</span> {Math.round(problem.memory_limit / 1024)} MB</span>
+                        <span className="flex items-center gap-1.5"><span className="font-semibold text-gray-700 dark:text-gray-300">Difficulty:</span> <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wider ${
+                            problem.difficulty === 'easy' ? 'bg-green-100 dark:bg-green-900/30 text-green-800' :
+                            problem.difficulty === 'hard' ? 'bg-red-100 dark:bg-red-900/30 text-red-800' :
+                            'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800'
                         }`}>{problem.difficulty}</span></span>
                     </div>
                     {canExport && (
@@ -418,7 +433,7 @@ export default function ProblemDetail() {
                                         alert('Export failed: ' + e.message)
                                     }
                                 }}
-                                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 cursor-pointer"
+                                className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
                             >
                                 Export (FPS ZIP)
                             </button>
@@ -426,37 +441,57 @@ export default function ProblemDetail() {
                     )}
                 </div>
 
-                <div className="flex border-b border-gray-200">
-                    <button onClick={() => setTab('statement')} className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${tab === 'statement' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+                <div className="flex border-b border-gray-200 dark:border-gray-700">
+                    <button onClick={() => setTab('statement')} className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${tab === 'statement' ? 'border-blue-600 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}>
                         Statement
                     </button>
-                    <button onClick={() => setTab('stats')} className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${tab === 'stats' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+                    <button onClick={() => setTab('stats')} className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${tab === 'stats' ? 'border-blue-600 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}>
                         Statistics
                     </button>
-                    <button onClick={() => setTab('editorials')} className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${tab === 'editorials' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+                    <button onClick={() => setTab('editorials')} className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${tab === 'editorials' ? 'border-blue-600 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}>
                         Editorials
                     </button>
                     {getAccessToken() && (
-                        <button onClick={() => setTab('submissions')} className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${tab === 'submissions' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+                        <button onClick={() => setTab('submissions')} className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${tab === 'submissions' ? 'border-blue-600 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}>
                             My Submissions
                         </button>
                     )}
-                    <button onClick={() => setTab('more')} className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${tab === 'more' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+                    <button onClick={() => setTab('more')} className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${tab === 'more' ? 'border-blue-600 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}>
                         More
                     </button>
                 </div>
 
                 {tab === 'statement' ? (
                     <div className="space-y-5 pb-8">
-                        <div className="prose prose-sm max-w-none text-gray-800 leading-relaxed">
-                            <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
-                                {problem.description}
-                            </ReactMarkdown>
-                        </div>
+                        {isPdfUrl(problem.description) ? (
+                            <div className="space-y-3">
+                                <h3 className="font-semibold text-sm text-gray-700 dark:text-gray-300 uppercase tracking-wide">PDF Problem Statement</h3>
+                                <a
+                                    href={problem.description}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
+                                >
+                                    <Download className="w-4 h-4" />
+                                    Download PDF
+                                </a>
+                                <iframe
+                                    src={problem.description}
+                                    className="w-full h-[800px] border-0 rounded-lg shadow-sm bg-white"
+                                    title="Problem Statement"
+                                />
+                            </div>
+                        ) : (
+                            <div className="prose prose-sm max-w-none text-gray-800 dark:text-gray-200 leading-relaxed">
+                                <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                                    {problem.description}
+                                </ReactMarkdown>
+                            </div>
+                        )}
                         {problem.input_format && (
                             <div>
-                                <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide mb-1">Input Format</h3>
-                                <div className="prose prose-sm max-w-none text-gray-700">
+                                <h3 className="font-semibold text-sm text-gray-700 dark:text-gray-300 uppercase tracking-wide mb-1">Input Format</h3>
+                                <div className="prose prose-sm max-w-none text-gray-700 dark:text-gray-300">
                                     <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
                                         {problem.input_format}
                                     </ReactMarkdown>
@@ -465,8 +500,8 @@ export default function ProblemDetail() {
                         )}
                         {problem.output_format && (
                             <div>
-                                <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide mb-1">Output Format</h3>
-                                <div className="prose prose-sm max-w-none text-gray-700">
+                                <h3 className="font-semibold text-sm text-gray-700 dark:text-gray-300 uppercase tracking-wide mb-1">Output Format</h3>
+                                <div className="prose prose-sm max-w-none text-gray-700 dark:text-gray-300">
                                     <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
                                         {problem.output_format}
                                     </ReactMarkdown>
@@ -475,8 +510,8 @@ export default function ProblemDetail() {
                         )}
                         {problem.hint && (
                             <div>
-                                <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide mb-1">Constraints</h3>
-                                <div className="prose prose-sm max-w-none text-gray-700">
+                                <h3 className="font-semibold text-sm text-gray-700 dark:text-gray-300 uppercase tracking-wide mb-1">Constraints</h3>
+                                <div className="prose prose-sm max-w-none text-gray-700 dark:text-gray-300">
                                     <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
                                         {problem.hint}
                                     </ReactMarkdown>
@@ -485,18 +520,18 @@ export default function ProblemDetail() {
                         )}
                         {problem.sample_cases?.length > 0 && problem.sample_cases.map((sc: any, i: number) => (
                             <div key={i} className="space-y-1">
-                                <h3 className="font-semibold text-sm text-gray-700 uppercase tracking-wide">Sample {i + 1}</h3>
+                                <h3 className="font-semibold text-sm text-gray-700 dark:text-gray-300 uppercase tracking-wide">Sample {i + 1}</h3>
                                 <div className="grid grid-cols-2 gap-2">
                                     <div>
-                                        <div className="text-xs text-gray-400 mb-1">Input</div>
-                                        <pre className="bg-gray-100 rounded p-2 text-xs overflow-x-auto select-all">{sc.input}</pre>
+                                        <div className="text-xs text-gray-400 dark:text-gray-500 mb-1">Input</div>
+                                        <pre className="bg-gray-100 dark:bg-gray-700 rounded p-2 text-xs overflow-x-auto select-all">{sc.input}</pre>
                                     </div>
                                     <div>
-                                        <div className="text-xs text-gray-400 mb-1">Output</div>
-                                        <pre className="bg-gray-100 rounded p-2 text-xs overflow-x-auto select-all">{sc.output}</pre>
+                                        <div className="text-xs text-gray-400 dark:text-gray-500 mb-1">Output</div>
+                                        <pre className="bg-gray-100 dark:bg-gray-700 rounded p-2 text-xs overflow-x-auto select-all">{sc.output}</pre>
                                     </div>
                                 </div>
-                                {sc.explanation && <p className="text-xs text-gray-500 mt-1">{sc.explanation}</p>}
+                                {sc.explanation && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{sc.explanation}</p>}
                             </div>
                         ))}
                     </div>
@@ -520,13 +555,13 @@ export default function ProblemDetail() {
                         )}
                         {problem.tags && problem.tags.length > 0 && (
                             <div>
-                                <h3 className="font-semibold text-gray-800 mb-3">Tags</h3>
+                                <h3 className="font-semibold text-gray-800 dark:text-gray-200 mb-3">Tags</h3>
                                 <div className="flex flex-wrap gap-2">
                                     {problem.tags.map((tag: string) => (
                                         <Link 
                                             key={tag} 
                                             to={`/problems?tag=${tag}`} 
-                                            className="bg-gray-100 hover:bg-gray-200 border border-gray-200 text-sm text-gray-700 px-3 py-1.5 rounded transition-colors"
+                                            className="bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-300 px-3 py-1.5 rounded transition-colors"
                                         >
                                             {tag}
                                         </Link>
@@ -536,30 +571,47 @@ export default function ProblemDetail() {
                         )}
                         {problem.source && (
                             <div>
-                                <h3 className="font-semibold text-gray-800 mb-2">Source / Author</h3>
-                                <div className="text-sm text-gray-700 bg-gray-50 border border-gray-200 px-4 py-2 rounded-lg inline-block">
+                                <h3 className="font-semibold text-gray-800 dark:text-gray-200 mb-2">Source / Author</h3>
+                                <div className="text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-4 py-2 rounded-lg inline-block">
                                     {problem.source}
                                 </div>
                             </div>
                         )}
                         {(!problem.tags?.length && !problem.source && !problem.interactive && problem.scoring_mode !== 'partial') && (
-                            <p className="text-gray-500 text-sm py-4">No additional information available for this problem.</p>
+                            <p className="text-gray-500 dark:text-gray-400 text-sm py-4">No additional information available for this problem.</p>
                         )}
                     </div>
                 ) : tab === 'stats' ? (
                     <ProblemStats problemId={problem.id} />
                 ) : tab === 'editorials' ? (
                     <div className="space-y-4">
+                        {(() => {
+                            const role = decodeRole()
+                            const isPrivileged = !!getAccessToken() && (role === 'admin' || role === 'teacher')
+                            if (isPrivileged) {
+                                return (
+                                    <div className="flex justify-end">
+                                        <button
+                                            onClick={() => setIsAddModalOpen(true)}
+                                            className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-sm font-medium"
+                                        >
+                                            Add Editorial
+                                        </button>
+                                    </div>
+                                )
+                            }
+                            return null
+                        })()}
                         {editorials.length === 0 ? (
-                            <p className="text-gray-400 text-sm">No editorials yet for this problem.</p>
+                            <p className="text-gray-400 dark:text-gray-500 text-sm">No editorials yet for this problem.</p>
                         ) : (
                             editorials.map(e => (
-                                <Link key={e.id} to={`/editorials/${e.id}`} className="block border rounded p-4 hover:bg-gray-50">
+                                <Link key={e.id} to={`/editorials/${e.id}`} className="block border rounded p-4 hover:bg-gray-50 dark:hover:bg-gray-700">
                                     <div className="flex items-center gap-2 mb-1">
-                                        {e.is_official && <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded font-medium">Official</span>}
+                                        {e.is_official && <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-2 py-0.5 rounded font-medium">Official</span>}
                                         <h4 className="font-medium">{e.title}</h4>
                                     </div>
-                                    <div className="flex gap-4 text-xs text-gray-400">
+                                    <div className="flex gap-4 text-xs text-gray-400 dark:text-gray-500">
                                         <span>{e.username}</span>
                                         {e.time_complexity && <span>Time: {e.time_complexity}</span>}
                                         <span>{e.upvotes} upvotes</span>
@@ -567,17 +619,28 @@ export default function ProblemDetail() {
                                 </Link>
                             ))
                         )}
+                        <AddEditorialModal
+                            problemId={problem.id}
+                            isUserAdmin={decodeRole() === 'admin'}
+                            isOpen={isAddModalOpen}
+                            onClose={() => setIsAddModalOpen(false)}
+                            onSuccess={() => {
+                                api.editorials.getByProblem(problem.id)
+                                    .then(d => setEditorials(d.data || []))
+                                    .catch(console.error)
+                            }}
+                        />
                     </div>
                 ) : (
                     <div className="space-y-4">
                         {loadingSubs ? (
-                            <div className="text-center py-8 text-gray-400">Loading submissions...</div>
+                            <div className="text-center py-8 text-gray-400 dark:text-gray-500">Loading submissions...</div>
                         ) : mySubs.length === 0 ? (
-                            <p className="text-gray-400 text-sm text-center py-8">No submissions yet for this problem.</p>
+                            <p className="text-gray-400 dark:text-gray-500 text-sm text-center py-8">No submissions yet for this problem.</p>
                         ) : (
-                            <div className="border border-gray-200 rounded-lg overflow-hidden">
+                            <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
                                 <table className="w-full text-sm">
-                                    <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                                    <thead className="bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-xs uppercase">
                                         <tr>
                                             <th className="px-4 py-2 text-left">ID</th>
                                             <th className="px-4 py-2 text-left">Language</th>
@@ -586,26 +649,26 @@ export default function ProblemDetail() {
                                             <th className="px-4 py-2 text-left">Memory</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-gray-100">
+                                    <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                                         {mySubs.map((s: any) => (
-                                            <tr key={s.id} className="hover:bg-gray-50">
+                                            <tr key={s.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                                                 <td className="px-4 py-2 font-mono text-xs">
-                                                    <Link to={`/submissions/${s.id}`} className="text-blue-600 hover:underline">
+                                                    <Link to={`/submissions/${s.id}`} className="text-blue-600 dark:text-blue-400 hover:underline">
                                                         {s.id?.substring(0, 8)}...
                                                     </Link>
                                                 </td>
-                                                <td className="px-4 py-2 text-gray-500">{s.language}</td>
+                                                <td className="px-4 py-2 text-gray-500 dark:text-gray-400">{s.language}</td>
                                                 <td className="px-4 py-2 font-semibold">
                                                     <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                                                        s.status === 'ac' ? 'text-green-600 bg-green-50' : 
-                                                        s.status === 'wa' ? 'text-red-600 bg-red-50' : 
-                                                        s.status === 'tle' ? 'text-yellow-600 bg-yellow-50' :
-                                                        s.status === 'mle' ? 'text-orange-600 bg-orange-50' :
-                                                        s.status === 're' ? 'text-red-700 bg-red-50' :
-                                                        s.status === 'ce' ? 'text-purple-600 bg-purple-50' :
-                                                        s.status === 'pending' ? 'text-blue-500 bg-blue-50' :
-                                                        s.status === 'judging' ? 'text-blue-600 bg-blue-50' :
-                                                        'text-gray-600 bg-gray-50'
+                                                        s.status === 'ac' ? 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20' : 
+                                                        s.status === 'wa' ? 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20' : 
+                                                        s.status === 'tle' ? 'text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20' :
+                                                        s.status === 'mle' ? 'text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20' :
+                                                        s.status === 're' ? 'text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/20' :
+                                                        s.status === 'ce' ? 'text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20' :
+                                                        s.status === 'pending' ? 'text-blue-500 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20' :
+                                                        s.status === 'judging' ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20' :
+                                                        'text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800'
                                                     }`}>
                                                         {s.status === 'ac' ? 'Accepted' : 
                                                          s.status === 'wa' ? 'Wrong Answer' : 
@@ -618,8 +681,8 @@ export default function ProblemDetail() {
                                                          s.status}
                                                     </span>
                                                 </td>
-                                                <td className="px-4 py-2 text-gray-500">{s.time_used > 0 ? `${s.time_used}ms` : '—'}</td>
-                                                <td className="px-4 py-2 text-gray-500">{s.memory_used > 0 ? `${Math.round(s.memory_used / 1024)}MB` : '—'}</td>
+                                                <td className="px-4 py-2 text-gray-500 dark:text-gray-400">{s.time_used > 0 ? `${s.time_used}ms` : '—'}</td>
+                                                <td className="px-4 py-2 text-gray-500 dark:text-gray-400">{s.memory_used > 0 ? `${Math.round(s.memory_used / 1024)}MB` : '—'}</td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -633,7 +696,7 @@ export default function ProblemDetail() {
             {/* Divider */}
             <div
                 onMouseDown={handleMouseDown}
-                className={`w-1.5 flex-shrink-0 cursor-col-resize group hover:bg-blue-500 transition-colors ${dragging ? 'bg-blue-500' : 'bg-gray-200'}`}
+                className={`w-1.5 flex-shrink-0 cursor-col-resize group hover:bg-blue-500 transition-colors ${dragging ? 'bg-blue-500' : 'bg-gray-200 dark:bg-gray-700'}`}
             >
                 <div className="w-0.5 h-full mx-auto group-hover:bg-blue-400" />
             </div>
@@ -644,7 +707,7 @@ export default function ProblemDetail() {
                     <select
                         value={lang}
                         onChange={e => setLang(e.target.value)}
-                        className="border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
                     >
                         {LANGS.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
                     </select>
@@ -673,72 +736,72 @@ export default function ProblemDetail() {
                     height="400px"
                 />
                 {result && (
-                    <div className="border border-gray-200 rounded p-3 text-sm">
+                    <div className="border border-gray-200 dark:border-gray-700 rounded p-3 text-sm">
                         <div className="flex justify-between items-center">
                             <span className={`font-semibold ${STATUS_COLORS[result.status] || ''}`}>
                                 {STATUS_LABELS[result.status] || result.status}
                             </span>
                             {result.time_used > 0 && (
-                                <span className="text-gray-500 text-xs">
+                                <span className="text-gray-500 dark:text-gray-400 text-xs">
                                     {result.time_used}ms / {Math.round(result.memory_used / 1024)}MB
                                 </span>
                             )}
                         </div>
                         {result.compile_output && (
-                            <pre className="mt-2 text-xs text-red-600 bg-red-50 rounded p-2 overflow-x-auto">{result.compile_output}</pre>
+                            <pre className="mt-2 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded p-2 overflow-x-auto">{result.compile_output}</pre>
                         )}
                     </div>
                 )}
 
                 {/* Sample Test Results */}
                 {sampleResults.length > 0 && (
-                    <div className="border border-gray-200 rounded-lg overflow-hidden bg-white shadow-sm">
-                        <div className="bg-gray-50 border-b border-gray-200 px-4 py-3 flex items-center justify-between">
-                            <span className="font-semibold text-sm text-gray-700">Sample Test Results</span>
+                    <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800 shadow-sm">
+                        <div className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center justify-between">
+                            <span className="font-semibold text-sm text-gray-700 dark:text-gray-300">Sample Test Results</span>
                             <span className={`text-xs font-medium px-2 py-0.5 rounded ${
-                                sampleResults.every(r => r.passed) ? 'bg-green-100 text-green-700' :
-                                sampleResults.some(r => r.passed) ? 'bg-yellow-100 text-yellow-700' :
-                                'bg-red-100 text-red-700'
+                                sampleResults.every(r => r.passed) ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' :
+                                sampleResults.some(r => r.passed) ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300' :
+                                'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
                             }`}>
                                 {sampleResults.filter(r => r.passed).length}/{sampleResults.length} Passed
                             </span>
                         </div>
-                        <div className="divide-y divide-gray-100">
+                        <div className="divide-y divide-gray-100 dark:divide-gray-700">
                             {sampleResults.map((r) => (
                                 <div key={r.index} className="p-4">
                                     <div className="flex items-center justify-between mb-2">
-                                        <span className="text-sm font-medium text-gray-700">Sample {r.index}</span>
+                                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Sample {r.index}</span>
                                         <div className="flex items-center gap-2">
                                             {r.time > 0 && (
-                                                <span className="text-xs text-gray-500">{r.time}ms</span>
+                                                <span className="text-xs text-gray-500 dark:text-gray-400">{r.time}ms</span>
                                             )}
                                             <span className={`text-xs font-medium px-2 py-0.5 rounded ${
-                                                r.passed ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                                                r.passed ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
                                             }`}>
                                                 {r.passed ? 'Passed' : 'Failed'}
                                             </span>
                                         </div>
                                     </div>
-                                    <div className="text-xs text-gray-500 mb-2 font-mono bg-gray-50 rounded p-2 overflow-x-auto">
+                                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-2 font-mono bg-gray-50 dark:bg-gray-800 rounded p-2 overflow-x-auto">
                                         Input: {r.input.substring(0, 100)}{r.input.length > 100 ? '...' : ''}
                                     </div>
                                     {!r.passed && (
                                         <div className="grid grid-cols-2 gap-2">
                                             <div>
-                                                <span className="block text-xs font-semibold text-gray-500 mb-1">Expected</span>
-                                                <pre className="bg-green-50 text-green-700 font-mono text-xs p-2 rounded overflow-x-auto max-h-24 border border-green-100">{r.expected || '(empty)'}</pre>
+                                                <span className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Expected</span>
+                                                <pre className="bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 font-mono text-xs p-2 rounded overflow-x-auto max-h-24 border border-green-100">{r.expected || '(empty)'}</pre>
                                             </div>
                                             <div>
-                                                <span className="block text-xs font-semibold text-gray-500 mb-1">Actual</span>
-                                                <pre className="bg-red-50 text-red-700 font-mono text-xs p-2 rounded overflow-x-auto max-h-24 border border-red-100">{r.actual || '(empty)'}</pre>
+                                                <span className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Actual</span>
+                                                <pre className="bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 font-mono text-xs p-2 rounded overflow-x-auto max-h-24 border border-red-100">{r.actual || '(empty)'}</pre>
                                             </div>
                                         </div>
                                     )}
                                     {r.compile_output && (
-                                        <pre className="mt-2 text-xs text-red-600 bg-red-50 rounded p-2 overflow-x-auto">{r.compile_output}</pre>
+                                        <pre className="mt-2 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded p-2 overflow-x-auto">{r.compile_output}</pre>
                                     )}
                                     {r.stderr && (
-                                        <pre className="mt-2 text-xs text-red-600 bg-red-50 rounded p-2 overflow-x-auto">{r.stderr}</pre>
+                                        <pre className="mt-2 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded p-2 overflow-x-auto">{r.stderr}</pre>
                                     )}
                                 </div>
                             ))}
@@ -747,9 +810,9 @@ export default function ProblemDetail() {
                 )}
 
                 {/* Custom Scratchpad */}
-                <div className="mt-4 border border-gray-200 rounded-lg overflow-hidden bg-white shadow-sm">
-                    <div className="bg-gray-50 border-b border-gray-200 px-4 py-3 flex items-center justify-between">
-                        <span className="font-semibold text-sm text-gray-700">Custom Stdin / Scratchpad</span>
+                <div className="mt-4 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800 shadow-sm">
+                    <div className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center justify-between">
+                        <span className="font-semibold text-sm text-gray-700 dark:text-gray-300">Custom Stdin / Scratchpad</span>
                         <button
                             onClick={runCustomCode}
                             disabled={runningCustom || !code.trim() || problem?.source !== 'local'}
@@ -761,22 +824,22 @@ export default function ProblemDetail() {
                     </div>
                     <div className="p-4 space-y-4">
                         <div>
-                            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Custom Input (Stdin)</label>
+                            <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">Custom Input (Stdin)</label>
                             <textarea
                                 value={customInput}
                                 onChange={(e) => setCustomInput(e.target.value)}
                                 rows={4}
                                 placeholder="Enter input values here..."
-                                className="w-full font-mono text-xs border border-gray-300 rounded p-2.5 bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                                className="w-full font-mono text-xs border border-gray-300 dark:border-gray-600 rounded p-2.5 bg-gray-50 dark:bg-gray-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors"
                             />
                         </div>
 
                         {customOutput && (
-                            <div className="space-y-3 pt-2 border-t border-gray-100">
+                            <div className="space-y-3 pt-2 border-t border-gray-100 dark:border-gray-700">
                                 <div className="flex items-center justify-between text-xs">
                                     <span className={`font-semibold uppercase tracking-wider ${
-                                        customOutput.status === 'success' ? 'text-green-600' :
-                                        customOutput.status === 'ce' ? 'text-purple-600' : 'text-red-600'
+                                        customOutput.status === 'success' ? 'text-green-600 dark:text-green-400' :
+                                        customOutput.status === 'ce' ? 'text-purple-600 dark:text-purple-400' : 'text-red-600 dark:text-red-400'
                                     }`}>
                                         Execution: {
                                             customOutput.status === 'success' ? 'Completed' :
@@ -788,7 +851,7 @@ export default function ProblemDetail() {
                                         }
                                     </span>
                                     {customOutput.time_used > 0 && (
-                                        <span className="text-gray-500 font-mono">
+                                        <span className="text-gray-500 dark:text-gray-400 font-mono">
                                             {customOutput.time_used}ms / {Math.round(customOutput.memory_used / 1024)}MB
                                         </span>
                                     )}
@@ -796,20 +859,20 @@ export default function ProblemDetail() {
 
                                 {customOutput.compile_output && (
                                     <div>
-                                        <span className="block text-xs font-semibold text-red-500 mb-1">Compiler Output</span>
-                                        <pre className="bg-red-50 text-red-600 font-mono text-xs p-3 rounded overflow-x-auto max-h-40 border border-red-100">{customOutput.compile_output}</pre>
+                                        <span className="block text-xs font-semibold text-red-500 dark:text-red-400 mb-1">Compiler Output</span>
+                                        <pre className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 font-mono text-xs p-3 rounded overflow-x-auto max-h-40 border border-red-100">{customOutput.compile_output}</pre>
                                     </div>
                                 )}
 
                                 {customOutput.status !== 'ce' && (
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                         <div>
-                                            <span className="block text-xs font-semibold text-gray-500 mb-1">Standard Output (Stdout)</span>
-                                            <pre className="bg-gray-900 text-gray-100 font-mono text-xs p-3 rounded overflow-x-auto max-h-40">{customOutput.stdout || <span className="text-gray-500 italic">No output</span>}</pre>
+                                            <span className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Standard Output (Stdout)</span>
+                                            <pre className="bg-gray-900 text-gray-100 font-mono text-xs p-3 rounded overflow-x-auto max-h-40">{customOutput.stdout || <span className="text-gray-500 dark:text-gray-400 italic">No output</span>}</pre>
                                         </div>
                                         <div>
-                                            <span className="block text-xs font-semibold text-gray-500 mb-1">Standard Error (Stderr)</span>
-                                            <pre className="bg-gray-950 text-red-400 font-mono text-xs p-3 rounded overflow-x-auto max-h-40">{customOutput.stderr || <span className="text-gray-600 italic">No stderr</span>}</pre>
+                                            <span className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Standard Error (Stderr)</span>
+                                            <pre className="bg-gray-950 text-red-400 font-mono text-xs p-3 rounded overflow-x-auto max-h-40">{customOutput.stderr || <span className="text-gray-600 dark:text-gray-400 italic">No stderr</span>}</pre>
                                         </div>
                                     </div>
                                 )}

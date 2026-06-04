@@ -18,16 +18,19 @@ type CFSubmitClient struct {
 type cfSubmitLoginRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
+	Proxy    string `json:"proxy,omitempty"`
 }
 
 type cfSubmitRequest struct {
-	ProblemCode  string `json:"problem_code"`
-	SourceCode   string `json:"source_code"`
-	LangID       string `json:"lang_id"`
-	Handle       string `json:"handle"`
-	SubmissionID string `json:"submission_id"`
-	Username     string `json:"username"`
-	Password     string `json:"password"`
+	ProblemCode  string            `json:"problem_code"`
+	SourceCode   string            `json:"source_code"`
+	LangID       string            `json:"lang_id"`
+	Handle       string            `json:"handle"`
+	SubmissionID string            `json:"submission_id"`
+	Username     string            `json:"username"`
+	Password     string            `json:"password"`
+	Cookies      map[string]string `json:"cookies,omitempty"`
+	Proxy        string            `json:"proxy,omitempty"`
 }
 
 type cfSubmitResponse struct {
@@ -88,10 +91,11 @@ func (c *CFSubmitClient) doRequest(ctx context.Context, method, path string, bod
 	return &result, nil
 }
 
-func (c *CFSubmitClient) Login(ctx context.Context, username, password string) (map[string]string, error) {
+func (c *CFSubmitClient) Login(ctx context.Context, username, password, proxy string) (map[string]string, error) {
 	result, err := c.doRequest(ctx, "POST", "/login", cfSubmitLoginRequest{
 		Username: username,
 		Password: password,
+		Proxy:    proxy,
 	})
 	if err != nil {
 		return nil, err
@@ -107,7 +111,7 @@ func (c *CFSubmitClient) SeedCookies(ctx context.Context, cookies map[string]str
 	return err
 }
 
-func (c *CFSubmitClient) Submit(ctx context.Context, problemCode, sourceCode, langID, handle, submissionID, username, password string) (string, error) {
+func (c *CFSubmitClient) Submit(ctx context.Context, problemCode, sourceCode, langID, handle, submissionID, username, password string, cookies map[string]string, proxy string) (string, error) {
 	result, err := c.doRequest(ctx, "POST", "/submit", cfSubmitRequest{
 		ProblemCode:  problemCode,
 		SourceCode:   sourceCode,
@@ -116,6 +120,8 @@ func (c *CFSubmitClient) Submit(ctx context.Context, problemCode, sourceCode, la
 		SubmissionID: submissionID,
 		Username:     username,
 		Password:     password,
+		Cookies:      cookies,
+		Proxy:        proxy,
 	})
 	if err != nil {
 		return "", err

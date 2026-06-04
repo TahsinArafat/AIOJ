@@ -80,14 +80,14 @@ int main(int argc, char* argv[]) {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-bold text-gray-900 border-b pb-2 mb-4">Checker & Special Judge Configuration</h2>
+      <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100 border-b pb-2 mb-4">Checker & Special Judge Configuration</h2>
 
       <div>
-        <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Checker Method</label>
+        <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Checker Method</label>
         <select
           value={formState.checkerType}
           onChange={e => onUpdate('checkerType', e.target.value)}
-          className="border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-800"
+          className="border border-gray-300 dark:border-gray-600 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200"
         >
           <option value="exact">Exact Bytes Match (Standard)</option>
           <option value="lines">Lines Differences (Ignore Trailing Spaces)</option>
@@ -100,13 +100,13 @@ int main(int argc, char* argv[]) {
 
       {(formState.checkerType === 'float' || formState.checkerType === 'float_absolute' || formState.checkerType === 'float_relative') && (
         <div>
-          <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Float Epsilon (Precision Tolerance)</label>
+          <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Float Epsilon (Precision Tolerance)</label>
           <input
             type="number"
             step="any"
             value={formState.floatEpsilon}
             onChange={e => onUpdate('floatEpsilon', Number(e.target.value))}
-            className="border border-gray-300 rounded px-3 py-1.5 text-sm w-48 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-800"
+            className="border border-gray-300 dark:border-gray-600 rounded px-3 py-1.5 text-sm w-48 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200"
           />
         </div>
       )}
@@ -118,48 +118,48 @@ int main(int argc, char* argv[]) {
               <span className="w-2.5 h-2.5 rounded-full bg-yellow-400 animate-pulse" />
               <p className="font-bold text-xs uppercase tracking-wider">Special Judge (SPJ) Sandbox Environment Protocol</p>
             </div>
-            <p className="text-xs leading-relaxed text-gray-400">
+            <p className="text-xs leading-relaxed text-gray-400 dark:text-gray-500">
               Your compiled C++ checker binary runs inside a secure isolated sandbox with execution parameters:
             </p>
-            <div className="bg-black/40 border border-gray-800 rounded p-2.5 font-mono text-[11px] text-emerald-400 select-all">
+            <div className="bg-black/40 border border-gray-800 rounded p-2.5 font-mono text-[11px] text-emerald-400 dark:text-emerald-400 select-all">
               ./spj input.txt user.txt answer.txt
             </div>
             <div className="grid grid-cols-2 gap-4 pt-2 text-[11px]">
               <div className="space-y-1.5">
-                <span className="font-semibold block text-gray-400 uppercase tracking-wider text-[10px]">Compilation Outputs</span>
-                <ul className="list-disc pl-4 space-y-0.5 text-gray-500">
+                <span className="font-semibold block text-gray-400 dark:text-gray-500 uppercase tracking-wider text-[10px]">Compilation Outputs</span>
+                <ul className="list-disc pl-4 space-y-0.5 text-gray-500 dark:text-gray-400">
                   <li>Standard streams are fully captured</li>
-                  <li>Errors output on <span className="font-semibold text-gray-400">stderr</span> as details</li>
+                  <li>Errors output on <span className="font-semibold text-gray-400 dark:text-gray-500">stderr</span> as details</li>
                 </ul>
               </div>
               <div className="space-y-1.5">
-                <span className="font-semibold block text-gray-400 uppercase tracking-wider text-[10px]">Return Status Codes</span>
-                <ul className="list-disc pl-4 space-y-0.5 text-gray-500">
-                  <li><span className="font-semibold text-emerald-400">exit status 0</span>: Accepted (AC)</li>
+                <span className="font-semibold block text-gray-400 dark:text-gray-500 uppercase tracking-wider text-[10px]">Return Status Codes</span>
+                <ul className="list-disc pl-4 space-y-0.5 text-gray-500 dark:text-gray-400">
+                  <li><span className="font-semibold text-emerald-400 dark:text-emerald-400">exit status 0</span>: Accepted (AC)</li>
                   <li><span className="font-semibold text-rose-400">exit status 1</span>: Wrong Answer (WA)</li>
                 </ul>
               </div>
             </div>
           </div>
 
-          <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm space-y-4">
+          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 shadow-sm space-y-4">
             <div className="flex justify-between items-center border-b pb-3">
               <div>
-                <span className="text-xs text-gray-600 font-bold block uppercase tracking-wider">Advanced SPJ Presets</span>
-                <span className="text-[11px] text-gray-400">Populate boilerplate templates directly into the editor</span>
+                <span className="text-xs text-gray-600 dark:text-gray-400 font-bold block uppercase tracking-wider">Advanced SPJ Presets</span>
+                <span className="text-[11px] text-gray-400 dark:text-gray-500">Populate boilerplate templates directly into the editor</span>
               </div>
               <div className="flex gap-2">
                 <button
                   type="button"
                   onClick={() => onUpdate('spjSourceCode', precisionFloatPreset)}
-                  className="bg-gray-50 border border-gray-200 text-gray-700 px-3 py-1.5 rounded-md text-xs hover:bg-gray-100 hover:text-black transition-colors font-semibold cursor-pointer"
+                  className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 px-3 py-1.5 rounded-md text-xs hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-black dark:hover:text-white transition-colors font-semibold cursor-pointer"
                 >
                   Precision Float Presets
                 </button>
                 <button
                   type="button"
                   onClick={() => onUpdate('spjSourceCode', arrayGraphPreset)}
-                  className="bg-gray-50 border border-gray-200 text-gray-700 px-3 py-1.5 rounded-md text-xs hover:bg-gray-100 hover:text-black transition-colors font-semibold cursor-pointer"
+                  className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 px-3 py-1.5 rounded-md text-xs hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-black dark:hover:text-white transition-colors font-semibold cursor-pointer"
                 >
                   Array/Graph Presets
                 </button>
@@ -167,19 +167,19 @@ int main(int argc, char* argv[]) {
             </div>
 
             <div>
-              <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">SPJ Sandbox Language</label>
+              <label className="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">SPJ Sandbox Language</label>
               <select
                 value={formState.spjLanguage}
                 onChange={e => onUpdate('spjLanguage', e.target.value)}
-                className="border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-800"
+                className="border border-gray-300 dark:border-gray-600 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200"
               >
                 <option value="cpp-gpp-64">C++ (G++ 64-bit)</option>
               </select>
             </div>
 
             <div>
-              <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">SPJ Source Code Editor</label>
-              <div className="border border-gray-200 rounded overflow-hidden shadow-inner bg-gray-50">
+              <label className="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1">SPJ Source Code Editor</label>
+              <div className="border border-gray-200 dark:border-gray-700 rounded overflow-hidden shadow-inner bg-gray-50 dark:bg-gray-800">
                 <CodeEditor
                   language={formState.spjLanguage}
                   value={formState.spjSourceCode}
@@ -192,39 +192,39 @@ int main(int argc, char* argv[]) {
         </div>
       )}
 
-      <hr className="border-gray-200" />
+      <hr className="border-gray-200 dark:border-gray-700" />
 
       <div className="space-y-3">
-        <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider">Interactive Problem</h3>
+        <h3 className="text-sm font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider">Interactive Problem</h3>
         <div className="flex items-center gap-2">
           <input
             type="checkbox"
             id="interactive"
             checked={formState.interactive}
             onChange={e => onUpdate('interactive', e.target.checked)}
-            className="h-4 w-4 border-gray-300 rounded text-blue-600 focus:ring-blue-500 bg-white"
+            className="h-4 w-4 border-gray-300 dark:border-gray-600 rounded text-blue-600 dark:text-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-800"
           />
-          <label htmlFor="interactive" className="text-sm font-medium text-gray-700">
+          <label htmlFor="interactive" className="text-sm font-medium text-gray-700 dark:text-gray-300">
             Interactive Problem (Judge communicates via stdin/stdout)
           </label>
         </div>
 
         {formState.interactive && (
-          <div className="space-y-3 pl-6 border-l-2 border-blue-200">
+          <div className="space-y-3 pl-6 border-l-2 border-blue-200 dark:border-blue-800">
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Interactor Language</label>
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Interactor Language</label>
               <select
                 value={formState.interactorLanguage}
                 onChange={e => onUpdate('interactorLanguage', e.target.value)}
-                className="border border-gray-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-800"
+                className="border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200"
               >
                 <option value="cpp-gpp-64">C++ (G++ 64-bit)</option>
                 <option value="python">Python 3</option>
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">Interactor Source Code</label>
-              <div className="border border-gray-200 rounded overflow-hidden shadow-inner bg-gray-50">
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Interactor Source Code</label>
+              <div className="border border-gray-200 dark:border-gray-700 rounded overflow-hidden shadow-inner bg-gray-50 dark:bg-gray-800">
                 <CodeEditor
                   language={formState.interactorLanguage}
                   value={formState.interactorSourceCode}

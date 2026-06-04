@@ -5,12 +5,24 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="manifest" href="/manifest.json" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
-    <meta name="theme-color" content="#2563eb" />
+    <meta id="theme-color-meta" name="theme-color" content="#2563eb" />
+    <meta name="color-scheme" content="light dark" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="AIOJ" />
     <link rel="apple-touch-icon" href="/icons/icon-192.png" />
     <title>AIOJ — Online Judge</title>
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem('theme');
+          var theme = saved || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+          if (theme === 'dark') document.documentElement.classList.add('dark');
+          var meta = document.getElementById('theme-color-meta');
+          if (meta) meta.setAttribute('content', theme === 'dark' ? '#1f2937' : '#2563eb');
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
