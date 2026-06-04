@@ -21,23 +21,26 @@ func NewRedisQueue(client *redis.Client) *RedisQueue {
 	}
 }
 
-func (q *RedisQueue) Enqueue(ctx context.Context, id string) error {
-	return q.client.LPush(ctx, q.queueName, id).Err()
+func (q *RedisQueue) Enqueue(ctx context.Context, id string, priority int) error {
+	return q.client.ZAdd(ctx, q.queueName, redis.Z{
+		Score:  float64(priority),
+		Member: id,
+	}).Err()
 }
 
 func (q *RedisQueue) Dequeue(ctx context.Context) (string, error) {
-	result, err := q.client.BRPop(ctx, 2*time.Second, q.queueName).Result()
+	result, err := q.client.BZPopMin(ctx, 2*time.Second, q.queueName).Result()
 	if err != nil {
 		if err == redis.Nil {
 			return "", nil
 		}
 		return "", err
 	}
-	return result[1], nil
+	return result.Member.(string), nil
 }
 
 func (q *RedisQueue) Len() int {
-	l, err := q.client.LLen(context.Background(), q.queueName).Result()
+	l, err := q.client.ZCard(context.Background(), q.queueName).Result()
 	if err != nil {
 		return 0
 	}

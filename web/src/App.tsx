@@ -55,6 +55,7 @@ import ContestPlagiarism from './pages/ContestPlagiarism'
 import ContestProblem from './pages/ContestProblem'
 import ContestEdit from './pages/ContestEdit'
 import ContestManage from './pages/ContestManage'
+import IDE from './pages/IDE'
 import './global.css'
 
 function Home() {
@@ -308,6 +309,7 @@ export default function App() {
                         <Route path="/training" element={<TrainingPlanList />} />
                         <Route path="/training/create" element={<TrainingPlanCreate />} />
                         <Route path="/training/:id" element={<TrainingPlanDetail />} />
+                        <Route path="/ide" element={<IDE />} />
                         <Route path="/profile" element={<Profile />} />
                         <Route path="/virtual" element={<VirtualContest />} />
                         <Route path="/rating-history" element={<RatingHistory />} />

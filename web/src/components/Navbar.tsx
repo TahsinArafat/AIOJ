@@ -8,7 +8,7 @@ import GlobalSearch from './GlobalSearch'
 import {
     Code2, Trophy, Dumbbell, BookOpen, Users, UserCheck,
     MessageSquare, BarChart3, Settings, LogOut, User, FileCode,
-    Bell, Key, ChevronDown, Menu, X, Building2, GraduationCap, Sun, Moon
+    Bell, Key, ChevronDown, Menu, X, Building2, GraduationCap, Sun, Moon, Terminal
 } from 'lucide-react'
 
 function decodeRole(): string | null {
@@ -106,6 +106,10 @@ export default function Navbar() {
                             <Code2 className="w-4 h-4" />
                             <span>Problems</span>
                         </Link>
+                        <Link to="/ide" className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white transition-colors">
+                            <Terminal className="w-4 h-4" />
+                            <span>IDE</span>
+                        </Link>
                             </>
                         )}
                         {isAdmin && (
@@ -198,6 +202,9 @@ export default function Navbar() {
                     </Link>
                     <Link to="/problems" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white font-medium py-2 px-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
                         <Code2 className="w-4 h-4" /> Problems
+                    </Link>
+                    <Link to="/ide" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white font-medium py-2 px-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
+                        <Terminal className="w-4 h-4" /> IDE
                     </Link>
 
                     <div className="px-3 py-1 mt-2 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Community</div>

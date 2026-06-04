@@ -8,7 +8,7 @@ import { api, getAccessToken } from '../lib/api'
 import ProblemStats from '../components/ProblemStats'
 import CodeEditor from '../components/CodeEditor'
 import AddEditorialModal from '../components/AddEditorialModal'
-import { Download } from 'lucide-react'
+import { Download, Copy, Check } from 'lucide-react'
 
 function isPdfUrl(url: string | undefined | null): boolean {
     if (!url) return false
@@ -20,6 +20,37 @@ function isPdfUrl(url: string | undefined | null): boolean {
     }
     const lower = url.toLowerCase()
     return lower.endsWith('.pdf') || lower.includes('/problem.pdf')
+}
+
+function CopyButton({ text }: { text: string }) {
+    const [copied, setCopied] = useState(false)
+
+    const handleCopy = async () => {
+        try {
+            await navigator.clipboard.writeText(text)
+            setCopied(true)
+            setTimeout(() => setCopied(false), 2000)
+        } catch {
+            const ta = document.createElement('textarea')
+            ta.value = text
+            document.body.appendChild(ta)
+            ta.select()
+            document.execCommand('copy')
+            document.body.removeChild(ta)
+            setCopied(true)
+            setTimeout(() => setCopied(false), 2000)
+        }
+    }
+
+    return (
+        <button
+            onClick={handleCopy}
+            className="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors px-2 py-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer"
+            title="Copy to clipboard"
+        >
+            {copied ? <><Check className="w-3.5 h-3.5" /> Copied</> : <><Copy className="w-3.5 h-3.5" /> Copy</>}
+        </button>
+    )
 }
 
 function decodeRole(): string | null {
@@ -523,12 +554,18 @@ export default function ProblemDetail() {
                                 <h3 className="font-semibold text-sm text-gray-700 dark:text-gray-300 uppercase tracking-wide">Sample {i + 1}</h3>
                                 <div className="grid grid-cols-2 gap-2">
                                     <div>
-                                        <div className="text-xs text-gray-400 dark:text-gray-500 mb-1">Input</div>
-                                        <pre className="bg-gray-100 dark:bg-gray-700 rounded p-2 text-xs overflow-x-auto select-all">{sc.input}</pre>
+                                        <div className="flex items-center justify-between mb-1">
+                                            <span className="text-xs text-gray-400 dark:text-gray-500">Input</span>
+                                            <CopyButton text={sc.input} />
+                                        </div>
+                                        <pre className="bg-gray-100 dark:bg-gray-700 rounded p-2 text-xs overflow-x-auto">{sc.input}</pre>
                                     </div>
                                     <div>
-                                        <div className="text-xs text-gray-400 dark:text-gray-500 mb-1">Output</div>
-                                        <pre className="bg-gray-100 dark:bg-gray-700 rounded p-2 text-xs overflow-x-auto select-all">{sc.output}</pre>
+                                        <div className="flex items-center justify-between mb-1">
+                                            <span className="text-xs text-gray-400 dark:text-gray-500">Output</span>
+                                            <CopyButton text={sc.output} />
+                                        </div>
+                                        <pre className="bg-gray-100 dark:bg-gray-700 rounded p-2 text-xs overflow-x-auto">{sc.output}</pre>
                                     </div>
                                 </div>
                                 {sc.explanation && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{sc.explanation}</p>}
@@ -696,9 +733,14 @@ export default function ProblemDetail() {
             {/* Divider */}
             <div
                 onMouseDown={handleMouseDown}
-                className={`w-1.5 flex-shrink-0 cursor-col-resize group hover:bg-blue-500 transition-colors ${dragging ? 'bg-blue-500' : 'bg-gray-200 dark:bg-gray-700'}`}
+                className={`w-3 flex-shrink-0 cursor-col-resize group transition-colors relative ${dragging ? 'bg-blue-500' : 'bg-gray-200 dark:bg-gray-700 hover:bg-blue-500'}`}
             >
-                <div className="w-0.5 h-full mx-auto group-hover:bg-blue-400" />
+                {/* Grip dots indicator */}
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
+                        <span className="w-1 h-1 rounded-full bg-gray-400 dark:bg-gray-500 group-hover:bg-white/70 transition-colors" />
+                        <span className="w-1 h-1 rounded-full bg-gray-400 dark:bg-gray-500 group-hover:bg-white/70 transition-colors" />
+                        <span className="w-1 h-1 rounded-full bg-gray-400 dark:bg-gray-500 group-hover:bg-white/70 transition-colors" />
+                    </div>
             </div>
 
             {/* IDE */}

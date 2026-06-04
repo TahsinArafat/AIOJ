@@ -9,8 +9,8 @@ import (
 func TestQueue(t *testing.T) {
 	m := NewMemory()
 	ctx := context.Background()
-	m.Enqueue(ctx, "a")
-	m.Enqueue(ctx, "b")
+	m.Enqueue(ctx, "a", 1)
+	m.Enqueue(ctx, "b", 1)
 	if m.Len() != 2 {
 		t.Fatalf("len: %d", m.Len())
 	}
@@ -29,7 +29,7 @@ func TestBlockingDequeue(t *testing.T) {
 	done := make(chan string)
 	go func() { id, _ := m.Dequeue(context.Background()); done <- id }()
 	time.Sleep(50 * time.Millisecond)
-	m.Enqueue(context.Background(), "x")
+	m.Enqueue(context.Background(), "x", 1)
 	select {
 	case id := <-done:
 		if id != "x" {

@@ -12,7 +12,7 @@ interface EditorSettings {
   tabSize: number
   wordWrap: 'on' | 'off'
   minimap: boolean
-  theme: 'light' | 'vs-dark' | 'hc-black'
+  theme: 'system' | 'light' | 'vs-dark' | 'hc-black'
 }
 
 interface CodeEditorProps {
@@ -33,6 +33,7 @@ const FONT_SIZES = [12, 13, 14, 15, 16, 18, 20, 22, 24]
 const TAB_SIZES = [2, 4, 8]
 
 const THEME_OPTIONS: { value: EditorSettings['theme']; label: string }[] = [
+  { value: 'system', label: 'Match Site Theme' },
   { value: 'light', label: 'Light' },
   { value: 'vs-dark', label: 'Dark' },
   { value: 'hc-black', label: 'High Contrast' },
@@ -62,7 +63,15 @@ const MONACO_LANG_MAP: Record<string, string> = {
 }
 
 function mapLanguage(lang: string): string {
-  return MONACO_LANG_MAP[lang] ?? 'plaintext'
+  if (MONACO_LANG_MAP[lang]) return MONACO_LANG_MAP[lang]
+  if (lang.startsWith('cpp') || lang.startsWith('c-')) return 'cpp'
+  if (lang.startsWith('csharp')) return 'csharp'
+  if (lang.startsWith('python') || lang.startsWith('pypy')) return 'python'
+  if (lang.startsWith('java')) return 'java'
+  if (lang.startsWith('rust')) return 'rust'
+  if (lang.startsWith('node') || lang.startsWith('javascript')) return 'javascript'
+  if (lang.startsWith('typescript')) return 'typescript'
+  return 'plaintext'
 }
 
 // ---------------------------------------------------------------------------
@@ -75,7 +84,7 @@ function loadSettings(): EditorSettings {
     tabSize: 4,
     wordWrap: 'off',
     minimap: true,
-    theme: 'vs-dark',
+    theme: 'system',
   }
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
@@ -117,35 +126,6 @@ function Toolbar({
 
   return (
     <div className="relative flex items-center gap-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-3 py-1.5 text-xs">
-      {/* Font size */}
-      <label className="flex items-center gap-1 text-gray-500 dark:text-gray-400">
-        <span className="font-medium">Font</span>
-        <select
-          value={settings.fontSize}
-          onChange={(e) => update('fontSize', Number(e.target.value))}
-          className="rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-1.5 py-0.5 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
-        >
-          {FONT_SIZES.map((s) => (
-            <option key={s} value={s}>{s}</option>
-          ))}
-        </select>
-      </label>
-
-      {/* Tab size */}
-      <label className="flex items-center gap-1 text-gray-500 dark:text-gray-400">
-        <span className="font-medium">Tab</span>
-        <select
-          value={settings.tabSize}
-          onChange={(e) => update('tabSize', Number(e.target.value))}
-          className="rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-1.5 py-0.5 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
-        >
-          {TAB_SIZES.map((s) => (
-            <option key={s} value={s}>{s}</option>
-          ))}
-        </select>
-      </label>
-
-      {/* Word-wrap toggle */}
       <button
         onClick={() =>
           update('wordWrap', settings.wordWrap === 'on' ? 'off' : 'on')
@@ -159,7 +139,6 @@ function Toolbar({
         </span>
       </button>
 
-      {/* Minimap toggle */}
       <button
         onClick={() => update('minimap', !settings.minimap)}
         className="flex items-center gap-1 rounded px-1.5 py-0.5 transition-colors hover:bg-gray-200 dark:hover:bg-gray-600"
@@ -171,23 +150,6 @@ function Toolbar({
         </span>
       </button>
 
-      {/* Theme selector */}
-      <label className="flex items-center gap-1 text-gray-500 dark:text-gray-400">
-        <span className="font-medium">Theme</span>
-        <select
-          value={settings.theme}
-          onChange={(e) =>
-            update('theme', e.target.value as EditorSettings['theme'])
-          }
-          className="rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-1.5 py-0.5 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
-        >
-          {THEME_OPTIONS.map((t) => (
-            <option key={t.value} value={t.value}>{t.label}</option>
-          ))}
-        </select>
-      </label>
-
-      {/* Settings gear (currently decorative – all controls are visible inline) */}
       <button
         onClick={() => setOpen(!open)}
         className="ml-auto rounded p-1 transition-colors hover:bg-gray-200 dark:hover:bg-gray-600"
@@ -195,6 +157,51 @@ function Toolbar({
       >
         <Settings size={14} className="text-gray-500 dark:text-gray-400" />
       </button>
+
+      {open && (
+        <div className="absolute right-0 top-full z-50 mt-1 w-56 rounded border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 shadow-lg">
+          <label className="flex items-center justify-between gap-2 text-gray-500 dark:text-gray-400">
+            <span className="font-medium">Font</span>
+            <select
+              value={settings.fontSize}
+              onChange={(e) => update('fontSize', Number(e.target.value))}
+              className="rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-1.5 py-0.5 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            >
+              {FONT_SIZES.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </label>
+
+          <label className="mt-1.5 flex items-center justify-between gap-2 text-gray-500 dark:text-gray-400">
+            <span className="font-medium">Tab</span>
+            <select
+              value={settings.tabSize}
+              onChange={(e) => update('tabSize', Number(e.target.value))}
+              className="rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-1.5 py-0.5 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            >
+              {TAB_SIZES.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </label>
+
+          <label className="mt-1.5 flex items-center justify-between gap-2 text-gray-500 dark:text-gray-400">
+            <span className="font-medium">Theme</span>
+            <select
+              value={settings.theme}
+              onChange={(e) =>
+                update('theme', e.target.value as EditorSettings['theme'])
+              }
+              className="rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-1.5 py-0.5 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            >
+              {THEME_OPTIONS.map((t) => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
     </div>
   )
 }
@@ -218,10 +225,12 @@ export default function CodeEditor({
     saveSettings(settings)
   }, [settings])
 
-  // Resolve the Monaco theme from application theme when no explicit choice
+  // Resolve the Monaco theme: 'system' follows the app theme, otherwise use explicit choice
   const resolvedTheme = useMemo(() => {
-    if (settings.theme !== 'vs-dark') return settings.theme
-    return appTheme === 'dark' ? 'vs-dark' : 'light'
+    if (settings.theme === 'system') {
+      return appTheme === 'dark' ? 'vs-dark' : 'light'
+    }
+    return settings.theme
   }, [settings.theme, appTheme])
 
   const monacoLang = mapLanguage(language)

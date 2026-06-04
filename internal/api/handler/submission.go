@@ -67,6 +67,7 @@ type submissionBuildRequest struct {
 	ContestID  string
 	UserID     string
 	Upsolving  bool
+	Priority   int // 0=auto (contest=0, normal=1), >0=explicit override
 }
 
 func (h *SubmissionHandler) buildAndEnqueue(r *http.Request, w http.ResponseWriter, req submissionBuildRequest) {
@@ -94,10 +95,23 @@ func (h *SubmissionHandler) buildAndEnqueue(r *http.Request, w http.ResponseWrit
 		return
 	}
 
-	if prob.Source != "" && prob.Source != "local" && h.vjudgeSvc != nil {
-	} else {
-		h.queue.Enqueue(r.Context(), sub.ID)
+	priority := req.Priority
+	if priority == 0 {
+		priority = 1
+		if prob.Source != "" && prob.Source != "local" && h.vjudgeSvc != nil {
+		} else {
+			if req.ContestID != "" && !req.Upsolving {
+				contest, cerr := h.contestStore.GetByID(r.Context(), req.ContestID)
+				if cerr == nil && contest != nil {
+					now := time.Now()
+					if now.After(contest.StartTime) && now.Before(contest.EndTime) {
+						priority = 0
+					}
+				}
+			}
+		}
 	}
+	h.queue.Enqueue(r.Context(), sub.ID, priority)
 	respondJSON(w, http.StatusCreated, sub)
 }
 
@@ -113,6 +127,7 @@ func (h *SubmissionHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Language   string `json:"language"`
 		SourceCode string `json:"source_code"`
 		ContestID  string `json:"contest_id,omitempty"`
+		Priority   int    `json:"priority,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid body", http.StatusBadRequest)
@@ -166,6 +181,7 @@ func (h *SubmissionHandler) Create(w http.ResponseWriter, r *http.Request) {
 		SourceCode: req.SourceCode,
 		ContestID:  req.ContestID,
 		UserID:     claims.UserID,
+		Priority:   req.Priority,
 	})
 }
 
