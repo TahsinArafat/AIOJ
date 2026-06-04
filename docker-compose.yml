@@ -141,9 +141,37 @@ services:
       - cf-bypass
     restart: unless-stopped
 
+  # =====================================================================
+  # PRODUCTION: Caddy Reverse Proxy (HTTPS / SSL)
+  # =====================================================================
+  # Only starts when you run: docker compose --profile production up -d
+  # Before using: (1) point your domain DNS to this server's IP
+  #               (2) edit deploy/Caddyfile → replace "yourdomain.com"
+  #               (3) comment out "80:80" under the frontend service above
+  #               (4) ensure ports 80 & 443 are open in firewall
+  #               (5) run: docker compose --profile production up -d
+  # Caddy auto-obtains & renews Let's Encrypt SSL - zero maintenance.
+  # =====================================================================
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+    restart: unless-stopped
+    profiles:
+      - production
+
 volumes:
   pgdata:
   redisdata:
   testdata:
   promdata:
   grafdata:
+  caddy_data:
+  caddy_config:

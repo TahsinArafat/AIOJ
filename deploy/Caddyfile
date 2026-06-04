@@ -1,0 +1,30 @@
+# AIOJ Production Caddyfile
+# ===========================
+# Caddy automatically obtains and renews SSL certificates from Let's Encrypt.
+# You only need to change the domain name below.
+
+# --- Replace with your actual domain ---
+yourdomain.com {
+    # Reverse proxy all traffic to the frontend container (Nginx serving React SPA)
+    reverse_proxy frontend:80
+
+    # Optional: Enable gzip compression for faster page loads
+    encode gzip zstd
+
+    # Optional: Security headers (uncomment for production)
+    # header {
+    #     X-Content-Type-Options "nosniff"
+    #     X-Frame-Options "DENY"
+    #     Referrer-Policy "strict-origin-when-cross-origin"
+    # }
+
+    # Optional: Log requests (uncomment to debug)
+    # log {
+    #     output file /var/log/caddy/access.log
+    # }
+}
+
+# --- Subdomain example (uncomment if you also want www) ---
+# www.yourdomain.com {
+#     redir https://yourdomain.com{uri} permanent
+# }
