@@ -94,6 +94,7 @@ type CreateProblemRequest struct {
 	SPJSourceCode string          `json:"spj_source_code,omitempty"`
 	CheckerType   string          `json:"checker_type,omitempty"`
 	FloatEpsilon  float64         `json:"float_epsilon,omitempty"`
+	Visible       bool            `json:"visible"`
 	Interactive          bool   `json:"interactive"`
 	InteractorLanguage   string `json:"interactor_language,omitempty"`
 	InteractorSourceCode string `json:"interactor_source_code,omitempty"`

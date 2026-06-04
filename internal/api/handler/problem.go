@@ -136,6 +136,7 @@ func (h *ProblemHandler) Update(w http.ResponseWriter, r *http.Request) {
 	p.SPJSourceCode = req.SPJSourceCode
 	p.CheckerType = req.CheckerType
 	p.FloatEpsilon = req.FloatEpsilon
+	p.Visible = req.Visible
 	p.Interactive = req.Interactive
 	p.InteractorLanguage = req.InteractorLanguage
 	p.InteractorSourceCode = req.InteractorSourceCode
