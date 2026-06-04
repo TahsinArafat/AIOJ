@@ -60,7 +60,13 @@ func (wp *WorkerPool) Start(ctx context.Context) {
 		select {
 		case wp.sem <- struct{}{}:
 			go func(id string) {
-				defer func() { <-wp.sem }()
+				defer func() {
+					if r := recover(); r != nil {
+						slog.Error("judge panic", "id", id, "panic", r)
+						wp.subStore.UpdateResult(context.Background(), id, model.StatusSE, 0, 0, 0, fmt.Sprintf("panic: %v", r), nil)
+					}
+					<-wp.sem
+				}()
 				wp.judge(ctx, id)
 			}(subID)
 		case <-ctx.Done():
@@ -71,13 +77,14 @@ func (wp *WorkerPool) Start(ctx context.Context) {
 
 func (wp *WorkerPool) judge(ctx context.Context, submissionID string) {
 	slog.Info("judging", "id", submissionID)
-	sub, err := wp.subStore.GetByID(ctx, submissionID)
+	sub, err := wp.subStore.GetByID(context.Background(), submissionID)
 	if err != nil || sub == nil {
 		slog.Error("load sub failed", "id", submissionID, "error", err)
+		wp.subStore.UpdateResult(context.Background(), submissionID, model.StatusSE, 0, 0, 0, fmt.Sprintf("failed to load submission: %v", err), nil)
 		return
 	}
 
-	wp.subStore.UpdateStatus(ctx, submissionID, model.StatusJudging)
+	wp.subStore.UpdateStatus(context.Background(), submissionID, model.StatusJudging)
 
 	prob, err := wp.probStore.GetByID(ctx, sub.ProblemID)
 	if err != nil || prob == nil {
