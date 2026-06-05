@@ -117,21 +117,27 @@ try:
         sys.exit(0)
 
     if op == "submit":
-        page.goto("https://codeforces.com/problemset/submit", wait_until="domcontentloaded")
-        time.sleep(4)
+        page.goto("https://codeforces.com/problemset/submit", wait_until="networkidle", timeout=120000)
         ss(ctx, "03_submit.png")
 
         if "enter" in page.url.lower():
             print(json.dumps({"error": "redirected to login"}))
             sys.exit(0)
 
-        try:
-            page.wait_for_selector('input[name="submittedProblemCode"]', state="visible", timeout=15000)
-        except:
+        found = False
+        for attempt in range(20):
+            if page.locator('input[name="submittedProblemCode"]').count() > 0:
+                found = True
+                break
+            time.sleep(3)
+            print(f"[info] polling for submit form, attempt {attempt+1}/20", flush=True)
+
+        if not found:
             ss(ctx, "99_no_submit_form.png")
-            print(json.dumps({"error": "submit form not found"}))
+            print(json.dumps({"error": "submit form not found after 60s"}))
             sys.exit(0)
 
+        print("[info] submit form found, filling", flush=True)
         page.fill('input[name="submittedProblemCode"]', problem_code)
         time.sleep(0.5)
         page.select_option('select[name="programTypeId"]', lang_id)
