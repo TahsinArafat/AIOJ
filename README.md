@@ -176,6 +176,13 @@ To                         Action      From
 
 **DO NOT expose ports 5432, 6379, 5050, 8080, 9090, 3000 to the internet.** These are internal services. Only Caddy (or Nginx) on ports 80/443 should be public.
 
+If you are using the Codeforces VJudge bot, also allow Docker containers to reach the host's cf-submit service:
+
+```bash
+# Allow Docker bridge networks to reach cf-submit on port 8003
+sudo ufw allow from 172.16.0.0/12 to any port 8003 proto tcp
+```
+
 #### 4d. Clone AIOJ
 
 ```bash
@@ -504,6 +511,7 @@ When deployed behind Caddy, Nginx, or NPM, only these ports should be open to th
 | 81 | NPM Admin (optional) | ⚠️ Setup only | Nginx Proxy Manager UI — close after setup, use SSH tunnel instead |
 | 5001 | Dockge (optional) | ⚠️ Setup only | Docker management UI — close after setup, use SSH tunnel instead |
 | 8080 | Backend (Go) | ❌ No | Internal API |
+| 8003 | cf-submit (host) | ❌ No | CloakBrowser Codeforces automation — only accessible from Docker containers |
 | 5432 | PostgreSQL | ❌ No | Database |
 | 6379 | Redis | ❌ No | Job queue |
 | 5050 | go-judge | ❌ No | Code sandbox |
@@ -524,19 +532,330 @@ When deployed behind Caddy, Nginx, or NPM, only these ports should be open to th
 | "SSL certificate error" after domain change | Old cert cached | Delete the cert in NPM (SSL Certificates tab), request new one. Or for Caddy: `docker compose stop caddy && docker compose rm caddy`. |
 | Migrations fail | Database not ready | Wait longer after `docker compose up`. Check: `docker compose logs postgres`. |
 | 502 Bad Gateway | Backend container not running | `docker compose ps` — all services should be "Up". |
+| Codeforces submission shows SE (System Error) | cf-submit not reachable, bot locked, or Cloudflare blocked | See [Codeforces VJudge Bot Debugging](#debugging-cf-submit) section below. Common causes: missing proxy, wrong CF_SUBMIT_URL, bot account password empty, firewall blocking Docker→host traffic. |
+| `dial tcp 172.x.x.x:8003: i/o timeout` | UFW blocking Docker→host traffic | `sudo ufw allow from 172.16.0.0/12 to any port 8003 proto tcp && sudo ufw reload` |
+| `lookup host.docker.internal: no such host` | `extra_hosts` not configured | Ensure `extra_hosts: ["host.docker.internal:host-gateway"]` is present in `docker-compose.yml` under `backend` and `judge-worker`. |
+| `login form not found. CF blocked: False` | Proxy not working or JS rendering failed | Verify proxy: `curl -s localhost:8003/health` should show `"proxy":true`. Clear stale browser profile: `rm -rf /tmp/cb-profile`. Check screenshots in `/tmp/cf-screenshots/`. |
+| `login form not found. CF blocked: True` | Cloudflare challenge page returned | Your proxy is not working. Codeforces sees your real (datacenter) IP. Get a residential proxy. |
+| `cf-submit error: crash: ... ImportError: geoip2 is required` | `cloakbrowser[geoip]` not installed | Reinstall: `pip install "cloakbrowser[geoip]" --break-system-packages` |
 
 ---
 
 ## Codeforces VJudge Bot (cf-submit)
 
-The cf-submit service uses CloakBrowser to log into Codeforces and submit solutions on behalf of a bot account. Because Cloudflare's managed challenge blocks datacenter IPs (including Docker/VPS), **the service must run on a machine with a residential IP** — either your local machine or a VPS behind a residential proxy.
+AIOJ can submit solutions to Codeforces on behalf of bot accounts. The `cf-submit` service runs a headful Chromium browser via CloakBrowser (Playwright-based) to bypass Cloudflare's bot detection and interact with Codeforces' login and submission pages.
 
-### macOS (local development)
+**Cloudflare blocks datacenter IPs.** On a VPS (AWS, DigitalOcean, Hetzner, etc.) you MUST route through a residential proxy. Without a proxy, Codeforces will return a "Just a moment..." Cloudflare challenge page instead of the login form.
+
+### How It Works
+
+```
+User submits to CF problem
+       │
+       ▼
+AIOJ Backend → POST /submit → cf-submit service
+       │
+       ▼
+CloakBrowser (headful Chromium) → Codeforces.com
+       │
+       ▼
+Returns submission ID → Backend polls CF API for verdict
+```
+
+### Architecture Options
+
+You can run `cf-submit` either:
+
+| Option | Setup | Default Port | Use When |
+|--------|-------|------|----------|
+| **systemd service** on host | `systemctl` | `8003` | Best for simplicity — runs Python directly on the host, no Docker overhead |
+| **Docker container** | `docker compose` | `8002/8003` | Runs inside Docker network, no systemd needed |
+
+**Recommended: systemd service on host (port 8003)**. It avoids Docker networking complexity and page-rendering issues inside containers.
+
+---
+
+### Environment Variables
+
+| Variable | Used By | Purpose |
+|----------|---------|---------|
+| `CF_PROXY` | cf-submit (Python) | Residential proxy URL (`http://user:pass@host:port` or `socks5://user:pass@host:port`). **Required on VPS.** |
+| `CF_SUBMIT_URL` | Backend (Go) | Override the cf-submit base URL. Default: `http://host.docker.internal:8003` |
+| `PORT` | cf-submit (Python) | Listen port for the FastAPI server. Default: `8002` |
+
+---
+
+### Option A: systemd Service on Host (Recommended)
+
+The cf-submit service runs as a systemd unit directly on the VPS host, listening on port 8003. The Docker backend container reaches it via `host.docker.internal:8003`.
+
+#### 1. Install Dependencies
+
+```bash
+# Install Python packages (use --break-system-packages on Ubuntu 24.04+)
+pip install "cloakbrowser[geoip]" fastapi uvicorn requests --break-system-packages
+
+# Install Chromium runtime deps and fonts
+# Ubuntu 24.04 (t64 suffix):
+sudo apt-get install -y xvfb \
+    libglib2.0-0t64 libgobject-2.0-0 libnspr4 libnss3 \
+    libatk1.0-0t64 libatk-bridge2.0-0t64 libcups2t64 libxkbcommon0 \
+    libatspi2.0-0t64 libxcomposite1 libxdamage1 libxfixes3 \
+    libcairo2 libpango-1.0-0 libasound2t64 \
+    fonts-noto-color-emoji fonts-freefont-ttf fonts-unifont
+
+# Ubuntu 22.04:
+# sudo apt-get install -y xvfb \
+#     libglib2.0-0 libgobject-2.0-0 libnspr4 libnss3 \
+#     libatk1.0-0 libatk-bridge2.0-0 libcups2 libxkbcommon0 \
+#     libatspi2.0-0 libxcomposite1 libxdamage1 libxfixes3 \
+#     libcairo2 libpango-1.0-0 libasound2 \
+#     fonts-noto-color-emoji fonts-freefont-ttf fonts-unifont
+
+# Install Chromium browser binary
+python3 -m cloakbrowser install
+```
+
+#### 2. Configure the Proxy
+
+Edit the systemd service file before creating it if using a proxy:
+```bash
+# Edit the Environment line in the service file below to include:
+# Environment=CF_PROXY=http://user:pass@residential-proxy-host:port
+```
+
+#### 3. Create the systemd Service
+
+```bash
+sudo nano /etc/systemd/system/cf-submit.service
+```
+
+```ini
+[Unit]
+Description=AIOJ cf-submit service
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/aioj/deploy/cf-submit
+ExecStartPre=/bin/bash -c 'rm -f /tmp/.X99-lock && Xvfb :99 -screen 0 1920x1080x24 -ac &'
+ExecStart=/usr/bin/python3 server.py
+Environment=PORT=8003
+Environment=DISPLAY=:99
+Environment=CF_PROXY=http://user:pass@residential-proxy-host:port
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Start it:
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now cf-submit
+sudo systemctl status cf-submit
+```
+
+#### 4. Configure UFW (Firewall)
+
+Docker containers use a private bridge network. The backend container must reach the host's port 8003. Allow Docker-originated traffic:
+
+```bash
+sudo ufw allow from 172.16.0.0/12 to any port 8003 proto tcp
+sudo ufw reload
+```
+
+> `172.16.0.0/12` covers all Docker bridge subnets (`172.17.x.x` through `172.31.x.x`).
+
+#### 5. Configure Docker to Reach the Host
+
+The backend container uses `host.docker.internal` to reach the host. Docker Compose needs `extra_hosts` for this to resolve on Linux. The default `docker-compose.yml` already includes this:
+
+```yaml
+backend:
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+```
+
+#### 6. Verify
+
+```bash
+# Health check (confirms service is up and proxy is loaded)
+curl -s http://localhost:8003/health
+# → {"status":"ok","proxy":true}
+
+# Test login directly (replace with your credentials)
+curl -s -X POST http://localhost:8003/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"YOUR_BOT_HANDLE","password":"YOUR_BOT_PASSWORD"}'
+# → {"status":"ok","message":"login successful"}
+
+# Test reachability from inside the Docker backend container
+docker compose exec backend sh -c "wget -qO- http://host.docker.internal:8003/health 2>&1"
+```
+
+---
+
+### Option B: Docker Container
+
+The `cf-submit` Docker container runs with `network_mode: host` to avoid Docker bridge networking issues. It binds directly to the host's port 8003.
+
+#### 1. Configure `.env`
+
+```bash
+# In /opt/aioj/.env
+CF_PROXY=http://user:pass@residential-proxy-host:port
+CF_SUBMIT_URL=http://host.docker.internal:8003   # or omit (default)
+```
+
+#### 2. Start the Container
+
+```bash
+docker compose up -d --build cf-submit
+docker compose logs cf-submit --tail 20
+```
+
+#### 3. Stop the systemd Service (If Running)
+
+```bash
+sudo systemctl stop cf-submit
+sudo systemctl disable cf-submit
+```
+
+---
+
+### Setting Up a Bot Account
+
+1. Log into AIOJ as admin.
+2. Go to **Admin Panel → Bot Accounts**.
+3. Add a new Codeforces bot account:
+   - **Platform:** `codeforces`
+   - **Handle:** The Codeforces username (e.g., `JUST_Analytics`)
+   - **Password:** The Codeforces account password
+   - **Status:** `active`
+4. The backend will use the first active bot account for submissions.
+
+Alternatively, insert directly into PostgreSQL:
+```bash
+docker compose exec postgres psql -U aioj -d aioj -c "
+  INSERT INTO bot_accounts (id, platform, platform_user, platform_pass, status, consecutive_failures)
+  VALUES (gen_random_uuid(), 'codeforces', 'YOUR_HANDLE', 'YOUR_PASSWORD', 'active', 0);
+"
+```
+
+#### Resetting a Locked Bot Account
+
+After 3 consecutive failures, the bot is skipped. Reset it:
+```bash
+docker compose exec postgres psql -U aioj -d aioj -c "
+  UPDATE bot_accounts SET consecutive_failures = 0, status = 'active';
+"
+```
+
+---
+
+### Debugging cf-submit
+
+#### Check Service Health
+
+```bash
+curl -s http://localhost:8003/health
+# {"status":"ok","proxy":false}  → proxy NOT configured!
+# {"status":"ok","proxy":true}   → proxy is active
+```
+
+#### Check Backend Logs for Submission Issues
+
+```bash
+docker compose logs backend --tail 50 -f
+```
+
+Key log messages and what they mean:
+
+| Log Message | Meaning |
+|-------------|---------|
+| `async submit: submitting to remote OJ` | Backend picked up the submission, routing to vjudge |
+| `cf-submit failed, falling back to direct POST` | cf-submit service errored; falling back to direct HTTP (will fail on VPS) |
+| `dial tcp ... i/o timeout` | Network issue — backend container can't reach cf-submit (check UFW) |
+| `lookup host.docker.internal: no such host` | `extra_hosts` not configured in docker-compose.yml |
+| `login form not found. CF blocked: False` | Browser rendered page but inputs didn't appear (proxy or rendering issue) |
+| `CF blocked: True` | Cloudflare challenge page returned (proxy not working or missing) |
+| `vjudge submitted via bot` | **Success!** Submission sent to Codeforces |
+| `all bots failed` | All bot accounts exhausted or locked |
+
+#### Check cf-submit Logs
+
+```bash
+# systemd service
+sudo journalctl -u cf-submit -n 50 --no-pager -f
+
+# Docker container
+docker compose logs cf-submit --tail 50 -f
+```
+
+#### View Browser Screenshots
+
+CloakBrowser captures screenshots at each step. They're saved to `/tmp/cf-screenshots/`:
+
+```bash
+ls -la /tmp/cf-screenshots/
+```
+
+| Screenshot | Captured When |
+|------------|---------------|
+| `01_enter.png` | After navigating to login page |
+| `02_after_login.png` | After submitting login credentials |
+| `03_submit.png` | After navigating to submit page |
+| `04_before_submit.png` | Before clicking submit |
+| `05_after_submit.png` | After clicking submit |
+| `99_no_form.png` | Login form not found (Cloudflare or render issue) |
+| `99_login_failed.png` | Login credentials rejected |
+| `99_no_submit_form.png` | Submit form not found |
+
+Download them to inspect visually:
+```bash
+# From your LOCAL machine:
+scp -r root@YOUR_VPS_IP:/tmp/cf-screenshots/ /tmp/
+```
+
+#### Run a Manual Browser Test
+
+To test if CloakBrowser can log into Codeforces directly (bypassing the Go backend):
+
+```bash
+DISPLAY=:99 python3 -c "
+import time
+from cloakbrowser import launch_persistent_context
+kw = dict(headless=False, humanize=True, args=['--no-sandbox','--disable-dev-shm-usage'])
+ctx = launch_persistent_context('/tmp/cb-profile', **kw)
+page = ctx.pages[0]
+page.goto('https://codeforces.com/enter', timeout=60000)
+time.sleep(5)
+print('Page title:', page.title())
+print('Login form found:', page.locator('#handleOrEmail').count() > 0)
+ctx.close()
+"
+```
+
+### Proxy Format
+
+`CF_PROXY` accepts HTTP and SOCKS5 proxies:
+
+```
+CF_PROXY=http://user:pass@host:port
+CF_PROXY=socks5://user:pass@host:port
+```
+
+When `CF_PROXY` is set, `geoip=True` is automatically enabled — CloakBrowser will match the browser's timezone and locale to the proxy's exit IP, making the session look more natural. This requires `cloakbrowser[geoip]` to be installed.
+
+### macOS (Local Development)
 
 Run the service directly on your Mac so CloakBrowser uses your residential IP:
 
 ```bash
-pip install cloakbrowser fastapi uvicorn requests
+pip install "cloakbrowser[geoip]" fastapi uvicorn requests
 
 # Start on port 8003 (Docker backend reaches it via host.docker.internal:8003)
 PORT=8003 python3 deploy/cf-submit/server.py
@@ -556,7 +875,6 @@ cat > ~/Library/LaunchAgents/com.aioj.cf-submit.plist << 'EOF'
     <key>ProgramArguments</key>
     <array>
         <string>/usr/bin/python3</string>
-        <!-- ⚠️ Replace /opt/aioj with your actual AIOJ path below -->
         <string>/opt/aioj/deploy/cf-submit/server.py</string>
     </array>
     <key>EnvironmentVariables</key>
@@ -576,93 +894,7 @@ cat > ~/Library/LaunchAgents/com.aioj.cf-submit.plist << 'EOF'
 </plist>
 EOF
 
-# ⚠️ After creating the file, edit it and replace /opt/aioj with your actual path:
-# nano ~/Library/LaunchAgents/com.aioj.cf-submit.plist
-
 launchctl load ~/Library/LaunchAgents/com.aioj.cf-submit.plist
 ```
 
-Make sure `cmd/aioj/main.go` points to `http://host.docker.internal:8003`.
-
-### Linux VPS (production)
-
-On a VPS, Cloudflare blocks the datacenter IP. Set `CF_PROXY` to a residential proxy:
-
-```bash
-# On Ubuntu 24.04+ use --break-system-packages (pip is externally managed)
-pip install cloakbrowser fastapi uvicorn requests --break-system-packages
-# On older Ubuntu (22.04), omit the flag:
-# pip install cloakbrowser fastapi uvicorn requests
-
-# Install Chromium runtime deps and fonts
-# Ubuntu 24.04 package names (t64 suffix):
-sudo apt-get install -y xvfb \
-    libglib2.0-0t64 libgobject-2.0-0 libnspr4 libnss3 \
-    libatk1.0-0t64 libatk-bridge2.0-0t64 libcups2t64 libxkbcommon0 \
-    libatspi2.0-0t64 libxcomposite1 libxdamage1 libxfixes3 \
-    libcairo2 libpango-1.0-0 libasound2t64 \
-    fonts-noto-color-emoji fonts-freefont-ttf fonts-unifont
-
-# For Ubuntu 22.04, use instead:
-# sudo apt-get install -y xvfb \
-#     libglib2.0-0 libgobject-2.0-0 libnspr4 libnss3 \
-#     libatk1.0-0 libatk-bridge2.0-0 libcups2 libxkbcommon0 \
-#     libatspi2.0-0 libxcomposite1 libxdamage1 libxfixes3 \
-#     libcairo2 libpango-1.0-0 libasound2 \
-#     fonts-noto-color-emoji fonts-freefont-ttf fonts-unifont
-
-python -m cloakbrowser install
-```
-
-Create a systemd service at `/etc/systemd/system/cf-submit.service`:
-
-> ⚠️ **Replace `/opt/aioj` below** with the actual path where you cloned AIOJ. Use the **exact same case** — Linux paths are case-sensitive.
-
-```ini
-[Unit]
-Description=AIOJ cf-submit service
-After=network.target
-
-[Service]
-Type=simple
-# Change User to whoever owns the AIOJ directory (run `whoami` to check)
-User=root
-WorkingDirectory=/opt/aioj/deploy/cf-submit
-ExecStartPre=/bin/bash -c 'rm -f /tmp/.X99-lock && Xvfb :99 -screen 0 1920x1080x24 -ac &'
-ExecStart=/usr/bin/python3 server.py
-Environment=PORT=8003
-Environment=DISPLAY=:99
-# Uncomment and set if using a residential proxy:
-# Environment=CF_PROXY=http://user:pass@residential-proxy-host:port
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-```
-
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable cf-submit
-sudo systemctl start cf-submit
-sudo systemctl status cf-submit
-```
-
-Point the backend at `http://localhost:8003` (same machine) or update `CF_SUBMIT_URL` if running separately.
-
-### Proxy format
-
-`CF_PROXY` accepts HTTP and SOCKS5 proxies:
-
-```
-CF_PROXY=http://user:pass@host:port
-CF_PROXY=socks5://user:pass@host:port
-```
-
-When `CF_PROXY` is set, `geoip=True` is automatically enabled — CloakBrowser will match the browser's timezone and locale to the proxy's exit IP, making the session look more natural.
-
-Verify the proxy is active:
-```bash
-curl http://localhost:8003/health
-# {"status":"ok","proxy":true}
-```
+Make sure `CF_SUBMIT_URL` is set to `http://host.docker.internal:8003` (the default).
