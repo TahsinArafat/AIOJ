@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y \
     && fc-cache -f \
     && rm -rf /var/lib/apt/lists/*
 
-RUN pip install --no-cache-dir cloakbrowser fastapi uvicorn requests
+RUN pip install --no-cache-dir cloakbrowser[geoip] fastapi uvicorn requests
 
 RUN python -m cloakbrowser install
 
