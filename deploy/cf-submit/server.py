@@ -117,7 +117,7 @@ try:
         sys.exit(0)
 
     if op == "submit":
-        page.goto("https://codeforces.com/problemset/submit", wait_until="networkidle", timeout=120000)
+        page.goto("https://codeforces.com/problemset/submit", wait_until="load", timeout=60000)
         ss(ctx, "03_submit.png")
 
         if "enter" in page.url.lower():
