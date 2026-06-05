@@ -406,7 +406,7 @@ export default function ProblemDetail() {
     }
 
     const role = decodeRole()
-    const canExport = role === 'admin' || role === 'teacher'
+    const canExport = role === 'admin' || role === 'setter'
 
     if (!problem) {
         return <div className="text-center py-20 text-gray-400 dark:text-gray-500">Loading...</div>
@@ -624,7 +624,7 @@ export default function ProblemDetail() {
                     <div className="space-y-4">
                         {(() => {
                             const role = decodeRole()
-                            const isPrivileged = !!getAccessToken() && (role === 'admin' || role === 'teacher')
+                            const isPrivileged = !!getAccessToken() && (role === 'admin' || role === 'setter')
                             if (isPrivileged) {
                                 return (
                                     <div className="flex justify-end">

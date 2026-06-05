@@ -31,7 +31,7 @@ export default function SetterAppsPanel() {
                 <table className="w-full text-sm">
                     <thead className="bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-xs uppercase">
                         <tr>
-                            <th className="px-4 py-3 text-left">Applicant ID</th>
+                            <th className="px-4 py-3 text-left">Applicant</th>
                             <th className="px-4 py-3 text-left">Reason</th>
                             <th className="px-4 py-3 text-left">Status</th>
                             <th className="px-4 py-3 text-left">Applied</th>
@@ -41,7 +41,7 @@ export default function SetterAppsPanel() {
                     <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                         {apps.map(a => (
                             <tr key={a.user_id}>
-                                <td className="px-4 py-3 font-mono text-xs">{a.user_id.substring(0, 8)}...</td>
+                                <td className="px-4 py-3 font-semibold">{a.username}</td>
                                 <td className="px-4 py-3 max-w-xs truncate" title={a.reason}>{a.reason}</td>
                                 <td className="px-4 py-3">
                                     <span className={`px-2 py-1 rounded text-xs font-medium ${

@@ -39,9 +39,9 @@ func (h *AdminHandler) UpdateUserRole(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid body", http.StatusBadRequest)
 		return
 	}
-	validRoles := map[string]bool{"admin": true, "teacher": true, "user": true, "bot": true}
+	validRoles := map[string]bool{"admin": true, "setter": true, "user": true, "bot": true}
 	if !validRoles[req.Role] {
-		http.Error(w, "invalid role: must be admin, teacher, user, or bot", http.StatusBadRequest)
+		http.Error(w, "invalid role: must be admin, setter, user, or bot", http.StatusBadRequest)
 		return
 	}
 	if err := h.userStore.UpdateRole(r.Context(), userID, req.Role); err != nil {
@@ -77,7 +77,7 @@ func (h *AdminHandler) ReviewSetterApp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.Status == "approved" {
-		if err := h.userStore.UpdateRole(r.Context(), userID, "teacher"); err != nil {
+		if err := h.userStore.UpdateRole(r.Context(), userID, "setter"); err != nil {
 			http.Error(w, "failed to update user role", http.StatusInternalServerError)
 			return
 		}

@@ -73,7 +73,7 @@ func (h *ContestHandler) Create(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
-	if claims.Role != "admin" && claims.Role != "teacher" {
+	if claims.Role != "admin" && claims.Role != "setter" {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
@@ -642,7 +642,7 @@ func (h *ContestHandler) CreateEducational(w http.ResponseWriter, r *http.Reques
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
-	if claims.Role != "admin" && claims.Role != "teacher" {
+	if claims.Role != "admin" && claims.Role != "setter" {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}

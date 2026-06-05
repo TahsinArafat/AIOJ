@@ -21,7 +21,10 @@ func (s *SetterStore) CreateApplication(ctx context.Context, userID, reason stri
 
 func (s *SetterStore) ListApplications(ctx context.Context) ([]model.SetterApplication, error) {
 	rows, err := s.db.QueryContext(ctx,
-		"SELECT user_id, status, reason, created_at FROM setter_applications ORDER BY created_at DESC")
+		`SELECT sa.user_id, u.username, sa.status, sa.reason, sa.created_at 
+		 FROM setter_applications sa 
+		 JOIN users u ON u.id = sa.user_id 
+		 ORDER BY sa.created_at DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -29,7 +32,7 @@ func (s *SetterStore) ListApplications(ctx context.Context) ([]model.SetterAppli
 	var items []model.SetterApplication
 	for rows.Next() {
 		var a model.SetterApplication
-		if err := rows.Scan(&a.UserID, &a.Status, &a.Reason, &a.CreatedAt); err != nil {
+		if err := rows.Scan(&a.UserID, &a.Username, &a.Status, &a.Reason, &a.CreatedAt); err != nil {
 			return nil, err
 		}
 		items = append(items, a)
@@ -48,8 +51,11 @@ func (s *SetterStore) UpdateApplicationStatus(ctx context.Context, userID, statu
 func (s *SetterStore) GetApplication(ctx context.Context, userID string) (*model.SetterApplication, error) {
 	var a model.SetterApplication
 	err := s.db.QueryRowContext(ctx,
-		"SELECT user_id, status, reason, created_at FROM setter_applications WHERE user_id=$1",
-		userID).Scan(&a.UserID, &a.Status, &a.Reason, &a.CreatedAt)
+		`SELECT sa.user_id, u.username, sa.status, sa.reason, sa.created_at 
+		 FROM setter_applications sa 
+		 JOIN users u ON u.id = sa.user_id 
+		 WHERE sa.user_id=$1`,
+		userID).Scan(&a.UserID, &a.Username, &a.Status, &a.Reason, &a.CreatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}

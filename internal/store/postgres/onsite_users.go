@@ -69,7 +69,7 @@ func (s *OnsiteUserStoreImpl) GetByUsername(ctx context.Context, username string
 	var u model.OnsiteBatchUser
 	err := s.db.QueryRowContext(ctx,
 		`SELECT id, contest_id, team_name, institution, username, password_hash, is_used, used_by, created_at
-		 FROM onsite_batch_users WHERE username = $1`,
+		 FROM onsite_batch_users WHERE LOWER(username) = LOWER($1)`,
 		username,
 	).Scan(&u.ID, &u.ContestID, &u.TeamName, &u.Institution, &u.Username, &u.PasswordHash, &u.IsUsed, &u.UsedBy, &u.CreatedAt)
 	if err == sql.ErrNoRows {

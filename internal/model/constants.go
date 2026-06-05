@@ -3,7 +3,7 @@ package model
 // User roles — must match CHECK constraint in 000001_init.up.sql.
 const (
 	RoleAdmin   = "admin"
-	RoleTeacher = "teacher"
+	RoleSetter = "setter"
 	RoleUser    = "user"
 	RoleBot     = "bot"
 )

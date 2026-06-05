@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
+import SetterApplication from '../components/SetterApplication'
 
 function decodeRole(): string | null {
     const token = localStorage.getItem('access_token')
@@ -174,6 +175,19 @@ export default function SetterPanel() {
 
     const role = decodeRole()
     const isAdmin = role === 'admin'
+    const isSetter = role === 'setter' || isAdmin
+
+    if (!isSetter) {
+        return (
+            <div className="max-w-md mx-auto mt-10 p-6 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm">
+                <h2 className="text-xl font-bold mb-2 text-gray-900 dark:text-gray-100">Become a Problem Setter</h2>
+                <p className="text-gray-600 dark:text-gray-400 text-sm mb-6">
+                    Problem setters can create problems and host contests on AIOJ. Request access below by providing a reason.
+                </p>
+                <SetterApplication />
+            </div>
+        )
+    }
 
     return (
         <div>

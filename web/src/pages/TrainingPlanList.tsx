@@ -15,7 +15,7 @@ export default function TrainingPlanList() {
 		if (token) {
 			try {
 				const payload = JSON.parse(atob(token.split('.')[1]))
-				setIsAdmin(payload.role === 'admin' || payload.role === 'teacher')
+				setIsAdmin(payload.role === 'admin' || payload.role === 'setter')
 			} catch {}
 			api.organizations.my().then(d => {
 				setMyOrgs(d.data || [])

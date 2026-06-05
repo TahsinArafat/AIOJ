@@ -69,7 +69,6 @@ export default function Navbar() {
     const loggedIn = !!getAccessToken()
     const role = decodeRole()
     const isAdmin = role === 'admin'
-    const isSetter = role === 'teacher' || isAdmin
     const isContestant = role === 'contestant'
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
     const { theme, toggleTheme } = useTheme()
@@ -118,12 +117,6 @@ export default function Navbar() {
                                 <span>Admin</span>
                             </Link>
                         )}
-                        {isSetter && (
-                            <Link to="/setter" className="flex items-center gap-1.5 text-sm font-medium text-orange-600 dark:text-orange-400 hover:text-orange-800 dark:hover:text-orange-300 transition-colors">
-                                <FileCode className="w-4 h-4" />
-                                <span>Setter</span>
-                            </Link>
-                        )}
                     </div>
                 </div>
 
@@ -145,6 +138,7 @@ export default function Navbar() {
                                 <NavLink to="/profile" icon={User}>Profile</NavLink>
                                 <NavLink to="/notifications" icon={Bell}>Notifications</NavLink>
                                 <NavLink to="/submissions" icon={FileCode}>My Submissions</NavLink>
+                                <NavLink to="/setter" icon={FileCode}>Setter Workspace</NavLink>
                                 {!isContestant && (
                                     <>
                                 <NavLink to="/settings/api" icon={Key}>API Keys</NavLink>
@@ -231,7 +225,7 @@ export default function Navbar() {
                             </Link>
                         </>
                     )}
-                    {isSetter && (
+                    {loggedIn && !isContestant && (
                         <Link to="/setter" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2 text-sm font-semibold text-orange-600 dark:text-orange-400 hover:text-orange-800 dark:hover:text-orange-300 py-2 px-3 rounded-lg hover:bg-orange-50 dark:hover:bg-orange-900/20">
                             <FileCode className="w-4 h-4" /> Setter Workspace
                         </Link>

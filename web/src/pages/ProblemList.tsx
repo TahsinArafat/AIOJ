@@ -111,7 +111,7 @@ export default function ProblemList() {
 
     const hasActiveFilters = difficulty || selectedTags.length > 0 || search || source || rating || sortBy !== 'newest'
     const role = decodeRole()
-    const canImport = role === 'admin' || role === 'teacher'
+    const canImport = role === 'admin' || role === 'setter'
 
     const handleImport = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]

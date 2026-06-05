@@ -50,7 +50,7 @@ export default function UsersPanel() {
                                         disabled={u.username === 'admin'}
                                     >
                                         <option value="user">User</option>
-                                        <option value="teacher">Teacher (Setter)</option>
+                                        <option value="setter">Problem Setter</option>
                                         <option value="admin">Admin</option>
                                         <option value="bot">Bot</option>
                                     </select>

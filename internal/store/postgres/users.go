@@ -25,7 +25,17 @@ func (s *UserStore) GetByID(ctx context.Context, id string) (*model.User, error)
 }
 
 func (s *UserStore) GetByUsername(ctx context.Context, username string) (*model.User, error) {
-	return s.getBy(ctx, "username", username)
+	var u model.User
+	err := s.db.QueryRowContext(ctx,
+		`SELECT id,username,email,password_hash,role,is_bot,created_at,updated_at FROM users WHERE LOWER(username)=LOWER($1)`,
+		username).Scan(&u.ID, &u.Username, &u.Email, &u.PasswordHash, &u.Role, &u.IsBot, &u.CreatedAt, &u.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &u, nil
 }
 
 func (s *UserStore) GetByEmail(ctx context.Context, email string) (*model.User, error) {
@@ -80,7 +90,7 @@ func (s *UserStore) GetPublicProfile(ctx context.Context, username string) (*mod
 			COALESCE(up.show_tags, true)
 		FROM users u
 		LEFT JOIN user_profiles up ON up.user_id = u.id
-		WHERE u.username = $1
+		WHERE LOWER(u.username) = LOWER($1)
 	`, username).Scan(
 		&p.ID, &p.Username, &p.Email,
 		&p.Rating, &p.CreatedAt,

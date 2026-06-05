@@ -37,7 +37,7 @@ func (h *ImportHandler) ImportCodeforces(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
-	if claims.Role != "admin" && claims.Role != "teacher" {
+	if claims.Role != "admin" && claims.Role != "setter" {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
@@ -114,7 +114,7 @@ func (h *ImportHandler) ImportCSES(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
-	if claims.Role != "admin" && claims.Role != "teacher" {
+	if claims.Role != "admin" && claims.Role != "setter" {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
@@ -184,7 +184,7 @@ func (h *ImportHandler) ImportAtCoder(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
-	if claims.Role != "admin" && claims.Role != "teacher" {
+	if claims.Role != "admin" && claims.Role != "setter" {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
@@ -259,7 +259,7 @@ func (h *ImportHandler) ImportToph(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
-	if claims.Role != "admin" && claims.Role != "teacher" {
+	if claims.Role != "admin" && claims.Role != "setter" {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
@@ -333,7 +333,7 @@ func (h *ImportHandler) ImportQOJ(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
-	if claims.Role != "admin" && claims.Role != "teacher" {
+	if claims.Role != "admin" && claims.Role != "setter" {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
@@ -407,7 +407,7 @@ func (h *ImportHandler) Import(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
-	if claims.Role != "admin" && claims.Role != "teacher" {
+	if claims.Role != "admin" && claims.Role != "setter" {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}

@@ -12,7 +12,7 @@ export default function OrganizationList() {
 		if (token) {
 			try {
 				const payload = JSON.parse(atob(token.split('.')[1]))
-				setIsAdmin(payload.role === 'admin' || payload.role === 'teacher')
+				setIsAdmin(payload.role === 'admin' || payload.role === 'setter')
 			} catch {}
 		}
 		api.organizations.list(0, 50)

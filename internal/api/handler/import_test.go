@@ -56,8 +56,8 @@ func TestImportAtCoder_Authorization(t *testing.T) {
 			wantStatus: http.StatusCreated,
 		},
 		{
-			name:       "teacher role - allowed",
-			claims:     &auth.Claims{UserID: "teacher1", Role: "teacher"},
+			name:       "setter role - allowed",
+			claims:     &auth.Claims{UserID: "setter1", Role: "setter"},
 			wantStatus: http.StatusCreated,
 		},
 	}
@@ -171,8 +171,8 @@ func TestImportToph_Authorization(t *testing.T) {
 			wantStatus: http.StatusCreated,
 		},
 		{
-			name:       "teacher role - allowed",
-			claims:     &auth.Claims{UserID: "teacher1", Role: "teacher"},
+			name:       "setter role - allowed",
+			claims:     &auth.Claims{UserID: "setter1", Role: "setter"},
 			wantStatus: http.StatusCreated,
 		},
 	}
@@ -275,8 +275,8 @@ func TestImportQOJ_Authorization(t *testing.T) {
 			wantStatus: http.StatusCreated,
 		},
 		{
-			name:       "teacher role - allowed",
-			claims:     &auth.Claims{UserID: "teacher1", Role: "teacher"},
+			name:       "setter role - allowed",
+			claims:     &auth.Claims{UserID: "setter1", Role: "setter"},
 			wantStatus: http.StatusCreated,
 		},
 	}

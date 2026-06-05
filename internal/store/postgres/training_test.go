@@ -10,7 +10,7 @@ import (
 )
 
 func TestTrainingPlanStore_LifeCycle(t *testing.T) {
-	dsn := "postgres://aioj:aioj_dev@localhost:5432/aioj?sslmode=disable"
+	dsn := "postgres://aioj:aioj_secret@localhost:5432/aioj?sslmode=disable"
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
 		t.Fatalf("failed to connect to database: %v", err)
@@ -119,7 +119,7 @@ func TestTrainingPlanStore_LifeCycle(t *testing.T) {
 }
 
 func TestTrainingPlanStore_AutoCompleteOnAC(t *testing.T) {
-	dsn := "postgres://aioj:aioj_dev@localhost:5432/aioj?sslmode=disable"
+	dsn := "postgres://aioj:aioj_secret@localhost:5432/aioj?sslmode=disable"
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {
 		t.Fatalf("failed to connect to database: %v", err)

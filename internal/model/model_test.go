@@ -213,7 +213,7 @@ func TestDivisionNames(t *testing.T) {
 
 func TestRoleConstants(t *testing.T) {
 	// These must match the DB CHECK constraint in 000001_init.up.sql
-	roles := []string{RoleAdmin, RoleTeacher, RoleUser, RoleBot}
+	roles := []string{RoleAdmin, RoleSetter, RoleUser, RoleBot}
 	for _, r := range roles {
 		if r == "" {
 			t.Errorf("role constant is empty string")

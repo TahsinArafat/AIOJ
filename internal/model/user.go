@@ -72,6 +72,7 @@ type PublicProfile struct {
 
 type SetterApplication struct {
 	UserID    string    `json:"user_id"`
+	Username  string    `json:"username"`
 	Status    string    `json:"status"`
 	Reason    string    `json:"reason"`
 	CreatedAt time.Time `json:"created_at"`
