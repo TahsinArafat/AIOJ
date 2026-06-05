@@ -83,7 +83,7 @@ try:
         ss(ctx, "01_enter.png")
 
         try:
-            page.wait_for_selector("#handleOrEmail", state="visible", timeout=60000)
+            page.wait_for_selector("#handleOrEmail", state="attached", timeout=60000)
         except:
             body = page.inner_text("body")
             ss(ctx, "99_no_form.png")
