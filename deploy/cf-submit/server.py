@@ -162,8 +162,9 @@ def _run_browser(op, proxy, *args):
 	cmd = [sys.executable, sp, op, PROFILE_DIR, SCREENSHOT_DIR, proxy] + list(args)
 	r = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
 	os.unlink(sp)
+	print(f"BROWSER stdout:\n{r.stdout}\nBROWSER stderr:\n{r.stderr}", flush=True)
 	if r.returncode != 0:
-		return {"error": f"crash: {r.stderr[-500:]}"}
+		return {"error": f"crash: {r.stderr[-500:]}", "stdout": r.stdout[-1000:]}
 	try:
 		last = r.stdout.strip().split("\n")[-1]
 		return json.loads(last)
