@@ -141,7 +141,7 @@ services:
       dockerfile: Dockerfile
     network_mode: host
     environment:
-      - FLARESOLVERR_URL=http://cf-bypass:8191
+      - PORT=8003
       - CF_PROXY=${CF_PROXY:-}
     restart: unless-stopped
 
