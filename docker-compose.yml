@@ -139,6 +139,7 @@ services:
       - "8002:8002"
     environment:
       - FLARESOLVERR_URL=http://cf-bypass:8191
+      - CF_PROXY=${CF_PROXY:-}
     depends_on:
       - cf-bypass
     restart: unless-stopped
