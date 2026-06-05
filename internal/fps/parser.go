@@ -18,15 +18,16 @@ func ParseXML(data []byte) ([]*model.Problem, error) {
 	var problems []*model.Problem
 	for _, p := range raw.Problems {
 		prob := &model.Problem{
-			Title:       p.Title,
-			Description: p.Description,
-			InputFormat: p.Input,
+			Title:        p.Title,
+			Description:  p.Description,
+			InputFormat:  p.Input,
 			OutputFormat: p.Output,
-			Hint:        p.Hint,
-			TimeLimit:   p.TimeLimit,
-			MemoryLimit: p.MemoryLimit * 1024, // MB to KB
-			Source:      p.Source,
-			Visible:     true,
+			Hint:         p.Hint,
+			TimeLimit:    p.TimeLimit,
+			MemoryLimit:  p.MemoryLimit * 1024, // MB to KB
+			Source:       p.Source,
+			Visible:      true,
+			Difficulty:   "easy",
 		}
 
 		// Map tags (comma-separated list to string array)

@@ -719,8 +719,9 @@ func (p *ProblemParser) ParseAtCoderProblem(ctx context.Context, contestID, task
 	}
 
 	prob := &model.Problem{
-		Source:   "atcoder",
-		RemoteID: contestID + "_" + taskID,
+		Source:     "atcoder",
+		RemoteID:   contestID + "_" + taskID,
+		Difficulty: "medium",
 	}
 
 	doc, err := html.Parse(strings.NewReader(body))
@@ -784,8 +785,9 @@ func (p *ProblemParser) ParseTophProblem(ctx context.Context, problemID string) 
 	}
 
 	prob := &model.Problem{
-		Source:   "toph",
-		RemoteID: problemID,
+		Source:     "toph",
+		RemoteID:   problemID,
+		Difficulty: "medium",
 	}
 
 	doc, err := html.Parse(strings.NewReader(body))
@@ -875,8 +877,9 @@ func (p *ProblemParser) ParseQOJProblem(ctx context.Context, problemID string) (
 	}
 
 	prob := &model.Problem{
-		Source:   "qoj",
-		RemoteID: problemID,
+		Source:     "qoj",
+		RemoteID:   problemID,
+		Difficulty: "medium",
 	}
 
 	doc, err := html.Parse(strings.NewReader(body))

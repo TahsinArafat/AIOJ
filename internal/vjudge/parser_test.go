@@ -70,6 +70,9 @@ func TestParser(t *testing.T) {
 		if prob.MemoryLimit != 1048576 {
 			t.Errorf("expected memory limit 1048576KB (1024MB), got %d", prob.MemoryLimit)
 		}
+		if prob.Difficulty != "medium" {
+			t.Errorf("expected difficulty 'medium', got %q", prob.Difficulty)
+		}
 	})
 
 	t.Run("ParseAtCoderProblem/FetchError", func(t *testing.T) {
@@ -157,6 +160,9 @@ func TestParser(t *testing.T) {
 		if prob.MemoryLimit != 262144 {
 			t.Errorf("expected memory limit 262144KB (256MB), got %d", prob.MemoryLimit)
 		}
+		if prob.Difficulty != "medium" {
+			t.Errorf("expected difficulty 'medium', got %q", prob.Difficulty)
+		}
 	})
 
 	t.Run("ParseTophProblem/FetchError", func(t *testing.T) {
@@ -219,6 +225,9 @@ func TestParser(t *testing.T) {
 		}
 		if prob.Description != "https://qoj.ac/problems/files/123/problem.pdf" {
 			t.Errorf("expected description to be PDF URL, got %q", prob.Description)
+		}
+		if prob.Difficulty != "medium" {
+			t.Errorf("expected difficulty 'medium', got %q", prob.Difficulty)
 		}
 	})
 

@@ -21,6 +21,9 @@ func NewProblemStore(db *sql.DB) *ProblemStore {
 }
 
 func (s *ProblemStore) Create(ctx context.Context, p *model.Problem) error {
+	if p.Difficulty == "" {
+		p.Difficulty = "easy"
+	}
 	if p.ScoringMode == "" {
 		p.ScoringMode = "complete"
 	}
@@ -144,6 +147,9 @@ func (s *ProblemStore) UpdateCounts(ctx context.Context, id string, addSubmissio
 }
 
 func (s *ProblemStore) Update(ctx context.Context, id string, p *model.Problem) error {
+	if p.Difficulty == "" {
+		p.Difficulty = "easy"
+	}
 	samples, err := json.Marshal(p.SampleCases)
 	if err != nil {
 		return fmt.Errorf("marshal sample_cases: %w", err)

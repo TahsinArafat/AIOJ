@@ -65,6 +65,9 @@ func TestParseXML_SingleProblem(t *testing.T) {
 	if !p.Visible {
 		t.Errorf("expected visible=true")
 	}
+	if p.Difficulty != "easy" {
+		t.Errorf("expected difficulty 'easy', got %q", p.Difficulty)
+	}
 
 	// Tags
 	if len(p.Tags) != 2 || p.Tags[0] != "math" || p.Tags[1] != "basic" {
