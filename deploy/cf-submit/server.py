@@ -67,18 +67,15 @@ ctx = launch_persistent_context(profile_dir, **launch_kwargs)
 try:
     page = ctx.new_page() if not ctx.pages else ctx.pages[0]
 
-    page.goto("https://codeforces.com/", wait_until="domcontentloaded")
-    time.sleep(4)
-    ss(ctx, "00_home.png")
-    logged_in = is_logged_in(page)
-    print(f"[info] home logged_in={logged_in}", flush=True)
+    page.goto("https://codeforces.com/enter", wait_until="networkidle", timeout=120000)
+    logged_in = is_logged_in(page) or page.url == "https://codeforces.com/"
+    print(f"[info] enter_page logged_in={logged_in} url={page.url}", flush=True)
 
     if not logged_in:
         if not username or not password:
             print(json.dumps({"error": "not logged in and no credentials"}))
             sys.exit(0)
 
-        page.goto("https://codeforces.com/enter", wait_until="networkidle", timeout=120000)
         ss(ctx, "01_enter.png")
 
         # Poll for login form - CF renders inputs dynamically via JS
