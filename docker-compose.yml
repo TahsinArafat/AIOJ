@@ -49,6 +49,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       LANG_DIR: /app/lang
       REDIS_URL: ${REDIS_URL:-redis:6379}
+      CF_SUBMIT_URL: ${CF_SUBMIT_URL:-http://host.docker.internal:8003}
     ports:
       - "8080:8080"
     volumes:
@@ -75,6 +76,7 @@ services:
       JUDGE_ENDPOINT: http://judge:5050
       REDIS_URL: ${REDIS_URL:-redis:6379}
       LANG_DIR: /app/lang
+      CF_SUBMIT_URL: ${CF_SUBMIT_URL:-http://host.docker.internal:8003}
     volumes:
       - testdata:/app/testdata
       - ./lang:/app/lang
