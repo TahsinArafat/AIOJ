@@ -78,17 +78,17 @@ try:
             print(json.dumps({"error": "not logged in and no credentials"}))
             sys.exit(0)
 
-        page.goto("https://codeforces.com/enter", wait_until="domcontentloaded")
+        page.goto("https://codeforces.com/enter", wait_until="networkidle", timeout=120000)
         ss(ctx, "01_enter.png")
 
         # Poll for login form - CF renders inputs dynamically via JS
         found = False
-        for attempt in range(20):
-            time.sleep(3)
+        for attempt in range(30):
             if page.locator("#handleOrEmail").count() > 0:
                 found = True
                 break
-            print(f"[info] polling for login form, attempt {attempt+1}/20", flush=True)
+            time.sleep(2)
+            print(f"[info] polling for login form, attempt {attempt+1}/30", flush=True)
 
         if not found:
             body = page.inner_text("body")
