@@ -79,17 +79,24 @@ try:
             sys.exit(0)
 
         page.goto("https://codeforces.com/enter", wait_until="domcontentloaded")
-        time.sleep(4)
         ss(ctx, "01_enter.png")
 
-        try:
-            page.wait_for_selector("#handleOrEmail", state="attached", timeout=60000)
-        except:
+        # Poll for login form - CF renders inputs dynamically via JS
+        found = False
+        for attempt in range(20):
+            time.sleep(3)
+            if page.locator("#handleOrEmail").count() > 0:
+                found = True
+                break
+            print(f"[info] polling for login form, attempt {attempt+1}/20", flush=True)
+
+        if not found:
             body = page.inner_text("body")
             ss(ctx, "99_no_form.png")
-            print(json.dumps({"error": f"login form not found. CF blocked: {'Performing security' in body}"}))
+            print(json.dumps({"error": f"login form not found after 60s. CF blocked: {'Performing security' in body}"}))
             sys.exit(0)
 
+        print("[info] login form found, filling credentials", flush=True)
         page.locator("#handleOrEmail").fill(username)
         page.locator("#password").fill(password)
         try:
