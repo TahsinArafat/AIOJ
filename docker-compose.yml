@@ -139,13 +139,10 @@ services:
     build:
       context: ./deploy/cf-submit
       dockerfile: Dockerfile
-    ports:
-      - "8002:8002"
+    network_mode: host
     environment:
       - FLARESOLVERR_URL=http://cf-bypass:8191
       - CF_PROXY=${CF_PROXY:-}
-    depends_on:
-      - cf-bypass
     restart: unless-stopped
 
   # =====================================================================
