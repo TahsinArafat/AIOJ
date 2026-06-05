@@ -108,7 +108,11 @@ func main() {
 	remoteLangStore := postgres.NewRemoteLanguageStore(db)
 	vjService := vjudge.NewService(submissionStore, problemStore, botAccountStore, remoteLangStore)
 
-	cfSubmit := vjudge.NewCFSubmitClient("http://host.docker.internal:8003")
+	cfSubmitURL := os.Getenv("CF_SUBMIT_URL")
+	if cfSubmitURL == "" {
+		cfSubmitURL = "http://host.docker.internal:8003"
+	}
+	cfSubmit := vjudge.NewCFSubmitClient(cfSubmitURL)
 
 	submissionH := handler.NewSubmissionHandler(submissionStore, problemStore, contestStore, judgeQueue, wsManager, execClient, cfg.LangDir, vjService)
 contestH := handler.NewContestHandler(contestStore, ratingStore, problemStore, userStore)
