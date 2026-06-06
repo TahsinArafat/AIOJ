@@ -100,10 +100,6 @@ export default function RemoteLanguagesPanel() {
         setDetecting(true)
         try {
             const result = await api.admin.remoteLanguages.detect(platform)
-            const all = [
-                ...result.matched.map((m, i) => ({ ...m, type: 'matched' as const, idx: i })),
-                ...result.unmatched.map((u, i) => ({ ...u, local_id: '', type: 'unmatched' as const, idx: result.matched.length + i })),
-            ]
             setDetectResults({ matched: result.matched, unmatched: result.unmatched })
             setSelectedForSave(new Set(result.matched.map((_, i) => i)))
             setShowDetectModal(true)
