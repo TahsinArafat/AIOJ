@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -112,7 +113,10 @@ func (h *RemoteLanguageHandler) AutoDetect(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	remoteLangs, err := h.vjudgeSvc.FetchLanguages(r.Context(), platform)
+	// Use background context — browser automation can take several minutes
+	// and r.Context() gets cancelled when nginx/proxy times out
+	ctx := context.Background()
+	remoteLangs, err := h.vjudgeSvc.FetchLanguages(ctx, platform)
 	if err != nil {
 		http.Error(w, "failed to fetch remote languages: "+err.Error(), http.StatusInternalServerError)
 		return
