@@ -114,6 +114,12 @@ func main() {
 	}
 	cfSubmit := vjudge.NewCFSubmitClient(cfSubmitURL)
 
+	atcoderSubmitURL := os.Getenv("ATCODER_SUBMIT_URL")
+	if atcoderSubmitURL == "" {
+		atcoderSubmitURL = "http://host.docker.internal:8004"
+	}
+	atcoderSubmit := vjudge.NewAtCoderSubmitClient(atcoderSubmitURL)
+
 	submissionH := handler.NewSubmissionHandler(submissionStore, problemStore, contestStore, judgeQueue, wsManager, execClient, cfg.LangDir, vjService)
 contestH := handler.NewContestHandler(contestStore, ratingStore, problemStore, userStore)
 	contestProblemH := handler.NewContestProblemHandler(contestStore, problemStore)
@@ -133,7 +139,7 @@ contestH := handler.NewContestHandler(contestStore, ratingStore, problemStore, u
 		case "codeforces":
 			vjService.RegisterBot(platform, vjudge.NewCodeforcesBotWithSubmit(vjCfg, cfSubmit))
 		case "atcoder":
-			vjService.RegisterBot(platform, vjudge.NewAtCoderBot(vjCfg))
+			vjService.RegisterBot(platform, vjudge.NewAtCoderBotWithSubmit(vjCfg, atcoderSubmit))
 		case "cses":
 			vjService.RegisterBot(platform, vjudge.NewCSESBotWithStore(vjCfg, remoteLangStore))
 		case "toph":
@@ -211,7 +217,7 @@ contestH := handler.NewContestHandler(contestStore, ratingStore, problemStore, u
 	settingsH := handler.NewAdminSystemSettingsHandler(settingsStore)
 	langAdminH := handler.NewAdminLanguageHandler(cfg.LangDir)
 
-	remoteLangH := handler.NewRemoteLanguageHandler(remoteLangStore)
+	remoteLangH := handler.NewRemoteLanguageHandler(remoteLangStore, vjService)
 	adminSubH := handler.NewAdminSubmissionHandler(submissionStore, problemStore, vjService)
 
 	router := api.NewRouter(api.Deps{

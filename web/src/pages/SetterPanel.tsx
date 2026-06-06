@@ -173,6 +173,29 @@ export default function SetterPanel() {
         setImporting(false)
     }
 
+    const handleXMLZIPImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+        setImporting(true)
+        setImportResults(null)
+        try {
+            const res = await api.problems.importProblem(file)
+            setImportResults({
+                success: [`XML/ZIP import successful (${res.slug})`],
+                failed: []
+            })
+            loadData()
+        } catch (err: any) {
+            setImportResults({
+                success: [],
+                failed: [`XML/ZIP import failed: ${err.message || err}`]
+            })
+        } finally {
+            setImporting(false)
+            e.target.value = ''
+        }
+    }
+
     const role = decodeRole()
     const isAdmin = role === 'admin'
     const isSetter = role === 'setter' || isAdmin
@@ -230,7 +253,26 @@ export default function SetterPanel() {
 
             {activeTab === 'import' ? (
                 <section className="space-y-6">
-                    <h2 className="text-lg font-semibold mb-3">Import Remote Problems</h2>
+                    <h2 className="text-lg font-semibold mb-3">Import Problems</h2>
+
+                    {/* XML/ZIP Import */}
+                    <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-5 shadow-sm">
+                        <h3 className="font-semibold text-sm mb-3">Import from XML/ZIP File</h3>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+                            Upload a problem package in XML or ZIP format. The problem will be created and you'll be redirected to it.
+                        </p>
+                        <label className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 cursor-pointer">
+                            Choose File (XML/ZIP)
+                            <input
+                                type="file"
+                                accept=".xml,.zip"
+                                className="hidden"
+                                onChange={handleXMLZIPImport}
+                            />
+                        </label>
+                    </div>
+
+                    <h3 className="font-semibold text-sm mt-6 mb-3">Import from Remote Platforms</h3>
                     
                     {importResults && (
                         <div className="border rounded-lg p-4 bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 space-y-3">

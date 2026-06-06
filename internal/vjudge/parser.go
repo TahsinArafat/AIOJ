@@ -236,7 +236,7 @@ func stripSampleCases(n *html.Node) {
 	var removeNodes []*html.Node
 	inExample := false
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		if c.Type == html.ElementNode && c.Data == "h1" && extractText(c) == "Example" {
+		if c.Type == html.ElementNode && c.Data == "h1" && strings.TrimSpace(extractText(c)) == "Example" {
 			inExample = true
 			removeNodes = append(removeNodes, c)
 		} else if inExample {
@@ -254,7 +254,7 @@ func stripConstraints(n *html.Node) {
 	var removeNodes []*html.Node
 	inConstraints := false
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		if c.Type == html.ElementNode && c.Data == "h1" && extractText(c) == "Constraints" {
+		if c.Type == html.ElementNode && c.Data == "h1" && strings.TrimSpace(extractText(c)) == "Constraints" {
 			inConstraints = true
 			removeNodes = append(removeNodes, c)
 		} else if inConstraints {
@@ -431,10 +431,30 @@ func extractText(n *html.Node) string {
 	var walk func(*html.Node)
 	walk = func(n *html.Node) {
 		if n.Type == html.TextNode {
-			sb.WriteString(n.Data)
+			text := n.Data
+			if sb.Len() > 0 {
+				text = strings.TrimLeft(text, "\n")
+			}
+			sb.WriteString(text)
+			return
 		}
-		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			walk(c)
+		if n.Type != html.ElementNode {
+			return
+		}
+		switch n.Data {
+		case "br":
+			sb.WriteString("\n")
+		case "div", "p", "li", "h1", "h2", "h3", "h4", "h5", "h6", "tr":
+			for c := n.FirstChild; c != nil; c = c.NextSibling {
+				walk(c)
+			}
+			if sb.Len() > 0 && !strings.HasSuffix(sb.String(), "\n") {
+				sb.WriteString("\n")
+			}
+		default:
+			for c := n.FirstChild; c != nil; c = c.NextSibling {
+				walk(c)
+			}
 		}
 	}
 	walk(n)
@@ -470,6 +490,7 @@ func shouldSkipNode(n *html.Node) bool {
 func renderNodeToMarkdown(n *html.Node) string {
 	var sb strings.Builder
 	var walk func(*html.Node)
+	inPre := false
 	walk = func(n *html.Node) {
 		if n.Type == html.TextNode {
 			sb.WriteString(n.Data)
@@ -510,12 +531,26 @@ func renderNodeToMarkdown(n *html.Node) string {
 				walk(c)
 			}
 			sb.WriteString("`")
+		case "var":
+			if inPre {
+				for c := n.FirstChild; c != nil; c = c.NextSibling {
+					walk(c)
+				}
+			} else {
+				sb.WriteString("$")
+				for c := n.FirstChild; c != nil; c = c.NextSibling {
+					walk(c)
+				}
+				sb.WriteString("$")
+			}
 		case "pre":
+			inPre = true
 			sb.WriteString("\n```\n")
 			for c := n.FirstChild; c != nil; c = c.NextSibling {
 				walk(c)
 			}
 			sb.WriteString("\n```\n")
+			inPre = false
 		case "ul":
 			sb.WriteString("\n")
 			for c := n.FirstChild; c != nil; c = c.NextSibling {
@@ -565,13 +600,15 @@ func renderNodeToMarkdown(n *html.Node) string {
 			sb.WriteString("\n")
 		case "hr":
 			sb.WriteString("\n---\n")
-		case "h1", "h2", "h3":
-			prefix := strings.Repeat("#", len(n.Data)-1)
+		case "h1", "h2":
+			prefix := strings.Repeat("#", len(n.Data))
 			sb.WriteString(fmt.Sprintf("\n%s ", prefix))
 			for c := n.FirstChild; c != nil; c = c.NextSibling {
 				walk(c)
 			}
 			sb.WriteString("\n\n")
+		case "h3", "h4", "h5", "h6":
+			// skip section labels entirely
 		case "table":
 			sb.WriteString("\n")
 			rows := findAllNodes(n, func(node *html.Node) bool {
@@ -612,6 +649,24 @@ func renderNodeToMarkdown(n *html.Node) string {
 			} else {
 				sb.WriteString("$")
 			}
+		} else if hasClass(n, "tex-font-style-bf") {
+			sb.WriteString("**")
+			for c := n.FirstChild; c != nil; c = c.NextSibling {
+				walk(c)
+			}
+			sb.WriteString("**")
+		} else if hasClass(n, "tex-font-style-it") {
+			sb.WriteString("*")
+			for c := n.FirstChild; c != nil; c = c.NextSibling {
+				walk(c)
+			}
+			sb.WriteString("*")
+		} else if hasClass(n, "tex-font-style-tt") {
+			sb.WriteString("`")
+			for c := n.FirstChild; c != nil; c = c.NextSibling {
+				walk(c)
+			}
+			sb.WriteString("`")
 		} else {
 			for c := n.FirstChild; c != nil; c = c.NextSibling {
 				walk(c)
@@ -631,11 +686,13 @@ func renderNodeToMarkdown(n *html.Node) string {
 		}
 	}
 }
-walk(n)
-result := sb.String()
-// Clean up excessive newlines
-result = regexp.MustCompile(`\n{3,}`).ReplaceAllString(result, "\n\n")
-return strings.TrimSpace(result)
+	walk(n)
+	result := sb.String()
+	// Clean up excessive newlines
+	result = regexp.MustCompile(`\n{3,}`).ReplaceAllString(result, "\n\n")
+	// Convert Codeforces $$$ math notation to standard $ notation
+	result = strings.ReplaceAll(result, "$$$", "$")
+	return strings.TrimSpace(result)
 }
 
 // parseTimeLimit extracts time limit in milliseconds from CF text.
@@ -730,13 +787,21 @@ func (p *ProblemParser) ParseAtCoderProblem(ctx context.Context, contestID, task
 	}
 
 	titleNode := findNode(doc, func(n *html.Node) bool {
-		return n.Type == html.ElementNode && n.Data == "h2"
+		if n.Type == html.ElementNode && n.Data == "h2" {
+			return true
+		}
+		return n.Type == html.ElementNode && n.Data == "span" && hasClass(n, "h2")
 	})
 	if titleNode != nil {
 		prob.Title = strings.TrimSpace(extractText(titleNode))
+		if idx := strings.Index(prob.Title, "Editorial"); idx != -1 {
+			prob.Title = strings.TrimSpace(prob.Title[:idx])
+		}
 		if idx := strings.Index(prob.Title, " - "); idx != -1 {
 			prob.Title = strings.TrimSpace(prob.Title[idx+3:])
 		}
+		prob.Title = strings.Split(prob.Title, "\n")[0]
+		prob.Title = strings.TrimSpace(prob.Title)
 	}
 	if prob.Title == "" {
 		prob.Title = fmt.Sprintf("AtCoder %s %s", contestID, taskID)
@@ -770,9 +835,7 @@ func (p *ProblemParser) ParseAtCoderProblem(ctx context.Context, contestID, task
 		prob.MemoryLimit = 1048576
 	}
 
-	prob.Description = extractAtCoderDescription(doc)
-	prob.InputFormat = extractSectionFromDescription(prob.Description, "Input")
-	prob.OutputFormat = extractSectionFromDescription(prob.Description, "Output")
+	prob.Description, prob.InputFormat, prob.OutputFormat, prob.Hint, prob.SampleCases = extractAtCoderDescription(doc)
 
 	return prob, nil
 }
@@ -1024,21 +1087,75 @@ func parseAtCoderMemoryLimit(s string) int {
 	return 0
 }
 
-func extractAtCoderDescription(doc *html.Node) string {
-	parts := findAllNodes(doc, func(n *html.Node) bool {
+func extractAtCoderDescription(doc *html.Node) (string, string, string, string, []model.SampleCase) {
+	langSpan := findNode(doc, func(n *html.Node) bool {
+		return n.Type == html.ElementNode && n.Data == "span" && hasClass(n, "lang-en")
+	})
+	searchRoot := doc
+	if langSpan != nil {
+		searchRoot = langSpan
+	}
+
+	parts := findAllNodes(searchRoot, func(n *html.Node) bool {
 		return n.Type == html.ElementNode && n.Data == "div" && hasClass(n, "part")
 	})
 
-	var sb strings.Builder
+	var descParts, constraints []string
+	var inputFormat, outputFormat string
+	var sampleCases []model.SampleCase
 	for _, part := range parts {
 		stripScriptAndStyle(part)
-		md := renderNodeToMarkdown(part)
-		if md != "" {
-			sb.WriteString(md)
-			sb.WriteString("\n\n")
+		h3 := findNode(part, func(n *html.Node) bool {
+			return n.Type == html.ElementNode && n.Data == "h3"
+		})
+		heading := ""
+		if h3 != nil {
+			heading = strings.TrimSpace(extractText(h3))
+		}
+
+		switch {
+		case strings.HasPrefix(heading, "Sample Input") || strings.HasPrefix(heading, "Sample Output") ||
+			strings.HasPrefix(heading, "入力例") || strings.HasPrefix(heading, "出力例"):
+			pre := findNode(part, func(n *html.Node) bool {
+				return n.Type == html.ElementNode && n.Data == "pre"
+			})
+			if pre != nil {
+				content := strings.TrimSpace(extractText(pre))
+				if strings.HasPrefix(heading, "Sample Input") || strings.HasPrefix(heading, "入力例") {
+					for len(sampleCases) > 0 && sampleCases[len(sampleCases)-1].Input != "" {
+						sampleCases = append(sampleCases, model.SampleCase{})
+					}
+					if len(sampleCases) == 0 || sampleCases[len(sampleCases)-1].Input != "" {
+						sampleCases = append(sampleCases, model.SampleCase{})
+					}
+					sampleCases[len(sampleCases)-1].Input = content + "\n"
+				} else {
+					if len(sampleCases) == 0 || sampleCases[len(sampleCases)-1].Output != "" {
+						sampleCases = append(sampleCases, model.SampleCase{})
+					}
+					sampleCases[len(sampleCases)-1].Output = content + "\n"
+				}
+			}
+		case heading == "Constraints" || heading == "制約":
+			md := renderNodeToMarkdown(part)
+			constraints = append(constraints, md)
+		case heading == "Input" || heading == "入力":
+			inputFormat = renderNodeToMarkdown(part)
+			inputFormat = strings.TrimSpace(inputFormat)
+		case heading == "Output" || heading == "出力":
+			outputFormat = renderNodeToMarkdown(part)
+			outputFormat = strings.TrimSpace(outputFormat)
+		default:
+			md := renderNodeToMarkdown(part)
+			if md != "" {
+				descParts = append(descParts, md)
+			}
 		}
 	}
-	return strings.TrimSpace(sb.String())
+
+	description := strings.TrimSpace(strings.Join(descParts, "\n\n"))
+	hint := strings.TrimSpace(strings.Join(constraints, "\n"))
+	return description, inputFormat, outputFormat, hint, sampleCases
 }
 
 func parseTophProblemTimeLimit(s string) int {

@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 /* Tailwind v4: make `dark:` utilities react to the `.dark` class on <html>.
    Without this, `dark:bg-gray-950` etc. only trigger on the OS dark-mode
@@ -38,3 +39,12 @@ body {
 }
 
 * { box-sizing: border-box; }
+
+.prose :where(code):not(:where([class~="not-prose"],[class~="not-prose"] *)):before,
+.prose :where(code):not(:where([class~="not-prose"],[class~="not-prose"] *)):after {
+    content: none !important;
+}
+
+.prose :where(pre):not(:where([class~="not-prose"],[class~="not-prose"] *)) {
+    font-size: 1em !important;
+}

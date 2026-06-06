@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../../lib/api'
-import { Plus, Pencil, Trash2, X, Save } from 'lucide-react'
+import { Plus, Pencil, Trash2, X, Save, Search, Check, AlertTriangle } from 'lucide-react'
 
 interface RemoteLanguage {
     id: string
@@ -28,6 +28,10 @@ export default function RemoteLanguagesPanel() {
     const [editingId, setEditingId] = useState<string | null>(null)
     const [showForm, setShowForm] = useState(false)
     const [form, setForm] = useState({ local_id: '', remote_id: '', display_name: '', enabled: true, sort_order: 0, inline_comment_prefix: '//' })
+    const [detecting, setDetecting] = useState(false)
+    const [detectResults, setDetectResults] = useState<{ matched: { remote_id: string; display_name: string; local_id: string }[]; unmatched: { remote_id: string; display_name: string }[] } | null>(null)
+    const [showDetectModal, setShowDetectModal] = useState(false)
+    const [selectedForSave, setSelectedForSave] = useState<Set<number>>(new Set())
 
     const loadLangs = () => {
         setLoading(true)
@@ -92,6 +96,46 @@ export default function RemoteLanguagesPanel() {
         }
     }
 
+    const handleAutoDetect = async () => {
+        setDetecting(true)
+        try {
+            const result = await api.admin.remoteLanguages.detect(platform)
+            const all = [
+                ...result.matched.map((m, i) => ({ ...m, type: 'matched' as const, idx: i })),
+                ...result.unmatched.map((u, i) => ({ ...u, local_id: '', type: 'unmatched' as const, idx: result.matched.length + i })),
+            ]
+            setDetectResults({ matched: result.matched, unmatched: result.unmatched })
+            setSelectedForSave(new Set(result.matched.map((_, i) => i)))
+            setShowDetectModal(true)
+        } catch (err: any) {
+            alert(err.message)
+        } finally {
+            setDetecting(false)
+        }
+    }
+
+    const handleBulkSave = async () => {
+        if (!detectResults) return
+        const all = [
+            ...detectResults.matched.map(m => ({ platform, local_id: m.local_id, remote_id: m.remote_id, display_name: m.display_name })),
+            ...detectResults.unmatched.map(u => ({ platform, local_id: '', remote_id: u.remote_id, display_name: u.display_name })),
+        ]
+        const selected = all.filter((_, i) => selectedForSave.has(i))
+        if (selected.length === 0) return
+        try {
+            await api.admin.remoteLanguages.bulkUpsert(
+                selected.map((s, i) => ({ ...s, enabled: true, sort_order: i }))
+            )
+            loadLangs()
+            setShowDetectModal(false)
+            setDetectResults(null)
+        } catch (err: any) {
+            alert(err.message)
+        }
+    }
+
+    const totalItems = detectResults ? detectResults.matched.length + detectResults.unmatched.length : 0
+
     return (
         <div>
             <div className="flex items-center justify-between mb-4">
@@ -102,6 +146,10 @@ export default function RemoteLanguagesPanel() {
                 <button onClick={() => { resetForm(); setShowForm(true) }}
                     className="flex items-center gap-1.5 bg-blue-600 text-white px-3 py-1.5 rounded text-sm hover:bg-blue-700 transition-colors">
                     <Plus className="w-4 h-4" /> Add Language
+                </button>
+                <button onClick={handleAutoDetect} disabled={detecting}
+                    className="flex items-center gap-1.5 bg-gray-600 dark:bg-gray-600 text-white px-3 py-1.5 rounded text-sm hover:bg-gray-700 dark:hover:bg-gray-500 transition-colors disabled:opacity-50">
+                    <Search className="w-4 h-4" /> {detecting ? 'Detecting...' : 'Auto-Detect'}
                 </button>
             </div>
 
@@ -199,6 +247,115 @@ export default function RemoteLanguagesPanel() {
                             )}
                         </tbody>
                     </table>
+                </div>
+            )}
+
+            {showDetectModal && detectResults && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 w-full max-w-2xl max-h-[80vh] flex flex-col">
+                        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-700">
+                            <div className="flex items-center gap-2">
+                                <h3 className="font-semibold text-sm">Review Detected Languages</h3>
+                                <span className="px-2 py-0.5 rounded text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+                                    {selectedForSave.size} of {totalItems} selected
+                                </span>
+                            </div>
+                            <button onClick={() => { setShowDetectModal(false); setDetectResults(null) }}
+                                className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300">
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+                        <div className="overflow-auto flex-1 px-5 py-3">
+                            {detectResults.matched.length > 0 && (
+                                <div className="mb-4">
+                                    <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-2 flex items-center gap-1.5">
+                                        <Check className="w-3.5 h-3.5 text-green-500" /> Matched ({detectResults.matched.length})
+                                    </h4>
+                                    <table className="w-full text-sm">
+                                        <thead className="text-xs text-gray-500 dark:text-gray-400 uppercase">
+                                            <tr>
+                                                <th className="px-3 py-2 text-left w-10"></th>
+                                                <th className="px-3 py-2 text-left">Remote Name</th>
+                                                <th className="px-3 py-2 text-left">Remote ID</th>
+                                                <th className="px-3 py-2 text-left">Matched Local ID</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                                            {detectResults.matched.map((m, i) => (
+                                                <tr key={i}>
+                                                    <td className="px-3 py-2">
+                                                        <input type="checkbox" checked={selectedForSave.has(i)}
+                                                            onChange={() => {
+                                                                const next = new Set(selectedForSave)
+                                                                next.has(i) ? next.delete(i) : next.add(i)
+                                                                setSelectedForSave(next)
+                                                            }}
+                                                            className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500" />
+                                                    </td>
+                                                    <td className="px-3 py-2">{m.display_name}</td>
+                                                    <td className="px-3 py-2 font-mono text-xs">{m.remote_id}</td>
+                                                    <td className="px-3 py-2 font-mono text-xs text-green-600 dark:text-green-400">{m.local_id}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                            {detectResults.unmatched.length > 0 && (
+                                <div>
+                                    <h4 className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-2 flex items-center gap-1.5">
+                                        <AlertTriangle className="w-3.5 h-3.5 text-amber-500" /> No Match ({detectResults.unmatched.length})
+                                    </h4>
+                                    <table className="w-full text-sm">
+                                        <thead className="text-xs text-gray-500 dark:text-gray-400 uppercase">
+                                            <tr>
+                                                <th className="px-3 py-2 text-left w-10"></th>
+                                                <th className="px-3 py-2 text-left">Remote Name</th>
+                                                <th className="px-3 py-2 text-left">Remote ID</th>
+                                                <th className="px-3 py-2 text-left">Matched Local ID</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                                            {detectResults.unmatched.map((u, i) => {
+                                                const idx = detectResults.matched.length + i
+                                                return (
+                                                    <tr key={idx}>
+                                                        <td className="px-3 py-2">
+                                                            <input type="checkbox" checked={selectedForSave.has(idx)}
+                                                                onChange={() => {
+                                                                    const next = new Set(selectedForSave)
+                                                                    next.has(idx) ? next.delete(idx) : next.add(idx)
+                                                                    setSelectedForSave(next)
+                                                                }}
+                                                                className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500" />
+                                                        </td>
+                                                        <td className="px-3 py-2">{u.display_name}</td>
+                                                        <td className="px-3 py-2 font-mono text-xs">{u.remote_id}</td>
+                                                        <td className="px-3 py-2 font-mono text-xs text-gray-400 dark:text-gray-500">No match</td>
+                                                    </tr>
+                                                )
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                            {detectResults.matched.length === 0 && detectResults.unmatched.length === 0 && (
+                                <div className="text-center py-8 text-gray-400 dark:text-gray-500 text-sm">
+                                    No languages detected for this platform.
+                                </div>
+                            )}
+                        </div>
+                        <div className="flex justify-end gap-2 px-5 py-4 border-t border-gray-200 dark:border-gray-700">
+                            <button onClick={() => { setShowDetectModal(false); setDetectResults(null) }}
+                                className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white">
+                                Cancel
+                            </button>
+                            <button onClick={handleBulkSave} disabled={selectedForSave.size === 0}
+                                className="flex items-center gap-1.5 bg-green-600 text-white px-4 py-2 rounded text-sm hover:bg-green-700 transition-colors disabled:opacity-50">
+                                <Save className="w-4 h-4" /> Save Selected
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

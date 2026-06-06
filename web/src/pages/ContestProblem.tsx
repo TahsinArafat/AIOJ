@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkMath from 'remark-math'
+import remarkGfm from 'remark-gfm'
 import rehypeKatex from 'rehype-katex'
 import 'katex/dist/katex.min.css'
 import { api, getAccessToken } from '../lib/api'
@@ -227,7 +228,7 @@ function SampleCase({ sample, index }: { sample: any; index: number }) {
                 <div className="border-t border-gray-200 dark:border-gray-700 bg-blue-50 dark:bg-blue-900/20 px-4 py-3">
                     <div className="text-xs font-semibold text-blue-700 dark:text-blue-300 uppercase tracking-wide mb-1">Explanation</div>
                     <div className="prose prose-sm max-w-none text-gray-700 dark:text-gray-300">
-                        <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                        <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
                             {sample.explanation}
                         </ReactMarkdown>
                     </div>
@@ -252,7 +253,7 @@ function HintSection({ hint }: { hint: string }) {
             {expanded && (
                 <div className="px-4 py-3 bg-white dark:bg-gray-800 border-t border-amber-200 dark:border-amber-700">
                     <div className="prose prose-sm max-w-none text-gray-700 dark:text-gray-300">
-                        <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                        <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
                             {hint}
                         </ReactMarkdown>
                     </div>
@@ -872,7 +873,7 @@ export default function ContestProblem() {
                                         </div>
                                     ) : (
                                         <div className="prose prose-sm max-w-none text-gray-800 dark:text-gray-300 leading-relaxed">
-                                            <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                                            <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
                                                 {problem.description}
                                             </ReactMarkdown>
                                         </div>
@@ -882,7 +883,7 @@ export default function ContestProblem() {
                                         <div>
                                             <h3 className="font-semibold text-sm text-gray-700 dark:text-gray-300 uppercase tracking-wide mb-2">Input Format</h3>
                                             <div className="prose prose-sm max-w-none text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900/20 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-                                                <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                                                <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
                                                     {problem.input_format}
                                                 </ReactMarkdown>
                                             </div>
@@ -893,7 +894,7 @@ export default function ContestProblem() {
                                         <div>
                                             <h3 className="font-semibold text-sm text-gray-700 dark:text-gray-300 uppercase tracking-wide mb-2">Output Format</h3>
                                             <div className="prose prose-sm max-w-none text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900/20 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-                                                <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                                                <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
                                                     {problem.output_format}
                                                 </ReactMarkdown>
                                             </div>

@@ -1,0 +1,1 @@
+ALTER TABLE remote_languages DROP CONSTRAINT IF EXISTS remote_languages_platform_remote_id_key;

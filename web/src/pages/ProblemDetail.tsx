@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkMath from 'remark-math'
+import remarkGfm from 'remark-gfm'
 import rehypeKatex from 'rehype-katex'
 import 'katex/dist/katex.min.css'
 import { api, getAccessToken } from '../lib/api'
@@ -9,6 +10,20 @@ import ProblemStats from '../components/ProblemStats'
 import CodeEditor from '../components/CodeEditor'
 import AddEditorialModal from '../components/AddEditorialModal'
 import { Download, Copy, Check } from 'lucide-react'
+
+function useIsDesktop(breakpoint = 768) {
+    const [isDesktop, setIsDesktop] = useState(
+        () => typeof window !== 'undefined' ? window.innerWidth >= breakpoint : true
+    )
+    useEffect(() => {
+        const mql = window.matchMedia(`(min-width: ${breakpoint}px)`)
+        const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches)
+        setIsDesktop(mql.matches)
+        mql.addEventListener('change', handler)
+        return () => mql.removeEventListener('change', handler)
+    }, [breakpoint])
+    return isDesktop
+}
 
 function isPdfUrl(url: string | undefined | null): boolean {
     if (!url) return false
@@ -64,7 +79,7 @@ function decodeRole(): string | null {
     }
 }
 
-const LANGS = [
+const DEFAULT_LANGS = [
     { value: 'cpp-gpp-64', label: 'GNU G++17 7.3.0 (64 bit)' },
     { value: 'cpp-gpp-32', label: 'GNU G++14 6.4.0 (32 bit)' },
     { value: 'c-gcc-64', label: 'GNU GCC C11 9.2.0 (64 bit)' },
@@ -172,6 +187,7 @@ export default function ProblemDetail() {
     const contestId = searchParams.get('contest')
     const [problem, setProblem] = useState<any>(null)
     const [lang, setLang] = useState('cpp-gpp-64')
+    const [languages, setLanguages] = useState(DEFAULT_LANGS)
     const [code, setCode] = useState('')
     const [result, setResult] = useState<any>(null)
     const [submitting, setSubmitting] = useState(false)
@@ -188,6 +204,8 @@ export default function ProblemDetail() {
     const [editorials, setEditorials] = useState<any[]>([])
     const [isAddModalOpen, setIsAddModalOpen] = useState(false)
     const isMountedRef = useRef(true)
+    const isDesktop = useIsDesktop()
+    const [mobileTab, setMobileTab] = useState<'problem' | 'code'>('problem')
 
     const [splitPos, setSplitPos] = useState(() => {
         const saved = localStorage.getItem('aioj_split_pos')
@@ -232,6 +250,25 @@ export default function ProblemDetail() {
     useEffect(() => {
         if (slug) api.problems.get(slug).then(setProblem).catch(() => {})
     }, [slug])
+
+    useEffect(() => {
+        if (problem?.source && problem.source !== 'local') {
+            api.remoteLanguages.list(problem.source)
+                .then(d => {
+                    const langs = (d.data || [])
+                        .filter((rl: any) => rl.enabled)
+                        .sort((a: any, b: any) => a.sort_order - b.sort_order)
+                        .map((rl: any) => ({ value: rl.local_id, label: rl.display_name }))
+                    if (langs.length > 0) {
+                        setLanguages(langs)
+                        setLang(langs[0].value)
+                    }
+                })
+                .catch(() => {})
+        } else {
+            setLanguages(DEFAULT_LANGS)
+        }
+    }, [problem?.source])
 
     useEffect(() => {
         if (problem?.id) api.editorials.getByProblem(problem.id).then(d => setEditorials(d.data || [])).catch(() => {})
@@ -413,9 +450,36 @@ export default function ProblemDetail() {
     }
 
     return (
-        <div ref={containerRef} className="flex h-full select-none" style={{ cursor: dragging ? 'col-resize' : undefined }}>
+        <div ref={containerRef} className="flex flex-col h-full select-none md:flex-row" style={{ cursor: dragging ? 'col-resize' : undefined }}>
+            {/* Mobile tab bar */}
+            <div className="flex md:hidden border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex-shrink-0">
+                <button
+                    onClick={() => setMobileTab('problem')}
+                    className={`flex-1 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                        mobileTab === 'problem'
+                            ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+                            : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                    }`}
+                >
+                    Problem
+                </button>
+                <button
+                    onClick={() => setMobileTab('code')}
+                    className={`flex-1 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                        mobileTab === 'code'
+                            ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+                            : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                    }`}
+                >
+                    Code
+                </button>
+            </div>
+
             {/* Problem Statement */}
-            <div className="space-y-4 overflow-y-auto pr-1" style={{ width: `${splitPos}%`, minWidth: '20%' }}>
+            <div
+                className={`space-y-4 overflow-y-auto pr-1 ${mobileTab === 'problem' ? '' : 'hidden'} md:block`}
+                style={isDesktop ? { width: `${splitPos}%`, minWidth: '20%' } : { flex: 1 }}
+            >
                 <div>
                     <h1 className="text-2xl font-bold">
                         {problem.title}
@@ -472,22 +536,22 @@ export default function ProblemDetail() {
                     )}
                 </div>
 
-                <div className="flex border-b border-gray-200 dark:border-gray-700">
-                    <button onClick={() => setTab('statement')} className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${tab === 'statement' ? 'border-blue-600 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}>
+                <div className="flex overflow-x-auto border-b border-gray-200 dark:border-gray-700 flex-shrink-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                    <button onClick={() => setTab('statement')} className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px whitespace-nowrap ${tab === 'statement' ? 'border-blue-600 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}>
                         Statement
                     </button>
-                    <button onClick={() => setTab('stats')} className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${tab === 'stats' ? 'border-blue-600 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}>
+                    <button onClick={() => setTab('stats')} className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px whitespace-nowrap ${tab === 'stats' ? 'border-blue-600 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}>
                         Statistics
                     </button>
-                    <button onClick={() => setTab('editorials')} className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${tab === 'editorials' ? 'border-blue-600 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}>
+                    <button onClick={() => setTab('editorials')} className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px whitespace-nowrap ${tab === 'editorials' ? 'border-blue-600 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}>
                         Editorials
                     </button>
                     {getAccessToken() && (
-                        <button onClick={() => setTab('submissions')} className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${tab === 'submissions' ? 'border-blue-600 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}>
+                        <button onClick={() => setTab('submissions')} className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px whitespace-nowrap ${tab === 'submissions' ? 'border-blue-600 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}>
                             My Submissions
                         </button>
                     )}
-                    <button onClick={() => setTab('more')} className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${tab === 'more' ? 'border-blue-600 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}>
+                    <button onClick={() => setTab('more')} className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px whitespace-nowrap ${tab === 'more' ? 'border-blue-600 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}>
                         More
                     </button>
                 </div>
@@ -514,7 +578,20 @@ export default function ProblemDetail() {
                             </div>
                         ) : (
                             <div className="prose prose-sm max-w-none text-gray-800 dark:text-gray-200 leading-relaxed">
-                                <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                                <ReactMarkdown
+                                    remarkPlugins={[remarkGfm, remarkMath]}
+                                    rehypePlugins={[rehypeKatex]}
+                                    components={{
+                                        code(props) {
+                                            const {children, className} = props
+                                            const isBlock = className?.includes('language-')
+                                            if (isBlock) {
+                                                return <code className={className}>{children}</code>
+                                            }
+                                            return <code className="bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded text-sm font-mono">{children}</code>
+                                        }
+                                    }}
+                                >
                                     {problem.description}
                                 </ReactMarkdown>
                             </div>
@@ -523,7 +600,7 @@ export default function ProblemDetail() {
                             <div>
                                 <h3 className="font-semibold text-sm text-gray-700 dark:text-gray-300 uppercase tracking-wide mb-1">Input Format</h3>
                                 <div className="prose prose-sm max-w-none text-gray-700 dark:text-gray-300">
-                                    <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                                    <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
                                         {problem.input_format}
                                     </ReactMarkdown>
                                 </div>
@@ -533,7 +610,7 @@ export default function ProblemDetail() {
                             <div>
                                 <h3 className="font-semibold text-sm text-gray-700 dark:text-gray-300 uppercase tracking-wide mb-1">Output Format</h3>
                                 <div className="prose prose-sm max-w-none text-gray-700 dark:text-gray-300">
-                                    <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                                    <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
                                         {problem.output_format}
                                     </ReactMarkdown>
                                 </div>
@@ -543,7 +620,7 @@ export default function ProblemDetail() {
                             <div>
                                 <h3 className="font-semibold text-sm text-gray-700 dark:text-gray-300 uppercase tracking-wide mb-1">Constraints</h3>
                                 <div className="prose prose-sm max-w-none text-gray-700 dark:text-gray-300">
-                                    <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                                    <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
                                         {problem.hint}
                                     </ReactMarkdown>
                                 </div>
@@ -552,7 +629,7 @@ export default function ProblemDetail() {
                         {problem.sample_cases?.length > 0 && problem.sample_cases.map((sc: any, i: number) => (
                             <div key={i} className="space-y-1">
                                 <h3 className="font-semibold text-sm text-gray-700 dark:text-gray-300 uppercase tracking-wide">Sample {i + 1}</h3>
-                                <div className="grid grid-cols-2 gap-2">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                                     <div>
                                         <div className="flex items-center justify-between mb-1">
                                             <span className="text-xs text-gray-400 dark:text-gray-500">Input</span>
@@ -675,7 +752,7 @@ export default function ProblemDetail() {
                         ) : mySubs.length === 0 ? (
                             <p className="text-gray-400 dark:text-gray-500 text-sm text-center py-8">No submissions yet for this problem.</p>
                         ) : (
-                            <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                            <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-x-auto">
                                 <table className="w-full text-sm">
                                     <thead className="bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-xs uppercase">
                                         <tr>
@@ -733,7 +810,7 @@ export default function ProblemDetail() {
             {/* Divider */}
             <div
                 onMouseDown={handleMouseDown}
-                className={`w-3 flex-shrink-0 cursor-col-resize group transition-colors relative ${dragging ? 'bg-blue-500' : 'bg-gray-200 dark:bg-gray-700 hover:bg-blue-500'}`}
+                className={`hidden md:flex w-3 flex-shrink-0 cursor-col-resize group transition-colors relative ${dragging ? 'bg-blue-500' : 'bg-gray-200 dark:bg-gray-700 hover:bg-blue-500'}`}
             >
                 {/* Grip dots indicator */}
                     <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
@@ -744,16 +821,19 @@ export default function ProblemDetail() {
             </div>
 
             {/* IDE */}
-            <div className="flex flex-col gap-3 overflow-y-auto pl-1" style={{ width: `${100 - splitPos}%`, minWidth: '20%' }}>
-                <div className="flex items-center justify-between">
+            <div
+                className={`flex flex-col gap-3 overflow-y-auto pl-1 ${mobileTab === 'code' ? '' : 'hidden'} md:block`}
+                style={isDesktop ? { width: `${100 - splitPos}%`, minWidth: '20%' } : { flex: 1 }}
+            >
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                     <select
                         value={lang}
                         onChange={e => setLang(e.target.value)}
-                        className="border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                        className="border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 w-full sm:w-auto"
                     >
-                        {LANGS.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
+                        {languages.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
                     </select>
-                        <div className="flex gap-2">
+                    <div className="flex gap-2 flex-shrink-0">
                         <button
                             onClick={testWithSamples}
                             disabled={runningSamples || !code.trim() || problem?.source !== 'local'}
@@ -775,7 +855,7 @@ export default function ProblemDetail() {
                     language={lang}
                     value={code}
                     onChange={handleCodeChange}
-                    height="400px"
+                    height={isDesktop ? "400px" : "250px"}
                 />
                 {result && (
                     <div className="border border-gray-200 dark:border-gray-700 rounded p-3 text-sm">
@@ -828,7 +908,7 @@ export default function ProblemDetail() {
                                         Input: {r.input.substring(0, 100)}{r.input.length > 100 ? '...' : ''}
                                     </div>
                                     {!r.passed && (
-                                        <div className="grid grid-cols-2 gap-2">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                                             <div>
                                                 <span className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Expected</span>
                                                 <pre className="bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 font-mono text-xs p-2 rounded overflow-x-auto max-h-24 border border-green-100">{r.expected || '(empty)'}</pre>

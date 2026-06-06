@@ -336,6 +336,7 @@ type RemoteLanguageStore interface {
 	Create(ctx context.Context, rl *model.RemoteLanguage) error
 	Update(ctx context.Context, id string, rl *model.RemoteLanguage) error
 	Delete(ctx context.Context, id string) error
+	BulkUpsert(ctx context.Context, platform string, langs []model.RemoteLanguage) error
 }
 
 type OnsiteUserStore interface {

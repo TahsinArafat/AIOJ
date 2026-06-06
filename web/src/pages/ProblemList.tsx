@@ -2,17 +2,6 @@ import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
 
-function decodeRole(): string | null {
-    const token = localStorage.getItem('access_token')
-    if (!token) return null
-    try {
-        const payload = JSON.parse(atob(token.split('.')[1]))
-        return payload.role ?? null
-    } catch {
-        return null
-    }
-}
-
 const difficultyColor: Record<string, string> = {
     easy: 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20',
     medium: 'text-yellow-700 dark:text-yellow-300 bg-yellow-50 dark:bg-yellow-900/20',
@@ -110,19 +99,6 @@ export default function ProblemList() {
     }
 
     const hasActiveFilters = difficulty || selectedTags.length > 0 || search || source || rating || sortBy !== 'newest'
-    const role = decodeRole()
-    const canImport = role === 'admin' || role === 'setter'
-
-    const handleImport = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0]
-        if (!file) return
-        try {
-            const res = await api.problems.importProblem(file)
-            window.location.href = `/problems/${res.slug}`
-        } catch (err: any) {
-            alert('Failed to import problem: ' + (err.message || err))
-        }
-    }, [])
 
     const FilterSidebar = () => (
         <div className="w-64 flex-shrink-0 space-y-6">
@@ -210,23 +186,15 @@ export default function ProblemList() {
 
     return (
         <div>
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
                 <div>
                     <h1 className="text-2xl font-bold">Problems</h1>
                     <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{total} problems found</p>
                 </div>
-                <div className="flex gap-2">
-                    {canImport && (
-                        <label className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 cursor-pointer">
-                            Import (XML/ZIP)
-                            <input type="file" accept=".xml,.zip" className="hidden" onChange={handleImport} />
-                        </label>
-                    )}
-                    <button onClick={() => setShowMobileFilters(!showMobileFilters)}
-                        className="md:hidden inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
-                        Filters
-                    </button>
-                </div>
+                <button onClick={() => setShowMobileFilters(!showMobileFilters)}
+                    className="md:hidden inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
+                    Filters
+                </button>
             </div>
 
             {/* Active filter chips */}
@@ -285,9 +253,9 @@ export default function ProblemList() {
                     </div>
                 )}
 
-                {/* Problem table */}
+                {/* Problem table - Desktop */}
                 <div className="flex-1 min-w-0">
-                    <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                    <div className="hidden md:block border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
                         <table className="w-full text-sm">
                             <thead className="bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-xs uppercase">
                                 <tr>
@@ -337,7 +305,57 @@ export default function ProblemList() {
                             </tbody>
                         </table>
                     </div>
-                    <div className="flex justify-between mt-4 text-sm text-gray-500 dark:text-gray-400">
+
+                    {/* Problem cards - Mobile */}
+                    <div className="md:hidden space-y-3">
+                        {problems.map(p => (
+                            <div key={p.slug} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                                <Link to={`/problems/${p.slug}`} className="block">
+                                    <h3 className="font-medium text-blue-600 dark:text-blue-400 hover:underline mb-2">
+                                        {p.title}
+                                    </h3>
+                                </Link>
+                                <div className="flex flex-wrap items-center gap-2 mb-2">
+                                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                                        p.source === 'codeforces' ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300' :
+                                        p.source === 'atcoder' ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300' :
+                                        p.source === 'cses' ? 'bg-cyan-50 text-cyan-700' :
+                                        p.source === 'toph' ? 'bg-pink-50 dark:bg-pink-900/20 text-pink-700' :
+                                        p.source === 'qoj' ? 'bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300' :
+                                        'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
+                                    }`}>
+                                        {p.source === 'local' || !p.source ? 'AIOJ' : p.source?.charAt(0).toUpperCase() + p.source?.slice(1)}
+                                    </span>
+                                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${difficultyColor[p.difficulty] || ''}`}>
+                                        {p.difficulty}
+                                    </span>
+                                    <span className="text-xs text-gray-500 dark:text-gray-400 ml-auto">
+                                        {p.accepted_count}/{p.submission_count} solved
+                                    </span>
+                                </div>
+                                {p.tags && p.tags.length > 0 && (
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {p.tags.slice(0, 3).map((tag: string) => (
+                                            <span key={tag} className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded text-xs">
+                                                {tag}
+                                            </span>
+                                        ))}
+                                        {p.tags.length > 3 && (
+                                            <span className="px-1.5 py-0.5 text-gray-400 dark:text-gray-500 text-xs">
+                                                +{p.tags.length - 3} more
+                                            </span>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                        {problems.length === 0 && (
+                            <div className="px-4 py-8 text-center text-gray-400 dark:text-gray-500">No problems found.</div>
+                        )}
+                    </div>
+
+                    {/* Pagination */}
+                    <div className="flex items-center justify-between mt-4 text-sm text-gray-500 dark:text-gray-400">
                         <span>{total} problems</span>
                         <div className="flex gap-2">
                             <button onClick={() => setOffset(Math.max(0, offset - limit))} disabled={offset === 0}

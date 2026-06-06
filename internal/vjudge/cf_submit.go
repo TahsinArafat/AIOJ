@@ -111,6 +111,40 @@ func (c *CFSubmitClient) SeedCookies(ctx context.Context, cookies map[string]str
 	return err
 }
 
+type cfLanguagesResponse struct {
+	Status    string               `json:"status"`
+	Languages []RemoteLanguageItem `json:"languages"`
+}
+
+func (c *CFSubmitClient) FetchLanguages(ctx context.Context) ([]RemoteLanguageItem, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", c.baseURL+"/languages", nil)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
+
+	var result cfLanguagesResponse
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return nil, fmt.Errorf("parse response: %w", err)
+	}
+
+	if result.Status != "ok" {
+		return nil, fmt.Errorf("cf-submit: unexpected status %s", result.Status)
+	}
+
+	return result.Languages, nil
+}
+
 func (c *CFSubmitClient) Submit(ctx context.Context, problemCode, sourceCode, langID, handle, submissionID, username, password string, cookies map[string]string, proxy string) (string, error) {
 	result, err := c.doRequest(ctx, "POST", "/submit", cfSubmitRequest{
 		ProblemCode:  problemCode,

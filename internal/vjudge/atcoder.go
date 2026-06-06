@@ -14,11 +14,12 @@ import (
 )
 
 type AtCoderBot struct {
-	config   BotConfig
-	client   *http.Client
-	mu       sync.RWMutex
-	state    BotState
-	loggedIn bool
+	config       BotConfig
+	client       *http.Client
+	submitClient *AtCoderSubmitClient
+	mu           sync.RWMutex
+	state        BotState
+	loggedIn     bool
 }
 
 func NewAtCoderBot(cfg BotConfig) *AtCoderBot {
@@ -42,6 +43,12 @@ func NewAtCoderBot(cfg BotConfig) *AtCoderBot {
 	if len(cfg.Cookies) > 0 {
 		bot.loggedIn = true
 	}
+	return bot
+}
+
+func NewAtCoderBotWithSubmit(cfg BotConfig, submitClient *AtCoderSubmitClient) *AtCoderBot {
+	bot := NewAtCoderBot(cfg)
+	bot.submitClient = submitClient
 	return bot
 }
 
@@ -117,99 +124,146 @@ func (b *AtCoderBot) IsLoggedIn(ctx context.Context) bool {
 }
 
 func (b *AtCoderBot) Login(ctx context.Context) (map[string]string, error) {
-	// AtCoder uses Cloudflare Turnstile which blocks automated login
-	// Cookies must be provided manually by the user
-	if len(b.config.Cookies) == 0 {
-		return nil, fmt.Errorf("atcoder: cookies required (Turnstile blocks automated login)")
+	b.mu.RLock()
+	cookies := b.config.Cookies
+	b.mu.RUnlock()
+
+	if len(cookies) > 0 {
+		b.mu.Lock()
+		b.loggedIn = true
+		b.mu.Unlock()
+		slog.Info("atcoder logged in via stored cookies")
+		return cookies, nil
 	}
-	b.mu.Lock()
-	b.loggedIn = true
-	b.mu.Unlock()
-	slog.Info("atcoder logged in via cookies")
-	return nil, nil
+
+	if b.submitClient != nil && b.config.Username != "" && b.config.Password != "" {
+		cookies, err := b.submitClient.Login(ctx, b.config.Username, b.config.Password)
+		if err != nil {
+			return nil, fmt.Errorf("atcoder: submit service login: %w", err)
+		}
+		b.SetCookies(cookies)
+		slog.Info("atcoder: logged in via submit service", "cookies", len(cookies))
+		return cookies, nil
+	}
+
+	return nil, fmt.Errorf("atcoder: no credentials — set username/password, or provide cookies")
 }
 
 func (b *AtCoderBot) Submit(ctx context.Context, problemID, sourceCode, language string) (string, error) {
 	b.setState(StateRunning)
 	defer b.setState(StateIdle)
 
-	// Parse contest ID from problem ID (e.g., abc300_a -> abc300)
 	contestID, err := parseAtCoderContestID(problemID)
 	if err != nil {
 		return "", fmt.Errorf("atcoder: %w", err)
 	}
 
-	// Check if logged in
 	if !b.IsLoggedIn(ctx) {
-		return "", fmt.Errorf("atcoder: not logged in (cookies required)")
+		if _, err := b.Login(ctx); err != nil {
+			return "", fmt.Errorf("atcoder: not logged in: %w", err)
+		}
 	}
 
-	// Fetch submit page to get CSRF token
+	langID := resolveAtCoderLangID(language)
+
+	if b.submitClient != nil && b.config.Username != "" && b.config.Password != "" {
+		remoteID, err := b.submitClient.Submit(ctx, contestID, problemID, sourceCode, langID, b.config.Username, b.config.Password)
+		if err != nil {
+			slog.Error("atcoder: submit service failed", "err", err)
+		} else if remoteID != "" {
+			formattedID := contestID + "/" + remoteID
+			slog.Info("atcoder submitted via submit service", "problem", problemID, "remote_id", formattedID)
+			return formattedID, nil
+		}
+	}
+
 	submitPageURL := fmt.Sprintf("%s/contests/%s/submit", b.baseURL(), contestID)
+
 	body, err := b.fetch(ctx, submitPageURL)
-	if err != nil {
-		return "", fmt.Errorf("atcoder: fetch submit page: %w", err)
+	if err == nil {
+		csrf := extractAtCoderCSRFToken(body)
+		if csrf != "" {
+			form := url.Values{
+				"csrf_token":          {csrf},
+				"data.TaskScreenName": {problemID},
+				"data.LanguageId":     {langID},
+				"sourceCode":          {sourceCode},
+			}
+
+			req, err := http.NewRequestWithContext(ctx, "POST", submitPageURL, strings.NewReader(form.Encode()))
+			if err == nil {
+				req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+				req.Header.Set("Referer", submitPageURL)
+				setBrowserHeaders(req)
+
+				resp, err := b.client.Do(req)
+				if err == nil {
+					defer resp.Body.Close()
+					location := resp.Header.Get("Location")
+					respBody, _ := io.ReadAll(resp.Body)
+					combined := string(respBody) + location
+
+					slog.Info("atcoder: direct submit result",
+						"status", resp.StatusCode,
+						"location", location,
+						"respLen", len(respBody))
+
+					if subID := extractAtCoderSubmissionID(location); subID != "" {
+						remoteID := contestID + "/" + subID
+						slog.Info("atcoder submitted", "problem", problemID, "remote_id", remoteID)
+						return remoteID, nil
+					}
+
+					if subID := extractAtCoderLatestSubmissionID(combined); subID != "" {
+						remoteID := contestID + "/" + subID
+						slog.Info("atcoder submitted", "problem", problemID, "remote_id", remoteID)
+						return remoteID, nil
+					}
+				}
+			}
+		}
 	}
 
-	csrf := extractAtCoderCSRFToken(body)
-	if csrf == "" {
-		return "", fmt.Errorf("atcoder: no CSRF token found")
-	}
+	return "", fmt.Errorf("atcoder: submit failed via all methods")
+}
 
-	// Prepare form data
-	form := url.Values{
-		"csrf_token":          {csrf},
-		"data.TaskScreenName": {problemID},
-		"data.LanguageId":     {language},
-		"sourceCode":          {sourceCode},
+func resolveAtCoderLangID(language string) string {
+	switch language {
+	case "go", "go1", "Go", "Go1":
+		return "5001"
+	case "python", "python3", "Python", "Python3", "py":
+		return "5028"
+	case "cpp", "c++", "C++":
+		return "5001"
+	case "java", "Java":
+		return "5002"
+	case "c", "C":
+		return "5003"
+	case "rust", "Rust":
+		return "5014"
+	case "javascript", "js", "JavaScript", "Node.js":
+		return "5013"
+	default:
+		return "5001"
 	}
-
-	// Submit (prevent redirects to inspect Location header)
-	req, err := http.NewRequestWithContext(ctx, "POST", submitPageURL, strings.NewReader(form.Encode()))
-	if err != nil {
-		return "", fmt.Errorf("atcoder: create request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("Referer", submitPageURL)
-	setBrowserHeaders(req)
-
-	resp, err := b.client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("atcoder: submit request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// Check for redirect to submissions page
-	location := resp.Header.Get("Location")
-	if location != "" && strings.Contains(location, "/submissions/me") {
-		// Extract submission ID from redirect URL
-		// Format: /contests/{contest_id}/submissions/me
-		remoteID := contestID + "/me"
-		slog.Info("atcoder submitted", "problem", problemID, "remote_id", remoteID)
-		return remoteID, nil
-	}
-
-	return "", fmt.Errorf("atcoder: unexpected response from submit endpoint")
 }
 
 func (b *AtCoderBot) Poll(ctx context.Context, remoteSubmissionID string) (*RemoteResult, error) {
-	// Parse remote submission ID to get contest ID
-	// Format: {contest_id}/me or {contest_id}/me/{submission_number}
-	parts := strings.SplitN(remoteSubmissionID, "/me", 2)
-	if len(parts) == 0 {
+	parts := strings.SplitN(remoteSubmissionID, "/", 2)
+	if len(parts) != 2 {
 		return &RemoteResult{RemoteID: remoteSubmissionID, Done: false, Verdict: "PENDING"}, nil
 	}
 	contestID := parts[0]
+	submissionID := parts[1]
 
-	// Fetch submissions page for the contest
-	submissionsURL := fmt.Sprintf("%s/contests/%s/submissions/me", b.baseURL(), contestID)
-	body, err := b.fetch(ctx, submissionsURL)
+	detailURL := fmt.Sprintf("%s/contests/%s/submissions/%s", b.baseURL(), contestID, submissionID)
+
+	body, err := b.fetch(ctx, detailURL)
 	if err != nil {
 		return &RemoteResult{RemoteID: remoteSubmissionID, Done: false, Verdict: "PENDING"}, nil
 	}
 
-	// Parse the submissions page to find the latest submission
-	return parseAtCoderSubmissions(body, remoteSubmissionID), nil
+	return parseAtCoderSubmissionDetail(body, remoteSubmissionID), nil
 }
 
 func (b *AtCoderBot) baseURL() string {
@@ -243,7 +297,6 @@ func (b *AtCoderBot) fetch(ctx context.Context, url string) (string, error) {
 	return string(body), nil
 }
 
-// parseAtCoderContestID extracts contest ID from problem ID (e.g., abc300_a -> abc300)
 func parseAtCoderContestID(problemID string) (string, error) {
 	parts := strings.SplitN(problemID, "_", 2)
 	if len(parts) != 2 {
@@ -252,13 +305,17 @@ func parseAtCoderContestID(problemID string) (string, error) {
 	return parts[0], nil
 }
 
-// extractAtCoderCSRFToken extracts CSRF token from input name="csrf_token"
 func extractAtCoderCSRFToken(html string) string {
-	idx := strings.Index(html, `name="csrf_token"`)
+	return extractHiddenField(html, "csrf_token")
+}
+
+func extractHiddenField(html, name string) string {
+	pattern := `name="` + name + `"`
+	idx := strings.Index(html, pattern)
 	if idx == -1 {
 		return ""
 	}
-	idx += len(`name="csrf_token"`)
+	idx += len(pattern)
 	valIdx := strings.Index(html[idx:], `value="`)
 	if valIdx == -1 {
 		return ""
@@ -271,48 +328,93 @@ func extractAtCoderCSRFToken(html string) string {
 	return html[start : start+end]
 }
 
-// parseAtCoderSubmissions parses the submissions page HTML to extract the latest submission status
-func parseAtCoderSubmissions(html string, remoteID string) *RemoteResult {
-	// Look for verdict spans
+func extractAtCoderSubmissionID(s string) string {
+	if s == "" {
+		return ""
+	}
+	idx := strings.LastIndex(s, "/submissions/")
+	if idx != -1 {
+		id := s[idx+len("/submissions/"):]
+		id = strings.TrimRight(id, "/ \n\r\t")
+		for _, c := range id {
+			if c < '0' || c > '9' {
+				return ""
+			}
+		}
+		if len(id) > 0 {
+			return id
+		}
+	}
+	return ""
+}
+
+func extractAtCoderLatestSubmissionID(html string) string {
+	idx := strings.LastIndex(html, "/submissions/")
+	if idx == -1 {
+		return ""
+	}
+	id := html[idx+len("/submissions/"):]
+	end := strings.IndexAny(id, "\"' <")
+	if end != -1 {
+		id = id[:end]
+	}
+	for _, c := range id {
+		if c < '0' || c > '9' {
+			return ""
+		}
+	}
+	return id
+}
+
+func parseAtCoderSubmissionDetail(html string, remoteID string) *RemoteResult {
 	result := &RemoteResult{RemoteID: remoteID}
 
-	// Parse verdict from span classes
-	if strings.Contains(html, "judge-result-success") {
+	if strings.Contains(html, "No such submission") || strings.Contains(html, "404 Not Found") {
+		result.Done = true
+		result.Verdict = "CE"
+		return result
+	}
+
+	if strings.Contains(html, "judge-result-success") || strings.Contains(html, ">AC<") || strings.Contains(html, ">Accepted<") {
 		result.Done = true
 		result.Verdict = "AC"
-	} else if strings.Contains(html, "judge-result-danger") {
+	} else if strings.Contains(html, "judge-result-danger") || strings.Contains(html, ">WA<") || strings.Contains(html, ">Wrong Answer<") {
 		result.Done = true
 		result.Verdict = "WA"
 	} else if strings.Contains(html, "judge-result-warning") {
-		// Could be TLE or other time/memory limit
-		if strings.Contains(html, "TLE") {
+		if strings.Contains(html, ">TLE<") || strings.Contains(html, ">Time Limit Exceeded<") {
 			result.Verdict = "TLE"
+		} else if strings.Contains(html, ">MLE<") || strings.Contains(html, ">Memory Limit Exceeded<") {
+			result.Verdict = "MLE"
 		} else {
 			result.Verdict = "TLE"
 		}
 		result.Done = true
-	} else if strings.Contains(html, "judge-result-info") {
+	} else if strings.Contains(html, "judge-result-info") || strings.Contains(html, ">RE<") || strings.Contains(html, ">Runtime Error<") {
 		result.Done = true
 		result.Verdict = "RE"
+	} else if strings.Contains(html, ">CE<") || strings.Contains(html, ">Compilation Error<") {
+		result.Done = true
+		result.Verdict = "CE"
+	} else if strings.Contains(html, ">OLE<") || strings.Contains(html, ">Output Limit Exceeded<") {
+		result.Done = true
+		result.Verdict = "OLE"
+	} else if strings.Contains(html, ">WJ<") || strings.Contains(html, ">Waiting for Judging<") || strings.Contains(html, ">judging<") {
+		return &RemoteResult{RemoteID: remoteID, Done: false, Verdict: "PENDING"}
 	} else {
-		// Still pending/judging
 		return &RemoteResult{RemoteID: remoteID, Done: false, Verdict: "PENDING"}
 	}
 
-	// Parse time and memory from table cells
-	// Look for patterns like "200 ms" and "8192 KB"
 	lines := strings.Split(html, "\n")
 	for _, line := range lines {
 		lower := strings.ToLower(line)
 		if strings.Contains(lower, "ms") {
-			// Extract time
 			timeStr := extractTimeValue(line)
 			if timeStr > 0 {
 				result.TimeUsed = timeStr
 			}
 		}
 		if strings.Contains(lower, "kb") {
-			// Extract memory
 			memStr := extractMemoryValue(line)
 			if memStr > 0 {
 				result.MemoryUsed = memStr

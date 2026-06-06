@@ -1,6 +1,7 @@
 import { useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkMath from 'remark-math'
+import remarkGfm from 'remark-gfm'
 import rehypeKatex from 'rehype-katex'
 import 'katex/dist/katex.min.css'
 import VisualEditor from '../VisualEditor'
@@ -159,7 +160,7 @@ export default function StatementTab({
                 {formState.description && (
                   <div>
                     <h4 className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2">Description</h4>
-                    <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                    <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
                       {formState.description}
                     </ReactMarkdown>
                   </div>
@@ -167,7 +168,7 @@ export default function StatementTab({
                 {formState.inputFormat && (
                   <div>
                     <h4 className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2">Input Format</h4>
-                    <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                    <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
                       {formState.inputFormat}
                     </ReactMarkdown>
                   </div>
@@ -175,7 +176,7 @@ export default function StatementTab({
                 {formState.outputFormat && (
                   <div>
                     <h4 className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2">Output Format</h4>
-                    <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                    <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
                       {formState.outputFormat}
                     </ReactMarkdown>
                   </div>
@@ -183,7 +184,7 @@ export default function StatementTab({
                 {formState.hint && (
                   <div>
                     <h4 className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2">Constraints</h4>
-                    <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                    <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
                       {formState.hint}
                     </ReactMarkdown>
                   </div>

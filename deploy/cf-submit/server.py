@@ -116,6 +116,35 @@ try:
         print(json.dumps({"status": "ok", "message": "login successful"}))
         sys.exit(0)
 
+    if op == "languages":
+        page.goto("https://codeforces.com/problemset/submit", wait_until="load", timeout=60000)
+        time.sleep(3)
+        if "enter" in page.url.lower():
+            print(json.dumps({"error": "redirected to login from submit page"}))
+            sys.exit(0)
+        found = False
+        for attempt in range(20):
+            if page.locator('select[name="programTypeId"]').count() > 0:
+                found = True
+                break
+            time.sleep(2)
+            print(f"[info] polling for language select, attempt {attempt+1}/20", flush=True)
+        if not found:
+            ss(ctx, "99_no_language_select.png")
+            print(json.dumps({"error": "language select not found after 40s"}))
+            sys.exit(0)
+        select_el = page.locator('select[name="programTypeId"]')
+        options = select_el.evaluate("""el => {
+            const result = [];
+            for (const opt of el.options) {
+                if (opt.value) result.push({value: opt.value, text: opt.textContent.trim()});
+            }
+            return result;
+        }""")
+        print(f"[info] detected {len(options)} languages", flush=True)
+        print(json.dumps({"status": "ok", "languages": options}))
+        sys.exit(0)
+
     if op == "submit":
         page.goto("https://codeforces.com/problemset/submit", wait_until="load", timeout=60000)
         ss(ctx, "03_submit.png")
@@ -185,6 +214,15 @@ def _run_browser(op, proxy, *args):
 @app.get("/health")
 async def health():
     return {"status": "ok", "proxy": bool(PROXY)}
+
+
+@app.get("/languages")
+async def languages():
+    loop = asyncio.get_event_loop()
+    r = await loop.run_in_executor(None, _run_browser, "languages", PROXY)
+    if "error" in r:
+        return JSONResponse(r, status_code=400)
+    return r
 
 
 @app.post("/login")

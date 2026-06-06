@@ -234,6 +234,8 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 			r.Post("/", remoteLangH.Create)
 			r.Put("/{id}", remoteLangH.Update)
 			r.Delete("/{id}", remoteLangH.Delete)
+			r.Post("/detect/{platform}", remoteLangH.AutoDetect)
+			r.Post("/bulk", remoteLangH.BulkUpsert)
 		})
 
 		r.Route("/submissions", func(r chi.Router) {
@@ -242,6 +244,8 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 			r.Post("/{id}/refresh", adminSubH.ForceRefresh)
 		})
 	})
+
+	r.Get("/api/remote-languages/{platform}", remoteLangH.ListByPlatform)
 
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.AuthMiddleware(jwtManager))

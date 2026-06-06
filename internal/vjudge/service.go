@@ -25,6 +25,11 @@ type SubmitRequest struct {
 	RemoteOJ        string `json:"remote_oj"`
 }
 
+type RemoteLanguageItem struct {
+	ID   string `json:"value"`
+	Name string `json:"text"`
+}
+
 type Service struct {
 	mu              sync.RWMutex
 	bots            map[string]Bot
@@ -195,6 +200,27 @@ func (s *Service) Submit(ctx context.Context, req SubmitRequest) error {
 		return fmt.Errorf("all bots failed for %s: %w", req.RemoteOJ, lastErr)
 	}
 	return fmt.Errorf("no healthy bot available for %s", req.RemoteOJ)
+}
+
+func (s *Service) FetchLanguages(ctx context.Context, platform string) ([]RemoteLanguageItem, error) {
+	s.mu.RLock()
+	bot, ok := s.bots[platform]
+	s.mu.RUnlock()
+	if !ok {
+		return nil, fmt.Errorf("no bot for platform: %s", platform)
+	}
+
+	switch b := bot.(type) {
+	case *AtCoderBot:
+		if b.submitClient != nil {
+			return b.submitClient.FetchLanguages(ctx)
+		}
+	case *CodeforcesBot:
+		if b.cfSubmit != nil {
+			return b.cfSubmit.FetchLanguages(ctx)
+		}
+	}
+	return nil, fmt.Errorf("submit client not configured for platform: %s", platform)
 }
 
 func (s *Service) StartPollWorkers() {

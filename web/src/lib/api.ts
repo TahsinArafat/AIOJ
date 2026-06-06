@@ -324,6 +324,10 @@ export const api = {
                 request<any>(`/admin/remote-languages/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
             delete: (id: string) =>
                 request(`/admin/remote-languages/${id}`, { method: 'DELETE' }),
+            detect: (platform: string) =>
+                request<{ matched: any[]; unmatched: any[]; existing: any[] }>(`/admin/remote-languages/detect/${platform}`, { method: 'POST' }),
+            bulkUpsert: (items: { platform: string; local_id: string; remote_id: string; display_name: string; enabled: boolean; sort_order: number }[]) =>
+                request<any>('/admin/remote-languages/bulk', { method: 'POST', body: JSON.stringify(items) }),
         },
         submissions: {
             pendingRemote: () =>
@@ -701,5 +705,9 @@ export const api = {
     search: {
         global: (q: string, limit = 10) =>
             request<{ problems: any[]; users: any[]; contests: any[] }>(`/search?q=${encodeURIComponent(q)}&limit=${limit}`),
+    },
+    remoteLanguages: {
+        list: (platform: string) =>
+            request<{ data: any[] }>(`/remote-languages/${platform}`),
     },
 }

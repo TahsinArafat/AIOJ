@@ -178,15 +178,15 @@ export default function IDE() {
     const content = (
         <>
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 flex-shrink-0">
-                <div className="flex items-center gap-4">
-                    <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">IDE</h1>
-                    <span className="text-xs text-gray-400 dark:text-gray-500">|</span>
-                    <span className="text-xs text-gray-400 dark:text-gray-500">
+            <div className="flex items-center justify-between px-4 md:px-6 py-3 md:py-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 flex-shrink-0">
+                <div className="flex items-center gap-2 md:gap-4 min-w-0">
+                    <h1 className="text-lg md:text-xl font-bold text-gray-900 dark:text-gray-100 whitespace-nowrap">IDE</h1>
+                    <span className="text-xs text-gray-400 dark:text-gray-500 hidden sm:inline">|</span>
+                    <span className="text-xs text-gray-400 dark:text-gray-500 hidden sm:inline whitespace-nowrap">
                         Limits: {IDE_TIME_LIMIT_MS / 1000}s / {IDE_MEMORY_LIMIT_KB / 1024}MB
                     </span>
                     {cooldownRemaining > 0 && (
-                        <span className="text-xs text-yellow-600 dark:text-yellow-400">
+                        <span className="text-xs text-yellow-600 dark:text-yellow-400 whitespace-nowrap">
                             Cooldown: {Math.ceil(cooldownRemaining / 1000)}s
                         </span>
                     )}
@@ -201,11 +201,11 @@ export default function IDE() {
             </div>
 
             {/* Toolbar */}
-            <div className="flex items-center gap-3 px-6 py-3 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+            <div className="flex items-center gap-3 px-4 md:px-6 py-2 md:py-3 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
                 <select
                     value={language}
                     onChange={e => handleLanguageChange(e.target.value)}
-                    className="border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-0 max-w-[50vw] md:max-w-none"
                 >
                     {LANGS.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
                 </select>
@@ -213,17 +213,17 @@ export default function IDE() {
                 <button
                     onClick={handleRun}
                     disabled={running || !code.trim()}
-                    className="inline-flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-2 bg-blue-600 text-white px-3 md:px-4 py-1.5 md:py-2 rounded text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors cursor-pointer whitespace-nowrap"
                 >
                     <Play className="w-4 h-4" />
                     {running ? 'Running...' : 'Run'}
                 </button>
             </div>
 
-            {/* Main content: editor + output side by side */}
-            <div className="flex flex-1 min-h-0">
+            {/* Main content: editor + output side by side (stacked on mobile) */}
+            <div className="flex flex-col md:flex-row flex-1 min-h-0 overflow-auto">
                 {/* Left: Code Editor */}
-                <div className="flex-1 min-w-0 border-r border-gray-200 dark:border-gray-700">
+                <div className="flex-1 min-w-0 border-b md:border-b-0 md:border-r border-gray-200 dark:border-gray-700 min-h-[40vh] md:min-h-0">
                     <CodeEditor
                         language={language}
                         value={code}
@@ -233,21 +233,21 @@ export default function IDE() {
                 </div>
 
                 {/* Right: Input + Output */}
-                <div className="w-[420px] flex-shrink-0 flex flex-col min-h-0">
+                <div className="w-full md:w-[420px] md:flex-shrink-0 flex flex-col min-h-0">
                     {/* Custom Input */}
-                    <div className="border-b border-gray-200 dark:border-gray-700 p-4">
+                    <div className="border-b border-gray-200 dark:border-gray-700 p-3 md:p-4">
                         <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Custom Input (stdin)</h3>
                         <textarea
                             value={customInput}
                             onChange={e => setCustomInput(e.target.value)}
                             placeholder="Enter input for your program..."
-                            rows={5}
+                            rows={4}
                             className="w-full border border-gray-300 dark:border-gray-600 rounded p-2 text-sm bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                         />
                     </div>
 
                     {/* Output */}
-                    <div className="flex-1 overflow-y-auto p-4">
+                    <div className="flex-1 overflow-y-auto p-3 md:p-4">
                         <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Output</h3>
 
                         {error && (
@@ -263,7 +263,7 @@ export default function IDE() {
                                 return (
                                     <div className="space-y-3">
                                         {/* Stats */}
-                                        <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 rounded p-2">
+                                        <div className="flex flex-wrap items-center gap-2 md:gap-4 text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 rounded p-2">
                                             <span className="flex items-center gap-1">
                                                 <Clock className="w-3.5 h-3.5" />
                                                 {output.time_used > 0 ? `${output.time_used}ms` : '—'}

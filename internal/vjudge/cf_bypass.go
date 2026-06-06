@@ -138,11 +138,26 @@ func (c *CFBypassClient) Post(ctx context.Context, targetURL string, postData st
 	return result.Solution, nil
 }
 
+
+
 func (c *CFBypassClient) PostWithSession(ctx context.Context, targetURL string, postData string, sessionID string) (*flaresolverrSolution, error) {
 	result, err := c.doRequest(ctx, flaresolverrRequest{
 		CMD:        "request.post",
 		URL:        targetURL,
 		PostData:   postData,
+		Session:    sessionID,
+		MaxTimeout: 60000,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result.Solution, nil
+}
+
+func (c *CFBypassClient) GetWithSession(ctx context.Context, targetURL string, sessionID string) (*flaresolverrSolution, error) {
+	result, err := c.doRequest(ctx, flaresolverrRequest{
+		CMD:        "request.get",
+		URL:        targetURL,
 		Session:    sessionID,
 		MaxTimeout: 60000,
 	})

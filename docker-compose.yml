@@ -52,6 +52,8 @@ services:
       LANG_DIR: /app/lang
       REDIS_URL: ${REDIS_URL:-redis:6379}
       CF_SUBMIT_URL: ${CF_SUBMIT_URL:-http://host.docker.internal:8003}
+      FLARESOLVERR_URL: ${FLARESOLVERR_URL:-http://cf-bypass:8191}
+      ATCODER_SUBMIT_URL: ${ATCODER_SUBMIT_URL:-http://host.docker.internal:8004}
     ports:
       - "8080:8080"
     volumes:
@@ -143,6 +145,16 @@ services:
     environment:
       - PORT=8003
       - CF_PROXY=${CF_PROXY:-}
+    restart: unless-stopped
+
+  atcoder-submit:
+    build:
+      context: ./deploy/atcoder-submit
+      dockerfile: Dockerfile
+    ports:
+      - "8004:8004"
+    environment:
+      - PORT=8004
     restart: unless-stopped
 
   # =====================================================================

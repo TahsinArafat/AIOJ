@@ -4,6 +4,7 @@ import { api, getAccessToken } from '../lib/api'
 import CommentSection from '../components/CommentSection'
 import ReactMarkdown from 'react-markdown'
 import remarkMath from 'remark-math'
+import remarkGfm from 'remark-gfm'
 import rehypeKatex from 'rehype-katex'
 import 'katex/dist/katex.min.css'
 
@@ -153,7 +154,7 @@ export default function BlogDetail() {
                         )}
                     </div>
                     <div className="prose max-w-none text-gray-800 dark:text-gray-200">
-                        <ReactMarkdown remarkPlugins={[remarkMath]} rehypePlugins={[rehypeKatex]}>
+                        <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
                             {post.content}
                         </ReactMarkdown>
                     </div>

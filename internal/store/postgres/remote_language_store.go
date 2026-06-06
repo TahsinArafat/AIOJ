@@ -72,3 +72,24 @@ func (s *RemoteLanguageStore) Delete(ctx context.Context, id string) error {
 	_, err := s.db.ExecContext(ctx, `DELETE FROM remote_languages WHERE id = $1`, id)
 	return err
 }
+
+func (s *RemoteLanguageStore) BulkUpsert(ctx context.Context, platform string, langs []model.RemoteLanguage) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	for _, lang := range langs {
+		_, err := tx.ExecContext(ctx,
+			`INSERT INTO remote_languages (platform, local_id, remote_id, display_name, enabled, sort_order, inline_comment_prefix)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7)
+			 ON CONFLICT (platform, remote_id) DO UPDATE SET local_id = $2, display_name = $4, enabled = $5, sort_order = $6`,
+			platform, lang.LocalID, lang.RemoteID, lang.DisplayName, lang.Enabled, lang.SortOrder, lang.InlineCommentPrefix)
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}

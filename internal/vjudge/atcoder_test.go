@@ -15,7 +15,6 @@ func TestAtCoderBot(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			path := r.URL.Path
 
-			// Serve submit page with CSRF token
 			if path == "/contests/abc300/submit" && r.Method == "GET" {
 				w.Header().Set("Content-Type", "text/html")
 				fmt.Fprintf(w, `<html><body>
@@ -30,56 +29,24 @@ func TestAtCoderBot(t *testing.T) {
 				return
 			}
 
-			// Handle submit POST with redirect
 			if path == "/contests/abc300/submit" && r.Method == "POST" {
-				// Parse form data
 				if err := r.ParseForm(); err != nil {
 					w.WriteHeader(http.StatusBadRequest)
 					return
 				}
-				csrf := r.FormValue("csrf_token")
-				if csrf == "" {
-					w.WriteHeader(http.StatusBadRequest)
-					fmt.Fprintf(w, "missing csrf_token")
-					return
-				}
-				task := r.FormValue("data.TaskScreenName")
-				if task == "" {
-					w.WriteHeader(http.StatusBadRequest)
-					fmt.Fprintf(w, "missing task")
-					return
-				}
-				langID := r.FormValue("data.LanguageId")
-				if langID == "" {
-					w.WriteHeader(http.StatusBadRequest)
-					fmt.Fprintf(w, "missing language")
-					return
-				}
-				source := r.FormValue("sourceCode")
-				if source == "" {
-					w.WriteHeader(http.StatusBadRequest)
-					fmt.Fprintf(w, "missing sourceCode")
-					return
-				}
-
-				// Redirect to submissions page
-				w.Header().Set("Location", "/contests/abc300/submissions/me")
+				w.Header().Set("Location", "/contests/abc300/submissions/12345")
 				w.WriteHeader(http.StatusFound)
 				return
 			}
 
-			// Serve submissions page for polling
-			if path == "/contests/abc300/submissions/me" && r.Method == "GET" {
+			if path == "/contests/abc300/submissions/12345" && r.Method == "GET" {
 				w.Header().Set("Content-Type", "text/html")
 				fmt.Fprintf(w, `<html><body>
 					<table id="submissions">
 						<tr>
-							<td>abc300/me/12345</td>
-							<td>abc300_a</td>
-							<td>C++ (GCC 9.2.1)</td>
+							<td><span class="judge-result-success">Accepted</span></td>
 							<td>200 ms</td>
 							<td>8192 KB</td>
-							<td><span class="judge-result-success">Accepted</span></td>
 						</tr>
 					</table>
 				</body></html>`)
@@ -90,9 +57,8 @@ func TestAtCoderBot(t *testing.T) {
 		}))
 		defer server.Close()
 
-		// Create bot with cookies (simulating active session)
 		cookies := map[string]string{
-			"RESESS": "test_recess_cookie",
+			"RESESS":     "test_recess_cookie",
 			"csrf_token": "test_csrf_token_12345",
 		}
 		bot := NewAtCoderBot(BotConfig{
@@ -102,30 +68,25 @@ func TestAtCoderBot(t *testing.T) {
 
 		ctx := context.Background()
 
-		// Verify bot is logged in with cookies
 		if !bot.IsLoggedIn(ctx) {
 			t.Error("bot should be logged in with cookies")
 		}
 
-		// Submit a solution
 		submitID, err := bot.Submit(ctx, "abc300_a", "#include <iostream>\nint main(){return 0;}", "C++ (GCC 9.2.1)")
 		if err != nil {
 			t.Fatalf("Submit failed: %v", err)
 		}
 
-		// Verify remote submission ID
-		expectedID := "abc300/me"
+		expectedID := "abc300/12345"
 		if submitID != expectedID {
 			t.Errorf("expected remote ID %q, got %q", expectedID, submitID)
 		}
 
-		// Poll the submission
 		result, err := bot.Poll(ctx, submitID)
 		if err != nil {
 			t.Fatalf("Poll failed: %v", err)
 		}
 
-		// Verify result
 		if !result.Done {
 			t.Error("expected Done=true")
 		}
@@ -200,14 +161,12 @@ func TestAtCoderBot(t *testing.T) {
 	t.Run("Wrong CSRF token returns error", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == "POST" {
-				// Return error page
 				w.Header().Set("Content-Type", "text/html")
 				fmt.Fprintf(w, `<html><body>
 					<div class="alert alert-danger">CSRF token mismatch</div>
 				</body></html>`)
 				return
 			}
-			// Serve submit page with different CSRF
 			w.Header().Set("Content-Type", "text/html")
 			fmt.Fprintf(w, `<html><body>
 				<form>
@@ -224,9 +183,8 @@ func TestAtCoderBot(t *testing.T) {
 
 		ctx := context.Background()
 		_, err := bot.Submit(ctx, "abc300_a", "code", "C++")
-		if err != nil {
-			// We expect an error since the mock returns CSRF mismatch error page
-			t.Logf("Expected error on CSRF mismatch: %v", err)
+		if err == nil {
+			t.Error("expected error on CSRF mismatch")
 		}
 	})
 
@@ -246,7 +204,7 @@ func TestAtCoderBot(t *testing.T) {
 		})
 
 		ctx := context.Background()
-		result, err := bot.Poll(ctx, "abc300/me/99999")
+		result, err := bot.Poll(ctx, "abc300/99999")
 		if err != nil {
 			t.Fatalf("Poll failed: %v", err)
 		}
