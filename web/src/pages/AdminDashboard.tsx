@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Users, FileText, Bot, Settings, Code, Globe, Send } from 'lucide-react'
+import { Users, FileText, Bot, Settings, Code, Globe, Send, Database } from 'lucide-react'
 import UsersPanel from './admin/UsersPanel'
 import SetterAppsPanel from './admin/SetterAppsPanel'
 import BotAccountsPanel from './admin/BotAccountsPanel'
@@ -7,8 +7,9 @@ import SystemSettingsPanel from './admin/SystemSettingsPanel'
 import LanguagesPanel from './admin/LanguagesPanel'
 import RemoteLanguagesPanel from './admin/RemoteLanguagesPanel'
 import SubmissionsPanel from './admin/SubmissionsPanel'
+import BackupsPanel from './admin/BackupsPanel'
 
-type AdminTab = 'users' | 'applications' | 'bots' | 'languages' | 'remote-languages' | 'submissions' | 'settings'
+type AdminTab = 'users' | 'applications' | 'bots' | 'languages' | 'remote-languages' | 'submissions' | 'settings' | 'backups'
 
 const tabs: { key: AdminTab; label: string; icon: typeof Users }[] = [
     { key: 'users', label: 'Users', icon: Users },
@@ -17,13 +18,14 @@ const tabs: { key: AdminTab; label: string; icon: typeof Users }[] = [
     { key: 'languages', label: 'Languages', icon: Code },
     { key: 'remote-languages', label: 'Remote Languages', icon: Globe },
     { key: 'submissions', label: 'Remote Subs', icon: Send },
+    { key: 'backups', label: 'Backup & Restore', icon: Database },
     { key: 'settings', label: 'Settings', icon: Settings },
 ]
 
 export default function AdminDashboard() {
     const [activeTab, setActiveTab] = useState<AdminTab>(() => {
         const hash = window.location.hash.replace('#', '') as AdminTab
-        const validTabs: AdminTab[] = ['users', 'applications', 'bots', 'languages', 'remote-languages', 'submissions', 'settings']
+        const validTabs: AdminTab[] = ['users', 'applications', 'bots', 'languages', 'remote-languages', 'submissions', 'backups', 'settings']
         return validTabs.includes(hash) ? hash : 'users'
     })
 
@@ -63,6 +65,7 @@ export default function AdminDashboard() {
                     {activeTab === 'languages' && <LanguagesPanel />}
                     {activeTab === 'remote-languages' && <RemoteLanguagesPanel />}
                     {activeTab === 'submissions' && <SubmissionsPanel />}
+                    {activeTab === 'backups' && <BackupsPanel />}
                     {activeTab === 'settings' && <SystemSettingsPanel />}
                 </div>
             </div>
