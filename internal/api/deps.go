@@ -49,4 +49,5 @@ type Deps struct {
 	LangAdmin      *handler.AdminLanguageHandler
 	RemoteLang     *handler.RemoteLanguageHandler
 	AdminSub       *handler.AdminSubmissionHandler
+	Backup         *handler.AdminBackupHandler
 }

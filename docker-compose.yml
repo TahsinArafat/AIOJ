@@ -59,6 +59,7 @@ services:
     volumes:
       - testdata:/app/testdata
       - ./lang:/app/lang
+      - backups:/app/backups
     depends_on:
       postgres:
         condition: service_healthy
@@ -191,3 +192,4 @@ volumes:
   grafdata:
   caddy_data:
   caddy_config:
+  backups:

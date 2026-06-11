@@ -219,6 +219,7 @@ contestH := handler.NewContestHandler(contestStore, ratingStore, problemStore, u
 
 	remoteLangH := handler.NewRemoteLanguageHandler(remoteLangStore, vjService)
 	adminSubH := handler.NewAdminSubmissionHandler(submissionStore, problemStore, vjService)
+	backupH := handler.NewAdminBackupHandler(userStore, cfg.Database, "./backups")
 
 	router := api.NewRouter(api.Deps{
 		Auth:           authH,
@@ -263,6 +264,7 @@ contestH := handler.NewContestHandler(contestStore, ratingStore, problemStore, u
 		LangAdmin:      langAdminH,
 		RemoteLang:     remoteLangH,
 		AdminSub:       adminSubH,
+		Backup:         backupH,
 	}, jwtManager)
 
 	srv := &http.Server{

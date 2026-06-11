@@ -53,6 +53,7 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 	langAdminH := d.LangAdmin
 	remoteLangH := d.RemoteLang
 	adminSubH := d.AdminSub
+	backupH := d.Backup
 	r := chi.NewRouter()
 	rl := middleware.NewRateLimiter()
 	r.Use(middleware.RateLimit(rl, "/api/health", "/api/ws", "/metrics"), chiMiddleware.RequestID, chiMiddleware.RealIP, middleware.Logging, chiMiddleware.Recoverer)
@@ -242,6 +243,15 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 			r.Get("/pending-remote", adminSubH.ListPendingRemote)
 			r.Post("/{id}/rejudge", adminSubH.Rejudge)
 			r.Post("/{id}/refresh", adminSubH.ForceRefresh)
+		})
+
+		r.Route("/backups", func(r chi.Router) {
+			r.Get("/", backupH.List)
+			r.Post("/", backupH.Create)
+			r.Post("/upload", backupH.Upload)
+			r.Get("/{filename}", backupH.Download)
+			r.Delete("/{filename}", backupH.Delete)
+			r.Post("/{filename}/restore", backupH.Restore)
 		})
 	})
 
