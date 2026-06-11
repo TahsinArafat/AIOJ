@@ -203,7 +203,7 @@ func (h *AdminBackupHandler) Create(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	case "files":
-		if err := h.runTarCreate(filename, h.dir); err != nil {
+		if err := h.runTarCreate(filename, "./testdata", "./media"); err != nil {
 			http.Error(w, fmt.Sprintf("files backup failed: %v", err), http.StatusInternalServerError)
 			return
 		}
@@ -214,9 +214,9 @@ func (h *AdminBackupHandler) Create(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, fmt.Sprintf("database backup failed: %v", err), http.StatusInternalServerError)
 			return
 		}
-		// Create tar.gz archive containing the db dump
+		// Create tar.gz archive containing the db dump, testdata, and media
 		dbPath := filepath.Join(h.dir, dbFilename)
-		if err := h.runTarCreate(filename, dbPath); err != nil {
+		if err := h.runTarCreate(filename, dbPath, "./testdata", "./media"); err != nil {
 			os.Remove(dbPath)
 			http.Error(w, fmt.Sprintf("full backup failed: %v", err), http.StatusInternalServerError)
 			return
@@ -304,27 +304,23 @@ func (h *AdminBackupHandler) Restore(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	case "files":
-		if err := h.runTarExtract(path, h.dir); err != nil {
+		os.RemoveAll("./testdata")
+		os.RemoveAll("./media")
+		if err := h.runTarExtract(path, "."); err != nil {
 			http.Error(w, fmt.Sprintf("files restore failed: %v", err), http.StatusInternalServerError)
 			return
 		}
 	case "full":
-		// Extract the tar.gz to get the db dump, then restore
-		tmpDir, err := os.MkdirTemp("", "aioj-restore-*")
-		if err != nil {
-			http.Error(w, "failed to create temp directory", http.StatusInternalServerError)
-			return
-		}
-		defer os.RemoveAll(tmpDir)
+		os.RemoveAll("./testdata")
+		os.RemoveAll("./media")
 
-		if err := h.runTarExtract(path, tmpDir); err != nil {
+		if err := h.runTarExtract(path, "."); err != nil {
 			http.Error(w, fmt.Sprintf("full restore failed: %v", err), http.StatusInternalServerError)
 			return
 		}
 
-		// Find the .sql file in the extracted contents
 		var sqlFile string
-		filepath.Walk(tmpDir, func(p string, info os.FileInfo, err error) error {
+		filepath.Walk(".", func(p string, info os.FileInfo, err error) error {
 			if err != nil {
 				return nil
 			}
@@ -343,6 +339,8 @@ func (h *AdminBackupHandler) Restore(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, fmt.Sprintf("database restore failed: %v", err), http.StatusInternalServerError)
 			return
 		}
+
+		os.Remove(sqlFile)
 	}
 
 	respondJSON(w, http.StatusOK, map[string]string{"status": "restored"})
