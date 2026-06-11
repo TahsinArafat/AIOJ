@@ -297,30 +297,62 @@ func (h *AdminBackupHandler) Restore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	tmpDir, err := os.MkdirTemp("", "aioj-restore-*")
+	if err != nil {
+		http.Error(w, "failed to create temp directory", http.StatusInternalServerError)
+		return
+	}
+	defer os.RemoveAll(tmpDir)
+
+	if err := h.runTarExtract(path, tmpDir); err != nil {
+		http.Error(w, fmt.Sprintf("restore extract failed: %v", err), http.StatusInternalServerError)
+		return
+	}
+
 	switch req.Type {
 	case "db":
-		if err := h.runPsql(path); err != nil {
+		var sqlFile string
+		filepath.Walk(tmpDir, func(p string, info os.FileInfo, err error) error {
+			if err != nil {
+				return nil
+			}
+			if !info.IsDir() && strings.HasSuffix(info.Name(), ".sql") {
+				sqlFile = p
+			}
+			return nil
+		})
+
+		if sqlFile == "" {
+			http.Error(w, "no database dump found in backup archive", http.StatusBadRequest)
+			return
+		}
+
+		if err := h.runPsql(sqlFile); err != nil {
 			http.Error(w, fmt.Sprintf("database restore failed: %v", err), http.StatusInternalServerError)
 			return
 		}
 	case "files":
 		os.RemoveAll("./testdata")
 		os.RemoveAll("./media")
-		if err := h.runTarExtract(path, "."); err != nil {
-			http.Error(w, fmt.Sprintf("files restore failed: %v", err), http.StatusInternalServerError)
-			return
+
+		extractedTestData := filepath.Join(tmpDir, "testdata")
+		if _, err := os.Stat(extractedTestData); err == nil {
+			if err := os.Rename(extractedTestData, "./testdata"); err != nil {
+				cmd := exec.Command("cp", "-r", extractedTestData, "./testdata")
+				_ = cmd.Run()
+			}
+		}
+
+		extractedMedia := filepath.Join(tmpDir, "media")
+		if _, err := os.Stat(extractedMedia); err == nil {
+			if err := os.Rename(extractedMedia, "./media"); err != nil {
+				cmd := exec.Command("cp", "-r", extractedMedia, "./media")
+				_ = cmd.Run()
+			}
 		}
 	case "full":
-		os.RemoveAll("./testdata")
-		os.RemoveAll("./media")
-
-		if err := h.runTarExtract(path, "."); err != nil {
-			http.Error(w, fmt.Sprintf("full restore failed: %v", err), http.StatusInternalServerError)
-			return
-		}
-
 		var sqlFile string
-		filepath.Walk(".", func(p string, info os.FileInfo, err error) error {
+		filepath.Walk(tmpDir, func(p string, info os.FileInfo, err error) error {
 			if err != nil {
 				return nil
 			}
@@ -340,7 +372,24 @@ func (h *AdminBackupHandler) Restore(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		os.Remove(sqlFile)
+		os.RemoveAll("./testdata")
+		os.RemoveAll("./media")
+
+		extractedTestData := filepath.Join(tmpDir, "testdata")
+		if _, err := os.Stat(extractedTestData); err == nil {
+			if err := os.Rename(extractedTestData, "./testdata"); err != nil {
+				cmd := exec.Command("cp", "-r", extractedTestData, "./testdata")
+				_ = cmd.Run()
+			}
+		}
+
+		extractedMedia := filepath.Join(tmpDir, "media")
+		if _, err := os.Stat(extractedMedia); err == nil {
+			if err := os.Rename(extractedMedia, "./media"); err != nil {
+				cmd := exec.Command("cp", "-r", extractedMedia, "./media")
+				_ = cmd.Run()
+			}
+		}
 	}
 
 	respondJSON(w, http.StatusOK, map[string]string{"status": "restored"})
