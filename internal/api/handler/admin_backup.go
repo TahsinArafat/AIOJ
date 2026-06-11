@@ -249,8 +249,13 @@ func (h *AdminBackupHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 // Restore restores from a backup file. Requires password confirmation.
 func (h *AdminBackupHandler) Restore(w http.ResponseWriter, r *http.Request) {
+	filename := chi.URLParam(r, "filename")
+	if filename == "" {
+		http.Error(w, "filename is required", http.StatusBadRequest)
+		return
+	}
+
 	var req struct {
-		Filename string `json:"filename"`
 		Password string `json:"password"`
 		Type     string `json:"type"`
 	}
@@ -259,11 +264,7 @@ func (h *AdminBackupHandler) Restore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Filename == "" {
-		http.Error(w, "filename is required", http.StatusBadRequest)
-		return
-	}
-	if strings.Contains(req.Filename, "..") || strings.Contains(req.Filename, "/") {
+	if strings.Contains(filename, "..") || strings.Contains(filename, "/") {
 		http.Error(w, "invalid filename", http.StatusBadRequest)
 		return
 	}
@@ -291,7 +292,7 @@ func (h *AdminBackupHandler) Restore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	path := filepath.Join(h.dir, req.Filename)
+	path := filepath.Join(h.dir, filename)
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		http.Error(w, "backup not found", http.StatusNotFound)
 		return
