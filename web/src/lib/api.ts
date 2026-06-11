@@ -64,7 +64,7 @@ export function getAccessToken(): string | null { return accessToken }
 
 async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
     const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
+        ...(opts.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
         ...(opts.headers as Record<string, string> || {}),
     }
     if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`
@@ -364,6 +364,24 @@ export const api = {
                 request<{ compilers: any[]; interpreters: any[] }>('/admin/languages/detect'),
             templates: () =>
                 request<{ data: any[] }>('/admin/languages/templates'),
+        },
+        backups: {
+            list: () =>
+                request<{ data: any[] }>('/admin/backups'),
+            create: (type: string) =>
+                request<any>('/admin/backups', { method: 'POST', body: JSON.stringify({ type }) }),
+            delete: (filename: string) =>
+                request<any>(`/admin/backups/${encodeURIComponent(filename)}`, { method: 'DELETE' }),
+            restore: (filename: string, password: string, type: string) =>
+                request<any>(`/admin/backups/${encodeURIComponent(filename)}/restore`, { method: 'POST', body: JSON.stringify({ password, type }) }),
+            upload: (file: File) => {
+                const formData = new FormData()
+                formData.append('file', file)
+                return request<any>('/admin/backups/upload', {
+                    method: 'POST',
+                    body: formData,
+                })
+            },
         },
     },
     setter: {
