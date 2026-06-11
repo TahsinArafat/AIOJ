@@ -117,7 +117,7 @@ export default function BackupsPanel() {
     const handleDownload = (backup: BackupFile) => {
         const token = localStorage.getItem('access_token')
         const link = document.createElement('a')
-        link.href = `/api/admin/backups/${encodeURIComponent(backup.filename)}/download`
+        link.href = `/api/admin/backups/${encodeURIComponent(backup.filename)}`
         if (token) {
             link.href += `?token=${token}`
         }
