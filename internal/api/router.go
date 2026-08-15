@@ -253,6 +253,16 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 			r.Delete("/{filename}", backupH.Delete)
 			r.Post("/{filename}/restore", backupH.Restore)
 		})
+
+		r.Route("/ai-models", func(r chi.Router) {
+			r.Get("/", d.AIModel.List)
+			r.Post("/", d.AIModel.Create)
+			r.Post("/test", d.AIModel.TestConnection)
+			r.Get("/{id}", d.AIModel.GetByID)
+			r.Put("/{id}", d.AIModel.Update)
+			r.Put("/{id}/toggle", d.AIModel.Toggle)
+			r.Delete("/{id}", d.AIModel.Delete)
+		})
 	})
 
 	r.Get("/api/remote-languages/{platform}", remoteLangH.ListByPlatform)
@@ -462,6 +472,12 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 		r.Get("/report/{reportId}", plagiarismH.GetReport)
 		r.Get("/report/{reportId}/pairs", plagiarismH.ListPairs)
 		r.Put("/pairs/{pairId}", plagiarismH.UpdatePairStatus)
+	})
+
+	r.Route("/api/generate", func(r chi.Router) {
+		r.Use(middleware.AuthMiddleware(jwtManager))
+		r.Use(middleware.RequireRole("admin", "setter"))
+		r.Post("/problem", d.Generate.Problem)
 	})
 
 	fileServer := http.FileServer(http.Dir("./media"))

@@ -16,6 +16,7 @@ import (
 	"github.com/tahsinarafat/aioj/internal/api/handler"
 	"github.com/tahsinarafat/aioj/internal/auth"
 	"github.com/tahsinarafat/aioj/internal/config"
+	"github.com/tahsinarafat/aioj/internal/generate"
 	"github.com/tahsinarafat/aioj/internal/judge"
 	"github.com/tahsinarafat/aioj/internal/judge/executor"
 	"github.com/tahsinarafat/aioj/internal/queue"
@@ -221,6 +222,11 @@ contestH := handler.NewContestHandler(contestStore, ratingStore, problemStore, u
 	adminSubH := handler.NewAdminSubmissionHandler(submissionStore, problemStore, vjService)
 	backupH := handler.NewAdminBackupHandler(userStore, cfg.Database, "./backups")
 
+	aiModelStore := postgres.NewAIModelStore(db)
+	aiModelH := handler.NewAdminAIModelHandler(aiModelStore)
+	genSvc := generate.NewService(aiModelStore, problemStore, editorialStore)
+	generateH := handler.NewGenerateHandler(genSvc)
+
 	router := api.NewRouter(api.Deps{
 		Auth:           authH,
 		Problem:        problemH,
@@ -265,6 +271,8 @@ contestH := handler.NewContestHandler(contestStore, ratingStore, problemStore, u
 		RemoteLang:     remoteLangH,
 		AdminSub:       adminSubH,
 		Backup:         backupH,
+		Generate:       generateH,
+		AIModel:        aiModelH,
 	}, jwtManager)
 
 	srv := &http.Server{

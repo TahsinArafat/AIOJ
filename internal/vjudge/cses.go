@@ -282,3 +282,17 @@ func setBrowserHeaders(req *http.Request) {
 	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8")
 	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
 }
+
+// Configure implements Bot.Configure.
+// CSESBot reads credentials at construction time; runtime Configure is a no-op.
+func (b *CSESBot) Configure(cfg BotConfig) {}
+
+// SetCookies implements Bot.SetCookies.
+// CSESBot does not use cookie-based sessions.
+func (b *CSESBot) SetCookies(cookies map[string]string) {}
+
+// FetchLanguages implements Bot.FetchLanguages.
+// CSESBot does not support remote language enumeration.
+func (b *CSESBot) FetchLanguages(ctx context.Context) ([]RemoteLanguageItem, error) {
+	return nil, nil
+}

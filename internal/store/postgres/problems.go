@@ -51,14 +51,14 @@ func (s *ProblemStore) Create(ctx context.Context, p *model.Problem) error {
 		 time_limit,memory_limit,difficulty,tags,visible,testdata_path,testcase_score,
 		 spj,spj_language,spj_source_code,spj_version,source,remote_id,created_by,
 		 checker_type,float_epsilon,interactive,interactor_language,interactor_source_code,
-		 scoring_mode,subtask_aggregation)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29)
+		 scoring_mode,subtask_aggregation,ai_generated)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30)
 		RETURNING created_at,updated_at`,
 		p.ID, p.Slug, p.Title, p.Description, p.InputFormat, p.OutputFormat, p.Hint, samples,
 		p.TimeLimit, p.MemoryLimit, p.Difficulty, pq.Array(p.Tags), p.Visible, p.TestdataPath, scores,
 		p.SPJ, p.SPJLanguage, p.SPJSourceCode, p.SPJVersion, p.Source, p.RemoteID, p.CreatedBy,
 		p.CheckerType, p.FloatEpsilon, p.Interactive, p.InteractorLanguage, p.InteractorSourceCode,
-		p.ScoringMode, p.SubtaskAggregation,
+		p.ScoringMode, p.SubtaskAggregation, p.AIGenerated,
 	).Scan(&p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
 		return fmt.Errorf("insert problem: %w", err)
@@ -95,13 +95,14 @@ func (s *ProblemStore) getBy(ctx context.Context, field, value string) (*model.P
 		spj,spj_language,spj_source_code,spj_version,checker_type,float_epsilon,submission_count,accepted_count,
 		source,remote_id,created_by,created_at,updated_at,
 		interactive,COALESCE(interactor_language,''),COALESCE(interactor_source_code,''),
-		COALESCE(scoring_mode,'complete'),COALESCE(subtask_aggregation,'min') FROM problems WHERE %s=$1`, field), value).Scan(
+		COALESCE(scoring_mode,'complete'),COALESCE(subtask_aggregation,'min'),
+		COALESCE(ai_generated,false) FROM problems WHERE %s=$1`, field), value).Scan(
 		&p.ID, &p.Slug, &p.Title, &p.Description, &p.InputFormat, &p.OutputFormat, &p.Hint, &samples,
 		&p.TimeLimit, &p.MemoryLimit, &p.Difficulty, pq.Array(&tags), &p.Visible, &p.TestdataPath, &scores,
 		&p.SPJ, &p.SPJLanguage, &p.SPJSourceCode, &p.SPJVersion, &p.CheckerType, &p.FloatEpsilon, &p.SubmissionCount, &p.AcceptedCount,
 		&p.Source, &p.RemoteID, &p.CreatedBy, &p.CreatedAt, &p.UpdatedAt,
 		&p.Interactive, &p.InteractorLanguage, &p.InteractorSourceCode,
-		&p.ScoringMode, &p.SubtaskAggregation)
+		&p.ScoringMode, &p.SubtaskAggregation, &p.AIGenerated)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}

@@ -499,14 +499,25 @@ export default function ProblemDetail() {
                             </span>
                         )}
                     </h1>
-                    <div className="mt-3 text-sm text-gray-600 dark:text-gray-400 flex flex-wrap items-center gap-4">
-                        <span className="flex items-center gap-1.5"><span className="font-semibold text-gray-700 dark:text-gray-300">Time Limit:</span> {problem.time_limit} ms</span>
-                        <span className="flex items-center gap-1.5"><span className="font-semibold text-gray-700 dark:text-gray-300">Memory Limit:</span> {Math.round(problem.memory_limit / 1024)} MB</span>
-                        <span className="flex items-center gap-1.5"><span className="font-semibold text-gray-700 dark:text-gray-300">Difficulty:</span> <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wider ${
-                            problem.difficulty === 'easy' ? 'bg-green-100 dark:bg-green-900/30 text-green-800' :
-                            problem.difficulty === 'hard' ? 'bg-red-100 dark:bg-red-900/30 text-red-800' :
-                            'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800'
-                        }`}>{problem.difficulty}</span></span>
+                    <div className="mt-3 pb-3 border-b border-gray-200 dark:border-gray-700 flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-xs text-gray-500 dark:text-gray-400">
+                        <span className="flex items-center gap-1.5">
+                            <span className="text-gray-700 dark:text-gray-300 font-semibold">Time:</span>
+                            <span className="text-gray-900 dark:text-gray-100 font-semibold">{(problem.time_limit / 1000).toFixed(1)} sec</span>
+                        </span>
+                        <span className="text-gray-300 dark:text-gray-600">·</span>
+                        <span className="flex items-center gap-1.5">
+                            <span className="text-gray-700 dark:text-gray-300 font-semibold">Memory:</span>
+                            <span className="text-gray-900 dark:text-gray-100 font-semibold">{Math.round(problem.memory_limit / 1024)} MB</span>
+                        </span>
+                        <span className="text-gray-300 dark:text-gray-600">·</span>
+                        <span className="flex items-center gap-1.5">
+                            <span className="text-gray-700 dark:text-gray-300 font-semibold">Difficulty:</span>
+                            <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wider ${
+                                problem.difficulty === 'easy' ? 'bg-green-100 dark:bg-green-900/30 text-green-800' :
+                                problem.difficulty === 'hard' ? 'bg-red-100 dark:bg-red-900/30 text-red-800' :
+                                'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800'
+                            }`}>{problem.difficulty}</span>
+                        </span>
                     </div>
                     {canExport && (
                         <div className="mt-2">
@@ -557,7 +568,7 @@ export default function ProblemDetail() {
                 </div>
 
                 {tab === 'statement' ? (
-                    <div className="space-y-5 pb-8">
+                    <div className="space-y-5 pb-8 px-4 py-6 md:px-8 md:py-8">
                         {isPdfUrl(problem.description) ? (
                             <div className="space-y-3">
                                 <h3 className="font-semibold text-sm text-gray-700 dark:text-gray-300 uppercase tracking-wide">PDF Problem Statement</h3>
@@ -577,7 +588,7 @@ export default function ProblemDetail() {
                                 />
                             </div>
                         ) : (
-                            <div className="prose prose-sm max-w-none text-gray-800 dark:text-gray-200 leading-relaxed">
+                            <div className="prose prose-sm max-w-none text-gray-800 dark:text-gray-200 text-[14px] leading-[1.6]">
                                 <ReactMarkdown
                                     remarkPlugins={[remarkGfm, remarkMath]}
                                     rehypePlugins={[rehypeKatex]}
@@ -599,7 +610,7 @@ export default function ProblemDetail() {
                         {problem.input_format && (
                             <div>
                                 <h3 className="font-semibold text-sm text-gray-700 dark:text-gray-300 uppercase tracking-wide mb-1">Input Format</h3>
-                                <div className="prose prose-sm max-w-none text-gray-700 dark:text-gray-300">
+                                <div className="prose prose-sm max-w-none text-gray-700 dark:text-gray-300 text-[14px] leading-[1.6]">
                                     <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
                                         {problem.input_format}
                                     </ReactMarkdown>
@@ -609,7 +620,7 @@ export default function ProblemDetail() {
                         {problem.output_format && (
                             <div>
                                 <h3 className="font-semibold text-sm text-gray-700 dark:text-gray-300 uppercase tracking-wide mb-1">Output Format</h3>
-                                <div className="prose prose-sm max-w-none text-gray-700 dark:text-gray-300">
+                                <div className="prose prose-sm max-w-none text-gray-700 dark:text-gray-300 text-[14px] leading-[1.6]">
                                     <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
                                         {problem.output_format}
                                     </ReactMarkdown>
@@ -619,7 +630,7 @@ export default function ProblemDetail() {
                         {problem.hint && (
                             <div>
                                 <h3 className="font-semibold text-sm text-gray-700 dark:text-gray-300 uppercase tracking-wide mb-1">Constraints</h3>
-                                <div className="prose prose-sm max-w-none text-gray-700 dark:text-gray-300">
+                                <div className="prose prose-sm max-w-none text-gray-700 dark:text-gray-300 text-[14px] leading-[1.6]">
                                     <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
                                         {problem.hint}
                                     </ReactMarkdown>
@@ -627,22 +638,24 @@ export default function ProblemDetail() {
                             </div>
                         )}
                         {problem.sample_cases?.length > 0 && problem.sample_cases.map((sc: any, i: number) => (
-                            <div key={i} className="space-y-1">
-                                <h3 className="font-semibold text-sm text-gray-700 dark:text-gray-300 uppercase tracking-wide">Sample {i + 1}</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                    <div>
-                                        <div className="flex items-center justify-between mb-1">
-                                            <span className="text-xs text-gray-400 dark:text-gray-500">Input</span>
-                                            <CopyButton text={sc.input} />
+                            <div key={i}>
+                                <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Sample {i + 1}</h3>
+                                <div className="border border-gray-200 dark:border-gray-700 rounded-md overflow-hidden mb-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-2">
+                                        <div className="border-b md:border-b-0 md:border-r border-gray-200 dark:border-gray-700">
+                                            <div className="bg-gray-50 dark:bg-gray-800 px-3 py-2 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                                                <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">Standard Input</span>
+                                                <CopyButton text={sc.input} />
+                                            </div>
+                                            <pre className="p-3 font-mono text-[13px] text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-all">{sc.input}</pre>
                                         </div>
-                                        <pre className="bg-gray-100 dark:bg-gray-700 rounded p-2 text-xs overflow-x-auto">{sc.input}</pre>
-                                    </div>
-                                    <div>
-                                        <div className="flex items-center justify-between mb-1">
-                                            <span className="text-xs text-gray-400 dark:text-gray-500">Output</span>
-                                            <CopyButton text={sc.output} />
+                                        <div>
+                                            <div className="bg-gray-50 dark:bg-gray-800 px-3 py-2 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                                                <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">Standard Output</span>
+                                                <CopyButton text={sc.output} />
+                                            </div>
+                                            <pre className="p-3 font-mono text-[13px] text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-all">{sc.output}</pre>
                                         </div>
-                                        <pre className="bg-gray-100 dark:bg-gray-700 rounded p-2 text-xs overflow-x-auto">{sc.output}</pre>
                                     </div>
                                 </div>
                                 {sc.explanation && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{sc.explanation}</p>}

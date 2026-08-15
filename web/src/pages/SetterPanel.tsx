@@ -219,6 +219,7 @@ export default function SetterPanel() {
                 <div className="flex gap-2">
                     <Link to="/setter/contest/create" className="bg-green-600 text-white px-4 py-2 rounded text-sm hover:bg-green-700 transition-colors">+ Create Contest</Link>
                     <Link to="/setter/create" className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 transition-colors">+ Create Problem</Link>
+                    <Link to="/generate/problem" className="bg-purple-600 text-white px-4 py-2 rounded text-sm hover:bg-purple-700 transition-colors flex items-center gap-1">✦ Generate with AI</Link>
                 </div>
             </div>
 

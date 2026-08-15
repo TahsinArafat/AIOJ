@@ -13,6 +13,7 @@ type Config struct {
 	Auth     AuthConfig     `yaml:"auth"`
 	Judge    JudgeConfig    `yaml:"judge"`
 	Redis    RedisConfig    `yaml:"redis"`
+	AI       AIConfig       `yaml:"ai"`
 	LangDir  string         `yaml:"lang_dir"`
 }
 
@@ -45,6 +46,12 @@ type JudgeConfig struct {
 
 type RedisConfig struct {
 	URL string `yaml:"url"`
+}
+
+type AIConfig struct {
+	Endpoint string `yaml:"endpoint"` // base URL of OpenAI-compatible API, e.g. http://localhost:8080/v1
+	APIKey   string `yaml:"api_key"`
+	Model    string `yaml:"model"` // model name served at the endpoint
 }
 
 func Load(path string) (*Config, error) {
@@ -82,6 +89,15 @@ func Load(path string) (*Config, error) {
 	}
 	if v := os.Getenv("JWT_SECRET"); v != "" {
 		cfg.Auth.JWTSecret = v
+	}
+	if v := os.Getenv("AI_ENDPOINT"); v != "" {
+		cfg.AI.Endpoint = v
+	}
+	if v := os.Getenv("AI_API_KEY"); v != "" {
+		cfg.AI.APIKey = v
+	}
+	if v := os.Getenv("AI_MODEL"); v != "" {
+		cfg.AI.Model = v
 	}
 	return &cfg, nil
 }

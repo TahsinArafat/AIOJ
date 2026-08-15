@@ -77,14 +77,36 @@ func (b *CodeforcesBot) Login(ctx context.Context) (map[string]string, error) {
 	err := b.login(ctx)
 	return b.config.Cookies, err
 }
-func (b *CodeforcesBot) Configure(acc model.BotAccount) {
-	b.config.Username = acc.PlatformUser
-	b.config.Password = acc.PlatformPass
-	b.config.APIKey = acc.APIKey
-	b.config.APISecret = acc.APISecret
-	b.config.ProxyURL = acc.ProxyURL
-	b.config.ProxyEnabled = acc.ProxyEnabled
-	b.SetCookies(acc.SessionData)
+// Configure implements Bot.Configure using a BotConfig.
+func (b *CodeforcesBot) Configure(cfg BotConfig) {
+	b.config.Username = cfg.Username
+	b.config.Password = cfg.Password
+	b.config.APIKey = cfg.APIKey
+	b.config.APISecret = cfg.APISecret
+	b.config.ProxyURL = cfg.ProxyURL
+	b.config.ProxyEnabled = cfg.ProxyEnabled
+	b.SetCookies(cfg.Cookies)
+}
+
+// ConfigureFromAccount configures the bot from a BotAccount model (used internally).
+func (b *CodeforcesBot) ConfigureFromAccount(acc model.BotAccount) {
+	b.Configure(BotConfig{
+		Username:     acc.PlatformUser,
+		Password:     acc.PlatformPass,
+		APIKey:       acc.APIKey,
+		APISecret:    acc.APISecret,
+		ProxyURL:     acc.ProxyURL,
+		ProxyEnabled: acc.ProxyEnabled,
+		Cookies:      acc.SessionData,
+	})
+}
+
+// FetchLanguages implements Bot.FetchLanguages.
+func (b *CodeforcesBot) FetchLanguages(ctx context.Context) ([]RemoteLanguageItem, error) {
+	if b.cfSubmit != nil {
+		return b.cfSubmit.FetchLanguages(ctx)
+	}
+	return nil, nil
 }
 
 func (b *CodeforcesBot) SetCookies(cookies map[string]string) {

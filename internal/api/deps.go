@@ -50,4 +50,6 @@ type Deps struct {
 	RemoteLang     *handler.RemoteLanguageHandler
 	AdminSub       *handler.AdminSubmissionHandler
 	Backup         *handler.AdminBackupHandler
+	Generate       *handler.GenerateHandler
+	AIModel        *handler.AdminAIModelHandler
 }

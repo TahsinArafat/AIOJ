@@ -48,6 +48,7 @@ type Problem struct {
 	AcceptedCount   int             `json:"accepted_count"`
 	Source          string          `json:"source"`
 	RemoteID        string          `json:"remote_id,omitempty"`
+	AIGenerated     bool            `json:"ai_generated,omitempty"`
 	CreatedBy       string          `json:"created_by"`
 	CreatedAt       time.Time       `json:"created_at"`
 	UpdatedAt       time.Time       `json:"updated_at"`

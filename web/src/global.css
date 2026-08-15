@@ -46,5 +46,5 @@ body {
 }
 
 .prose :where(pre):not(:where([class~="not-prose"],[class~="not-prose"] *)) {
-    font-size: 1em !important;
+    font-size: 0.875em !important;
 }

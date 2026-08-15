@@ -460,3 +460,11 @@ func extractMemoryValue(html string) int {
 	fmt.Sscanf(html[start:idx], "%d", &val)
 	return val
 }
+
+// FetchLanguages implements Bot.FetchLanguages.
+func (b *AtCoderBot) FetchLanguages(ctx context.Context) ([]RemoteLanguageItem, error) {
+	if b.submitClient != nil {
+		return b.submitClient.FetchLanguages(ctx)
+	}
+	return nil, nil
+}

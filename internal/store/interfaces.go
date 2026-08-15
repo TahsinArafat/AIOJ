@@ -361,3 +361,16 @@ type ContestNoticeStore interface {
 	ListByContest(ctx context.Context, contestID string) ([]model.ContestNotice, error)
 	Delete(ctx context.Context, id string) error
 }
+
+// AIModelStore manages AI endpoint configurations.
+// List omits the api_key; GetByID and GetDefault include it.
+type AIModelStore interface {
+	List(ctx context.Context) ([]model.AIModel, error)
+	GetByID(ctx context.Context, id string) (*model.AIModel, error)
+	// GetDefault returns the highest-priority enabled model, or (nil, nil) if none exists.
+	GetDefault(ctx context.Context) (*model.AIModel, error)
+	Create(ctx context.Context, am *model.AIModel) error
+	Update(ctx context.Context, id string, am *model.AIModel) error
+	Delete(ctx context.Context, id string) error
+	SetEnabled(ctx context.Context, id string, enabled bool) error
+}

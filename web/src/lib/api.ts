@@ -383,6 +383,22 @@ export const api = {
                 })
             },
         },
+        aiModels: {
+            list: () =>
+                request<{ data: any[] }>('/admin/ai-models'),
+            getById: (id: string) =>
+                request<any>(`/admin/ai-models/${id}`),
+            create: (d: { name: string; endpoint: string; api_key: string; model_name: string; enabled: boolean; priority: number; description: string }) =>
+                request<any>('/admin/ai-models', { method: 'POST', body: JSON.stringify(d) }),
+            update: (id: string, d: { name: string; endpoint: string; api_key: string; model_name: string; enabled: boolean; priority: number; description: string }) =>
+                request<any>(`/admin/ai-models/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
+            toggle: (id: string) =>
+                request<{ id: string; enabled: boolean }>(`/admin/ai-models/${id}/toggle`, { method: 'PUT' }),
+            delete: (id: string) =>
+                request(`/admin/ai-models/${id}`, { method: 'DELETE' }),
+            testConnection: (d: { endpoint: string; api_key: string; model_name: string }) =>
+                request<{ ok: boolean; error?: string }>('/admin/ai-models/test', { method: 'POST', body: JSON.stringify(d) }),
+        },
     },
     setter: {
         apply: (reason: string) => request('/auth/setter-apply', { method: 'POST', body: JSON.stringify({ reason }) }),
@@ -727,5 +743,19 @@ export const api = {
     remoteLanguages: {
         list: (platform: string) =>
             request<{ data: any[] }>(`/remote-languages/${platform}`),
+    },
+    generate: {
+        problem: (d: {
+            tags: string[]
+            rating: number
+            problem_type: string
+            testcase_count: number
+            has_subtasks: boolean
+            additional_prompt?: string
+        }) =>
+            request<{ problem_id: string; problem_slug: string; editorial_id: string }>(
+                '/generate/problem',
+                { method: 'POST', body: JSON.stringify(d) }
+            ),
     },
 }

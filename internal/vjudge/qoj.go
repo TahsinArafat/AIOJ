@@ -540,3 +540,9 @@ func parseQOJMemory(s string) int {
 	fmt.Sscanf(s, "%f", &val)
 	return int(val)
 }
+
+// FetchLanguages implements Bot.FetchLanguages.
+// QOJBot does not support remote language enumeration.
+func (b *QOJBot) FetchLanguages(ctx context.Context) ([]RemoteLanguageItem, error) {
+	return nil, nil
+}

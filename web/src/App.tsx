@@ -56,6 +56,7 @@ import ContestProblem from './pages/ContestProblem'
 import ContestEdit from './pages/ContestEdit'
 import ContestManage from './pages/ContestManage'
 import IDE from './pages/IDE'
+import GenerateProblem from './pages/GenerateProblem'
 import './global.css'
 
 function Home() {
@@ -300,6 +301,7 @@ export default function App() {
                         <Route path="/setter/create" element={<ProblemCreate />} />
                         <Route path="/setter/:slug" element={<SetterProblemWorkspace />} />
                         <Route path="/setter/contest/create" element={<ContestCreate />} />
+                        <Route path="/generate/problem" element={<GenerateProblem />} />
 
                         <Route path="/practice" element={<Practice />} />
                         <Route path="/organizations" element={<OrganizationList />} />

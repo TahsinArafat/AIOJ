@@ -619,3 +619,9 @@ func parseTophMemory(s string) int {
 	fmt.Sscanf(s, "%f", &val)
 	return int(val)
 }
+
+// FetchLanguages implements Bot.FetchLanguages.
+// TophBot does not support remote language enumeration.
+func (b *TophBot) FetchLanguages(ctx context.Context) ([]RemoteLanguageItem, error) {
+	return nil, nil
+}

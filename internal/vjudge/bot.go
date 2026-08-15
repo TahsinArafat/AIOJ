@@ -29,6 +29,20 @@ type Bot interface {
 	State() BotState
 	Login(ctx context.Context) (map[string]string, error)
 	IsLoggedIn(ctx context.Context) bool
+
+	// Configure applies account credentials/settings to the bot before a
+	// submission attempt.  Implementations that do not support session-based
+	// configuration may treat this as a no-op.
+	Configure(cfg BotConfig)
+
+	// SetCookies injects session cookies into the bot's HTTP client.
+	// Implementations that do not use cookies may treat this as a no-op.
+	SetCookies(cookies map[string]string)
+
+	// FetchLanguages retrieves the list of languages supported by the remote
+	// OJ for this bot.  Implementations that cannot enumerate languages
+	// should return (nil, nil).
+	FetchLanguages(ctx context.Context) ([]RemoteLanguageItem, error)
 }
 
 type BotConfig struct {

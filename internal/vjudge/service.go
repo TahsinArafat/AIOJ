@@ -77,15 +77,7 @@ func (s *Service) SetCookies(platform string, cookies map[string]string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if bot, ok := s.bots[platform]; ok {
-		if cfBot, ok := bot.(*CodeforcesBot); ok {
-			cfBot.SetCookies(cookies)
-		} else if atCoderBot, ok := bot.(*AtCoderBot); ok {
-			atCoderBot.SetCookies(cookies)
-		} else if tophBot, ok := bot.(*TophBot); ok {
-			tophBot.SetCookies(cookies)
-		} else if qojBot, ok := bot.(*QOJBot); ok {
-			qojBot.SetCookies(cookies)
-		}
+		bot.SetCookies(cookies)
 	}
 }
 
@@ -162,15 +154,7 @@ func (s *Service) Submit(ctx context.Context, req SubmitRequest) error {
 			ProxyEnabled: acc.ProxyEnabled,
 		}
 
-		if cfBot, ok := bot.(*CodeforcesBot); ok {
-			cfBot.Configure(acc)
-		} else if atCoderBot, ok := bot.(*AtCoderBot); ok {
-			atCoderBot.Configure(cfg)
-		} else if tophBot, ok := bot.(*TophBot); ok {
-			tophBot.Configure(cfg)
-		} else if qojBot, ok := bot.(*QOJBot); ok {
-			qojBot.Configure(cfg)
-		}
+		bot.Configure(cfg)
 
 		remoteID, err := bot.Submit(context.Background(), req.ProblemRemoteID, sourceCode, req.Language)
 		if err != nil {
@@ -209,18 +193,14 @@ func (s *Service) FetchLanguages(ctx context.Context, platform string) ([]Remote
 	if !ok {
 		return nil, fmt.Errorf("no bot for platform: %s", platform)
 	}
-
-	switch b := bot.(type) {
-	case *AtCoderBot:
-		if b.submitClient != nil {
-			return b.submitClient.FetchLanguages(ctx)
-		}
-	case *CodeforcesBot:
-		if b.cfSubmit != nil {
-			return b.cfSubmit.FetchLanguages(ctx)
-		}
+	langs, err := bot.FetchLanguages(ctx)
+	if err != nil {
+		return nil, err
 	}
-	return nil, fmt.Errorf("submit client not configured for platform: %s", platform)
+	if langs == nil {
+		return nil, fmt.Errorf("submit client not configured for platform: %s", platform)
+	}
+	return langs, nil
 }
 
 func (s *Service) StartPollWorkers() {

@@ -28,15 +28,32 @@ func (q *RedisQueue) Enqueue(ctx context.Context, id string, priority int) error
 	}).Err()
 }
 
+// Dequeue blocks until an item is available, the context is cancelled, or
+// an unexpected Redis error occurs.
+//
+// BZPopMin already blocks server-side for up to `blockTimeout`; we loop on
+// redis.Nil (timeout with no item) so the caller never sees ("", nil) — which
+// would require it to busy-loop.  On context cancellation we propagate the
+// context error so callers can clean up correctly.
 func (q *RedisQueue) Dequeue(ctx context.Context) (string, error) {
-	result, err := q.client.BZPopMin(ctx, 2*time.Second, q.queueName).Result()
-	if err != nil {
-		if err == redis.Nil {
-			return "", nil
+	const blockTimeout = 2 * time.Second
+	for {
+		// Check context before each attempt.
+		if err := ctx.Err(); err != nil {
+			return "", err
 		}
+
+		result, err := q.client.BZPopMin(ctx, blockTimeout, q.queueName).Result()
+		if err == nil {
+			return result.Member.(string), nil
+		}
+		if err == redis.Nil {
+			// BZPopMin timed out with no item — loop and try again.
+			continue
+		}
+		// Propagate real errors (context cancelled, network, etc.).
 		return "", err
 	}
-	return result.Member.(string), nil
 }
 
 func (q *RedisQueue) Len() int {
