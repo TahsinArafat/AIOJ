@@ -122,7 +122,8 @@ func main() {
 	atcoderSubmit := vjudge.NewAtCoderSubmitClient(atcoderSubmitURL)
 
 	submissionH := handler.NewSubmissionHandler(submissionStore, problemStore, contestStore, judgeQueue, wsManager, execClient, cfg.LangDir, vjService)
-contestH := handler.NewContestHandler(contestStore, ratingStore, problemStore, userStore)
+	teamStore := postgres.NewTeamStore(db)
+	contestH := handler.NewContestHandler(contestStore, ratingStore, problemStore, userStore, teamStore)
 	contestProblemH := handler.NewContestProblemHandler(contestStore, problemStore)
 
 	platforms := []string{"codeforces", "atcoder", "cses", "toph", "qoj"}
@@ -176,7 +177,6 @@ contestH := handler.NewContestHandler(contestStore, ratingStore, problemStore, u
 	notifH := handler.NewNotificationHandler(notifStore)
 	groupStore := postgres.NewGroupStore(db)
 	groupH := handler.NewGroupHandler(groupStore, userStore)
-	teamStore := postgres.NewTeamStore(db)
 	teamH := handler.NewTeamHandler(teamStore, userStore)
 	blogStore := postgres.NewBlogStore(db)
 	blogH := handler.NewBlogHandler(blogStore)

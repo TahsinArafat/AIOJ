@@ -6,6 +6,10 @@ web/node_modules/
 web/dist/
 .env
 .env.local
+config.yaml
+config.yaml.local
+/aioj-linux
+/vjudge-test
 .idea/
 .vscode/
 *.swp
@@ -15,3 +19,4 @@ pgdata/
 Reference_Projects/
 .commandcode/
 .worktrees/
+backups/

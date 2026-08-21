@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/exec"
@@ -42,6 +43,17 @@ func NewAdminBackupHandler(u store.UserStore, dbCfg config.DatabaseConfig, dir s
 		dbCfg:     dbCfg,
 		dir:       dir,
 	}
+}
+
+// sanitizeFilename reduces a client-supplied filename to a safe base name,
+// rejecting empty names, traversal segments, and path separators so the value
+// can never escape the backup directory.
+func sanitizeFilename(filename string) (string, error) {
+	name := filepath.Base(strings.TrimSpace(filename))
+	if name == "" || name == "." || name == ".." || strings.Contains(name, "/") || strings.Contains(name, "\\") || strings.Contains(name, "..") {
+		return "", fmt.Errorf("invalid filename %q", filename)
+	}
+	return name, nil
 }
 
 // List returns all backup files in the backup directory.
@@ -83,12 +95,8 @@ func (h *AdminBackupHandler) List(w http.ResponseWriter, r *http.Request) {
 
 // Delete removes a backup file by filename.
 func (h *AdminBackupHandler) Delete(w http.ResponseWriter, r *http.Request) {
-	filename := chi.URLParam(r, "filename")
-	if filename == "" {
-		http.Error(w, "filename is required", http.StatusBadRequest)
-		return
-	}
-	if strings.Contains(filename, "..") || strings.Contains(filename, "/") {
+	filename, err := sanitizeFilename(chi.URLParam(r, "filename"))
+	if err != nil {
 		http.Error(w, "invalid filename", http.StatusBadRequest)
 		return
 	}
@@ -108,12 +116,8 @@ func (h *AdminBackupHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 // Download serves a backup file for download.
 func (h *AdminBackupHandler) Download(w http.ResponseWriter, r *http.Request) {
-	filename := chi.URLParam(r, "filename")
-	if filename == "" {
-		http.Error(w, "filename is required", http.StatusBadRequest)
-		return
-	}
-	if strings.Contains(filename, "..") || strings.Contains(filename, "/") {
+	filename, err := sanitizeFilename(chi.URLParam(r, "filename"))
+	if err != nil {
 		http.Error(w, "invalid filename", http.StatusBadRequest)
 		return
 	}
@@ -147,7 +151,13 @@ func (h *AdminBackupHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dstPath := filepath.Join(h.dir, header.Filename)
+	filename, err := sanitizeFilename(header.Filename)
+	if err != nil {
+		http.Error(w, "invalid filename", http.StatusBadRequest)
+		return
+	}
+
+	dstPath := filepath.Join(h.dir, filename)
 	dst, err := os.Create(dstPath)
 	if err != nil {
 		http.Error(w, "failed to save file", http.StatusInternalServerError)
@@ -160,11 +170,17 @@ func (h *AdminBackupHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	fi, err := dst.Stat()
+	if err != nil {
+		http.Error(w, "failed to stat saved file", http.StatusInternalServerError)
+		return
+	}
+
 	respondJSON(w, http.StatusCreated, BackupMeta{
-		Filename:  header.Filename,
-		Type:      guessBackupType(header.Filename),
-		CreatedAt: time.Now(),
-		Size:      header.Size,
+		Filename:  filename,
+		Type:      guessBackupType(filename),
+		CreatedAt: fi.ModTime(),
+		Size:      fi.Size(),
 		Version:   "1.0",
 		CreatedBy: "upload",
 	})
@@ -249,9 +265,9 @@ func (h *AdminBackupHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 // Restore restores from a backup file. Requires password confirmation.
 func (h *AdminBackupHandler) Restore(w http.ResponseWriter, r *http.Request) {
-	filename := chi.URLParam(r, "filename")
-	if filename == "" {
-		http.Error(w, "filename is required", http.StatusBadRequest)
+	filename, err := sanitizeFilename(chi.URLParam(r, "filename"))
+	if err != nil {
+		http.Error(w, "invalid filename", http.StatusBadRequest)
 		return
 	}
 
@@ -261,11 +277,6 @@ func (h *AdminBackupHandler) Restore(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid body", http.StatusBadRequest)
-		return
-	}
-
-	if strings.Contains(filename, "..") || strings.Contains(filename, "/") {
-		http.Error(w, "invalid filename", http.StatusBadRequest)
 		return
 	}
 
@@ -338,17 +349,15 @@ func (h *AdminBackupHandler) Restore(w http.ResponseWriter, r *http.Request) {
 
 		extractedTestData := filepath.Join(tmpDir, "testdata")
 		if _, err := os.Stat(extractedTestData); err == nil {
-			if err := os.Rename(extractedTestData, "./testdata"); err != nil {
-				cmd := exec.Command("cp", "-r", extractedTestData, "./testdata")
-				_ = cmd.Run()
+			if err := copyDir(extractedTestData, "./testdata"); err != nil {
+				slog.Error("restore: failed to copy testdata directory", "error", err)
 			}
 		}
 
 		extractedMedia := filepath.Join(tmpDir, "media")
 		if _, err := os.Stat(extractedMedia); err == nil {
-			if err := os.Rename(extractedMedia, "./media"); err != nil {
-				cmd := exec.Command("cp", "-r", extractedMedia, "./media")
-				_ = cmd.Run()
+			if err := copyDir(extractedMedia, "./media"); err != nil {
+				slog.Error("restore: failed to copy media directory", "error", err)
 			}
 		}
 	case "full":
@@ -378,17 +387,15 @@ func (h *AdminBackupHandler) Restore(w http.ResponseWriter, r *http.Request) {
 
 		extractedTestData := filepath.Join(tmpDir, "testdata")
 		if _, err := os.Stat(extractedTestData); err == nil {
-			if err := os.Rename(extractedTestData, "./testdata"); err != nil {
-				cmd := exec.Command("cp", "-r", extractedTestData, "./testdata")
-				_ = cmd.Run()
+			if err := copyDir(extractedTestData, "./testdata"); err != nil {
+				slog.Error("restore: failed to copy testdata directory", "error", err)
 			}
 		}
 
 		extractedMedia := filepath.Join(tmpDir, "media")
 		if _, err := os.Stat(extractedMedia); err == nil {
-			if err := os.Rename(extractedMedia, "./media"); err != nil {
-				cmd := exec.Command("cp", "-r", extractedMedia, "./media")
-				_ = cmd.Run()
+			if err := copyDir(extractedMedia, "./media"); err != nil {
+				slog.Error("restore: failed to copy media directory", "error", err)
 			}
 		}
 	}
@@ -472,4 +479,17 @@ func guessBackupType(filename string) string {
 		return "files"
 	}
 	return "full"
+}
+
+// copyDir copies a directory tree from src to dst, preferring an atomic rename
+// when possible and falling back to a recursive copy via cp -r.
+func copyDir(src, dst string) error {
+	if err := os.Rename(src, dst); err == nil {
+		return nil
+	}
+	cmd := exec.Command("cp", "-r", src, dst)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("copy %s -> %s failed: %w, output: %s", src, dst, err, string(output))
+	}
+	return nil
 }

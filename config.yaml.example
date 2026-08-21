@@ -1,0 +1,22 @@
+server:
+  host: "0.0.0.0"
+  port: 8080
+database:
+  host: "localhost"
+  port: 5432
+  user: "aioj"
+  password: "changeme"        # override with DB_PASSWORD env var
+  name: "aioj"
+  max_open: 25
+  max_idle: 5
+auth:
+  jwt_secret: "change-me-in-production"  # override with JWT_SECRET env var — set a long random value in production
+  access_ttl: 15m
+  refresh_ttl: 168h
+judge:
+  endpoint: "http://localhost:5050"
+  concurrency: 4
+  max_code_size: 262144
+redis:
+  url: "localhost:6379"       # leave empty to use in-memory judge queue
+lang_dir: "./lang"

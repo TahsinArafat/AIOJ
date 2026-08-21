@@ -1,0 +1,8 @@
+# Local development override.
+# The host already runs a native PostgreSQL on port 5432, so we stop publishing
+# the AIOJ database container to the host. The backend and judge-worker still
+# reach Postgres via the internal Docker network (hostname "postgres"), so this
+# only removes host-side access and avoids the port conflict.
+services:
+  postgres:
+    ports: !reset []

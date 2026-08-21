@@ -141,9 +141,9 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 			r.Put("/{id}/problems/{problemId}", contestH.UpdateProblem)
 			r.Delete("/{id}/problems/{problemId}", contestH.RemoveProblem)
 			r.Get("/{id}/submissions", submissionH.ListByContest)
+			r.Post("/{id}/calculate-ratings", contestH.CalculateRatings)
 		})
-		r.Post("/{id}/calculate-ratings", contestH.CalculateRatings)
-		r.Post("/{id}/register-team", contestH.RegisterTeam)
+		r.With(middleware.AuthMiddleware(jwtManager)).Post("/{id}/register-team", contestH.RegisterTeam)
 		r.Get("/{id}/team-registrations", contestH.ListTeamRegistrations)
 	})
 
@@ -278,7 +278,6 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 	r.Route("/api/rating", func(r chi.Router) {
 		r.Get("/user/{userId}", ratingH.GetByUser)
 		r.Get("/contest/{contestId}", ratingH.GetByContest)
-		r.Post("/calculate/{id}", contestH.CalculateRatings)
 	})
 
 	r.Get("/api/rankings", rankingsH.List)

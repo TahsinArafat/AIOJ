@@ -186,7 +186,7 @@ export default function ContestScoreboard() {
     setRatingMsg('');
     try {
       const token = getAccessToken();
-      const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/rating/calculate/${id}`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/contests/${id}/calculate-ratings`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -252,22 +252,20 @@ export default function ContestScoreboard() {
           <div className="inline-flex items-center rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden text-sm">
             <button
               onClick={() => setViewMode('judge')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 font-medium transition-colors ${
-                viewMode === 'judge'
+              className={`flex items-center gap-1.5 px-3 py-1.5 font-medium transition-colors ${viewMode === 'judge'
                   ? 'bg-blue-600 text-white'
                   : 'text-gray-600 hover:bg-gray-50'
-              }`}
+                }`}
             >
               <Eye className="w-3.5 h-3.5" />
               Judge View
             </button>
             <button
               onClick={() => setViewMode('public')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 font-medium transition-colors ${
-                viewMode === 'public'
+              className={`flex items-center gap-1.5 px-3 py-1.5 font-medium transition-colors ${viewMode === 'public'
                   ? 'bg-blue-600 text-white'
                   : 'text-gray-600 hover:bg-gray-50'
-              }`}
+                }`}
             >
               <EyeOff className="w-3.5 h-3.5" />
               Public
@@ -359,7 +357,7 @@ export default function ContestScoreboard() {
                 const ph = Math.floor(sec / 3600)
                 const pm = Math.floor((sec % 3600) / 60)
                 const ps = sec % 60
-                const penaltyStr = ph > 0 ? `${ph}:${String(pm).padStart(2,'0')}:${String(ps).padStart(2,'0')}` : `${pm}:${String(ps).padStart(2,'0')}`
+                const penaltyStr = ph > 0 ? `${ph}:${String(pm).padStart(2, '0')}:${String(ps).padStart(2, '0')}` : `${pm}:${String(ps).padStart(2, '0')}`
 
                 return (
                   <tr
@@ -369,11 +367,10 @@ export default function ContestScoreboard() {
                     {/* Rank */}
                     <td className="px-3 py-2.5 text-center">
                       {medal ? (
-                        <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-sm font-black ${
-                          medal === 'gold' ? 'bg-yellow-400 text-yellow-900' :
-                          medal === 'silver' ? 'bg-gray-300 text-gray-800' :
-                          'bg-amber-600 text-white'
-                        }`}>{entry.rank}</span>
+                        <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-sm font-black ${medal === 'gold' ? 'bg-yellow-400 text-yellow-900' :
+                            medal === 'silver' ? 'bg-gray-300 text-gray-800' :
+                              'bg-amber-600 text-white'
+                          }`}>{entry.rank}</span>
                       ) : (
                         <span className="text-sm font-bold text-gray-600">{entry.rank}</span>
                       )}
@@ -538,11 +535,10 @@ export default function ContestScoreboard() {
                 <button
                   key={p}
                   onClick={() => setCurrentPage(p)}
-                  className={`min-w-[36px] px-2 py-1.5 text-sm font-medium rounded-md border transition-colors ${
-                    p === page
+                  className={`min-w-[36px] px-2 py-1.5 text-sm font-medium rounded-md border transition-colors ${p === page
                       ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
                       : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
-                  }`}
+                    }`}
                 >
                   {p}
                 </button>

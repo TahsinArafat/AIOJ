@@ -60,11 +60,12 @@ type ContestHandler struct {
 	ratingStore  *postgres.RatingStore
 	problemStore store.ProblemStore
 	userStore    store.UserStore
+	teamStore    store.TeamStore
 	cache        *scoreboardCache
 }
 
-func NewContestHandler(s *postgres.ContestStore, rs *postgres.RatingStore, ps store.ProblemStore, us store.UserStore) *ContestHandler {
-	return &ContestHandler{store: s, ratingStore: rs, problemStore: ps, userStore: us, cache: newScoreboardCache(30 * time.Second)}
+func NewContestHandler(s *postgres.ContestStore, rs *postgres.RatingStore, ps store.ProblemStore, us store.UserStore, ts store.TeamStore) *ContestHandler {
+	return &ContestHandler{store: s, ratingStore: rs, problemStore: ps, userStore: us, teamStore: ts, cache: newScoreboardCache(30 * time.Second)}
 }
 
 func (h *ContestHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -96,13 +97,11 @@ func (h *ContestHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	var formatConfigJSON []byte
 	if len(req.FormatConfig) > 0 {
-		cf, err := format.Create(fmtName, req.FormatConfig)
-		if err != nil {
+		if _, err := format.Create(fmtName, req.FormatConfig); err != nil {
 			http.Error(w, "invalid format config: "+err.Error(), http.StatusBadRequest)
 			return
 		}
 		formatConfigJSON = req.FormatConfig
-		_ = cf
 	} else {
 		factory, ok := format.Get(fmtName)
 		if !ok {
@@ -703,12 +702,32 @@ func (h *ContestHandler) RegisterTeam(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err := h.store.RegisterTeam(r.Context(), contestID, req.TeamID)
+	if req.TeamID == "" {
+		http.Error(w, "team_id required", http.StatusBadRequest)
+		return
+	}
+
+	// Only the team captain (creator/owner) may register the team for a contest.
+	role, err := h.teamStore.GetMemberRole(r.Context(), req.TeamID, claims.UserID)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if role == "" {
+		http.Error(w, "forbidden: not a member of this team", http.StatusForbidden)
+		return
+	}
+	if role != "owner" {
+		http.Error(w, "forbidden: only the team captain can register the team", http.StatusForbidden)
+		return
+	}
+
+	tr, err := h.store.RegisterTeam(r.Context(), contestID, req.TeamID)
 	if err != nil {
 		http.Error(w, "registration failed", http.StatusInternalServerError)
 		return
 	}
-	respondJSON(w, http.StatusCreated, map[string]string{"status": "registered"})
+	respondJSON(w, http.StatusCreated, tr)
 }
 
 func (h *ContestHandler) ListTeamRegistrations(w http.ResponseWriter, r *http.Request) {
@@ -844,7 +863,6 @@ func (h *ContestHandler) DownloadPDF(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ContestHandler) ContestStats(w http.ResponseWriter, r *http.Request) {
-	claims := middleware.GetUserClaims(r)
 	id := chi.URLParam(r, "id")
 
 	contest, err := h.store.GetByID(r.Context(), id)
@@ -857,10 +875,7 @@ func (h *ContestHandler) ContestStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Require auth: admin or contest manager/judge.
-	// Stats are public like scoreboard — no auth check needed.
-	_ = claims
-
+	// Stats are public like the scoreboard — no auth check needed.
 	stats, err := h.store.GetContestStats(r.Context(), contest.ID)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)

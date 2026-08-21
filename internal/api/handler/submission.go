@@ -244,6 +244,13 @@ func (h *SubmissionHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Source code (and full run details) are private: owner, admins, and
+	// contest judges/managers only. Mirrors RetryRemote/RecheckRemote.
+	if !h.hasSubmissionAccess(r, sub) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
 	prob, err := h.probStore.GetByID(r.Context(), sub.ProblemID)
 	if err == nil && prob != nil && prob.Source != "" && prob.Source != "local" {
 		sub.IsRemote = true
@@ -421,12 +428,22 @@ func (h *SubmissionHandler) CustomRun(w http.ResponseWriter, r *http.Request) {
 		args = []string{"/bin/sh", "-c", runCmd}
 	}
 
+	// Client-supplied limits are honored only up to hard ceilings (2x the
+	// defaults) so a single user cannot pin shared judge workers for minutes.
+	const maxTimeLimitMs = 10 * 1000          // 10s
+	const maxMemoryLimitKB = 512 * 1024       // 512MB
 	cpuNs := uint64(5.0 * 1e9 * cfg.TimeLimitMultiplier)
 	memBytes := uint64(256.0 * 1024 * 1024 * cfg.MemoryLimitMultiplier)
 	if req.TimeLimitMs > 0 {
+		if req.TimeLimitMs > maxTimeLimitMs {
+			req.TimeLimitMs = maxTimeLimitMs
+		}
 		cpuNs = uint64(req.TimeLimitMs) * 1e6
 	}
 	if req.MemoryLimitKB > 0 {
+		if req.MemoryLimitKB > maxMemoryLimitKB {
+			req.MemoryLimitKB = maxMemoryLimitKB
+		}
 		memBytes = uint64(req.MemoryLimitKB) * 1024
 	}
 
