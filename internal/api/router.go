@@ -6,6 +6,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/tahsinarafat/aioj/internal/api/handler"
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
 	"github.com/tahsinarafat/aioj/internal/auth"
 )
@@ -62,6 +63,15 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 	r.Get("/metrics", promhttp.Handler().ServeHTTP)
 
 	r.Get("/api/health", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte(`{"status":"ok"}`)) })
+
+	// Public sitemap for crawlers. Built from the same public-visibility rules
+	// the problem/contest APIs apply, so it never advertises an auth-gated URL.
+	if d.Sitemap != nil {
+		r.Get("/sitemap.xml", func(w http.ResponseWriter, req *http.Request) {
+			groups := d.Sitemap(req.Context())
+			handler.ServeSitemap(groups, w, req)
+		})
+	}
 
 	r.Get("/api/search", searchH.Search)
 

@@ -1,6 +1,8 @@
 package api
 
 import (
+	"context"
+
 	"github.com/tahsinarafat/aioj/internal/api/handler"
 )
 
@@ -10,6 +12,10 @@ type Deps struct {
 	Auth           *handler.AuthHandler
 	Problem        *handler.ProblemHandler
 	ProblemI18n    *handler.ProblemI18nHandler
+	// Sitemap returns the URL groups for /sitemap.xml. A func rather than a
+	// handler type so the DB-backed gathering stays in main.go where the stores
+	// live, and the router stays free of store knowledge.
+	Sitemap func(ctx context.Context) [][]handler.SitemapURL
 	Submission     *handler.SubmissionHandler
 	Contest        *handler.ContestHandler
 	ContestProblem *handler.ContestProblemHandler

@@ -17,19 +17,19 @@ import (
 	"github.com/tahsinarafat/aioj/internal/auth"
 	"github.com/tahsinarafat/aioj/internal/config"
 	"github.com/tahsinarafat/aioj/internal/generate"
+	"github.com/tahsinarafat/aioj/internal/hack"
 	"github.com/tahsinarafat/aioj/internal/judge"
 	"github.com/tahsinarafat/aioj/internal/judge/executor"
-	"github.com/tahsinarafat/aioj/internal/queue"
-	"github.com/tahsinarafat/aioj/internal/hack"
 	"github.com/tahsinarafat/aioj/internal/plagiarism"
+	"github.com/tahsinarafat/aioj/internal/queue"
 	"github.com/tahsinarafat/aioj/internal/store/postgres"
 	"github.com/tahsinarafat/aioj/internal/virtual"
 	"github.com/tahsinarafat/aioj/internal/vjudge"
 
-	"github.com/redis/go-redis/v9"
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/redis/go-redis/v9"
 )
 
 func main() {
@@ -70,6 +70,7 @@ func main() {
 	refreshTokenStore := postgres.NewRefreshTokenStore(db)
 	problemStore := postgres.NewProblemStore(db)
 	problemI18nStore := postgres.NewProblemI18nStore(db)
+	sitemapStore := postgres.NewSitemapStore(db)
 	submissionStore := postgres.NewSubmissionStore(db)
 	contestStore := postgres.NewContestStore(db)
 	ratingStore := postgres.NewRatingStore(db)
@@ -230,9 +231,47 @@ func main() {
 	generateH := handler.NewGenerateHandler(genSvc)
 
 	router := api.NewRouter(api.Deps{
-		Auth:           authH,
-		Problem:        problemH,
-		ProblemI18n:    problemI18nH,
+		Auth:        authH,
+		Problem:     problemH,
+		ProblemI18n: problemI18nH,
+		// Each section is fetched independently and a failure yields an empty
+		// group rather than an error: a partial sitemap is far better for
+		// crawlers than a 500.
+		Sitemap: func(ctx context.Context) [][]handler.SitemapURL {
+			origin := handler.NormalizeOrigin(os.Getenv("PUBLIC_ORIGIN"))
+			if origin == "" {
+				origin = "http://localhost:8081"
+			}
+			toURLs := func(entries []postgres.SitemapEntry) []handler.SitemapURL {
+				out := make([]handler.SitemapURL, 0, len(entries))
+				for _, e := range entries {
+					out = append(out, handler.SitemapURL{
+						Location:   e.Location,
+						LastMod:    e.LastMod,
+						ChangeFreq: e.ChangeFreq,
+						Priority:   e.Priority,
+					})
+				}
+				return out
+			}
+			problems, err := sitemapStore.PublicProblems(ctx, origin)
+			if err != nil {
+				slog.Error("sitemap: problems", "error", err)
+			}
+			contests, err := sitemapStore.PublicContests(ctx, origin)
+			if err != nil {
+				slog.Error("sitemap: contests", "error", err)
+			}
+			posts, err := sitemapStore.BlogPosts(ctx, origin)
+			if err != nil {
+				slog.Error("sitemap: posts", "error", err)
+			}
+			return [][]handler.SitemapURL{
+				toURLs(problems),
+				toURLs(contests),
+				toURLs(posts),
+			}
+		},
 		Submission:     submissionH,
 		Contest:        contestH,
 		ContestProblem: contestProblemH,
