@@ -65,6 +65,7 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 		chiMiddleware.RequestID,
 		chiMiddleware.RealIP,
 		middleware.Logging,
+		middleware.SentryRecover,
 		chiMiddleware.Recoverer,
 	)
 

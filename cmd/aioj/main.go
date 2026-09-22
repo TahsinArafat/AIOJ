@@ -25,6 +25,7 @@ import (
 	"github.com/tahsinarafat/aioj/internal/judge/executor"
 	"github.com/tahsinarafat/aioj/internal/mail"
 	"github.com/tahsinarafat/aioj/internal/oauth"
+	"github.com/tahsinarafat/aioj/internal/observability"
 	"github.com/tahsinarafat/aioj/internal/plagiarism"
 	"github.com/tahsinarafat/aioj/internal/queue"
 	"github.com/tahsinarafat/aioj/internal/store/postgres"
@@ -49,6 +50,7 @@ func main() {
 
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
 	slog.Info("starting aioj", "port", cfg.Server.Port)
+	defer observability.InitSentry()()
 
 	db, err := postgres.Connect(cfg.Database)
 	if err != nil {
