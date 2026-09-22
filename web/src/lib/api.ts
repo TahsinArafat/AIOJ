@@ -140,16 +140,23 @@ export const api = {
         listMy: (offset = 0, limit = 20) => request<{ data: any[]; total: number }>(`/problems/my?offset=${offset}&limit=${limit}`),
         listTags: () => request<{ data: string[] }>('/problems/tags'),
         get: (slug: string) => request<any>(`/problems/${slug}`),
+        // Per-problem statement translations. `listI18n` is public; the write
+        // methods are used by the setter panel.
+        listI18n: (id: string) => request<any[]>(`/problems/${id}/i18n/`),
+        upsertI18n: (id: string, lang: string, d: { title?: string; description?: string }) =>
+            request<any>(`/problems/${id}/i18n/${lang}`, { method: 'PUT', body: JSON.stringify(d) }),
+        deleteI18n: (id: string, lang: string) =>
+            request<any>(`/problems/${id}/i18n/${lang}`, { method: 'DELETE' }),
         create: (d: any) => request<any>('/problems', { method: 'POST', body: JSON.stringify(d) }),
         update: (slug: string, d: any) => request<any>(`/problems/${slug}`, { method: 'PUT', body: JSON.stringify(d) }),
         delete: (slug: string) => request<any>(`/problems/${slug}`, { method: 'DELETE' }),
         getPermissions: (slug: string) => request<{ data: any[] }>(`/problems/${slug}/permissions`),
-        addPermission: (slug: string, username: string, accessLevel: string) => 
-            request<any>(`/problems/${slug}/permissions`, { 
-                method: 'POST', 
-                body: JSON.stringify({ username, access_level: accessLevel }) 
+        addPermission: (slug: string, username: string, accessLevel: string) =>
+            request<any>(`/problems/${slug}/permissions`, {
+                method: 'POST',
+                body: JSON.stringify({ username, access_level: accessLevel })
             }),
-        removePermission: (slug: string, userId: string) => 
+        removePermission: (slug: string, userId: string) =>
             request<any>(`/problems/${slug}/permissions/${userId}`, { method: 'DELETE' }),
         uploadTestcases: async (slug: string, file: File) => {
             const formData = new FormData()
@@ -274,7 +281,7 @@ export const api = {
     submissions: {
         create: (d: any) => request<any>('/submissions', { method: 'POST', body: JSON.stringify(d) }),
         createUpsolving: (d: any) => request<any>('/submissions/upsolving', { method: 'POST', body: JSON.stringify(d) }),
-        run: (d: { source_code: string; language: string; input: string; expected?: string; time_limit_ms?: number; memory_limit_kb?: number }) => 
+        run: (d: { source_code: string; language: string; input: string; expected?: string; time_limit_ms?: number; memory_limit_kb?: number }) =>
             request<{
                 status: string;
                 stdout: string;
@@ -415,11 +422,11 @@ export const api = {
         create: (d: any) => request<any>('/contests', { method: 'POST', body: JSON.stringify(d) }),
         getFormats: () => request<{ formats: string[] }>('/contests/formats'),
         scoreboard: (id: string, view?: string, page?: number) => {
-          const params = new URLSearchParams();
-          if (view) params.set('view', view);
-          if (page && page > 1) params.set('page', String(page));
-          const qs = params.toString();
-          return request<any>(`/contests/${id}/scoreboard${qs ? '?' + qs : ''}`);
+            const params = new URLSearchParams();
+            if (view) params.set('view', view);
+            if (page && page > 1) params.set('page', String(page));
+            const qs = params.toString();
+            return request<any>(`/contests/${id}/scoreboard${qs ? '?' + qs : ''}`);
         },
         register: (id: string) => request(`/contests/${id}/register`, { method: 'POST' }),
         unregister: (id: string) => request(`/contests/${id}/register`, { method: 'DELETE' }),
@@ -437,10 +444,10 @@ export const api = {
             request<any>(`/contests/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
         stats: (id: string) => request<any>(`/contests/${id}/stats`),
         standings: (id: string, page?: number) => {
-          const params = new URLSearchParams();
-          if (page && page > 1) params.set('page', String(page));
-          const qs = params.toString();
-          return request<any>(`/contests/${id}/scoreboard${qs ? '?' + qs : ''}`);
+            const params = new URLSearchParams();
+            if (page && page > 1) params.set('page', String(page));
+            const qs = params.toString();
+            return request<any>(`/contests/${id}/scoreboard${qs ? '?' + qs : ''}`);
         },
         problems: (id: string) => request<any[]>(`/contests/${id}/problems`),
         announcements: (id: string) => request<any[]>(`/contests/${id}/notices`),

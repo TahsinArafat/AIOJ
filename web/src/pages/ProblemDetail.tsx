@@ -10,6 +10,7 @@ import ProblemStats from '../components/ProblemStats'
 import CodeEditor from '../components/CodeEditor'
 import AddEditorialModal from '../components/AddEditorialModal'
 import { Download, Copy, Check } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 function useIsDesktop(breakpoint = 768) {
     const [isDesktop, setIsDesktop] = useState(
@@ -186,6 +187,14 @@ export default function ProblemDetail() {
     const isUpsolving = searchParams.get('upsolving') === 'true'
     const contestId = searchParams.get('contest')
     const [problem, setProblem] = useState<any>(null)
+    const { i18n } = useTranslation()
+    // Translation for the active UI language, if the setter supplied one.
+    const [translation, setTranslation] = useState<any>(null)
+
+    // The description to actually show: the translation when the setter supplied
+    // one for the active language, otherwise the problem's default. Centralised
+    // so the PDF-vs-markdown branch and the markdown body can't disagree.
+    const effectiveDescription = translation?.description || problem?.description
     const [lang, setLang] = useState('cpp-gpp-64')
     const [languages, setLanguages] = useState(DEFAULT_LANGS)
     const [code, setCode] = useState('')
@@ -248,8 +257,30 @@ export default function ProblemDetail() {
     }, [])
 
     useEffect(() => {
-        if (slug) api.problems.get(slug).then(setProblem).catch(() => {})
+        if (slug) api.problems.get(slug).then(setProblem).catch(() => { })
     }, [slug])
+
+    // Fetch the translation for the active UI language and prefer it over the
+    // problem's default title/description. Mirrors the backend's Coalesce
+    // fallback: an absent translation simply leaves the defaults in place.
+    useEffect(() => {
+        if (!problem?.id) {
+            setTranslation(null)
+            return
+        }
+        let cancelled = false
+        api.problems.listI18n(problem.id)
+            .then((rows) => {
+                if (cancelled) return
+                const match = (rows || []).find((r: any) => r.language === i18n.language)
+                setTranslation(match || null)
+            })
+            .catch(() => { if (!cancelled) setTranslation(null) })
+        return () => { cancelled = true }
+    }, [problem?.id, i18n.language])
+
+    // Switching language re-runs the effect above (it depends on i18n.language),
+    // so no separate languageChanged listener is needed.
 
     useEffect(() => {
         if (problem?.source && problem.source !== 'local') {
@@ -264,14 +295,14 @@ export default function ProblemDetail() {
                         setLang(langs[0].value)
                     }
                 })
-                .catch(() => {})
+                .catch(() => { })
         } else {
             setLanguages(DEFAULT_LANGS)
         }
     }, [problem?.source])
 
     useEffect(() => {
-        if (problem?.id) api.editorials.getByProblem(problem.id).then(d => setEditorials(d.data || [])).catch(() => {})
+        if (problem?.id) api.editorials.getByProblem(problem.id).then(d => setEditorials(d.data || [])).catch(() => { })
     }, [problem?.id])
 
     useEffect(() => {
@@ -393,30 +424,30 @@ export default function ProblemDetail() {
         setSubmitting(true)
         setResult(null)
         try {
-            const apiCall = isUpsolving 
+            const apiCall = isUpsolving
                 ? api.submissions.createUpsolving({
                     problem_id: problem.id,
                     language: lang,
                     source_code: code,
                     contest_id: contestId || undefined,
-                  })
+                })
                 : api.submissions.create({
                     problem_id: problem.id,
                     language: lang,
                     source_code: code,
-                  })
+                })
             const res = await apiCall
             if (isMountedRef.current) {
                 setResult(res)
             }
-            
+
             let retries = 0
             const maxRetries = 60
             const poll = async () => {
                 if (!isMountedRef.current) return
                 await new Promise(r => setTimeout(r, 2000))
                 if (!isMountedRef.current) return
-                
+
                 try {
                     const updated = await api.submissions.get(res.id)
                     if (!isMountedRef.current) return
@@ -455,21 +486,19 @@ export default function ProblemDetail() {
             <div className="flex md:hidden border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex-shrink-0">
                 <button
                     onClick={() => setMobileTab('problem')}
-                    className={`flex-1 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                        mobileTab === 'problem'
-                            ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                            : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-                    }`}
+                    className={`flex-1 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${mobileTab === 'problem'
+                        ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+                        : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                        }`}
                 >
                     Problem
                 </button>
                 <button
                     onClick={() => setMobileTab('code')}
-                    className={`flex-1 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-                        mobileTab === 'code'
-                            ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                            : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-                    }`}
+                    className={`flex-1 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${mobileTab === 'code'
+                        ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+                        : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                        }`}
                 >
                     Code
                 </button>
@@ -482,7 +511,15 @@ export default function ProblemDetail() {
             >
                 <div>
                     <h1 className="text-2xl font-bold">
-                        {problem.title}
+                        {translation?.title || problem.title}
+                        {translation?.title && (
+                            <span
+                                title={`Translated to ${i18n.language}`}
+                                className="inline-flex items-center ml-2 px-2 py-0.5 text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 rounded align-middle"
+                            >
+                                {i18n.language.toUpperCase()}
+                            </span>
+                        )}
                         {problem.interactive && (
                             <span className="inline-flex items-center ml-2 px-2 py-0.5 text-xs font-semibold bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 rounded align-middle">
                                 Interactive
@@ -512,11 +549,10 @@ export default function ProblemDetail() {
                         <span className="text-gray-300 dark:text-gray-600">·</span>
                         <span className="flex items-center gap-1.5">
                             <span className="text-gray-700 dark:text-gray-300 font-semibold">Difficulty:</span>
-                            <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wider ${
-                                problem.difficulty === 'easy' ? 'bg-green-100 dark:bg-green-900/30 text-green-800' :
+                            <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wider ${problem.difficulty === 'easy' ? 'bg-green-100 dark:bg-green-900/30 text-green-800' :
                                 problem.difficulty === 'hard' ? 'bg-red-100 dark:bg-red-900/30 text-red-800' :
-                                'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800'
-                            }`}>{problem.difficulty}</span>
+                                    'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800'
+                                }`}>{problem.difficulty}</span>
                         </span>
                     </div>
                     {canExport && (
@@ -569,11 +605,11 @@ export default function ProblemDetail() {
 
                 {tab === 'statement' ? (
                     <div className="space-y-5 pb-8 px-4 py-6 md:px-8 md:py-8">
-                        {isPdfUrl(problem.description) ? (
+                        {isPdfUrl(effectiveDescription) ? (
                             <div className="space-y-3">
                                 <h3 className="font-semibold text-sm text-gray-700 dark:text-gray-300 uppercase tracking-wide">PDF Problem Statement</h3>
                                 <a
-                                    href={problem.description}
+                                    href={effectiveDescription}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
@@ -582,7 +618,7 @@ export default function ProblemDetail() {
                                     Download PDF
                                 </a>
                                 <iframe
-                                    src={problem.description}
+                                    src={effectiveDescription}
                                     className="w-full h-[800px] border-0 rounded-lg shadow-sm bg-white"
                                     title="Problem Statement"
                                 />
@@ -594,7 +630,7 @@ export default function ProblemDetail() {
                                     rehypePlugins={[rehypeKatex]}
                                     components={{
                                         code(props) {
-                                            const {children, className} = props
+                                            const { children, className } = props
                                             const isBlock = className?.includes('language-')
                                             if (isBlock) {
                                                 return <code className={className}>{children}</code>
@@ -603,7 +639,7 @@ export default function ProblemDetail() {
                                         }
                                     }}
                                 >
-                                    {problem.description}
+                                    {effectiveDescription}
                                 </ReactMarkdown>
                             </div>
                         )}
@@ -685,9 +721,9 @@ export default function ProblemDetail() {
                                 <h3 className="font-semibold text-gray-800 dark:text-gray-200 mb-3">Tags</h3>
                                 <div className="flex flex-wrap gap-2">
                                     {problem.tags.map((tag: string) => (
-                                        <Link 
-                                            key={tag} 
-                                            to={`/problems?tag=${tag}`} 
+                                        <Link
+                                            key={tag}
+                                            to={`/problems?tag=${tag}`}
                                             className="bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-300 px-3 py-1.5 rounded transition-colors"
                                         >
                                             {tag}
@@ -786,26 +822,25 @@ export default function ProblemDetail() {
                                                 </td>
                                                 <td className="px-4 py-2 text-gray-500 dark:text-gray-400">{s.language}</td>
                                                 <td className="px-4 py-2 font-semibold">
-                                                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                                                        s.status === 'ac' ? 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20' : 
-                                                        s.status === 'wa' ? 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20' : 
-                                                        s.status === 'tle' ? 'text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20' :
-                                                        s.status === 'mle' ? 'text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20' :
-                                                        s.status === 're' ? 'text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/20' :
-                                                        s.status === 'ce' ? 'text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20' :
-                                                        s.status === 'pending' ? 'text-blue-500 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20' :
-                                                        s.status === 'judging' ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20' :
-                                                        'text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800'
-                                                    }`}>
-                                                        {s.status === 'ac' ? 'Accepted' : 
-                                                         s.status === 'wa' ? 'Wrong Answer' : 
-                                                         s.status === 'tle' ? 'Time Limit Exceeded' :
-                                                         s.status === 'mle' ? 'Memory Limit Exceeded' :
-                                                         s.status === 're' ? 'Runtime Error' :
-                                                         s.status === 'ce' ? 'Compile Error' :
-                                                         s.status === 'pending' ? 'Pending' :
-                                                         s.status === 'judging' ? 'Judging...' :
-                                                         s.status}
+                                                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${s.status === 'ac' ? 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20' :
+                                                        s.status === 'wa' ? 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20' :
+                                                            s.status === 'tle' ? 'text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20' :
+                                                                s.status === 'mle' ? 'text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20' :
+                                                                    s.status === 're' ? 'text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/20' :
+                                                                        s.status === 'ce' ? 'text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20' :
+                                                                            s.status === 'pending' ? 'text-blue-500 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20' :
+                                                                                s.status === 'judging' ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20' :
+                                                                                    'text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800'
+                                                        }`}>
+                                                        {s.status === 'ac' ? 'Accepted' :
+                                                            s.status === 'wa' ? 'Wrong Answer' :
+                                                                s.status === 'tle' ? 'Time Limit Exceeded' :
+                                                                    s.status === 'mle' ? 'Memory Limit Exceeded' :
+                                                                        s.status === 're' ? 'Runtime Error' :
+                                                                            s.status === 'ce' ? 'Compile Error' :
+                                                                                s.status === 'pending' ? 'Pending' :
+                                                                                    s.status === 'judging' ? 'Judging...' :
+                                                                                        s.status}
                                                     </span>
                                                 </td>
                                                 <td className="px-4 py-2 text-gray-500 dark:text-gray-400">{s.time_used > 0 ? `${s.time_used}ms` : '—'}</td>
@@ -826,11 +861,11 @@ export default function ProblemDetail() {
                 className={`hidden md:flex w-3 flex-shrink-0 cursor-col-resize group transition-colors relative ${dragging ? 'bg-blue-500' : 'bg-gray-200 dark:bg-gray-700 hover:bg-blue-500'}`}
             >
                 {/* Grip dots indicator */}
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
-                        <span className="w-1 h-1 rounded-full bg-gray-400 dark:bg-gray-500 group-hover:bg-white/70 transition-colors" />
-                        <span className="w-1 h-1 rounded-full bg-gray-400 dark:bg-gray-500 group-hover:bg-white/70 transition-colors" />
-                        <span className="w-1 h-1 rounded-full bg-gray-400 dark:bg-gray-500 group-hover:bg-white/70 transition-colors" />
-                    </div>
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
+                    <span className="w-1 h-1 rounded-full bg-gray-400 dark:bg-gray-500 group-hover:bg-white/70 transition-colors" />
+                    <span className="w-1 h-1 rounded-full bg-gray-400 dark:bg-gray-500 group-hover:bg-white/70 transition-colors" />
+                    <span className="w-1 h-1 rounded-full bg-gray-400 dark:bg-gray-500 group-hover:bg-white/70 transition-colors" />
+                </div>
             </div>
 
             {/* IDE */}
@@ -893,11 +928,10 @@ export default function ProblemDetail() {
                     <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800 shadow-sm">
                         <div className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center justify-between">
                             <span className="font-semibold text-sm text-gray-700 dark:text-gray-300">Sample Test Results</span>
-                            <span className={`text-xs font-medium px-2 py-0.5 rounded ${
-                                sampleResults.every(r => r.passed) ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' :
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded ${sampleResults.every(r => r.passed) ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' :
                                 sampleResults.some(r => r.passed) ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300' :
-                                'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
-                            }`}>
+                                    'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
+                                }`}>
                                 {sampleResults.filter(r => r.passed).length}/{sampleResults.length} Passed
                             </span>
                         </div>
@@ -910,9 +944,8 @@ export default function ProblemDetail() {
                                             {r.time > 0 && (
                                                 <span className="text-xs text-gray-500 dark:text-gray-400">{r.time}ms</span>
                                             )}
-                                            <span className={`text-xs font-medium px-2 py-0.5 rounded ${
-                                                r.passed ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
-                                            }`}>
+                                            <span className={`text-xs font-medium px-2 py-0.5 rounded ${r.passed ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
+                                                }`}>
                                                 {r.passed ? 'Passed' : 'Failed'}
                                             </span>
                                         </div>
@@ -921,7 +954,7 @@ export default function ProblemDetail() {
                                         Input: {r.input.substring(0, 100)}{r.input.length > 100 ? '...' : ''}
                                     </div>
                                     {!r.passed && (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                                             <div>
                                                 <span className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Expected</span>
                                                 <pre className="bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 font-mono text-xs p-2 rounded overflow-x-auto max-h-24 border border-green-100">{r.expected || '(empty)'}</pre>
@@ -972,17 +1005,16 @@ export default function ProblemDetail() {
                         {customOutput && (
                             <div className="space-y-3 pt-2 border-t border-gray-100 dark:border-gray-700">
                                 <div className="flex items-center justify-between text-xs">
-                                    <span className={`font-semibold uppercase tracking-wider ${
-                                        customOutput.status === 'success' ? 'text-green-600 dark:text-green-400' :
+                                    <span className={`font-semibold uppercase tracking-wider ${customOutput.status === 'success' ? 'text-green-600 dark:text-green-400' :
                                         customOutput.status === 'ce' ? 'text-purple-600 dark:text-purple-400' : 'text-red-600 dark:text-red-400'
-                                    }`}>
+                                        }`}>
                                         Execution: {
                                             customOutput.status === 'success' ? 'Completed' :
-                                            customOutput.status === 'ce' ? 'Compilation Error' :
-                                            customOutput.status === 'tle' ? 'Time Limit Exceeded' :
-                                            customOutput.status === 'mle' ? 'Memory Limit Exceeded' :
-                                            customOutput.status === 're' ? 'Runtime Error' :
-                                            customOutput.status
+                                                customOutput.status === 'ce' ? 'Compilation Error' :
+                                                    customOutput.status === 'tle' ? 'Time Limit Exceeded' :
+                                                        customOutput.status === 'mle' ? 'Memory Limit Exceeded' :
+                                                            customOutput.status === 're' ? 'Runtime Error' :
+                                                                customOutput.status
                                         }
                                     </span>
                                     {customOutput.time_used > 0 && (
