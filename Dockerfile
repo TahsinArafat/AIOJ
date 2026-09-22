@@ -5,7 +5,8 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /app/aioj ./cmd/aioj
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /app/aioj ./cmd/aioj && \
+    CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /app/seed ./cmd/seed
 
 # Stage 2: Run
 FROM alpine:3.19
@@ -15,6 +16,7 @@ RUN apk add --no-cache --repository=https://dl-cdn.alpinelinux.org/alpine/edge/m
 RUN addgroup -S aioj && adduser -S aioj -G aioj
 WORKDIR /app
 COPY --from=builder /app/aioj .
+COPY --from=builder /app/seed .
 COPY --from=builder /app/config.yaml .
 COPY --from=builder /app/lang ./lang
 COPY --from=builder /app/internal/store/migrations ./internal/store/migrations
