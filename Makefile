@@ -39,3 +39,32 @@ docker-down:
 
 docker-logs:
 	docker compose logs -f backend
+
+# --- sim harness (Full-Scale Completion program, Wave 0) --------------------
+# Thin wrappers only; each is exactly the command the wave plan documents.
+# The sim overlay adds mailhog + a second judge-worker and rebinds the
+# frontend to :8081 so it never fights local dev servers on :80.
+SIM = docker compose -f docker-compose.yml -f docker-compose.sim.yml --profile sim
+
+.PHONY: sim-up sim-down sim-reset sim-seed sim-logs sim-ps e2e
+
+sim-up:
+	$(SIM) up -d --build
+
+sim-down:
+	$(SIM) down
+
+sim-reset:
+	$(SIM) down -v && $(SIM) up -d --build
+
+sim-seed:
+	$(SIM) run --rm seeder
+
+sim-ps:
+	$(SIM) ps
+
+sim-logs:
+	$(SIM) logs -f backend judge-worker
+
+e2e:
+	cd web && npx playwright test
