@@ -20,7 +20,7 @@ COPY --from=builder /app/seed .
 COPY --from=builder /app/config.yaml .
 COPY --from=builder /app/lang ./lang
 COPY --from=builder /app/internal/store/migrations ./internal/store/migrations
-RUN mkdir -p /app/backups
+RUN mkdir -p /app/backups /app/testdata
 RUN chown -R aioj:aioj /app
 USER aioj
 EXPOSE 8080

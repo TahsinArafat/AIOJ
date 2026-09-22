@@ -30,6 +30,12 @@ func (s *ProblemStore) Create(ctx context.Context, p *model.Problem) error {
 	if p.SubtaskAggregation == "" {
 		p.SubtaskAggregation = "min"
 	}
+	// A nil slice would be rendered by pq.Array as the SQL literal NULL, which
+	// violates the NOT NULL constraint on problems.tags (SQLSTATE 23502) and
+	// surfaced only as a bare "create failed" 500. Normalise to an empty array.
+	if p.Tags == nil {
+		p.Tags = []string{}
+	}
 
 	samples, err := json.Marshal(p.SampleCases)
 	if err != nil {

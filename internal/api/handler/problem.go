@@ -4,6 +4,8 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/json"
+	"errors"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -12,6 +14,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
 	"github.com/tahsinarafat/aioj/internal/fps"
 	"github.com/tahsinarafat/aioj/internal/model"
@@ -274,32 +277,45 @@ func (h *ProblemHandler) Create(w http.ResponseWriter, r *http.Request) {
 		req.FloatEpsilon = 1e-6
 	}
 	prob := &model.Problem{
-		ID:            uuid.New().String(),
-		Slug:          req.Slug,
-		Title:         req.Title,
-		Description:   req.Description,
-		InputFormat:   req.InputFormat,
-		OutputFormat:  req.OutputFormat,
-		Hint:          req.Hint,
-		TimeLimit:     req.TimeLimit,
-		MemoryLimit:   req.MemoryLimit,
-		Difficulty:    req.Difficulty,
-		Tags:          req.Tags,
-		SampleCases:   req.SampleCases,
-		TestCaseScore: req.TestCaseScore,
-		SPJ:           req.SPJ,
-		SPJLanguage:   req.SPJLanguage,
-		SPJSourceCode: req.SPJSourceCode,
-		CheckerType:   req.CheckerType,
-		FloatEpsilon:  req.FloatEpsilon,
+		ID:                   uuid.New().String(),
+		Slug:                 req.Slug,
+		Title:                req.Title,
+		Description:          req.Description,
+		InputFormat:          req.InputFormat,
+		OutputFormat:         req.OutputFormat,
+		Hint:                 req.Hint,
+		TimeLimit:            req.TimeLimit,
+		MemoryLimit:          req.MemoryLimit,
+		Difficulty:           req.Difficulty,
+		Tags:                 req.Tags,
+		SampleCases:          req.SampleCases,
+		TestCaseScore:        req.TestCaseScore,
+		SPJ:                  req.SPJ,
+		SPJLanguage:          req.SPJLanguage,
+		SPJSourceCode:        req.SPJSourceCode,
+		CheckerType:          req.CheckerType,
+		FloatEpsilon:         req.FloatEpsilon,
 		Interactive:          req.Interactive,
 		InteractorLanguage:   req.InteractorLanguage,
 		InteractorSourceCode: req.InteractorSourceCode,
-		Source:        "local",
-		Visible:       false,
-		CreatedBy:     claims.UserID,
+		Source:               "local",
+		Visible:              false,
+		CreatedBy:            claims.UserID,
 	}
 	if err := h.store.Create(r.Context(), prob); err != nil {
+		// A duplicate slug is a client-level conflict, not a server fault. The
+		// seeder (and any retrying caller) treats 409 as "already exists, carry
+		// on", but this used to leak the raw pq 23505 as a 500 — which made
+		// `make sim-seed` fail on every re-run against an existing database.
+		var pqErr *pq.Error
+		if errors.As(err, &pqErr) && pqErr.Code == "23505" {
+			http.Error(w, "problem already exists", http.StatusConflict)
+			return
+		}
+		// Surface the real cause instead of a bare "create failed": this handler
+		// is the single entry point for problem creation (incl. the seeder), and
+		// a silent 500 here makes the failure impossible to diagnose from logs.
+		slog.Error("create problem failed", "slug", prob.Slug, "slug_id", prob.ID, "error", err)
 		http.Error(w, "create failed", http.StatusInternalServerError)
 		return
 	}
