@@ -8,6 +8,7 @@ import CheckerTab from '../components/SetterWorkspace/CheckerTab'
 import PermissionsTab from '../components/SetterWorkspace/PermissionsTab'
 import SettingsTab from '../components/SetterWorkspace/SettingsTab'
 import EditorialTab from '../components/SetterWorkspace/EditorialTab'
+import TranslationsTab from '../components/SetterWorkspace/TranslationsTab'
 
 function decodeRole(): string | null {
   const token = localStorage.getItem('access_token')
@@ -24,11 +25,11 @@ export default function SetterProblemWorkspace() {
   const { slug } = useParams<{ slug: string }>()
   const navigate = useNavigate()
   const [problem, setProblem] = useState<any>(null)
-  type WorkspaceTab = 'statement' | 'testcases' | 'checker' | 'permissions' | 'settings' | 'editorial'
+  type WorkspaceTab = 'statement' | 'testcases' | 'checker' | 'permissions' | 'settings' | 'editorial' | 'translations'
 
   const [activeTab, setActiveTab] = useState<WorkspaceTab>(() => {
     const hash = window.location.hash.replace('#', '') as WorkspaceTab
-    const validTabs: WorkspaceTab[] = ['statement', 'testcases', 'checker', 'permissions', 'settings', 'editorial']
+    const validTabs: WorkspaceTab[] = ['statement', 'testcases', 'checker', 'permissions', 'settings', 'editorial', 'translations']
     return validTabs.includes(hash) ? hash : 'statement'
   })
 
@@ -395,6 +396,13 @@ export default function SetterProblemWorkspace() {
           >
             Editorials
           </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('translations')}
+            className={`px-4 py-3 text-left font-medium ${activeTab === 'translations' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-l-4 border-l-blue-600' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-black dark:hover:text-white'}`}
+          >
+            Translations
+          </button>
         </div>
 
         {/* Tab Content Panels */}
@@ -460,6 +468,13 @@ export default function SetterProblemWorkspace() {
             <EditorialTab
               problemId={problem.id}
               isUserAdmin={decodeRole() === 'admin'}
+            />
+          )}
+          {activeTab === 'translations' && (
+            <TranslationsTab
+              problemId={problem.id}
+              defaultTitle={problem.title as string}
+              defaultDescription={problem.description as string}
             />
           )}
         </div>
