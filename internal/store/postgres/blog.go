@@ -49,7 +49,9 @@ func (s *BlogStore) GetPostByID(ctx context.Context, id string) (*model.BlogPost
 
 func (s *BlogStore) ListPosts(ctx context.Context, offset, limit int, tag string) ([]model.BlogListItem, int, error) {
 	var total int
-	query := "SELECT COUNT(*) FROM blog_posts"
+	// Match the feed's rule (migration 000058): only visible posts whose
+	// publish_on has arrived. publish_on NULL means publish immediately.
+	query := "SELECT COUNT(*) FROM blog_posts bp WHERE COALESCE(bp.visible, true) = true AND COALESCE(bp.publish_on, bp.created_at) <= now()"
 	args := []interface{}{}
 	argIdx := 1
 
@@ -61,7 +63,8 @@ func (s *BlogStore) ListPosts(ctx context.Context, offset, limit int, tag string
 	s.db.QueryRowContext(ctx, query, args...).Scan(&total)
 
 	selectQuery := `SELECT bp.id, bp.user_id, u.username, bp.title, bp.tags, bp.upvotes, bp.comment_count, bp.created_at
-	                FROM blog_posts bp JOIN users u ON bp.user_id = u.id`
+	                FROM blog_posts bp JOIN users u ON bp.user_id = u.id
+	                WHERE COALESCE(bp.visible, true) = true AND COALESCE(bp.publish_on, bp.created_at) <= now()`
 	if tag != "" {
 		selectQuery += " WHERE $1 = ANY(tags)"
 	}

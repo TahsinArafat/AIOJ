@@ -33,9 +33,14 @@ func (s *FeedStore) RecentBlogPosts(ctx context.Context, limit int) ([]BlogFeedE
 	if limit <= 0 || limit > 100 {
 		limit = 25 // dmoj publishes 25
 	}
+	// Filters now match dmoj's BlogFeed: visible posts only, published in the
+	// past. publish_on NULL means "publish immediately", so the effective time
+	// is publish_on when set and created_at otherwise.
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, title, COALESCE(content, ''), created_at
 		   FROM blog_posts
+		  WHERE visible = true
+		    AND COALESCE(publish_on, created_at) <= now()
 		  ORDER BY is_pinned DESC NULLS LAST, created_at DESC, id DESC
 		  LIMIT $1`, limit)
 	if err != nil {
