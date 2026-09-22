@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 	"unicode/utf8"
@@ -286,6 +287,28 @@ func main() {
 					Link:    url,
 					ID:      url,
 					Summary: truncateForFeed(e.Summary, 500),
+					Updated: toTime(e.Created),
+				})
+			}
+			return items, nil
+		},
+		BlogFeed: func(ctx context.Context) ([]handler.FeedItem, error) {
+			origin := handler.NormalizeOrigin(os.Getenv("PUBLIC_ORIGIN"))
+			if origin == "" {
+				origin = "http://localhost:8081"
+			}
+			entries, err := feedStore.RecentBlogPosts(ctx, 25)
+			if err != nil {
+				return nil, err
+			}
+			items := make([]handler.FeedItem, 0, len(entries))
+			for _, e := range entries {
+				url := origin + "/blog/" + strconv.FormatInt(e.ID, 10)
+				items = append(items, handler.FeedItem{
+					Title:   e.Title,
+					Link:    url,
+					ID:      url,
+					Summary: truncateForFeed(e.Content, 500),
 					Updated: toTime(e.Created),
 				})
 			}

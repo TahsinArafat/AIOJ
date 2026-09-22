@@ -9,9 +9,9 @@ import (
 // Deps holds all HTTP handler dependencies for the router.
 // Add a new field here when registering a new handler — no function signature change needed.
 type Deps struct {
-	Auth           *handler.AuthHandler
-	Problem        *handler.ProblemHandler
-	ProblemI18n    *handler.ProblemI18nHandler
+	Auth        *handler.AuthHandler
+	Problem     *handler.ProblemHandler
+	ProblemI18n *handler.ProblemI18nHandler
 	// Sitemap returns the URL groups for /sitemap.xml. A func rather than a
 	// handler type so the DB-backed gathering stays in main.go where the stores
 	// live, and the router stays free of store knowledge.
@@ -20,6 +20,8 @@ type Deps struct {
 	// The error is passed through rather than logged so a failed query cannot
 	// be served as a valid empty feed.
 	Feed func(ctx context.Context) ([]handler.FeedItem, error)
+	// BlogFeed returns items for the blog Atom feed, plus any fetch error.
+	BlogFeed       func(ctx context.Context) ([]handler.FeedItem, error)
 	Submission     *handler.SubmissionHandler
 	Contest        *handler.ContestHandler
 	ContestProblem *handler.ContestProblemHandler
