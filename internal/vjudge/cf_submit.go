@@ -34,10 +34,10 @@ type cfSubmitRequest struct {
 }
 
 type cfSubmitResponse struct {
-	Status       string `json:"status"`
-	Message      string `json:"message"`
-	Error        string `json:"error"`
-	SubmissionID string `json:"submission_id"`
+	Status       string            `json:"status"`
+	Message      string            `json:"message"`
+	Error        string            `json:"error"`
+	SubmissionID string            `json:"submission_id"`
 	Cookies      map[string]string `json:"cookies"`
 }
 

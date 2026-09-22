@@ -61,9 +61,9 @@ func (h *ContestProblemHandler) GetByIndex(w http.ResponseWriter, r *http.Reques
 			}
 
 			respondJSON(w, http.StatusOK, map[string]interface{}{
-				"problem":           problem,
-				"contest":           contest,
-				"can_submit":        false,
+				"problem":            problem,
+				"contest":            contest,
+				"can_submit":         false,
 				"upsolving_disabled": true,
 			})
 			return
@@ -80,10 +80,10 @@ func (h *ContestProblemHandler) GetByIndex(w http.ResponseWriter, r *http.Reques
 	statementHidden := contest.StatementHidden && !isJudge
 
 	respondJSON(w, http.StatusOK, map[string]interface{}{
-		"problem":           problem,
-		"contest":           contest,
-		"can_submit":        canSubmit,
-		"statement_hidden":  statementHidden,
-		"is_judge":          isJudge,
+		"problem":          problem,
+		"contest":          contest,
+		"can_submit":       canSubmit,
+		"statement_hidden": statementHidden,
+		"is_judge":         isJudge,
 	})
 }

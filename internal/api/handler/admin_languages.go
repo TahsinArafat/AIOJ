@@ -47,8 +47,8 @@ type DetectedTool struct {
 }
 
 var knownCompilers = []struct {
-	Name    string
-	Binary  string
+	Name        string
+	Binary      string
 	VersionArgs []string
 }{
 	{"GCC (C)", "/usr/bin/gcc", []string{"--version"}},
@@ -69,8 +69,8 @@ var knownCompilers = []struct {
 }
 
 var knownInterpreters = []struct {
-	Name    string
-	Binary  string
+	Name        string
+	Binary      string
 	VersionArgs []string
 }{
 	{"Python 3", "/usr/bin/python3", []string{"--version"}},
@@ -296,16 +296,16 @@ func (h *AdminLanguageHandler) Test(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result := map[string]interface{}{
-		"key":                   lang.Key,
-		"name":                  lang.Name,
-		"compile_command":       lang.CompileCmd,
-		"runtime":               lang.Runtime,
-		"time_limit_multiplier": lang.TimeLimitMultiplier,
+		"key":                     lang.Key,
+		"name":                    lang.Name,
+		"compile_command":         lang.CompileCmd,
+		"runtime":                 lang.Runtime,
+		"time_limit_multiplier":   lang.TimeLimitMultiplier,
 		"memory_limit_multiplier": lang.MemoryLimitMultiplier,
-		"seccomp_rule":          lang.SeccompRule,
-		"extensions":            lang.Extensions,
-		"status":                "config_valid",
-		"message":               fmt.Sprintf("Language '%s' (%s) configuration is valid", lang.Name, lang.Key),
+		"seccomp_rule":            lang.SeccompRule,
+		"extensions":              lang.Extensions,
+		"status":                  "config_valid",
+		"message":                 fmt.Sprintf("Language '%s' (%s) configuration is valid", lang.Name, lang.Key),
 	}
 
 	if lang.CompileCmd == "" && lang.Runtime == "" {

@@ -288,8 +288,8 @@ func extractSectionFromDescription(description string, sectionName string) strin
 			continue
 		}
 		if inSection {
-			if (strings.HasPrefix(trimmed, "#") && trimmed != "# "+sectionName) || 
-			   (trimmed != "" && !strings.HasPrefix(trimmed, "#") && isSectionHeader(trimmed)) {
+			if (strings.HasPrefix(trimmed, "#") && trimmed != "# "+sectionName) ||
+				(trimmed != "" && !strings.HasPrefix(trimmed, "#") && isSectionHeader(trimmed)) {
 				break
 			}
 			if trimmed != "" {
@@ -313,8 +313,8 @@ func removeSectionFromDescription(description string, sectionName string) string
 			continue
 		}
 		if inSection {
-			if (strings.HasPrefix(trimmed, "#") && trimmed != "# "+sectionName) || 
-			   (trimmed != "" && !strings.HasPrefix(trimmed, "#") && isSectionHeader(trimmed)) {
+			if (strings.HasPrefix(trimmed, "#") && trimmed != "# "+sectionName) ||
+				(trimmed != "" && !strings.HasPrefix(trimmed, "#") && isSectionHeader(trimmed)) {
 				inSection = false
 				result = append(result, line)
 			}
@@ -634,58 +634,58 @@ func renderNodeToMarkdown(n *html.Node) string {
 				}
 			}
 			sb.WriteString("\n")
-	case "span":
-		if hasClass(n, "math") {
-			if hasClass(n, "math-display") {
+		case "span":
+			if hasClass(n, "math") {
+				if hasClass(n, "math-display") {
+					sb.WriteString("$$")
+				} else {
+					sb.WriteString("$")
+				}
+				for c := n.FirstChild; c != nil; c = c.NextSibling {
+					walk(c)
+				}
+				if hasClass(n, "math-display") {
+					sb.WriteString("$$")
+				} else {
+					sb.WriteString("$")
+				}
+			} else if hasClass(n, "tex-font-style-bf") {
+				sb.WriteString("**")
+				for c := n.FirstChild; c != nil; c = c.NextSibling {
+					walk(c)
+				}
+				sb.WriteString("**")
+			} else if hasClass(n, "tex-font-style-it") {
+				sb.WriteString("*")
+				for c := n.FirstChild; c != nil; c = c.NextSibling {
+					walk(c)
+				}
+				sb.WriteString("*")
+			} else if hasClass(n, "tex-font-style-tt") {
+				sb.WriteString("`")
+				for c := n.FirstChild; c != nil; c = c.NextSibling {
+					walk(c)
+				}
+				sb.WriteString("`")
+			} else {
+				for c := n.FirstChild; c != nil; c = c.NextSibling {
+					walk(c)
+				}
+			}
+		default:
+			if n.Data == "div" && hasClass(n, "math-display") {
+				sb.WriteString("$$")
+				for c := n.FirstChild; c != nil; c = c.NextSibling {
+					walk(c)
+				}
 				sb.WriteString("$$")
 			} else {
-				sb.WriteString("$")
-			}
-			for c := n.FirstChild; c != nil; c = c.NextSibling {
-				walk(c)
-			}
-			if hasClass(n, "math-display") {
-				sb.WriteString("$$")
-			} else {
-				sb.WriteString("$")
-			}
-		} else if hasClass(n, "tex-font-style-bf") {
-			sb.WriteString("**")
-			for c := n.FirstChild; c != nil; c = c.NextSibling {
-				walk(c)
-			}
-			sb.WriteString("**")
-		} else if hasClass(n, "tex-font-style-it") {
-			sb.WriteString("*")
-			for c := n.FirstChild; c != nil; c = c.NextSibling {
-				walk(c)
-			}
-			sb.WriteString("*")
-		} else if hasClass(n, "tex-font-style-tt") {
-			sb.WriteString("`")
-			for c := n.FirstChild; c != nil; c = c.NextSibling {
-				walk(c)
-			}
-			sb.WriteString("`")
-		} else {
-			for c := n.FirstChild; c != nil; c = c.NextSibling {
-				walk(c)
-			}
-		}
-	default:
-		if n.Data == "div" && hasClass(n, "math-display") {
-			sb.WriteString("$$")
-			for c := n.FirstChild; c != nil; c = c.NextSibling {
-				walk(c)
-			}
-			sb.WriteString("$$")
-		} else {
-			for c := n.FirstChild; c != nil; c = c.NextSibling {
-				walk(c)
+				for c := n.FirstChild; c != nil; c = c.NextSibling {
+					walk(c)
+				}
 			}
 		}
 	}
-}
 	walk(n)
 	result := sb.String()
 	// Clean up excessive newlines

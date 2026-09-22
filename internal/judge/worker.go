@@ -18,18 +18,18 @@ import (
 // Runner (batch, interactive, or output-only).  All judging logic lives in the
 // runner and compiler sub-packages.
 type WorkerPool struct {
-	queue               queue.JudgeQueue
-	exec                *executor.Client
-	compiler            *compiler.Compiler
-	batchRunner         *runner.BatchRunner
-	interactiveRunner   *runner.InteractiveRunner
-	outputOnlyRunner    *runner.OutputOnlyRunner
-	langDir             string
-	sem                 chan struct{}
-	subStore            store.SubmissionStore
-	probStore           store.ProblemStore
-	langLimitStore      store.LanguageLimitStore
-	balloonStore        store.BalloonStore
+	queue             queue.JudgeQueue
+	exec              *executor.Client
+	compiler          *compiler.Compiler
+	batchRunner       *runner.BatchRunner
+	interactiveRunner *runner.InteractiveRunner
+	outputOnlyRunner  *runner.OutputOnlyRunner
+	langDir           string
+	sem               chan struct{}
+	subStore          store.SubmissionStore
+	probStore         store.ProblemStore
+	langLimitStore    store.LanguageLimitStore
+	balloonStore      store.BalloonStore
 }
 
 func NewWorkerPool(

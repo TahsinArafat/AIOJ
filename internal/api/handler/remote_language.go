@@ -187,7 +187,7 @@ func (h *RemoteLanguageHandler) AutoDetect(w http.ResponseWriter, r *http.Reques
 
 func (h *RemoteLanguageHandler) BulkUpsert(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Platform  string                `json:"platform"`
+		Platform  string                 `json:"platform"`
 		Languages []model.RemoteLanguage `json:"languages"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

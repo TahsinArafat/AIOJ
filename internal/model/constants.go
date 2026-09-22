@@ -2,10 +2,10 @@ package model
 
 // User roles — must match CHECK constraint in 000001_init.up.sql.
 const (
-	RoleAdmin   = "admin"
+	RoleAdmin  = "admin"
 	RoleSetter = "setter"
-	RoleUser    = "user"
-	RoleBot     = "bot"
+	RoleUser   = "user"
+	RoleBot    = "bot"
 )
 
 // Problem/contest collaboration access levels.

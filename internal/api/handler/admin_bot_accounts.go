@@ -13,8 +13,8 @@ import (
 )
 
 type AdminBotAccountHandler struct {
-	store      store.BotAccountStore
-	vjudgeSvc  *vjudge.Service
+	store     store.BotAccountStore
+	vjudgeSvc *vjudge.Service
 }
 
 func NewAdminBotAccountHandler(s store.BotAccountStore, vjSvc *vjudge.Service) *AdminBotAccountHandler {
@@ -127,13 +127,13 @@ func (h *AdminBotAccountHandler) Update(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	var req struct {
-		PlatformUser *string            `json:"platform_user"`
-		PlatformPass *string            `json:"platform_pass"`
-		Status       *string            `json:"status"`
-		RateLimitRPS *float32           `json:"rate_limit_rps"`
-		SessionData  map[string]string  `json:"session_data"`
-		ProxyURL     *string            `json:"proxy_url"`
-		ProxyEnabled *bool              `json:"proxy_enabled"`
+		PlatformUser *string           `json:"platform_user"`
+		PlatformPass *string           `json:"platform_pass"`
+		Status       *string           `json:"status"`
+		RateLimitRPS *float32          `json:"rate_limit_rps"`
+		SessionData  map[string]string `json:"session_data"`
+		ProxyURL     *string           `json:"proxy_url"`
+		ProxyEnabled *bool             `json:"proxy_enabled"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid body", http.StatusBadRequest)
@@ -274,7 +274,7 @@ func (h *AdminBotAccountHandler) TestLogin(w http.ResponseWriter, r *http.Reques
 			})
 			return
 		}
-		
+
 		if req.PlatformUser == "" || req.PlatformPass == "" {
 			http.Error(w, "username and password are required", http.StatusBadRequest)
 			return

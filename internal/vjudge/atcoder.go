@@ -62,7 +62,7 @@ func (b *AtCoderBot) Configure(acc BotConfig) {
 	b.config.ProxyURL = acc.ProxyURL
 	b.config.ProxyEnabled = acc.ProxyEnabled
 	b.config.Cookies = acc.Cookies
-	
+
 	if len(acc.Cookies) > 0 {
 		var baseURL *url.URL
 		if b.config.BaseURL != "" {

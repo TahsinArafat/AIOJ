@@ -95,3 +95,39 @@ func (s *SitemapStore) PublicContests(ctx context.Context, origin string) ([]Sit
 	return out, rows.Err()
 }
 
+// PublicUsers returns user profiles worth crawling.
+//
+// Ported from dmoj's judge/sitemap.py UserSitemap. dmoj indexes every user; here
+// the rule is narrower because AIOJ's users table has `role` and `is_bot`, so
+// bot accounts and privileged staff accounts are excluded -- ranking pages for
+// admin accounts invites enumeration of staff, and bot profiles are not
+// meaningful search results.
+func (s *SitemapStore) PublicUsers(ctx context.Context, origin string) ([]SitemapEntry, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT username, created_at
+		   FROM users
+		  WHERE COALESCE(is_bot, false) = false
+		    AND COALESCE(role, '') NOT IN ('admin', 'staff')
+		  ORDER BY created_at DESC
+		  LIMIT 50000`)
+	if err != nil {
+		return nil, fmt.Errorf("sitemap users: %w", err)
+	}
+	defer rows.Close()
+
+	out := []SitemapEntry{}
+	for rows.Next() {
+		var username string
+		var createdAt time.Time
+		if err := rows.Scan(&username, &createdAt); err != nil {
+			return nil, fmt.Errorf("scan sitemap user: %w", err)
+		}
+		out = append(out, SitemapEntry{
+			Location:   origin + "/users/" + username,
+			LastMod:    createdAt,
+			ChangeFreq: "monthly",
+			Priority:   "0.3",
+		})
+	}
+	return out, rows.Err()
+}

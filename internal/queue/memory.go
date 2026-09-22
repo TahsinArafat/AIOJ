@@ -14,7 +14,7 @@ type queueItem struct {
 
 type priorityQueue []*queueItem
 
-func (pq priorityQueue) Len() int { return len(pq) }
+func (pq priorityQueue) Len() int           { return len(pq) }
 func (pq priorityQueue) Less(i, j int) bool { return pq[i].priority < pq[j].priority }
 func (pq priorityQueue) Swap(i, j int) {
 	pq[i], pq[j] = pq[j], pq[i]

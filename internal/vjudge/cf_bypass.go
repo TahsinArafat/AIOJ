@@ -18,18 +18,18 @@ type CFBypassClient struct {
 }
 
 type flaresolverrRequest struct {
-	CMD        string                 `json:"cmd"`
-	URL        string                 `json:"url,omitempty"`
-	Session    string                 `json:"session,omitempty"`
-	PostData   string                 `json:"postData,omitempty"`
-	MaxTimeout int                    `json:"maxTimeout,omitempty"`
-	Cookies    []flaresolverrCookie   `json:"cookies,omitempty"`
+	CMD        string               `json:"cmd"`
+	URL        string               `json:"url,omitempty"`
+	Session    string               `json:"session,omitempty"`
+	PostData   string               `json:"postData,omitempty"`
+	MaxTimeout int                  `json:"maxTimeout,omitempty"`
+	Cookies    []flaresolverrCookie `json:"cookies,omitempty"`
 }
 
 type flaresolverrResponse struct {
-	Status  string                `json:"status"`
-	Message string                `json:"message"`
-	Session string                `json:"session,omitempty"`
+	Status   string                `json:"status"`
+	Message  string                `json:"message"`
+	Session  string                `json:"session,omitempty"`
 	Solution *flaresolverrSolution `json:"solution,omitempty"`
 }
 
@@ -137,8 +137,6 @@ func (c *CFBypassClient) Post(ctx context.Context, targetURL string, postData st
 	}
 	return result.Solution, nil
 }
-
-
 
 func (c *CFBypassClient) PostWithSession(ctx context.Context, targetURL string, postData string, sessionID string) (*flaresolverrSolution, error) {
 	result, err := c.doRequest(ctx, flaresolverrRequest{

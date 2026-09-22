@@ -40,11 +40,11 @@ type sampleData struct {
 }
 
 type templateData struct {
-	Title       string
-	Duration    string
+	Title        string
+	Duration     string
 	ProblemCount int
-	Problems    []problemData
-	Year        string
+	Problems     []problemData
+	Year         string
 }
 
 // stripIOSections removes Input/Output/Hint sections from the description
@@ -288,16 +288,16 @@ func (g *Generator) GenerateContestPDF(contest *model.Contest, problems []model.
 		memLimit := p.MemoryLimit / 1024
 
 		probList = append(probList, problemData{
-			Index:       string(rune('A' + i)),
-			Title:       p.Title,
-			TimeLimit:   p.TimeLimit,
-			MemoryLimit: memLimit,
-			Description: template.HTML(descHTML),
-			InputFormat: template.HTML(inputHTML),
+			Index:        string(rune('A' + i)),
+			Title:        p.Title,
+			TimeLimit:    p.TimeLimit,
+			MemoryLimit:  memLimit,
+			Description:  template.HTML(descHTML),
+			InputFormat:  template.HTML(inputHTML),
 			OutputFormat: template.HTML(outputHTML),
-			Samples:     samples,
-			Hint:        p.Hint,
-			HasHint:     p.Hint != "",
+			Samples:      samples,
+			Hint:         p.Hint,
+			HasHint:      p.Hint != "",
 		})
 	}
 
@@ -307,10 +307,10 @@ func (g *Generator) GenerateContestPDF(contest *model.Contest, problems []model.
 	durationStr := fmt.Sprintf("%dh %02dm", hours, mins)
 
 	data := templateData{
-		Title:       contest.Title,
-		Duration:    durationStr,
+		Title:        contest.Title,
+		Duration:     durationStr,
 		ProblemCount: len(problems),
-		Problems:    probList,
+		Problems:     probList,
 	}
 
 	tmpl, err := template.New("pdf").Parse(pdfTemplate)

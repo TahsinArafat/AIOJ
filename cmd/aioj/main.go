@@ -261,10 +261,12 @@ func main() {
 
 			problems, errProblems := sitemapStore.PublicProblems(ctx, origin)
 			contests, errContests := sitemapStore.PublicContests(ctx, origin)
+			users, errUsers := sitemapStore.PublicUsers(ctx, origin)
 
 			return []handler.SitemapSection{
 				{Name: "problems", URLs: toURLs(problems), Err: errProblems},
 				{Name: "contests", URLs: toURLs(contests), Err: errContests},
+				{Name: "users", URLs: toURLs(users), Err: errUsers},
 			}
 		},
 		// Feed items for /feed/problems.atom. The error is returned, not logged,
@@ -309,6 +311,28 @@ func main() {
 					Link:    url,
 					ID:      url,
 					Summary: truncateForFeed(e.Content, 500),
+					Updated: toTime(e.Created),
+				})
+			}
+			return items, nil
+		},
+		ContestFeed: func(ctx context.Context) ([]handler.FeedItem, error) {
+			origin := handler.NormalizeOrigin(os.Getenv("PUBLIC_ORIGIN"))
+			if origin == "" {
+				origin = "http://localhost:8081"
+			}
+			entries, err := feedStore.RecentContests(ctx, 25)
+			if err != nil {
+				return nil, err
+			}
+			items := make([]handler.FeedItem, 0, len(entries))
+			for _, e := range entries {
+				url := origin + "/contests/" + e.Slug
+				items = append(items, handler.FeedItem{
+					Title:   e.Title,
+					Link:    url,
+					ID:      url,
+					Summary: truncateForFeed(e.Summary, 500),
 					Updated: toTime(e.Created),
 				})
 			}

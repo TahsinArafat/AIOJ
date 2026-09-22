@@ -97,8 +97,8 @@ func TestACMFormat_ScoreProblem(t *testing.T) {
 			ctx := format.ScoringContext{
 				ContestID:           "1",
 				SubmissionStartTime: start,
-				Problem:            format.Problem{ID: "1", Index: "A"},
-				Submissions:        tt.submissions,
+				Problem:             format.Problem{ID: "1", Index: "A"},
+				Submissions:         tt.submissions,
 			}
 
 			result, err := f.ScoreProblem(ctx)

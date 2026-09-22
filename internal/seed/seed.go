@@ -225,17 +225,17 @@ func promoteAdmin(ctx context.Context, cfg Config) (bool, error) {
 
 func createProblem(ctx context.Context, c *http.Client, base, token, slug string) (bool, error) {
 	body := map[string]interface{}{
-		"slug":           slug,
-		"title":          "Hello, AIOJ!",
-		"description":    "Print `" + helloExpected + "`.",
-		"input_format":   "No input.",
-		"output_format":  "The string `" + helloExpected + "`.",
-		"time_limit":     1000,
-		"memory_limit":   262144,
-		"difficulty":     "easy",
-		"checker_type":   "exact",
-		"visible":        true,
-		"sample_cases":   []map[string]string{{"input": "", "output": helloExpected}},
+		"slug":          slug,
+		"title":         "Hello, AIOJ!",
+		"description":   "Print `" + helloExpected + "`.",
+		"input_format":  "No input.",
+		"output_format": "The string `" + helloExpected + "`.",
+		"time_limit":    1000,
+		"memory_limit":  262144,
+		"difficulty":    "easy",
+		"checker_type":  "exact",
+		"visible":       true,
+		"sample_cases":  []map[string]string{{"input": "", "output": helloExpected}},
 	}
 	resp, err := postJSON(ctx, c, base+"/api/problems", body, withToken(token))
 	if err != nil {

@@ -36,12 +36,12 @@ func NewSubmissionHandler(sub store.SubmissionStore, prob store.ProblemStore, co
 }
 
 type CustomRunRequest struct {
-	SourceCode   string `json:"source_code"`
-	Language     string `json:"language"`
-	Input        string `json:"input"`
-	Expected     string `json:"expected,omitempty"`
-	TimeLimitMs  int    `json:"time_limit_ms,omitempty"`
-	MemoryLimitKB int   `json:"memory_limit_kb,omitempty"`
+	SourceCode    string `json:"source_code"`
+	Language      string `json:"language"`
+	Input         string `json:"input"`
+	Expected      string `json:"expected,omitempty"`
+	TimeLimitMs   int    `json:"time_limit_ms,omitempty"`
+	MemoryLimitKB int    `json:"memory_limit_kb,omitempty"`
 }
 
 type CustomRunResponse struct {
@@ -430,8 +430,8 @@ func (h *SubmissionHandler) CustomRun(w http.ResponseWriter, r *http.Request) {
 
 	// Client-supplied limits are honored only up to hard ceilings (2x the
 	// defaults) so a single user cannot pin shared judge workers for minutes.
-	const maxTimeLimitMs = 10 * 1000          // 10s
-	const maxMemoryLimitKB = 512 * 1024       // 512MB
+	const maxTimeLimitMs = 10 * 1000    // 10s
+	const maxMemoryLimitKB = 512 * 1024 // 512MB
 	cpuNs := uint64(5.0 * 1e9 * cfg.TimeLimitMultiplier)
 	memBytes := uint64(256.0 * 1024 * 1024 * cfg.MemoryLimitMultiplier)
 	if req.TimeLimitMs > 0 {

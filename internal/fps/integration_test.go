@@ -9,16 +9,16 @@ import (
 
 func TestImportExportRoundtrip(t *testing.T) {
 	original := &model.Problem{
-		ID:          "round-trip-test",
-		Title:       "Sum Loop",
-		TimeLimit:   2000,
-		MemoryLimit: 131072, // 128MB in KB
-		Description: "Given two integers A and B, print their sum.",
-		InputFormat: "Two integers on one line.",
+		ID:           "round-trip-test",
+		Title:        "Sum Loop",
+		TimeLimit:    2000,
+		MemoryLimit:  131072, // 128MB in KB
+		Description:  "Given two integers A and B, print their sum.",
+		InputFormat:  "Two integers on one line.",
 		OutputFormat: "A single integer — their sum.",
-		Hint:        "Use addition.",
-		Source:      "AIOJ 2026",
-		Tags:        []string{"math", "easy"},
+		Hint:         "Use addition.",
+		Source:       "AIOJ 2026",
+		Tags:         []string{"math", "easy"},
 		SampleCases: []model.SampleCase{
 			{Input: "3 4", Output: "7"},
 			{Input: "100 200", Output: "300"},

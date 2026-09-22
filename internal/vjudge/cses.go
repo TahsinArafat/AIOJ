@@ -218,7 +218,7 @@ func extractMaxTime(html string) int {
 }
 
 func (b *CSESBot) MarkBotSuccess(ctx context.Context, botID string) {}
-func (b *CSESBot) MarkBotError(ctx context.Context, botID string)    {}
+func (b *CSESBot) MarkBotError(ctx context.Context, botID string)   {}
 
 func (b *CSESBot) fetch(ctx context.Context, url string) (string, error) {
 	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)

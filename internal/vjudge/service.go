@@ -309,18 +309,29 @@ func (s *Service) ForcePoll(ctx context.Context, platform, remoteID, submissionI
 					}
 					var status model.SubmissionStatus
 					switch verdict {
-					case "OK": status = model.StatusAC
-					case "WRONG_ANSWER": status = model.StatusWA
-					case "TIME_LIMIT_EXCEEDED": status = model.StatusTLE
-					case "COMPILATION_ERROR": status = model.StatusCE
-					case "RUNTIME_ERROR": status = model.StatusRE
-					case "MEMORY_LIMIT_EXCEEDED": status = model.StatusMLE
-					default: status = model.StatusWA
+					case "OK":
+						status = model.StatusAC
+					case "WRONG_ANSWER":
+						status = model.StatusWA
+					case "TIME_LIMIT_EXCEEDED":
+						status = model.StatusTLE
+					case "COMPILATION_ERROR":
+						status = model.StatusCE
+					case "RUNTIME_ERROR":
+						status = model.StatusRE
+					case "MEMORY_LIMIT_EXCEEDED":
+						status = model.StatusMLE
+					default:
+						status = model.StatusWA
 					}
 					timeUsed := 0
 					memUsed := 0
-					if t, ok := sub["timeConsumedMillis"].(float64); ok { timeUsed = int(t) }
-					if m, ok := sub["memoryConsumedBytes"].(float64); ok { memUsed = int(m / 1024) }
+					if t, ok := sub["timeConsumedMillis"].(float64); ok {
+						timeUsed = int(t)
+					}
+					if m, ok := sub["memoryConsumedBytes"].(float64); ok {
+						memUsed = int(m / 1024)
+					}
 					s.subStore.UpdateResult(ctx, submissionID, status, 0, timeUsed, memUsed, "", nil)
 					slog.Info("vjudge judged", "sub", submissionID, "verdict", verdict, "time", timeUsed, "mem", memUsed)
 					return
@@ -332,17 +343,25 @@ func (s *Service) ForcePoll(ctx context.Context, platform, remoteID, submissionI
 
 	result, err := bot.Poll(ctx, remoteID)
 	if err != nil || result == nil || !result.Done {
-		if err != nil { slog.Error("vjudge force poll", "err", err) }
+		if err != nil {
+			slog.Error("vjudge force poll", "err", err)
+		}
 		return
 	}
 	var status model.SubmissionStatus
 	switch result.Verdict {
-	case "AC": status = model.StatusAC
-	case "WA": status = model.StatusWA
-	case "TLE": status = model.StatusTLE
-	case "RE": status = model.StatusRE
-	case "CE": status = model.StatusCE
-	default: status = model.StatusWA
+	case "AC":
+		status = model.StatusAC
+	case "WA":
+		status = model.StatusWA
+	case "TLE":
+		status = model.StatusTLE
+	case "RE":
+		status = model.StatusRE
+	case "CE":
+		status = model.StatusCE
+	default:
+		status = model.StatusWA
 	}
 	s.subStore.UpdateResult(ctx, submissionID, status, 0, result.TimeUsed, result.MemoryUsed, "", nil)
 	slog.Info("vjudge judged", "sub", submissionID, "verdict", result.Verdict)
@@ -412,18 +431,29 @@ func (s *Service) pollCF(ctx context.Context, subs []model.PendingRemoteSubmissi
 					}
 					var status model.SubmissionStatus
 					switch verdict {
-					case "OK": status = model.StatusAC
-					case "WRONG_ANSWER": status = model.StatusWA
-					case "TIME_LIMIT_EXCEEDED": status = model.StatusTLE
-					case "COMPILATION_ERROR": status = model.StatusCE
-					case "RUNTIME_ERROR": status = model.StatusRE
-					case "MEMORY_LIMIT_EXCEEDED": status = model.StatusMLE
-					default: status = model.StatusWA
+					case "OK":
+						status = model.StatusAC
+					case "WRONG_ANSWER":
+						status = model.StatusWA
+					case "TIME_LIMIT_EXCEEDED":
+						status = model.StatusTLE
+					case "COMPILATION_ERROR":
+						status = model.StatusCE
+					case "RUNTIME_ERROR":
+						status = model.StatusRE
+					case "MEMORY_LIMIT_EXCEEDED":
+						status = model.StatusMLE
+					default:
+						status = model.StatusWA
 					}
 					timeUsed := 0
 					memUsed := 0
-					if t, ok := sub["timeConsumedMillis"].(float64); ok { timeUsed = int(t) }
-					if m, ok := sub["memoryConsumedBytes"].(float64); ok { memUsed = int(m / 1024) }
+					if t, ok := sub["timeConsumedMillis"].(float64); ok {
+						timeUsed = int(t)
+					}
+					if m, ok := sub["memoryConsumedBytes"].(float64); ok {
+						memUsed = int(m / 1024)
+					}
 					s.subStore.UpdateResult(ctx, ps.ID, status, 0, timeUsed, memUsed, "", nil)
 					slog.Info("vjudge judged", "sub", ps.ID, "verdict", verdict, "time", timeUsed, "mem", memUsed)
 				}
@@ -443,12 +473,18 @@ func (s *Service) pollGeneric(ctx context.Context, subs []model.PendingRemoteSub
 		}
 		var status model.SubmissionStatus
 		switch result.Verdict {
-		case "AC": status = model.StatusAC
-		case "WA": status = model.StatusWA
-		case "TLE": status = model.StatusTLE
-		case "RE": status = model.StatusRE
-		case "CE": status = model.StatusCE
-		default: status = model.StatusWA
+		case "AC":
+			status = model.StatusAC
+		case "WA":
+			status = model.StatusWA
+		case "TLE":
+			status = model.StatusTLE
+		case "RE":
+			status = model.StatusRE
+		case "CE":
+			status = model.StatusCE
+		default:
+			status = model.StatusWA
 		}
 		s.subStore.UpdateResult(ctx, ps.ID, status, 0, result.TimeUsed, result.MemoryUsed, "", nil)
 		slog.Info("vjudge judged", "sub", ps.ID, "verdict", result.Verdict)

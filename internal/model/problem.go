@@ -17,41 +17,41 @@ type TestCaseScore struct {
 }
 
 type Problem struct {
-	ID              string          `json:"id"`
-	Slug            string          `json:"slug"`
-	Title           string          `json:"title"`
-	Description     string          `json:"description"`
-	InputFormat     string          `json:"input_format,omitempty"`
-	OutputFormat    string          `json:"output_format,omitempty"`
-	Hint            string          `json:"hint,omitempty"`
-	SampleCases     []SampleCase    `json:"sample_cases"`
-	TimeLimit       int             `json:"time_limit"`
-	MemoryLimit     int             `json:"memory_limit"`
-	Difficulty      string          `json:"difficulty"`
-	Tags            []string        `json:"tags,omitempty"`
-	Visible         bool            `json:"visible"`
-	TestdataPath    string          `json:"-"`
-	TestCaseScore   []TestCaseScore `json:"testcase_score,omitempty"`
-	SPJ             bool            `json:"spj"`
-	SPJLanguage     string          `json:"spj_language,omitempty"`
-	SPJSourceCode   string          `json:"spj_source_code,omitempty"`
-	SPJVersion      string          `json:"spj_version,omitempty"`
-	CheckerType     string          `json:"checker_type"`
-	FloatEpsilon    float64         `json:"float_epsilon"`
-	Interactive          bool   `json:"interactive"`
-	InteractorLanguage   string `json:"interactor_language,omitempty"`
-	InteractorSourceCode string `json:"interactor_source_code,omitempty"`
-	ScoringMode        string `json:"scoring_mode"`         // "complete" or "partial"
-	SubtaskAggregation string `json:"subtask_aggregation"`  // "min" or "sum"
-	LanguageLimits     []LanguageLimit `json:"language_limits,omitempty"`
-	SubmissionCount int             `json:"submission_count"`
-	AcceptedCount   int             `json:"accepted_count"`
-	Source          string          `json:"source"`
-	RemoteID        string          `json:"remote_id,omitempty"`
-	AIGenerated     bool            `json:"ai_generated,omitempty"`
-	CreatedBy       string          `json:"created_by"`
-	CreatedAt       time.Time       `json:"created_at"`
-	UpdatedAt       time.Time       `json:"updated_at"`
+	ID                   string          `json:"id"`
+	Slug                 string          `json:"slug"`
+	Title                string          `json:"title"`
+	Description          string          `json:"description"`
+	InputFormat          string          `json:"input_format,omitempty"`
+	OutputFormat         string          `json:"output_format,omitempty"`
+	Hint                 string          `json:"hint,omitempty"`
+	SampleCases          []SampleCase    `json:"sample_cases"`
+	TimeLimit            int             `json:"time_limit"`
+	MemoryLimit          int             `json:"memory_limit"`
+	Difficulty           string          `json:"difficulty"`
+	Tags                 []string        `json:"tags,omitempty"`
+	Visible              bool            `json:"visible"`
+	TestdataPath         string          `json:"-"`
+	TestCaseScore        []TestCaseScore `json:"testcase_score,omitempty"`
+	SPJ                  bool            `json:"spj"`
+	SPJLanguage          string          `json:"spj_language,omitempty"`
+	SPJSourceCode        string          `json:"spj_source_code,omitempty"`
+	SPJVersion           string          `json:"spj_version,omitempty"`
+	CheckerType          string          `json:"checker_type"`
+	FloatEpsilon         float64         `json:"float_epsilon"`
+	Interactive          bool            `json:"interactive"`
+	InteractorLanguage   string          `json:"interactor_language,omitempty"`
+	InteractorSourceCode string          `json:"interactor_source_code,omitempty"`
+	ScoringMode          string          `json:"scoring_mode"`        // "complete" or "partial"
+	SubtaskAggregation   string          `json:"subtask_aggregation"` // "min" or "sum"
+	LanguageLimits       []LanguageLimit `json:"language_limits,omitempty"`
+	SubmissionCount      int             `json:"submission_count"`
+	AcceptedCount        int             `json:"accepted_count"`
+	Source               string          `json:"source"`
+	RemoteID             string          `json:"remote_id,omitempty"`
+	AIGenerated          bool            `json:"ai_generated,omitempty"`
+	CreatedBy            string          `json:"created_by"`
+	CreatedAt            time.Time       `json:"created_at"`
+	UpdatedAt            time.Time       `json:"updated_at"`
 }
 
 type ProblemListItem struct {
@@ -78,39 +78,39 @@ type ProblemPermission struct {
 }
 
 type CreateProblemRequest struct {
-	Slug          string          `json:"slug"`
-	Title         string          `json:"title"`
-	Description   string          `json:"description"`
-	InputFormat   string          `json:"input_format,omitempty"`
-	OutputFormat  string          `json:"output_format,omitempty"`
-	Hint          string          `json:"hint,omitempty"`
-	TimeLimit     int             `json:"time_limit"`
-	MemoryLimit   int             `json:"memory_limit"`
-	Difficulty    string          `json:"difficulty"`
-	Tags          []string        `json:"tags,omitempty"`
-	SampleCases   []SampleCase    `json:"sample_cases,omitempty"`
-	TestCaseScore []TestCaseScore `json:"testcase_score,omitempty"`
-	SPJ           bool            `json:"spj"`
-	SPJLanguage   string          `json:"spj_language,omitempty"`
-	SPJSourceCode string          `json:"spj_source_code,omitempty"`
-	CheckerType   string          `json:"checker_type,omitempty"`
-	FloatEpsilon  float64         `json:"float_epsilon,omitempty"`
-	Visible       bool            `json:"visible"`
-	Interactive          bool   `json:"interactive"`
-	InteractorLanguage   string `json:"interactor_language,omitempty"`
-	InteractorSourceCode string `json:"interactor_source_code,omitempty"`
-	ScoringMode        string `json:"scoring_mode,omitempty"`
-	SubtaskAggregation string `json:"subtask_aggregation,omitempty"`
+	Slug                 string          `json:"slug"`
+	Title                string          `json:"title"`
+	Description          string          `json:"description"`
+	InputFormat          string          `json:"input_format,omitempty"`
+	OutputFormat         string          `json:"output_format,omitempty"`
+	Hint                 string          `json:"hint,omitempty"`
+	TimeLimit            int             `json:"time_limit"`
+	MemoryLimit          int             `json:"memory_limit"`
+	Difficulty           string          `json:"difficulty"`
+	Tags                 []string        `json:"tags,omitempty"`
+	SampleCases          []SampleCase    `json:"sample_cases,omitempty"`
+	TestCaseScore        []TestCaseScore `json:"testcase_score,omitempty"`
+	SPJ                  bool            `json:"spj"`
+	SPJLanguage          string          `json:"spj_language,omitempty"`
+	SPJSourceCode        string          `json:"spj_source_code,omitempty"`
+	CheckerType          string          `json:"checker_type,omitempty"`
+	FloatEpsilon         float64         `json:"float_epsilon,omitempty"`
+	Visible              bool            `json:"visible"`
+	Interactive          bool            `json:"interactive"`
+	InteractorLanguage   string          `json:"interactor_language,omitempty"`
+	InteractorSourceCode string          `json:"interactor_source_code,omitempty"`
+	ScoringMode          string          `json:"scoring_mode,omitempty"`
+	SubtaskAggregation   string          `json:"subtask_aggregation,omitempty"`
 }
 
 type ProblemStats struct {
-	TotalSubmissions    int            `json:"total_submissions"`
-	AcceptedSubmissions int            `json:"accepted_submissions"`
-	AcceptanceRate      float64        `json:"acceptance_rate"`
-	UniqueSolvers       int            `json:"unique_solvers"`
-	AverageAttempts     float64        `json:"average_attempts"`
+	TotalSubmissions     int            `json:"total_submissions"`
+	AcceptedSubmissions  int            `json:"accepted_submissions"`
+	AcceptanceRate       float64        `json:"acceptance_rate"`
+	UniqueSolvers        int            `json:"unique_solvers"`
+	AverageAttempts      float64        `json:"average_attempts"`
 	LanguageDistribution map[string]int `json:"language_distribution"`
-	DifficultyEstimate  float64        `json:"difficulty_estimate"`
+	DifficultyEstimate   float64        `json:"difficulty_estimate"`
 }
 
 // GetSubtasks returns test cases grouped by subtask_id.

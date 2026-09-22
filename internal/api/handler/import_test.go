@@ -19,20 +19,34 @@ type mockProblemStore struct {
 }
 
 func (m *mockProblemStore) Create(_ context.Context, _ *model.Problem) error { return m.createErr }
-func (m *mockProblemStore) GetByID(_ context.Context, _ string) (*model.Problem, error) { return nil, nil }
-func (m *mockProblemStore) GetBySlug(_ context.Context, _ string) (*model.Problem, error) { return m.getBySlug, nil }
-func (m *mockProblemStore) List(_ context.Context, _, _ int) ([]model.ProblemListItem, int, error) { return nil, 0, nil }
-func (m *mockProblemStore) ListWithFilter(_ context.Context, _, _ int, _ string, _ []string, _ string, _ string, _ string, _ string) ([]model.ProblemListItem, int, error) { return nil, 0, nil }
-func (m *mockProblemStore) ListByCreatedBy(_ context.Context, _ string, _, _ int) ([]model.ProblemListItem, int, error) { return nil, 0, nil }
-func (m *mockProblemStore) GetAllTags(_ context.Context) ([]string, error) { return nil, nil }
-func (m *mockProblemStore) UpdateCounts(_ context.Context, _ string, _, _ int) error { return nil }
+func (m *mockProblemStore) GetByID(_ context.Context, _ string) (*model.Problem, error) {
+	return nil, nil
+}
+func (m *mockProblemStore) GetBySlug(_ context.Context, _ string) (*model.Problem, error) {
+	return m.getBySlug, nil
+}
+func (m *mockProblemStore) List(_ context.Context, _, _ int) ([]model.ProblemListItem, int, error) {
+	return nil, 0, nil
+}
+func (m *mockProblemStore) ListWithFilter(_ context.Context, _, _ int, _ string, _ []string, _ string, _ string, _ string, _ string) ([]model.ProblemListItem, int, error) {
+	return nil, 0, nil
+}
+func (m *mockProblemStore) ListByCreatedBy(_ context.Context, _ string, _, _ int) ([]model.ProblemListItem, int, error) {
+	return nil, 0, nil
+}
+func (m *mockProblemStore) GetAllTags(_ context.Context) ([]string, error)             { return nil, nil }
+func (m *mockProblemStore) UpdateCounts(_ context.Context, _ string, _, _ int) error   { return nil }
 func (m *mockProblemStore) Update(_ context.Context, _ string, _ *model.Problem) error { return nil }
-func (m *mockProblemStore) Delete(_ context.Context, _ string) error { return nil }
-func (m *mockProblemStore) AddPermission(_ context.Context, _, _, _ string) error { return nil }
-func (m *mockProblemStore) RemovePermission(_ context.Context, _, _ string) error { return nil }
-func (m *mockProblemStore) GetPermissions(_ context.Context, _ string) ([]model.ProblemPermission, error) { return nil, nil }
+func (m *mockProblemStore) Delete(_ context.Context, _ string) error                   { return nil }
+func (m *mockProblemStore) AddPermission(_ context.Context, _, _, _ string) error      { return nil }
+func (m *mockProblemStore) RemovePermission(_ context.Context, _, _ string) error      { return nil }
+func (m *mockProblemStore) GetPermissions(_ context.Context, _ string) ([]model.ProblemPermission, error) {
+	return nil, nil
+}
 func (m *mockProblemStore) HasAccess(_ context.Context, _, _ string, _ ...string) bool { return false }
-func (m *mockProblemStore) GetRecommendations(_ context.Context, _ string, _ int) (*model.RecommendationsResponse, error) { return nil, nil }
+func (m *mockProblemStore) GetRecommendations(_ context.Context, _ string, _ int) (*model.RecommendationsResponse, error) {
+	return nil, nil
+}
 
 func TestImportAtCoder_Authorization(t *testing.T) {
 	tests := []struct {

@@ -19,11 +19,11 @@ type Team struct {
 }
 
 type TeamMember struct {
-	TeamID    string    `json:"team_id"`
-	UserID    string    `json:"user_id"`
-	Username  string    `json:"username,omitempty"`
-	Role      string    `json:"role"`
-	JoinedAt  time.Time `json:"joined_at"`
+	TeamID   string    `json:"team_id"`
+	UserID   string    `json:"user_id"`
+	Username string    `json:"username,omitempty"`
+	Role     string    `json:"role"`
+	JoinedAt time.Time `json:"joined_at"`
 }
 
 type TeamContest struct {

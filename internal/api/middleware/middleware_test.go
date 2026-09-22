@@ -62,10 +62,10 @@ func TestOptionalAuthMiddleware(t *testing.T) {
 	token, _ := jwtMgr.GenerateAccessToken("user-1", "testuser", "user")
 
 	tests := []struct {
-		name        string
-		headerVal   string
-		wantClaims  bool
-		wantStatus  int
+		name       string
+		headerVal  string
+		wantClaims bool
+		wantStatus int
 	}{
 		{"with valid token", "Bearer " + token, true, http.StatusOK},
 		{"without token", "", false, http.StatusOK},

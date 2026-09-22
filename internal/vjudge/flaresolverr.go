@@ -107,11 +107,11 @@ func (c *FlareSolverrClient) Get(ctx context.Context, url string, cookies map[st
 	}
 
 	resp, err := c.request(ctx, flaresolverrRequest{
-		CMD:       "request.get",
-		URL:       url,
-		Session:   c.sessionID,
+		CMD:        "request.get",
+		URL:        url,
+		Session:    c.sessionID,
 		MaxTimeout: 60000,
-		Cookies:   fsCookies,
+		Cookies:    fsCookies,
 	})
 	if err != nil {
 		return nil, err
@@ -129,12 +129,12 @@ func (c *FlareSolverrClient) Post(ctx context.Context, url string, postData stri
 	}
 
 	resp, err := c.request(ctx, flaresolverrRequest{
-		CMD:       "request.post",
-		URL:       url,
-		Session:   c.sessionID,
-		PostData:  postData,
+		CMD:        "request.post",
+		URL:        url,
+		Session:    c.sessionID,
+		PostData:   postData,
 		MaxTimeout: 60000,
-		Cookies:   fsCookies,
+		Cookies:    fsCookies,
 	})
 	if err != nil {
 		return nil, err

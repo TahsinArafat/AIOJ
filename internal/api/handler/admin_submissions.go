@@ -10,9 +10,9 @@ import (
 )
 
 type AdminSubmissionHandler struct {
-	subStore   store.SubmissionStore
-	probStore  store.ProblemStore
-	vjudgeSvc  *vjudge.Service
+	subStore  store.SubmissionStore
+	probStore store.ProblemStore
+	vjudgeSvc *vjudge.Service
 }
 
 func NewAdminSubmissionHandler(subStore store.SubmissionStore, probStore store.ProblemStore, vjSvc *vjudge.Service) *AdminSubmissionHandler {

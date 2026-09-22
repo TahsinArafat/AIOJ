@@ -162,10 +162,10 @@ func autoDiscoverTestCases(targetDir string) []model.TestCaseScore {
 		".txt":   true,
 	}
 	outputExts := map[string]bool{
-		".out":   true,
+		".out":    true,
 		".output": true,
-		".ans":   true,
-		".sol":   true,
+		".ans":    true,
+		".sol":    true,
 	}
 
 	inputFiles := make(map[string]string)

@@ -51,15 +51,15 @@ type TrainingPlanProgress struct {
 }
 
 type CreateTrainingPlanRequest struct {
-	Title          string                   `json:"title"`
-	Description    string                   `json:"description"`
-	OrganizationID *string                  `json:"organization_id,omitempty"`
-	Sections       []CreateSectionRequest   `json:"sections"`
+	Title          string                 `json:"title"`
+	Description    string                 `json:"description"`
+	OrganizationID *string                `json:"organization_id,omitempty"`
+	Sections       []CreateSectionRequest `json:"sections"`
 }
 
 type CreateSectionRequest struct {
-	Title       string                    `json:"title"`
-	Description string                    `json:"description"`
+	Title       string                      `json:"title"`
+	Description string                      `json:"description"`
 	Problems    []CreateProblemEntryRequest `json:"problems"`
 }
 
@@ -70,9 +70,9 @@ type CreateProblemEntryRequest struct {
 
 type TrainingPlanDetail struct {
 	TrainingPlan
-	Sections  []TrainingPlanSection `json:"sections"`
-	Enrolled  bool                  `json:"enrolled"`
-	Progress  *PlanProgressSummary  `json:"progress,omitempty"`
+	Sections []TrainingPlanSection `json:"sections"`
+	Enrolled bool                  `json:"enrolled"`
+	Progress *PlanProgressSummary  `json:"progress,omitempty"`
 }
 
 type PlanProgressSummary struct {

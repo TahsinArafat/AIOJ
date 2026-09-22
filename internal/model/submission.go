@@ -9,12 +9,12 @@ const (
 	StatusJudging   SubmissionStatus = "judging"
 	StatusRejudging SubmissionStatus = "rejudging"
 	StatusAC        SubmissionStatus = "ac"
-	StatusWA      SubmissionStatus = "wa"
-	StatusTLE     SubmissionStatus = "tle"
-	StatusMLE     SubmissionStatus = "mle"
-	StatusRE      SubmissionStatus = "re"
-	StatusCE      SubmissionStatus = "ce"
-	StatusSE      SubmissionStatus = "se"
+	StatusWA        SubmissionStatus = "wa"
+	StatusTLE       SubmissionStatus = "tle"
+	StatusMLE       SubmissionStatus = "mle"
+	StatusRE        SubmissionStatus = "re"
+	StatusCE        SubmissionStatus = "ce"
+	StatusSE        SubmissionStatus = "se"
 )
 
 // Submission types
@@ -50,13 +50,13 @@ type Submission struct {
 	SourceCode     string           `json:"source_code,omitempty"`
 	SubmissionType string           `json:"submission_type"` // "code" or "output"
 	CodeSize       int              `json:"code_size"`
-	Status        SubmissionStatus `json:"status"`
-	Score         int              `json:"score"`
-	TimeUsed      int              `json:"time_used"`
-	MemoryUsed    int              `json:"memory_used"`
-	CompileOutput string           `json:"compile_output,omitempty"`
-	JudgeResult   []TestCaseResult `json:"judge_result,omitempty"`
-	JudgedBy      string           `json:"judged_by"`
+	Status         SubmissionStatus `json:"status"`
+	Score          int              `json:"score"`
+	TimeUsed       int              `json:"time_used"`
+	MemoryUsed     int              `json:"memory_used"`
+	CompileOutput  string           `json:"compile_output,omitempty"`
+	JudgeResult    []TestCaseResult `json:"judge_result,omitempty"`
+	JudgedBy       string           `json:"judged_by"`
 	RemoteID       string           `json:"remote_id,omitempty"`
 	RemoteURL      string           `json:"remote_url,omitempty"`
 	BotID          string           `json:"bot_id,omitempty"`
@@ -64,7 +64,7 @@ type Submission struct {
 	IsRemote       bool             `json:"is_remote"`
 	RemoteOJ       string           `json:"remote_oj,omitempty"`
 	CreatedAt      time.Time        `json:"created_at"`
-	JudgedAt      *time.Time       `json:"judged_at,omitempty"`
+	JudgedAt       *time.Time       `json:"judged_at,omitempty"`
 }
 
 type SubmitRequest struct {

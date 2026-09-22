@@ -6,38 +6,38 @@ import (
 )
 
 type Contest struct {
-	ID                   string     `json:"id"`
-	DisplayID            int        `json:"display_id"`
-	Slug                 string     `json:"slug,omitempty"`
-	Title                string     `json:"title"`
-	Type                 string     `json:"type"`
-	Format               string     `json:"format"`
-	FormatConfig         json.RawMessage `json:"format_config,omitempty"`
-	StartTime            time.Time  `json:"start_time"`
-	EndTime              time.Time  `json:"end_time"`
-	FreezeTime           *time.Time `json:"freeze_time,omitempty"`
-	Password             string     `json:"-"`
-	HasPassword          bool       `json:"has_password"`
-	Visible              bool       `json:"visible"`
-	Description          string     `json:"description,omitempty"`
-	RegistrationRequired bool       `json:"registration_required"`
-	RegistrationDeadline *time.Time `json:"registration_deadline,omitempty"`
-	MaxParticipants      *int       `json:"max_participants,omitempty"`
-	Division             int        `json:"division"`
-	EducationalConfig    *EducationalRoundConfig `json:"educational_config,omitempty"`
-	HackPhaseEnabled     bool       `json:"hack_phase_enabled"`
-	HackPhaseStart       *time.Time `json:"hack_phase_start,omitempty"`
-	HackPhaseEnd         *time.Time `json:"hack_phase_end,omitempty"`
-	TeamSize             int        `json:"team_size"`
-	IsTeamContest        bool       `json:"is_team_contest"`
-	UpsolvingEnabled     bool       `json:"upsolving_enabled"`
-	VirtualContestEnabled bool      `json:"virtual_contest_enabled"`
-	PDFEnabled           bool       `json:"pdf_enabled"`
-	StatementHidden      bool       `json:"statement_hidden"`
-	GroupID              string     `json:"group_id,omitempty"`
-	RatingCalculated     bool       `json:"rating_calculated"`
-	CreatedBy            string     `json:"created_by"`
-	CreatedAt            time.Time  `json:"created_at"`
+	ID                    string                  `json:"id"`
+	DisplayID             int                     `json:"display_id"`
+	Slug                  string                  `json:"slug,omitempty"`
+	Title                 string                  `json:"title"`
+	Type                  string                  `json:"type"`
+	Format                string                  `json:"format"`
+	FormatConfig          json.RawMessage         `json:"format_config,omitempty"`
+	StartTime             time.Time               `json:"start_time"`
+	EndTime               time.Time               `json:"end_time"`
+	FreezeTime            *time.Time              `json:"freeze_time,omitempty"`
+	Password              string                  `json:"-"`
+	HasPassword           bool                    `json:"has_password"`
+	Visible               bool                    `json:"visible"`
+	Description           string                  `json:"description,omitempty"`
+	RegistrationRequired  bool                    `json:"registration_required"`
+	RegistrationDeadline  *time.Time              `json:"registration_deadline,omitempty"`
+	MaxParticipants       *int                    `json:"max_participants,omitempty"`
+	Division              int                     `json:"division"`
+	EducationalConfig     *EducationalRoundConfig `json:"educational_config,omitempty"`
+	HackPhaseEnabled      bool                    `json:"hack_phase_enabled"`
+	HackPhaseStart        *time.Time              `json:"hack_phase_start,omitempty"`
+	HackPhaseEnd          *time.Time              `json:"hack_phase_end,omitempty"`
+	TeamSize              int                     `json:"team_size"`
+	IsTeamContest         bool                    `json:"is_team_contest"`
+	UpsolvingEnabled      bool                    `json:"upsolving_enabled"`
+	VirtualContestEnabled bool                    `json:"virtual_contest_enabled"`
+	PDFEnabled            bool                    `json:"pdf_enabled"`
+	StatementHidden       bool                    `json:"statement_hidden"`
+	GroupID               string                  `json:"group_id,omitempty"`
+	RatingCalculated      bool                    `json:"rating_calculated"`
+	CreatedBy             string                  `json:"created_by"`
+	CreatedAt             time.Time               `json:"created_at"`
 }
 
 const (
@@ -82,24 +82,24 @@ type ContestPermission struct {
 }
 
 type CreateContestRequest struct {
-	Title        string          `json:"title"`
-	Slug         string          `json:"slug,omitempty"`
-	Type         string          `json:"type"`
-	Format       string          `json:"format"`
-	FormatConfig json.RawMessage `json:"format_config,omitempty"`
-	Division     int             `json:"division"`
-	StartTime   time.Time  `json:"start_time"`
-	EndTime     time.Time  `json:"end_time"`
-	FreezeTime  *time.Time `json:"freeze_time,omitempty"`
-	Password    *string    `json:"password"`
-	Description string     `json:"description,omitempty"`
-	Visible     *bool      `json:"visible,omitempty"`
-	ProblemIDs  []string   `json:"problem_ids"`
-	PDFEnabled  *bool      `json:"pdf_enabled,omitempty"`
-	StatementHidden *bool  `json:"statement_hidden,omitempty"`
-	UpsolvingEnabled *bool `json:"upsolving_enabled,omitempty"`
-	VirtualContestEnabled *bool `json:"virtual_contest_enabled,omitempty"`
-	GroupID      string          `json:"group_id,omitempty"`
+	Title                 string          `json:"title"`
+	Slug                  string          `json:"slug,omitempty"`
+	Type                  string          `json:"type"`
+	Format                string          `json:"format"`
+	FormatConfig          json.RawMessage `json:"format_config,omitempty"`
+	Division              int             `json:"division"`
+	StartTime             time.Time       `json:"start_time"`
+	EndTime               time.Time       `json:"end_time"`
+	FreezeTime            *time.Time      `json:"freeze_time,omitempty"`
+	Password              *string         `json:"password"`
+	Description           string          `json:"description,omitempty"`
+	Visible               *bool           `json:"visible,omitempty"`
+	ProblemIDs            []string        `json:"problem_ids"`
+	PDFEnabled            *bool           `json:"pdf_enabled,omitempty"`
+	StatementHidden       *bool           `json:"statement_hidden,omitempty"`
+	UpsolvingEnabled      *bool           `json:"upsolving_enabled,omitempty"`
+	VirtualContestEnabled *bool           `json:"virtual_contest_enabled,omitempty"`
+	GroupID               string          `json:"group_id,omitempty"`
 }
 
 type ContestRegistration struct {

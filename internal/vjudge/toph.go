@@ -68,7 +68,7 @@ func (b *TophBot) Configure(acc BotConfig) {
 	b.config.ProxyURL = acc.ProxyURL
 	b.config.ProxyEnabled = acc.ProxyEnabled
 	b.config.Cookies = acc.Cookies
-	
+
 	if len(acc.Cookies) > 0 {
 		var baseURL *url.URL
 		if b.config.BaseURL != "" {
@@ -178,7 +178,7 @@ func (b *TophBot) Login(ctx context.Context) (map[string]string, error) {
 	b.mu.Unlock()
 
 	slog.Info("toph logged in", "user", b.config.Username)
-	
+
 	cookies := make(map[string]string)
 	u, _ := url.Parse(b.baseURL())
 	for _, c := range b.client.Jar.Cookies(u) {

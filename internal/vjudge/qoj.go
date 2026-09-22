@@ -66,7 +66,7 @@ func (b *QOJBot) Configure(acc BotConfig) {
 	b.config.ProxyURL = acc.ProxyURL
 	b.config.ProxyEnabled = acc.ProxyEnabled
 	b.config.Cookies = acc.Cookies
-	
+
 	if len(acc.Cookies) > 0 {
 		var baseURL *url.URL
 		if b.config.BaseURL != "" {
@@ -213,9 +213,9 @@ func (b *QOJBot) Submit(ctx context.Context, problemID, sourceCode, language str
 	}
 
 	form := url.Values{
-		"_token":      {csrf},
-		"answer":      {sourceCode},
-		"language":    {langID},
+		"_token":   {csrf},
+		"answer":   {sourceCode},
+		"language": {langID},
 	}
 
 	submitURL := fmt.Sprintf("%s/problem/%s/submit", b.baseURL(), problemID)

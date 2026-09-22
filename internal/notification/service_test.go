@@ -27,10 +27,10 @@ func (m *mockNotifStore) GetByUser(_ context.Context, _ string, _ bool, _ int) (
 	return nil, nil
 }
 
-func (m *mockNotifStore) MarkAsRead(_ context.Context, _ string) error   { return nil }
-func (m *mockNotifStore) MarkAllAsRead(_ context.Context, _ string) error { return nil }
+func (m *mockNotifStore) MarkAsRead(_ context.Context, _ string) error            { return nil }
+func (m *mockNotifStore) MarkAllAsRead(_ context.Context, _ string) error         { return nil }
 func (m *mockNotifStore) GetUnreadCount(_ context.Context, _ string) (int, error) { return 0, nil }
-func (m *mockNotifStore) Delete(_ context.Context, _ string) error        { return nil }
+func (m *mockNotifStore) Delete(_ context.Context, _ string) error                { return nil }
 
 func (m *mockNotifStore) GetPreferences(_ context.Context, userID string) (*model.NotificationPreferences, error) {
 	if m.getPrefsErr != nil {
@@ -136,10 +136,10 @@ func TestService_isNotificationEnabled(t *testing.T) {
 	svc := NewService(nil, nil)
 
 	tests := []struct {
-		name     string
+		name      string
 		notifType string
-		prefs    *model.NotificationPreferences
-		expected bool
+		prefs     *model.NotificationPreferences
+		expected  bool
 	}{
 		{"contest enabled", "contest", &model.NotificationPreferences{ContestAnnouncements: true}, true},
 		{"contest disabled", "contest", &model.NotificationPreferences{ContestAnnouncements: false}, false},

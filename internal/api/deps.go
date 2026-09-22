@@ -21,7 +21,9 @@ type Deps struct {
 	// be served as a valid empty feed.
 	Feed func(ctx context.Context) ([]handler.FeedItem, error)
 	// BlogFeed returns items for the blog Atom feed, plus any fetch error.
-	BlogFeed       func(ctx context.Context) ([]handler.FeedItem, error)
+	BlogFeed func(ctx context.Context) ([]handler.FeedItem, error)
+	// ContestFeed returns items for the contests Atom feed, plus any fetch error.
+	ContestFeed    func(ctx context.Context) ([]handler.FeedItem, error)
 	Submission     *handler.SubmissionHandler
 	Contest        *handler.ContestHandler
 	ContestProblem *handler.ContestProblemHandler

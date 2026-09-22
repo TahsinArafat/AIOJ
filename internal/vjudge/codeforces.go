@@ -59,8 +59,8 @@ func NewCodeforcesBotWithSubmit(cfg BotConfig, cfSubmit *CFSubmitClient) *Codefo
 	return bot
 }
 
-func (b *CodeforcesBot) Name() string          { return "codeforces" }
-func (b *CodeforcesBot) State() BotState       { return b.state }
+func (b *CodeforcesBot) Name() string                        { return "codeforces" }
+func (b *CodeforcesBot) State() BotState                     { return b.state }
 func (b *CodeforcesBot) IsLoggedIn(ctx context.Context) bool { return len(b.config.Cookies) > 0 }
 func (b *CodeforcesBot) Login(ctx context.Context) (map[string]string, error) {
 	if b.cfSubmit != nil && b.config.Username != "" && b.config.Password != "" {
@@ -77,6 +77,7 @@ func (b *CodeforcesBot) Login(ctx context.Context) (map[string]string, error) {
 	err := b.login(ctx)
 	return b.config.Cookies, err
 }
+
 // Configure implements Bot.Configure using a BotConfig.
 func (b *CodeforcesBot) Configure(cfg BotConfig) {
 	b.config.Username = cfg.Username

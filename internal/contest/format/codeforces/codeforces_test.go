@@ -86,8 +86,8 @@ func TestCodeforcesFormat_ScoreProblem(t *testing.T) {
 				ContestID:           "1",
 				ContestDuration:     contestDuration,
 				SubmissionStartTime: start,
-				Problem:            format.Problem{ID: "1", Index: tt.problemIdx},
-				Submissions:        tt.submissions,
+				Problem:             format.Problem{ID: "1", Index: tt.problemIdx},
+				Submissions:         tt.submissions,
 			}
 
 			result, err := f.ScoreProblem(ctx)

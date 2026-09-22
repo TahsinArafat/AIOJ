@@ -48,11 +48,11 @@ type atomAuthor struct {
 }
 
 type atomEntry struct {
-	Title   string     `xml:"title"`
-	Link    atomLink   `xml:"link"`
-	ID      string     `xml:"id"`
-	Updated string     `xml:"updated"`
-	Summary *atomText  `xml:"summary,omitempty"`
+	Title   string    `xml:"title"`
+	Link    atomLink  `xml:"link"`
+	ID      string    `xml:"id"`
+	Updated string    `xml:"updated"`
+	Summary *atomText `xml:"summary,omitempty"`
 }
 
 type atomText struct {

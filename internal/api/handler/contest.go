@@ -430,12 +430,12 @@ func (h *ContestHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 	ranks := contestFormat.RankParticipants(participantsScores)
 
 	type Entry struct {
-		Rank         int                           `json:"rank"`
-		UserID       string                        `json:"user_id"`
-		Username     string                        `json:"username"`
-		TotalSolved  int                           `json:"total_solved"`
-		TotalPenalty int                           `json:"total_penalty"`
-		TotalScore   int                           `json:"total_score"`
+		Rank         int                            `json:"rank"`
+		UserID       string                         `json:"user_id"`
+		Username     string                         `json:"username"`
+		TotalSolved  int                            `json:"total_solved"`
+		TotalPenalty int                            `json:"total_penalty"`
+		TotalScore   int                            `json:"total_score"`
 		Problems     map[string]model.ProblemResult `json:"problems"`
 	}
 

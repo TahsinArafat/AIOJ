@@ -12,6 +12,6 @@ type RemoteLanguage struct {
 }
 
 type RemoteLanguageConfig struct {
-	Platform    string           `json:"platform"`
-	Languages   []RemoteLanguage `json:"languages"`
+	Platform  string           `json:"platform"`
+	Languages []RemoteLanguage `json:"languages"`
 }

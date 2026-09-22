@@ -30,10 +30,10 @@ type CreateClassRequest struct {
 }
 
 type ClassListItem struct {
-	ID           string    `json:"id"`
-	OrganizationID string  `json:"organization_id"`
-	Name         string    `json:"name"`
-	Description  string    `json:"description"`
-	StudentCount int       `json:"student_count"`
-	CreatedAt    time.Time `json:"created_at"`
+	ID             string    `json:"id"`
+	OrganizationID string    `json:"organization_id"`
+	Name           string    `json:"name"`
+	Description    string    `json:"description"`
+	StudentCount   int       `json:"student_count"`
+	CreatedAt      time.Time `json:"created_at"`
 }

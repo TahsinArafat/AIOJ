@@ -33,13 +33,13 @@ type ExecRequest struct {
 }
 
 type CmdResult struct {
-	Status     string             `json:"status"`
-	ExitStatus int                `json:"exitStatus"`
-	Error      string             `json:"error,omitempty"`
-	Time       uint64             `json:"time"`
-	Memory     uint64             `json:"memory"`
-	RunDir     string             `json:"runDir"`
-	Files      map[string]string  `json:"files,omitempty"`
+	Status     string            `json:"status"`
+	ExitStatus int               `json:"exitStatus"`
+	Error      string            `json:"error,omitempty"`
+	Time       uint64            `json:"time"`
+	Memory     uint64            `json:"memory"`
+	RunDir     string            `json:"runDir"`
+	Files      map[string]string `json:"files,omitempty"`
 }
 
 type Client struct {

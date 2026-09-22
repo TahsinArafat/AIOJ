@@ -252,28 +252,28 @@ func TestAtCoderBotExtractCSRFToken(t *testing.T) {
 
 func TestAtCoderBotParseProblemID(t *testing.T) {
 	tests := []struct {
-		name      string
-		problemID string
+		name        string
+		problemID   string
 		wantContest string
-		wantErr   bool
+		wantErr     bool
 	}{
 		{
-			name:      "valid abc problem",
-			problemID: "abc300_a",
+			name:        "valid abc problem",
+			problemID:   "abc300_a",
 			wantContest: "abc300",
-			wantErr:   false,
+			wantErr:     false,
 		},
 		{
-			name:      "valid arc problem",
-			problemID: "arc123_b",
+			name:        "valid arc problem",
+			problemID:   "arc123_b",
 			wantContest: "arc123",
-			wantErr:   false,
+			wantErr:     false,
 		},
 		{
-			name:      "valid agc problem",
-			problemID: "agc001_c",
+			name:        "valid agc problem",
+			problemID:   "agc001_c",
 			wantContest: "agc001",
-			wantErr:   false,
+			wantErr:     false,
 		},
 		{
 			name:      "no underscore - invalid",
@@ -281,10 +281,10 @@ func TestAtCoderBotParseProblemID(t *testing.T) {
 			wantErr:   true,
 		},
 		{
-			name:      "multiple underscores - uses first part",
-			problemID: "abc300_a_b",
+			name:        "multiple underscores - uses first part",
+			problemID:   "abc300_a_b",
 			wantContest: "abc300",
-			wantErr:   false,
+			wantErr:     false,
 		},
 	}
 

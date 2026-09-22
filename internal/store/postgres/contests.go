@@ -470,22 +470,22 @@ func (s *ContestStore) IsParticipant(ctx context.Context, contestID, userID stri
 
 // ContestProblemStats holds per-problem statistics for a contest.
 type ContestProblemStats struct {
-	ProblemID      string  `json:"problem_id"`
-	Index          string  `json:"index"`
-	Title          string  `json:"title"`
-	TotalSubs      int     `json:"total_submissions"`
-	Accepted       int     `json:"accepted"`
-	SolveRate      float64 `json:"solve_rate"`
+	ProblemID string  `json:"problem_id"`
+	Index     string  `json:"index"`
+	Title     string  `json:"title"`
+	TotalSubs int     `json:"total_submissions"`
+	Accepted  int     `json:"accepted"`
+	SolveRate float64 `json:"solve_rate"`
 }
 
 // ContestStats holds aggregate statistics for a contest.
 type ContestStats struct {
-	TotalParticipants    int                          `json:"total_participants"`
-	TotalSubmissions     int                          `json:"total_submissions"`
-	AcceptedSubmissions  int                          `json:"accepted_submissions"`
-	Problems             []ContestProblemStats        `json:"problems"`
-	Languages            map[string]int               `json:"languages"`
-	Verdicts             map[string]int               `json:"verdicts"`
+	TotalParticipants   int                   `json:"total_participants"`
+	TotalSubmissions    int                   `json:"total_submissions"`
+	AcceptedSubmissions int                   `json:"accepted_submissions"`
+	Problems            []ContestProblemStats `json:"problems"`
+	Languages           map[string]int        `json:"languages"`
+	Verdicts            map[string]int        `json:"verdicts"`
 }
 
 // GetContestStats returns aggregate statistics for a contest.
