@@ -29,6 +29,7 @@ type AuthHandler struct {
 	contestStore      store.ContestStore
 	jwt               *auth.JWTManager
 	evt               store.EmailVerificationTokenStore
+	twoFA             store.TOTPSecretStore
 	mail              mail.Sender
 	mailTpl           *template.Template
 	publicURL         string
@@ -43,6 +44,7 @@ func NewAuthHandler(
 	contestStore store.ContestStore,
 	jwt *auth.JWTManager,
 	evt store.EmailVerificationTokenStore,
+	twoFA store.TOTPSecretStore,
 	m mail.Sender,
 	tpl *template.Template,
 	publicURL string,
@@ -51,7 +53,7 @@ func NewAuthHandler(
 	return &AuthHandler{
 		users: users, refreshToks: refreshToks, passwordResetToks: passwordResetToks,
 		onsiteStore: onsiteStore, contestStore: contestStore, jwt: jwt,
-		evt: evt, mail: m, mailTpl: tpl, publicURL: publicURL, mailFrom: mailFrom,
+		evt: evt, twoFA: twoFA, mail: m, mailTpl: tpl, publicURL: publicURL, mailFrom: mailFrom,
 	}
 }
 
@@ -65,8 +67,12 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "username, email, password required", http.StatusBadRequest)
 		return
 	}
-	if len(req.Password) < 6 {
-		http.Error(w, "password too short (min 6)", http.StatusBadRequest)
+	if err := auth.ValidatePasswordStrength(req.Password); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if auth.IsCommonPassword(req.Password) {
+		http.Error(w, auth.ErrPasswordCommon.Error(), http.StatusBadRequest)
 		return
 	}
 	existing, _ := h.users.GetByUsername(r.Context(), req.Username)
@@ -141,6 +147,9 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	user, err := h.users.GetByUsername(r.Context(), req.Username)
 	if err == nil && user != nil && auth.CheckPassword(req.Password, user.PasswordHash) {
+		if h.maybe2FAChallenge(w, r, user) {
+			return
+		}
 		respondJSON(w, http.StatusOK, h.tokenResp(r.Context(), user))
 		return
 	}
@@ -179,6 +188,10 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		_ = h.onsiteStore.AutoRegister(r.Context(), onsiteUser.ContestID, dbUser.ID)
+	}
+
+	if h.maybe2FAChallenge(w, r, dbUser) {
+		return
 	}
 
 	accessToken, err := h.jwt.GenerateAccessToken(dbUser.ID, dbUser.Username, dbUser.Role)
@@ -289,8 +302,12 @@ func (h *AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "token and new_password required", http.StatusBadRequest)
 		return
 	}
-	if len(req.NewPassword) < 6 {
-		http.Error(w, "password too short (min 6)", http.StatusBadRequest)
+	if err := auth.ValidatePasswordStrength(req.NewPassword); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if auth.IsCommonPassword(req.NewPassword) {
+		http.Error(w, auth.ErrPasswordCommon.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -353,6 +370,28 @@ func (h *AuthHandler) ResendVerification(w http.ResponseWriter, r *http.Request)
 	respondJSON(w, http.StatusOK, map[string]string{
 		"message": "If the account needs verification, a link has been sent",
 	})
+}
+
+// maybe2FAChallenge returns true and writes a challenge response when the
+// user has TOTP 2FA enabled. Returns false when tokens should be issued.
+func (h *AuthHandler) maybe2FAChallenge(w http.ResponseWriter, r *http.Request, user *model.User) bool {
+	if h.twoFA == nil || user == nil {
+		return false
+	}
+	secret, err := h.twoFA.Get(r.Context(), user.ID)
+	if err != nil || secret == nil || !secret.Enabled {
+		return false
+	}
+	chal, err := h.jwt.GenerateChallengeToken(user.ID, uuid.NewString(), 5*time.Minute)
+	if err != nil {
+		http.Error(w, "failed to generate challenge", http.StatusInternalServerError)
+		return true
+	}
+	respondJSON(w, http.StatusOK, model.AuthResponse{
+		Requires2FA: true,
+		ChallengeID: chal,
+	})
+	return true
 }
 
 func (h *AuthHandler) tokenResp(ctx context.Context, user *model.User) *model.AuthResponse {

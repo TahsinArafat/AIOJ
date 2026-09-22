@@ -12,7 +12,7 @@ export default function Register() {
     const handle = async (e: React.FormEvent) => {
         e.preventDefault()
         setErr('')
-        if (form.password.length < 6) { setErr('Password must be at least 6 characters'); return }
+        if (form.password.length < 12) { setErr('Password must be at least 12 characters'); return }
         setLoading(true)
         try {
             const d = await api.auth.register(form)

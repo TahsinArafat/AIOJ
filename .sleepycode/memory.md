@@ -21,7 +21,8 @@
 
 ## Gap ledger (global readiness)
 - **Slice A mail + reset + email verify (2026-06-13): DONE** — plan `docs/superpowers/plans/2026-06-13-slice-a-trust-completion.md`. Shipped: register JWT test fix; submit gate `requireVerifiedEmail` on Create/CreateUpsolving/CustomRun (403); onsite users auto-`MarkEmailVerified`; `POST /api/auth/verify-email/resend` (auth, enumeration-safe); frontend `/verify-email` page + Register check-email + api helpers. Verified: `go test ./internal/api/handler ./internal/mail`, `go build ./...`, `npx tsc -b --noEmit`, `npm run build`. Live stack may still run old binary until restart (resend 404 until rebuild). Commits deferred pending user approval.
-- **Next slice:** Phase A TOTP 2FA (global plan Task A.12+) — not started.
+- **Slice A committed:** `1a73f25` feat(mail)…
+- **Slice 2FA + password policy (A.12–A.16): DONE** — migration `000060_totp` (plan said 000053; renumbered because 000053=ai_models). TOTP begin/enable/disable + challenge login `POST /api/auth/2fa/verify`, 12-char complexity policy on Register/ResetPassword/UpdatePassword, Login UI for 2FA + Register min-12 hint. Verified: `go build`, `go test ./internal/auth ./internal/api/handler ./internal/mail`, `tsc -b --noEmit`. Next: Phase A A.17–A.22 OAuth.
 - Already present before this slice (do not re-do): `internal/mail` package, ForgotPassword email (no token in response), register verification email, `GET /api/auth/verify-email/{token}`, ForgotPassword/ResetPassword pages, migration 000059 email_verified, DevMail inspector.
 
 ## Deferred work (agreed with user)

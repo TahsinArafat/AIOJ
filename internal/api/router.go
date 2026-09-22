@@ -123,6 +123,14 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 		r.Get("/api/auth/verify-email/{token}", d.VerifyEmail.Verify)
 	}
 	r.With(middleware.AuthMiddleware(jwtManager)).Post("/api/auth/verify-email/resend", authH.ResendVerification)
+	if d.TwoFA != nil {
+		r.With(middleware.AuthMiddleware(jwtManager)).Post("/api/auth/2fa/begin", d.TwoFA.Begin)
+		r.With(middleware.AuthMiddleware(jwtManager)).Post("/api/auth/2fa/enable", d.TwoFA.Enable)
+		r.With(middleware.AuthMiddleware(jwtManager)).Post("/api/auth/2fa/disable", d.TwoFA.Disable)
+	}
+	if d.TwoFAVerify != nil {
+		r.Post("/api/auth/2fa/verify", d.TwoFAVerify.Verify)
+	}
 	if d.DevMail != nil {
 		r.Get("/api/dev/mail", d.DevMail.List)
 		r.Delete("/api/dev/mail", d.DevMail.Clear)

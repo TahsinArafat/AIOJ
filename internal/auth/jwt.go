@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"time"
 
@@ -63,3 +64,49 @@ func (m *JWTManager) GenerateRefreshToken() (raw, hashed string) {
 }
 
 func (m *JWTManager) RefreshTTL() time.Duration { return m.refreshTTL }
+
+// ChallengeClaims are the parsed contents of a short-lived 2FA challenge JWT.
+type ChallengeClaims struct {
+	UserID      string
+	ChallengeID string
+}
+
+// GenerateChallengeToken issues a 5-minute-class JWT used only for the
+// second login step (type claim must be "2fa").
+func (m *JWTManager) GenerateChallengeToken(userID, challengeID string, ttl time.Duration) (string, error) {
+	claims := jwt.MapClaims{
+		"sub":          userID,
+		"challenge_id": challengeID,
+		"type":         "2fa",
+		"exp":          time.Now().Add(ttl).Unix(),
+		"iat":          time.Now().Unix(),
+	}
+	t := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return t.SignedString(m.secret)
+}
+
+// ParseChallengeToken validates a 2FA challenge JWT and returns its claims.
+func (m *JWTManager) ParseChallengeToken(tokenString string) (*ChallengeClaims, error) {
+	parsed, err := jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
+		}
+		return m.secret, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	if !parsed.Valid {
+		return nil, errors.New("invalid token")
+	}
+	claims, ok := parsed.Claims.(jwt.MapClaims)
+	if !ok {
+		return nil, errors.New("bad claims type")
+	}
+	if typ, _ := claims["type"].(string); typ != "2fa" {
+		return nil, errors.New("not a 2fa challenge token")
+	}
+	sub, _ := claims["sub"].(string)
+	cid, _ := claims["challenge_id"].(string)
+	return &ChallengeClaims{UserID: sub, ChallengeID: cid}, nil
+}

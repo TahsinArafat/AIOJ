@@ -54,9 +54,20 @@ type LoginRequest struct {
 }
 
 type AuthResponse struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
-	User         *User  `json:"user"`
+	AccessToken  string `json:"access_token,omitempty"`
+	RefreshToken string `json:"refresh_token,omitempty"`
+	User         *User  `json:"user,omitempty"`
+	Requires2FA  bool   `json:"requires_2fa,omitempty"`
+	ChallengeID  string `json:"challenge_id,omitempty"`
+}
+
+// TOTPSecret is a per-user TOTP enrollment (enabled after first valid code).
+type TOTPSecret struct {
+	UserID    string     `json:"user_id"`
+	Secret    string     `json:"-"`
+	Enabled   bool       `json:"enabled"`
+	EnabledAt *time.Time `json:"enabled_at,omitempty"`
+	CreatedAt time.Time  `json:"created_at"`
 }
 
 type PublicProfile struct {

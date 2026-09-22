@@ -71,4 +71,6 @@ type Deps struct {
 	AIModel      *handler.AdminAIModelHandler
 	DevMail      *handler.DevMailHandler
 	VerifyEmail  *handler.EmailVerificationHandler
+	TwoFA       *handler.TwoFactorHandler
+	TwoFAVerify *handler.TwoFactorVerifyHandler
 }

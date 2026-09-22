@@ -82,6 +82,27 @@ type RefreshTokenStore interface {
 	Validate(ctx context.Context, tokenHash string) (string, error)
 }
 
+// TOTPSecretStore persists per-user TOTP secrets for 2FA.
+type TOTPSecretStore interface {
+	Upsert(ctx context.Context, userID, secret string) error
+	Enable(ctx context.Context, userID string) error
+	Disable(ctx context.Context, userID string) error
+	Get(ctx context.Context, userID string) (*model.TOTPSecret, error)
+}
+
+// BackupCodeRow is a single unused 2FA recovery code (hash only).
+type BackupCodeRow struct {
+	ID   string
+	Hash string
+}
+
+// BackupCodeStore stores one-shot SHA-256 hashed backup codes.
+type BackupCodeStore interface {
+	Create(ctx context.Context, id, userID, codeHash string) error
+	ListActive(ctx context.Context, userID string) ([]BackupCodeRow, error)
+	Consume(ctx context.Context, id string) error
+}
+
 type ContestStore interface {
 	Create(ctx context.Context, c *model.Contest) error
 	GetByID(ctx context.Context, id string) (*model.Contest, error)

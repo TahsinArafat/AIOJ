@@ -72,7 +72,7 @@ func TestRegister_SendsVerificationEmail(t *testing.T) {
 		jwt:               jwtMgr,
 	}
 
-	body := `{"username":"bob","email":"bob@x.com","password":"secret1"}`
+	body := `{"username":"bob","email":"bob@x.com","password":"Valid1Pass!xy"}`
 	req := httptest.NewRequest("POST", "/api/auth/register", strings.NewReader(body))
 	rec := httptest.NewRecorder()
 	h.Register(rec, req)

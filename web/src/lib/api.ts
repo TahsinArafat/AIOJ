@@ -113,10 +113,21 @@ export const api = {
                 body: JSON.stringify(d),
             }),
         login: (d: { username: string; password: string }) =>
-            request<{ access_token: string; refresh_token: string; user: any }>('/auth/login', {
+            request<{
+                access_token?: string
+                refresh_token?: string
+                user?: any
+                requires_2fa?: boolean
+                challenge_id?: string
+            }>('/auth/login', {
                 method: 'POST',
                 body: JSON.stringify(d),
             }),
+        verify2FA: (challenge_id: string, code: string) =>
+            request<{ access_token: string; refresh_token: string; user: any }>(
+                '/auth/2fa/verify',
+                { method: 'POST', body: JSON.stringify({ challenge_id, code }) },
+            ),
         forgotPassword: (d: { email: string }) =>
             request<{ message: string; token?: string }>('/auth/forgot-password', {
                 method: 'POST',

@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
+	"github.com/tahsinarafat/aioj/internal/auth"
 	"github.com/tahsinarafat/aioj/internal/model"
 	"github.com/tahsinarafat/aioj/internal/store"
 	"github.com/tahsinarafat/aioj/internal/store/postgres"
@@ -178,8 +179,12 @@ func (h *UsersHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "current_password and new_password required", http.StatusBadRequest)
 		return
 	}
-	if len(req.NewPassword) < 6 {
-		http.Error(w, "new password too short (min 6)", http.StatusBadRequest)
+	if err := auth.ValidatePasswordStrength(req.NewPassword); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if auth.IsCommonPassword(req.NewPassword) {
+		http.Error(w, auth.ErrPasswordCommon.Error(), http.StatusBadRequest)
 		return
 	}
 

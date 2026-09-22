@@ -109,6 +109,8 @@ func main() {
 	passwordResetTokenStore := postgres.NewPasswordResetTokenStore(db)
 	onsiteUserStore := postgres.NewOnsiteUserStore(db)
 	evtStore := postgres.NewEmailVerificationTokenStore(db)
+	totpStore := postgres.NewTOTPSecretStore(db)
+	backupCodeStore := postgres.NewBackupCodeStore(db)
 
 	var mailSender mail.Sender
 	switch cfg.Mail.Driver {
@@ -136,7 +138,7 @@ func main() {
 		mailFrom = "noreply@aioj.com"
 	}
 
-	authH := handler.NewAuthHandler(userStore, refreshTokenStore, passwordResetTokenStore, onsiteUserStore, contestStore, jwtManager, evtStore, mailSender, mailTpl, publicURL, mailFrom)
+	authH := handler.NewAuthHandler(userStore, refreshTokenStore, passwordResetTokenStore, onsiteUserStore, contestStore, jwtManager, evtStore, totpStore, mailSender, mailTpl, publicURL, mailFrom)
 	problemH := handler.NewProblemHandler(problemStore)
 	problemI18nH := handler.NewProblemI18nHandler(problemI18nStore, problemStore)
 
@@ -268,11 +270,16 @@ func main() {
 		devMailH = &handler.DevMailHandler{Sender: mailSender}
 	}
 
+	twoFAH := &handler.TwoFactorHandler{Users: userStore, Secrets: totpStore, Backups: backupCodeStore}
+	twoFAVerifyH := &handler.TwoFactorVerifyHandler{Secrets: totpStore, Backups: backupCodeStore, JWT: jwtManager, Users: userStore, Refresh: refreshTokenStore}
+
 	router := api.NewRouter(api.Deps{
-		Auth:         authH,
-		VerifyEmail:  verifyH,
-		DevMail:      devMailH,
-		Problem:      problemH,
+		Auth:        authH,
+		VerifyEmail: verifyH,
+		TwoFA:       twoFAH,
+		TwoFAVerify: twoFAVerifyH,
+		DevMail:     devMailH,
+		Problem:     problemH,
 		ProblemI18n: problemI18nH,
 		// Each section is gathered independently, and the error is carried out
 		// in the SitemapSection rather than logged and dropped. Dropping it is
