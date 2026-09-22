@@ -248,9 +248,22 @@ func (s *ProblemStore) ListWithFilter(ctx context.Context, offset, limit int, di
 	}
 
 	if search != "" {
-		where = append(where, fmt.Sprintf("(p.title ILIKE $%d OR p.slug ILIKE $%d)", argIdx, argIdx))
-		args = append(args, "%"+search+"%")
-		argIdx++
+		// Hybrid search, ported from dmoj's judge/fulltext.py, which keeps a real
+		// full-text index rather than relying on a LIKE scan.
+		//
+		// Full-text alone is not enough: a tsquery matches whole lexemes, so a
+		// user typing "hel" would not find "hello". Substring matching alone is
+		// not enough either: it ignores word boundaries and can't rank. So both
+		// run, OR'd, and the trigram/tsvector indexes from migration 000057
+		// serve each side.
+		//
+		// plainto_tsquery is used (not to_tsquery) because it treats the input as
+		// plain text and never raises a syntax error on punctuation a user typed.
+		where = append(where, fmt.Sprintf(
+			"(p.search_vector @@ plainto_tsquery('simple', $%d) OR p.title ILIKE $%d OR p.slug ILIKE $%d)",
+			argIdx, argIdx+1, argIdx+2))
+		args = append(args, search, "%"+search+"%", "%"+search+"%")
+		argIdx += 3
 	}
 
 	if source != "" {

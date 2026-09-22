@@ -15,7 +15,7 @@ type Deps struct {
 	// Sitemap returns the URL groups for /sitemap.xml. A func rather than a
 	// handler type so the DB-backed gathering stays in main.go where the stores
 	// live, and the router stays free of store knowledge.
-	Sitemap func(ctx context.Context) [][]handler.SitemapURL
+	Sitemap func(ctx context.Context) []handler.SitemapSection
 	Submission     *handler.SubmissionHandler
 	Contest        *handler.ContestHandler
 	ContestProblem *handler.ContestProblemHandler

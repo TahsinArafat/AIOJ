@@ -234,10 +234,11 @@ func main() {
 		Auth:        authH,
 		Problem:     problemH,
 		ProblemI18n: problemI18nH,
-		// Each section is fetched independently and a failure yields an empty
-		// group rather than an error: a partial sitemap is far better for
-		// crawlers than a 500.
-		Sitemap: func(ctx context.Context) [][]handler.SitemapURL {
+		// Each section is gathered independently, and the error is carried out
+		// in the SitemapSection rather than logged and dropped. Dropping it is
+		// what previously turned a query against a non-existent column into a
+		// clean-looking empty sitemap.
+		Sitemap: func(ctx context.Context) []handler.SitemapSection {
 			origin := handler.NormalizeOrigin(os.Getenv("PUBLIC_ORIGIN"))
 			if origin == "" {
 				origin = "http://localhost:8081"
@@ -254,22 +255,13 @@ func main() {
 				}
 				return out
 			}
-			problems, err := sitemapStore.PublicProblems(ctx, origin)
-			if err != nil {
-				slog.Error("sitemap: problems", "error", err)
-			}
-			contests, err := sitemapStore.PublicContests(ctx, origin)
-			if err != nil {
-				slog.Error("sitemap: contests", "error", err)
-			}
-			posts, err := sitemapStore.BlogPosts(ctx, origin)
-			if err != nil {
-				slog.Error("sitemap: posts", "error", err)
-			}
-			return [][]handler.SitemapURL{
-				toURLs(problems),
-				toURLs(contests),
-				toURLs(posts),
+
+			problems, errProblems := sitemapStore.PublicProblems(ctx, origin)
+			contests, errContests := sitemapStore.PublicContests(ctx, origin)
+
+			return []handler.SitemapSection{
+				{Name: "problems", URLs: toURLs(problems), Err: errProblems},
+				{Name: "contests", URLs: toURLs(contests), Err: errContests},
 			}
 		},
 		Submission:     submissionH,

@@ -68,8 +68,7 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 	// the problem/contest APIs apply, so it never advertises an auth-gated URL.
 	if d.Sitemap != nil {
 		r.Get("/sitemap.xml", func(w http.ResponseWriter, req *http.Request) {
-			groups := d.Sitemap(req.Context())
-			handler.ServeSitemap(groups, w, req)
+			handler.ServeSitemapSections(d.Sitemap(req.Context()), w, req)
 		})
 	}
 

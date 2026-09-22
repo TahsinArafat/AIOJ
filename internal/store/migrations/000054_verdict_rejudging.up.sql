@@ -6,10 +6,11 @@
 --
 --   ERROR: invalid input value for enum verdict: "rejudging"
 --
--- migration 38's partial index is recreated here once the value exists.
--- IF NOT EXISTS keeps this safe on databases where the index already landed.
+-- IMPORTANT: PostgreSQL refuses to *reference* a freshly added enum value in the
+-- same transaction that added it ("unsafe use of new value of enum type"),
+-- and golang-migrate wraps each migration in one transaction. So this migration
+-- ONLY adds the value; the partial index that references it lives in 000055,
+-- which runs in its own transaction and can therefore see 'rejudging'.
+--
+-- This split is why 000038's index is recreated in 000055 rather than here.
 ALTER TYPE verdict ADD VALUE IF NOT EXISTS 'rejudging';
-
-CREATE INDEX IF NOT EXISTS idx_submissions_pending_poll
-    ON submissions(status, remote_id)
-    WHERE remote_id != '' AND status IN ('pending', 'rejudging');

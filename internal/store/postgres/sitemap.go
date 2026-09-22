@@ -31,12 +31,14 @@ func NewSitemapStore(db *sql.DB) *SitemapStore {
 
 // PublicProblems returns problems visible to anonymous visitors.
 func (s *SitemapStore) PublicProblems(ctx context.Context, origin string) ([]SitemapEntry, error) {
-	// `is_public` mirrors the check the public /api/problems listing applies,
-	// so the sitemap can't advertise a problem the API would hide.
+	// `visible` is the column the rest of the store filters on (see
+	// idx_problems_visible and ProblemStore.List). An earlier version of this
+	// query used `is_public`, which does not exist -- it errored, and the
+	// caller's error handling turned that into an empty sitemap.
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT slug, COALESCE(updated_at, created_at)
 		   FROM problems
-		  WHERE is_public = true
+		  WHERE visible = true
 		  ORDER BY updated_at DESC NULLS LAST
 		  LIMIT 50000`)
 	if err != nil {
@@ -63,11 +65,13 @@ func (s *SitemapStore) PublicProblems(ctx context.Context, origin string) ([]Sit
 
 // PublicContests returns non-private contests.
 func (s *SitemapStore) PublicContests(ctx context.Context, origin string) ([]SitemapEntry, error) {
+	// contests has created_at but no updated_at, so the timestamp comes from
+	// created_at alone. (The problems table does have updated_at.)
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT slug, COALESCE(updated_at, created_at)
+		`SELECT slug, created_at
 		   FROM contests
-		  WHERE is_public = true
-		  ORDER BY updated_at DESC NULLS LAST
+		  WHERE visible = true
+		  ORDER BY created_at DESC
 		  LIMIT 50000`)
 	if err != nil {
 		return nil, fmt.Errorf("sitemap contests: %w", err)
@@ -91,34 +95,3 @@ func (s *SitemapStore) PublicContests(ctx context.Context, origin string) ([]Sit
 	return out, rows.Err()
 }
 
-// BlogPosts returns published posts.
-func (s *SitemapStore) BlogPosts(ctx context.Context, origin string) ([]SitemapEntry, error) {
-	rows, err := s.db.QueryContext(ctx,
-		`SELECT slug, COALESCE(updated_at, created_at)
-		   FROM blog_posts
-		  WHERE is_published = true
-		  ORDER BY created_at DESC
-		  LIMIT 50000`)
-	if err != nil {
-		// A missing or differently-shaped blog table must not 500 the whole
-		// sitemap -- the other sections are still worth serving.
-		return []SitemapEntry{}, nil
-	}
-	defer rows.Close()
-
-	out := []SitemapEntry{}
-	for rows.Next() {
-		var slug string
-		var lastMod time.Time
-		if err := rows.Scan(&slug, &lastMod); err != nil {
-			return []SitemapEntry{}, nil
-		}
-		out = append(out, SitemapEntry{
-			Location:   origin + "/blog/" + slug,
-			LastMod:    lastMod,
-			ChangeFreq: "monthly",
-			Priority:   "0.6",
-		})
-	}
-	return out, nil
-}
