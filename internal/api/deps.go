@@ -9,6 +9,7 @@ import (
 type Deps struct {
 	Auth           *handler.AuthHandler
 	Problem        *handler.ProblemHandler
+	ProblemI18n    *handler.ProblemI18nHandler
 	Submission     *handler.SubmissionHandler
 	Contest        *handler.ContestHandler
 	ContestProblem *handler.ContestProblemHandler

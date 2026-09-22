@@ -69,6 +69,7 @@ func main() {
 	userStore := postgres.NewUserStore(db)
 	refreshTokenStore := postgres.NewRefreshTokenStore(db)
 	problemStore := postgres.NewProblemStore(db)
+	problemI18nStore := postgres.NewProblemI18nStore(db)
 	submissionStore := postgres.NewSubmissionStore(db)
 	contestStore := postgres.NewContestStore(db)
 	ratingStore := postgres.NewRatingStore(db)
@@ -104,6 +105,7 @@ func main() {
 	onsiteUserStore := postgres.NewOnsiteUserStore(db)
 	authH := handler.NewAuthHandler(userStore, refreshTokenStore, passwordResetTokenStore, onsiteUserStore, contestStore, jwtManager)
 	problemH := handler.NewProblemHandler(problemStore)
+	problemI18nH := handler.NewProblemI18nHandler(problemI18nStore, problemStore)
 
 	botAccountStore := postgres.NewBotAccountStore(db)
 	remoteLangStore := postgres.NewRemoteLanguageStore(db)
@@ -230,6 +232,7 @@ func main() {
 	router := api.NewRouter(api.Deps{
 		Auth:           authH,
 		Problem:        problemH,
+		ProblemI18n:    problemI18nH,
 		Submission:     submissionH,
 		Contest:        contestH,
 		ContestProblem: contestProblemH,

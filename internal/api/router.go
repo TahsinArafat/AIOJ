@@ -13,6 +13,7 @@ import (
 func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 	authH := d.Auth
 	problemH := d.Problem
+	problemI18nH := d.ProblemI18n
 	submissionH := d.Submission
 	contestH := d.Contest
 	contestProblemH := d.ContestProblem
@@ -84,6 +85,15 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 		r.Get("/tags", problemH.ListTags)
 		r.With(middleware.AuthMiddleware(jwtManager)).Get("/my", problemH.ListMyProblems)
 		r.With(middleware.OptionalAuthMiddleware(jwtManager)).Get("/{slug}", problemH.GetBySlug)
+
+		// Per-problem statement translations (dmoj-style i18n). Reads are public
+		// so a solver can fetch the statement in their own language; writes sit
+		// behind auth like the other setter operations.
+		r.Route("/{id}/i18n", func(r chi.Router) {
+			r.Get("/", problemI18nH.List)
+			r.With(middleware.AuthMiddleware(jwtManager)).Put("/{lang}", problemI18nH.Upsert)
+			r.With(middleware.AuthMiddleware(jwtManager)).Delete("/{lang}", problemI18nH.Delete)
+		})
 		r.Get("/{slug}/submissions", submissionH.ListByProblem)
 		r.Get("/{slug}/language-limits", langLimitH.List)
 		r.Group(func(r chi.Router) {

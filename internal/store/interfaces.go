@@ -39,6 +39,16 @@ type ProblemStore interface {
 	GetRecommendations(ctx context.Context, userID string, currentRating int) (*model.RecommendationsResponse, error)
 }
 
+// ProblemI18nStore persists per-problem translations of title/description.
+// A missing translation is not an error -- Get returns (nil, nil) so callers
+// fall back to the problem's default text, mirroring dmoj's Coalesce behaviour.
+type ProblemI18nStore interface {
+	Get(ctx context.Context, problemID, language string) (*model.ProblemI18n, error)
+	ListForProblem(ctx context.Context, problemID string) ([]model.ProblemI18n, error)
+	Upsert(ctx context.Context, t *model.ProblemI18n) error
+	Delete(ctx context.Context, problemID, language string) error
+}
+
 type SubmissionStore interface {
 	Create(ctx context.Context, s *model.Submission) error
 	GetByID(ctx context.Context, id string) (*model.Submission, error)
