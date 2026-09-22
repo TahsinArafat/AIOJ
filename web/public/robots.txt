@@ -1,0 +1,30 @@
+# AIOJ robots.txt
+#
+# Allow crawling of the public surfaces and point crawlers at the sitemap.
+# Authenticated areas are disallowed: they redirect to login for anonymous
+# requests, so letting them be crawled only wastes crawl budget and produces
+# soft-404s in search console.
+
+User-agent: *
+Allow: /
+Allow: /problems
+Allow: /contests
+Allow: /blog
+Allow: /rankings
+
+# Login-gated or user-specific surfaces: nothing useful to index.
+Disallow: /admin
+Disallow: /settings
+Disallow: /submissions
+Disallow: /ide
+Disallow: /setter
+Disallow: /api/
+Disallow: /login
+Disallow: /register
+Disallow: /forgot-password
+
+# Query-string result pages are near-duplicates of the listing pages.
+Disallow: /*?*sort=
+Disallow: /*?*page=
+
+Sitemap: http://localhost:8081/sitemap.xml
