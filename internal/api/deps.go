@@ -68,5 +68,7 @@ type Deps struct {
 	AdminSub       *handler.AdminSubmissionHandler
 	Backup         *handler.AdminBackupHandler
 	Generate       *handler.GenerateHandler
-	AIModel        *handler.AdminAIModelHandler
+	AIModel      *handler.AdminAIModelHandler
+	DevMail      *handler.DevMailHandler
+	VerifyEmail  *handler.EmailVerificationHandler
 }

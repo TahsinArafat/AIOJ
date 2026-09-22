@@ -10,7 +10,7 @@
   - `GET /api/submissions/{id}` now calls existing `hasSubmissionAccess` (owner/admin/contest manager/judge) → 403 before serializing. Public `ListByProblem` (`/api/problems/{slug}/submissions`) was always safe — store query projects no source_code.
   - `CustomRun` (`POST /api/submissions/run`) client limits clamped to ceilings 10s / 512MB (2× defaults).
   - `?token=` query-param JWT now accepted **only** on backup download route `GET /api/admin/backups/{filename}` via new `QueryTokenAuthMiddleware`; global `AuthMiddleware` is header-only. BackupsPanel.tsx downloads unaffected.
-  - vjudge verdict dedup: `mapCFVerdict` (with MLE) + `mapGenericVerdict` (no MLE—default WA, preserving prior behavior) in service.go; 4 inline switches removed.
+  - vjudge verdict dedup: `mapCFVerdict` (with MLE) and `mapGenericVerdict` (no MLE—default WA, preserving prior behavior) in service.go; 4 inline switches removed.
 
 ## Codebase facts
 - `store.TeamStore` interface exposes GetMemberRole/IsMember — depend on interface.
@@ -18,6 +18,11 @@
 - VS Code format-on-save reflows adjacent template-literal whitespace in touched .tsx files; harmless reflow hunks may appear.
 - vjudge remaining nits (deferred): `bot.Configure(cfg)` mutates shared bot without lock; poll workers use context.Background() children (benign today).
 - Rate limiter keyed on r.RemoteAddr only (no X-Forwarded-For handling) — deferred.
+
+## Gap ledger (global readiness)
+- **Slice A mail + reset + email verify (2026-06-13): DONE** — plan `docs/superpowers/plans/2026-06-13-slice-a-trust-completion.md`. Shipped: register JWT test fix; submit gate `requireVerifiedEmail` on Create/CreateUpsolving/CustomRun (403); onsite users auto-`MarkEmailVerified`; `POST /api/auth/verify-email/resend` (auth, enumeration-safe); frontend `/verify-email` page + Register check-email + api helpers. Verified: `go test ./internal/api/handler ./internal/mail`, `go build ./...`, `npx tsc -b --noEmit`, `npm run build`. Live stack may still run old binary until restart (resend 404 until rebuild). Commits deferred pending user approval.
+- **Next slice:** Phase A TOTP 2FA (global plan Task A.12+) — not started.
+- Already present before this slice (do not re-do): `internal/mail` package, ForgotPassword email (no token in response), register verification email, `GET /api/auth/verify-email/{token}`, ForgotPassword/ResetPassword pages, migration 000059 email_verified, DevMail inspector.
 
 ## Deferred work (agreed with user)
 - Frontend smell batch: 23 hand-decoded `atob(token.split('.')[1])` across 18 files; **101 alert() calls across 32 files** (~30 `catch (e: any)`); api.ts = 761 lines / ~173 `any`s; 6 near-identical importX() functions in api.ts; zero AbortController; ContestManage.tsx 14 effects/0 cleanups; no ErrorBoundary; no react-query/SWR; hardcoded 130-country list.

@@ -1,12 +1,13 @@
 import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { api, setTokens } from '../lib/api'
 
 export default function Register() {
     const [form, setForm] = useState({ username: '', email: '', password: '' })
     const [err, setErr] = useState('')
     const [loading, setLoading] = useState(false)
-    const nav = useNavigate()
+    const [sent, setSent] = useState(false)
+    const [resent, setResent] = useState(false)
 
     const handle = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -16,12 +17,47 @@ export default function Register() {
         try {
             const d = await api.auth.register(form)
             setTokens(d.access_token, d.refresh_token)
-            nav('/')
+            setSent(true)
         } catch (e: any) {
             setErr(e.message || 'Registration failed')
         } finally {
             setLoading(false)
         }
+    }
+
+    const resend = async () => {
+        setErr('')
+        try {
+            await api.auth.resendVerification()
+            setResent(true)
+        } catch {
+            /* enumeration-safe: ignore errors quietly */
+        }
+    }
+
+    if (sent) {
+        return (
+            <div className="max-w-sm mx-auto mt-20 text-center">
+                <h1 className="text-2xl font-bold mb-4">Check Your Email</h1>
+                <p className="text-gray-600 dark:text-gray-400 mb-4">
+                    We sent a verification link to <strong>{form.email}</strong>.
+                    Verify your email to submit solutions.
+                </p>
+                {resent && (
+                    <p className="text-sm text-green-600 dark:text-green-400 mb-2">Verification email resent.</p>
+                )}
+                <button
+                    type="button"
+                    onClick={resend}
+                    className="text-blue-600 dark:text-blue-400 hover:underline text-sm"
+                >
+                    Resend verification email
+                </button>
+                <p className="mt-4">
+                    <Link to="/login" className="text-blue-600 dark:text-blue-400 hover:underline">Continue to Login</Link>
+                </p>
+            </div>
+        )
     }
 
     return (

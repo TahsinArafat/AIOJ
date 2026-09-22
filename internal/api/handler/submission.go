@@ -28,11 +28,13 @@ type SubmissionHandler struct {
 	exec         *executor.Client
 	langDir      string
 	vjudgeSvc    *vjudge.Service
+	users        store.UserStore
 }
 
 func NewSubmissionHandler(sub store.SubmissionStore, prob store.ProblemStore, contest store.ContestStore,
-	q queue.JudgeQueue, ws *WSManager, exec *executor.Client, langDir string, vjSvc *vjudge.Service) *SubmissionHandler {
-	return &SubmissionHandler{subStore: sub, probStore: prob, contestStore: contest, queue: q, wsManager: ws, exec: exec, langDir: langDir, vjudgeSvc: vjSvc}
+	q queue.JudgeQueue, ws *WSManager, exec *executor.Client, langDir string, vjSvc *vjudge.Service,
+	users store.UserStore) *SubmissionHandler {
+	return &SubmissionHandler{subStore: sub, probStore: prob, contestStore: contest, queue: q, wsManager: ws, exec: exec, langDir: langDir, vjudgeSvc: vjSvc, users: users}
 }
 
 type CustomRunRequest struct {
@@ -119,10 +121,36 @@ func (h *SubmissionHandler) buildAndEnqueue(r *http.Request, w http.ResponseWrit
 	respondJSON(w, http.StatusCreated, sub)
 }
 
+// requireVerifiedEmail returns false and writes 403 when the user has not
+// verified their email. Store errors surface as 500.
+func (h *SubmissionHandler) requireVerifiedEmail(w http.ResponseWriter, r *http.Request, userID string) bool {
+	if h.users == nil {
+		// Tests or wiring without users store: fail closed would break
+		// unit tests that only exercise other paths; fail open only if
+		// store was never injected (should not happen in main).
+		return true
+	}
+	verified, err := h.users.IsEmailVerified(r.Context(), userID)
+	if err != nil {
+		http.Error(w, "verification check failed", http.StatusInternalServerError)
+		return false
+	}
+	if !verified {
+		respondJSON(w, http.StatusForbidden, map[string]string{
+			"error": "email not verified; check your inbox or resend the verification link",
+		})
+		return false
+	}
+	return true
+}
+
 func (h *SubmissionHandler) Create(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetUserClaims(r)
 	if claims == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if !h.requireVerifiedEmail(w, r, claims.UserID) {
 		return
 	}
 
@@ -193,6 +221,9 @@ func (h *SubmissionHandler) CreateUpsolving(w http.ResponseWriter, r *http.Reque
 	claims := middleware.GetUserClaims(r)
 	if claims == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if !h.requireVerifiedEmail(w, r, claims.UserID) {
 		return
 	}
 
@@ -366,6 +397,9 @@ func (h *SubmissionHandler) CustomRun(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetUserClaims(r)
 	if claims == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if !h.requireVerifiedEmail(w, r, claims.UserID) {
 		return
 	}
 

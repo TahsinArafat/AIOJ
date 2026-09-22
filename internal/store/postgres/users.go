@@ -293,6 +293,25 @@ func (s *UserStore) ListUsersByRating(ctx context.Context, offset, limit int, co
 	return items, total, nil
 }
 
+func (s *UserStore) MarkEmailVerified(ctx context.Context, userID string) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE users SET email_verified = TRUE, email_verified_at = NOW() WHERE id = $1`, userID)
+	return err
+}
+
+func (s *UserStore) IsEmailVerified(ctx context.Context, userID string) (bool, error) {
+	var v bool
+	err := s.db.QueryRowContext(ctx,
+		`SELECT email_verified FROM users WHERE id = $1`, userID).Scan(&v)
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return v, nil
+}
+
 func (s *UserStore) UpdateRating(ctx context.Context, userID string, rating, maxRating, contestCount int) error {
 	_, err := s.db.ExecContext(ctx,
 		`UPDATE user_profiles SET rating = $1, max_rating = $2, contest_count = $3 WHERE user_id = $4`,

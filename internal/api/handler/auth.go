@@ -1,16 +1,22 @@
 package handler
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"html/template"
+	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/tahsinarafat/aioj/internal/api/middleware"
 	"github.com/tahsinarafat/aioj/internal/auth"
+	"github.com/tahsinarafat/aioj/internal/mail"
 	"github.com/tahsinarafat/aioj/internal/model"
 	"github.com/tahsinarafat/aioj/internal/store"
 )
@@ -22,10 +28,31 @@ type AuthHandler struct {
 	onsiteStore       store.OnsiteUserStore
 	contestStore      store.ContestStore
 	jwt               *auth.JWTManager
+	evt               store.EmailVerificationTokenStore
+	mail              mail.Sender
+	mailTpl           *template.Template
+	publicURL         string
+	mailFrom          string
 }
 
-func NewAuthHandler(users store.UserStore, refreshToks store.RefreshTokenStore, passwordResetToks store.PasswordResetTokenStore, onsiteStore store.OnsiteUserStore, contestStore store.ContestStore, jwt *auth.JWTManager) *AuthHandler {
-	return &AuthHandler{users: users, refreshToks: refreshToks, passwordResetToks: passwordResetToks, onsiteStore: onsiteStore, contestStore: contestStore, jwt: jwt}
+func NewAuthHandler(
+	users store.UserStore,
+	refreshToks store.RefreshTokenStore,
+	passwordResetToks store.PasswordResetTokenStore,
+	onsiteStore store.OnsiteUserStore,
+	contestStore store.ContestStore,
+	jwt *auth.JWTManager,
+	evt store.EmailVerificationTokenStore,
+	m mail.Sender,
+	tpl *template.Template,
+	publicURL string,
+	mailFrom string,
+) *AuthHandler {
+	return &AuthHandler{
+		users: users, refreshToks: refreshToks, passwordResetToks: passwordResetToks,
+		onsiteStore: onsiteStore, contestStore: contestStore, jwt: jwt,
+		evt: evt, mail: m, mailTpl: tpl, publicURL: publicURL, mailFrom: mailFrom,
+	}
 }
 
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
@@ -63,7 +90,46 @@ func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to create user", http.StatusInternalServerError)
 		return
 	}
+	h.sendVerificationEmail(r.Context(), user)
 	respondJSON(w, http.StatusCreated, h.tokenResp(r.Context(), user))
+}
+
+// sendVerificationEmail issues a one-shot hashed token and emails a verify link.
+// Failures are logged, not returned — registration still succeeds.
+func (h *AuthHandler) sendVerificationEmail(ctx context.Context, user *model.User) {
+	if h.evt == nil || h.mail == nil || h.mailTpl == nil || user.Email == "" {
+		return
+	}
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		slog.Error("email verification rand failed", "err", err, "user_id", user.ID)
+		return
+	}
+	rawHex := hex.EncodeToString(raw)
+	sum := sha256.Sum256([]byte(rawHex))
+	hash := hex.EncodeToString(sum[:])
+	if err := h.evt.Create(ctx, uuid.New().String(), user.ID, hash, time.Now().Add(24*time.Hour)); err != nil {
+		slog.Error("email verification token create failed", "err", err, "user_id", user.ID)
+		return
+	}
+	verifyURL := strings.TrimRight(h.publicURL, "/") + "/verify-email?token=" + rawHex
+	var body bytes.Buffer
+	if err := h.mailTpl.ExecuteTemplate(&body, "email_verification.txt", map[string]string{
+		"Username":      user.Username,
+		"VerifyURL":     verifyURL,
+		"ExpiryMinutes": "24",
+	}); err != nil {
+		slog.Error("render verification email failed", "err", err)
+		return
+	}
+	from := h.mailFrom
+	if from == "" {
+		from = "noreply@aioj.com"
+	}
+	_ = h.mail.Send(ctx, &mail.Message{
+		From: from, To: []string{user.Email},
+		Subject: "Verify your AIOJ email", Body: body.String(),
+	})
 }
 
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
@@ -105,6 +171,9 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "failed to create user", http.StatusInternalServerError)
 			return
 		}
+		// Onsite accounts have synthetic emails (…@onsite.aioj) and cannot
+		// receive mail; treat them as pre-verified so they can submit.
+		_ = h.users.MarkEmailVerified(r.Context(), dbUser.ID)
 		if err := h.onsiteStore.MarkUsed(r.Context(), onsiteUser.ID, dbUser.ID); err != nil {
 			http.Error(w, "failed to update credential state", http.StatusInternalServerError)
 			return
@@ -170,7 +239,6 @@ func (h *AuthHandler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Generate random token
 	tokenBytes := make([]byte, 32)
 	if _, err := rand.Read(tokenBytes); err != nil {
 		respondJSON(w, http.StatusOK, map[string]string{"message": "If the email exists, a reset link has been sent"})
@@ -186,11 +254,28 @@ func (h *AuthHandler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// In a real app, send email with rawToken here.
-	// For now, return the token directly for development/testing.
+	if h.mail != nil && h.mailTpl != nil && user.Email != "" {
+		resetURL := strings.TrimRight(h.publicURL, "/") + "/reset-password?token=" + rawToken
+		var body bytes.Buffer
+		if err := h.mailTpl.ExecuteTemplate(&body, "password_reset.txt", map[string]string{
+			"Username": user.Username,
+			"ResetURL": resetURL,
+			"Expiry":   "1 hour",
+		}); err == nil {
+			from := h.mailFrom
+			if from == "" {
+				from = "noreply@aioj.com"
+			}
+			_ = h.mail.Send(r.Context(), &mail.Message{
+				From: from, To: []string{user.Email},
+				Subject: "Reset your AIOJ password", Body: body.String(),
+			})
+		}
+	}
+
+	// Never return the raw token — enumeration-safe success only.
 	respondJSON(w, http.StatusOK, map[string]string{
 		"message": "If the email exists, a reset link has been sent",
-		"token":   rawToken,
 	})
 }
 
@@ -241,6 +326,33 @@ func (h *AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondJSON(w, http.StatusOK, map[string]string{"message": "password reset successfully"})
+}
+
+// ResendVerification re-sends the verify link for the logged-in user.
+// Enumeration-safe: always 200 with the same message.
+func (h *AuthHandler) ResendVerification(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r)
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	user, err := h.users.GetByID(r.Context(), claims.UserID)
+	if err != nil || user == nil {
+		respondJSON(w, http.StatusOK, map[string]string{
+			"message": "If the account needs verification, a link has been sent",
+		})
+		return
+	}
+	if verified, _ := h.users.IsEmailVerified(r.Context(), user.ID); verified {
+		respondJSON(w, http.StatusOK, map[string]string{
+			"message": "If the account needs verification, a link has been sent",
+		})
+		return
+	}
+	h.sendVerificationEmail(r.Context(), user)
+	respondJSON(w, http.StatusOK, map[string]string{
+		"message": "If the account needs verification, a link has been sent",
+	})
 }
 
 func (h *AuthHandler) tokenResp(ctx context.Context, user *model.User) *model.AuthResponse {

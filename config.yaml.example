@@ -19,4 +19,12 @@ judge:
   max_code_size: 262144
 redis:
   url: "localhost:6379"       # leave empty to use in-memory judge queue
+mail:
+  driver: "catcher"           # smtp | catcher | noop — override with MAIL_DRIVER
+  host: ""
+  port: 587
+  username: ""
+  password: ""                # override with MAIL_PASSWORD
+  from: "noreply@aioj.com"    # override with MAIL_FROM
+  public_url: "http://localhost:8081"  # override with MAIL_PUBLIC_URL / PUBLIC_ORIGIN
 lang_dir: "./lang"

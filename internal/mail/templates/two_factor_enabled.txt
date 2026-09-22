@@ -1,0 +1,8 @@
+Hi {{.Username}},
+
+Two-factor authentication has been enabled on your AIOJ account.
+
+If you did not perform this action, immediately change your password and
+contact support@aioj.com.
+
+— The AIOJ Team

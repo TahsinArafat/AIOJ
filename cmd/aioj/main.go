@@ -22,6 +22,7 @@ import (
 	"github.com/tahsinarafat/aioj/internal/hack"
 	"github.com/tahsinarafat/aioj/internal/judge"
 	"github.com/tahsinarafat/aioj/internal/judge/executor"
+	"github.com/tahsinarafat/aioj/internal/mail"
 	"github.com/tahsinarafat/aioj/internal/plagiarism"
 	"github.com/tahsinarafat/aioj/internal/queue"
 	"github.com/tahsinarafat/aioj/internal/store/postgres"
@@ -107,7 +108,35 @@ func main() {
 	wsManager := handler.NewWSManager()
 	passwordResetTokenStore := postgres.NewPasswordResetTokenStore(db)
 	onsiteUserStore := postgres.NewOnsiteUserStore(db)
-	authH := handler.NewAuthHandler(userStore, refreshTokenStore, passwordResetTokenStore, onsiteUserStore, contestStore, jwtManager)
+	evtStore := postgres.NewEmailVerificationTokenStore(db)
+
+	var mailSender mail.Sender
+	switch cfg.Mail.Driver {
+	case "smtp":
+		mailSender = mail.NewSMTPSender(mail.SMTPConfig{
+			Host: cfg.Mail.Host, Port: cfg.Mail.Port,
+			Username: cfg.Mail.Username, Password: cfg.Mail.Password,
+			From: cfg.Mail.From,
+		})
+	case "catcher":
+		mailSender = mail.NewMailCatcher()
+	default:
+		mailSender = mail.NoopSender{}
+	}
+	mailTpl, err := mail.LoadTemplates()
+	if err != nil {
+		log.Fatalf("load mail templates: %v", err)
+	}
+	publicURL := cfg.Mail.PublicURL
+	if publicURL == "" {
+		publicURL = "http://localhost:8081"
+	}
+	mailFrom := cfg.Mail.From
+	if mailFrom == "" {
+		mailFrom = "noreply@aioj.com"
+	}
+
+	authH := handler.NewAuthHandler(userStore, refreshTokenStore, passwordResetTokenStore, onsiteUserStore, contestStore, jwtManager, evtStore, mailSender, mailTpl, publicURL, mailFrom)
 	problemH := handler.NewProblemHandler(problemStore)
 	problemI18nH := handler.NewProblemI18nHandler(problemI18nStore, problemStore)
 
@@ -127,7 +156,7 @@ func main() {
 	}
 	atcoderSubmit := vjudge.NewAtCoderSubmitClient(atcoderSubmitURL)
 
-	submissionH := handler.NewSubmissionHandler(submissionStore, problemStore, contestStore, judgeQueue, wsManager, execClient, cfg.LangDir, vjService)
+	submissionH := handler.NewSubmissionHandler(submissionStore, problemStore, contestStore, judgeQueue, wsManager, execClient, cfg.LangDir, vjService, userStore)
 	teamStore := postgres.NewTeamStore(db)
 	contestH := handler.NewContestHandler(contestStore, ratingStore, problemStore, userStore, teamStore)
 	contestProblemH := handler.NewContestProblemHandler(contestStore, problemStore)
@@ -233,9 +262,17 @@ func main() {
 	genSvc := generate.NewService(aiModelStore, problemStore, editorialStore)
 	generateH := handler.NewGenerateHandler(genSvc)
 
+	verifyH := &handler.EmailVerificationHandler{Users: userStore, Tokens: evtStore}
+	var devMailH *handler.DevMailHandler
+	if cfg.Mail.Driver == "catcher" {
+		devMailH = &handler.DevMailHandler{Sender: mailSender}
+	}
+
 	router := api.NewRouter(api.Deps{
-		Auth:        authH,
-		Problem:     problemH,
+		Auth:         authH,
+		VerifyEmail:  verifyH,
+		DevMail:      devMailH,
+		Problem:      problemH,
 		ProblemI18n: problemI18nH,
 		// Each section is gathered independently, and the error is carried out
 		// in the SitemapSection rather than logged and dropped. Dropping it is

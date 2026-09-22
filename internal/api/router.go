@@ -119,6 +119,14 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 	r.Post("/api/auth/refresh", authH.Refresh)
 	r.Post("/api/auth/forgot-password", authH.ForgotPassword)
 	r.Post("/api/auth/reset-password", authH.ResetPassword)
+	if d.VerifyEmail != nil {
+		r.Get("/api/auth/verify-email/{token}", d.VerifyEmail.Verify)
+	}
+	r.With(middleware.AuthMiddleware(jwtManager)).Post("/api/auth/verify-email/resend", authH.ResendVerification)
+	if d.DevMail != nil {
+		r.Get("/api/dev/mail", d.DevMail.List)
+		r.Delete("/api/dev/mail", d.DevMail.Clear)
+	}
 
 	r.Get("/api/users/{username}", usersH.GetByUsername)
 	r.Get("/api/users/{username}/submissions", usersH.GetUserSubmissions)

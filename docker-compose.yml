@@ -54,6 +54,9 @@ services:
       CF_SUBMIT_URL: ${CF_SUBMIT_URL:-http://host.docker.internal:8003}
       FLARESOLVERR_URL: ${FLARESOLVERR_URL:-http://cf-bypass:8191}
       ATCODER_SUBMIT_URL: ${ATCODER_SUBMIT_URL:-http://host.docker.internal:8004}
+      MAIL_DRIVER: ${MAIL_DRIVER:-catcher}
+      MAIL_FROM: ${MAIL_FROM:-noreply@aioj.com}
+      MAIL_PUBLIC_URL: ${MAIL_PUBLIC_URL:-http://localhost:8081}
     ports:
       - "8080:8080"
     volumes:

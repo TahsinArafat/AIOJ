@@ -1,0 +1,9 @@
+Hi {{.Username}},
+
+Welcome to AIOJ! Please confirm your email address by visiting the link below
+(valid for {{.ExpiryMinutes}} hours):
+{{.VerifyURL}}
+
+If you did not create this account, you can safely ignore this email.
+
+— The AIOJ Team

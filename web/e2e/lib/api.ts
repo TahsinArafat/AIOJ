@@ -83,7 +83,35 @@ export async function register(
   if (r.status !== 201 && r.status !== 200) {
     throw new Error(`register failed: ${r.status} ${JSON.stringify(r.data)}`);
   }
+  await verifyEmailFromCatcher(email);
   return r.data;
+}
+
+/**
+ * Pull the verification link from the in-memory mailcatcher and call the
+ * verify endpoint so new e2e users can submit (submissions require a
+ * verified email).
+ */
+export async function verifyEmailFromCatcher(email: string): Promise<void> {
+  const list = await send<{ data?: Array<{ To?: string[]; to?: string[]; Body?: string; body?: string; Subject?: string }> }>(
+    'GET',
+    '/api/dev/mail',
+  );
+  if (list.status !== 200) {
+    // catcher disabled — leave the user unverified (submit will 403)
+    return;
+  }
+  const msgs = list.data?.data ?? [];
+  const mine = msgs.filter((m) => {
+    const to = (m.To ?? m.to ?? []).map((s) => s.toLowerCase());
+    return to.includes(email.toLowerCase());
+  });
+  const last = mine[mine.length - 1];
+  if (!last) return;
+  const body = last.Body ?? last.body ?? '';
+  const match = body.match(/verify-email\?token=([0-9a-f]+)/i);
+  if (!match) return;
+  await send('GET', `/api/auth/verify-email/${match[1]}`);
 }
 
 export async function login(username: string, password: string): Promise<Tokens> {

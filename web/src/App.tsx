@@ -7,6 +7,7 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
+import VerifyEmail from './pages/VerifyEmail'
 import ProblemList from './pages/ProblemList'
 import ProblemDetail from './pages/ProblemDetail'
 import ContestList from './pages/ContestList'
@@ -271,6 +272,7 @@ export default function App() {
                             <Route path="/register" element={<Register />} />
                             <Route path="/forgot-password" element={<ForgotPassword />} />
                             <Route path="/reset-password" element={<ResetPassword />} />
+                            <Route path="/verify-email" element={<VerifyEmail />} />
                             <Route path="/contests" element={<ContestList />} />
                             <Route path="/contests/:id" element={<ContestDetail />} />
                             <Route path="/contests/:id/scoreboard" element={<ContestScoreboard />} />

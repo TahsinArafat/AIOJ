@@ -19,6 +19,15 @@ type UserStore interface {
 	UpdateRole(ctx context.Context, id, role string) error
 	UpdatePassword(ctx context.Context, id, passwordHash string) error
 	UpdateRating(ctx context.Context, userID string, rating, maxRating, contestCount int) error
+	MarkEmailVerified(ctx context.Context, userID string) error
+	IsEmailVerified(ctx context.Context, userID string) (bool, error)
+}
+
+// EmailVerificationTokenStore persists hashed one-shot email-verify links.
+type EmailVerificationTokenStore interface {
+	Create(ctx context.Context, id, userID, tokenHash string, expiresAt time.Time) error
+	GetByHash(ctx context.Context, tokenHash string) (*model.EmailVerificationToken, error)
+	MarkUsed(ctx context.Context, id string) error
 }
 
 type ProblemStore interface {

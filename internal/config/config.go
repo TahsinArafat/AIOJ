@@ -14,7 +14,19 @@ type Config struct {
 	Judge    JudgeConfig    `yaml:"judge"`
 	Redis    RedisConfig    `yaml:"redis"`
 	AI       AIConfig       `yaml:"ai"`
+	Mail     MailConfig     `yaml:"mail"`
 	LangDir  string         `yaml:"lang_dir"`
+}
+
+// MailConfig selects the transactional mail backend and builds absolute links.
+type MailConfig struct {
+	Driver    string `yaml:"driver"` // "smtp" | "catcher" | "noop"
+	Host      string `yaml:"host"`
+	Port      int    `yaml:"port"`
+	Username  string `yaml:"username"`
+	Password  string `yaml:"password"`
+	From      string `yaml:"from"`
+	PublicURL string `yaml:"public_url"` // e.g. https://aioj.com (used in email links)
 }
 
 type ServerConfig struct {
@@ -98,6 +110,30 @@ func Load(path string) (*Config, error) {
 	}
 	if v := os.Getenv("AI_MODEL"); v != "" {
 		cfg.AI.Model = v
+	}
+	if v := os.Getenv("MAIL_DRIVER"); v != "" {
+		cfg.Mail.Driver = v
+	}
+	if v := os.Getenv("MAIL_HOST"); v != "" {
+		cfg.Mail.Host = v
+	}
+	if v := os.Getenv("MAIL_PORT"); v != "" {
+		cfg.Mail.Port = atoi(v)
+	}
+	if v := os.Getenv("MAIL_USERNAME"); v != "" {
+		cfg.Mail.Username = v
+	}
+	if v := os.Getenv("MAIL_PASSWORD"); v != "" {
+		cfg.Mail.Password = v
+	}
+	if v := os.Getenv("MAIL_FROM"); v != "" {
+		cfg.Mail.From = v
+	}
+	if v := os.Getenv("MAIL_PUBLIC_URL"); v != "" {
+		cfg.Mail.PublicURL = v
+	}
+	if v := os.Getenv("PUBLIC_ORIGIN"); v != "" && cfg.Mail.PublicURL == "" {
+		cfg.Mail.PublicURL = v
 	}
 	return &cfg, nil
 }

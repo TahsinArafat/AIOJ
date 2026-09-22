@@ -127,6 +127,10 @@ export const api = {
                 method: 'POST',
                 body: JSON.stringify(d),
             }),
+        verifyEmail: (token: string) =>
+            request<{ status: string }>(`/auth/verify-email/${encodeURIComponent(token)}`),
+        resendVerification: () =>
+            request<{ message: string }>('/auth/verify-email/resend', { method: 'POST' }),
     },
     problems: {
         list: (offset = 0, limit = 20, filters?: { difficulty?: string; tags?: string[]; search?: string; source?: string }) => {
