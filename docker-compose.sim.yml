@@ -1,0 +1,56 @@
+# Simulation overlay for the Full-Scale Completion program.
+# Boots on top of the base file; never modifies it:
+#   docker compose -f docker-compose.yml -f docker-compose.sim.yml --profile sim up -d --build
+services:
+  # Rebind to 8081 so the sim never fights local dev servers / Caddy on :80.
+  # `ports: !override` (Compose v2.24+ / Docker Desktop >= 4.38) replaces the
+  # base 80:80 instead of merging additively.
+  frontend:
+    ports: !override
+      - "8081:80"
+
+  # Two deciders on one Redis queue — the Wave 1 lossless/HA proof starts here.
+  judge-worker:
+    deploy:
+      replicas: 2
+
+  # go-judge >= 1.11 discovers its cgroup parent from /proc/self/cgroup. Docker's
+  # default PRIVATE cgroup namespace rewrites that path to "/", which the binary
+  # rejects with "cgroup path is empty" (fatal, restart loop). Host namespace is
+  # what the criyle/go-judge docs require for a privileged container.
+  judge:
+    cgroup: host
+
+  # Wave 1+ reads verification mail from here; Wave 0 brings it up so the
+  # service is present and healthy in every sim boot.
+  mailhog:
+    image: mailhog/mailhog:latest
+    ports:
+      - "8025:8025" # web UI + JSON API (localhost:8025/api/v2/messages)
+      - "1025:1025" # SMTP
+    restart: unless-stopped
+
+  # One-shot API seeder (cmd/seed). Runs after backend is up, exits 0.
+  seeder:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    entrypoint: ["/app/seed"]
+    command: []
+    dns:
+      - 1.1.1.1   # the seeder hits no external hosts, but the Docker embedded
+      - 8.8.8.8   # resolver can wedge mid-build; explicit DNS keeps it honest.
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: aioj
+      DB_USER: aioj
+      DB_PASSWORD: ${DB_PASSWORD:-aioj_secret}
+      SEED_ADMIN_USERNAME: ${SEED_ADMIN_USERNAME:-ai}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-aiseedpass}
+      SEED_PROBLEM_SLUG: ${SEED_PROBLEM_SLUG:-hello}
+      BACKEND_URL: http://backend:8080
+    depends_on:
+      backend:
+        condition: service_started
+    profiles: ["sim"]
