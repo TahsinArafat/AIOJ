@@ -23,3 +23,6 @@ backups/
 web/e2e/artifacts/
 web/test-results/
 web/playwright-report/
+
+# Keep the shared VS Code exclusions; other .vscode files stay local.
+!.vscode/settings.json

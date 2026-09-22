@@ -1,0 +1,27 @@
+{
+  // Keep project intelligence honest. `.worktrees/` holds full git worktrees
+  // (47k+ files across global-readiness-phase-a/b and production-oj). They are
+  // gitignored but were still being indexed, which:
+  //   1. inflated the index to ~3000 files drawn arbitrarily from a 47k pool,
+  //   2. listed the SAME symbols twice (e.g. internal/judge/checker/checker.go
+  //      and .worktrees/production-oj/internal/judge/checker/checker.go both
+  //      exposing TestExact/TestLines/TestFloat/GetChecker),
+  //   3. surfaced worktree copies as "important project files" ahead of main.
+  // Excluding them makes search, symbol lookup, and file watching reflect main.
+  "files.exclude": {
+    ".worktrees": true
+  },
+  "search.exclude": {
+    ".worktrees": true,
+    "**/Reference_Projects": true,
+    "**/node_modules": true,
+    "**/web/dist": true,
+    "**/web/e2e/artifacts": true,
+    "**/web/playwright-report": true,
+    "**/web/test-results": true
+  },
+  "files.watcherExclude": {
+    "**/.worktrees/**": true,
+    "**/node_modules/**": true
+  }
+}
