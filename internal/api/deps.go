@@ -16,6 +16,10 @@ type Deps struct {
 	// handler type so the DB-backed gathering stays in main.go where the stores
 	// live, and the router stays free of store knowledge.
 	Sitemap func(ctx context.Context) []handler.SitemapSection
+	// Feed returns the items for the problems Atom feed, plus any fetch error.
+	// The error is passed through rather than logged so a failed query cannot
+	// be served as a valid empty feed.
+	Feed func(ctx context.Context) ([]handler.FeedItem, error)
 	Submission     *handler.SubmissionHandler
 	Contest        *handler.ContestHandler
 	ContestProblem *handler.ContestProblemHandler

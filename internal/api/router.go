@@ -72,6 +72,16 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 		})
 	}
 
+	if d.Feed != nil {
+		r.Get("/feed/problems.atom", func(w http.ResponseWriter, req *http.Request) {
+			items, err := d.Feed(req.Context())
+			handler.ServeAtomFeed(items, err,
+				"AIOJ — New Problems", "The latest problems added to AIOJ",
+				"http://localhost:8081/feed/problems.atom",
+				"http://localhost:8081/feed/problems.atom", w, req)
+		})
+	}
+
 	r.Get("/api/search", searchH.Search)
 
 	r.Post("/api/auth/register", authH.Register)

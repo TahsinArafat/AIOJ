@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	"unicode/utf8"
 
 	"github.com/tahsinarafat/aioj/internal/api"
 	"github.com/tahsinarafat/aioj/internal/api/handler"
@@ -71,6 +72,7 @@ func main() {
 	problemStore := postgres.NewProblemStore(db)
 	problemI18nStore := postgres.NewProblemI18nStore(db)
 	sitemapStore := postgres.NewSitemapStore(db)
+	feedStore := postgres.NewFeedStore(db)
 	submissionStore := postgres.NewSubmissionStore(db)
 	contestStore := postgres.NewContestStore(db)
 	ratingStore := postgres.NewRatingStore(db)
@@ -264,6 +266,31 @@ func main() {
 				{Name: "contests", URLs: toURLs(contests), Err: errContests},
 			}
 		},
+		// Feed items for /feed/problems.atom. The error is returned, not logged,
+		// so a failed query surfaces as a 500 instead of a valid-looking empty
+		// feed -- the mistake that hid the first sitemap's broken query.
+		Feed: func(ctx context.Context) ([]handler.FeedItem, error) {
+			origin := handler.NormalizeOrigin(os.Getenv("PUBLIC_ORIGIN"))
+			if origin == "" {
+				origin = "http://localhost:8081"
+			}
+			entries, err := feedStore.RecentProblems(ctx, 25)
+			if err != nil {
+				return nil, err
+			}
+			items := make([]handler.FeedItem, 0, len(entries))
+			for _, e := range entries {
+				url := origin + "/problems/" + e.Slug
+				items = append(items, handler.FeedItem{
+					Title:   e.Title,
+					Link:    url,
+					ID:      url,
+					Summary: truncateForFeed(e.Summary, 500),
+					Updated: toTime(e.Created),
+				})
+			}
+			return items, nil
+		},
 		Submission:     submissionH,
 		Contest:        contestH,
 		ContestProblem: contestProblemH,
@@ -333,4 +360,31 @@ func main() {
 	defer shutCancel()
 	srv.Shutdown(shutCtx)
 	judgeQueue.Close()
+}
+
+// truncateForFeed bounds a problem statement for feed readers, which often
+// display the whole summary inline. Matches dmoj's feed, which truncates the
+// rendered description to 500 characters.
+func truncateForFeed(s string, max int) string {
+	if len(s) <= max {
+		return s
+	}
+	// Trim on a rune boundary so a multi-byte character is never cut in half.
+	cut := max
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+	return s[:cut] + "..."
+}
+
+func toTime(v any) time.Time {
+	switch t := v.(type) {
+	case time.Time:
+		return t
+	case *time.Time:
+		if t != nil {
+			return *t
+		}
+	}
+	return time.Time{}
 }
