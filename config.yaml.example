@@ -10,6 +10,7 @@ database:
   max_open: 25
   max_idle: 5
 auth:
+  csrf_secret: ""  # override with CSRF_SECRET
   jwt_secret: "change-me-in-production"  # override with JWT_SECRET env var — set a long random value in production
   access_ttl: 15m
   refresh_ttl: 168h

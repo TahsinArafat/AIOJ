@@ -278,6 +278,7 @@ func main() {
 		VerifyEmail: verifyH,
 		TwoFA:       twoFAH,
 		TwoFAVerify: twoFAVerifyH,
+		CSRFSecret:  cfg.Auth.CSRFSecret,
 		DevMail:     devMailH,
 		Problem:     problemH,
 		ProblemI18n: problemI18nH,

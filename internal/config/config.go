@@ -45,6 +45,7 @@ type DatabaseConfig struct {
 }
 
 type AuthConfig struct {
+	CSRFSecret string `yaml:"csrf_secret"`
 	JWTSecret  string `yaml:"jwt_secret"`
 	AccessTTL  string `yaml:"access_ttl"`
 	RefreshTTL string `yaml:"refresh_ttl"`
@@ -110,6 +111,9 @@ func Load(path string) (*Config, error) {
 	}
 	if v := os.Getenv("AI_MODEL"); v != "" {
 		cfg.AI.Model = v
+	}
+	if v := os.Getenv("CSRF_SECRET"); v != "" {
+		cfg.Auth.CSRFSecret = v
 	}
 	if v := os.Getenv("MAIL_DRIVER"); v != "" {
 		cfg.Mail.Driver = v

@@ -58,7 +58,15 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 	backupH := d.Backup
 	r := chi.NewRouter()
 	rl := middleware.NewRateLimiter()
-	r.Use(middleware.RateLimit(rl, "/api/health", "/api/ws", "/metrics"), chiMiddleware.RequestID, chiMiddleware.RealIP, middleware.Logging, chiMiddleware.Recoverer)
+	r.Use(
+		middleware.SecurityHeaders(),
+		middleware.CSRF(d.CSRFSecret),
+		middleware.RateLimit(rl, "/api/health", "/api/ws", "/metrics"),
+		chiMiddleware.RequestID,
+		chiMiddleware.RealIP,
+		middleware.Logging,
+		chiMiddleware.Recoverer,
+	)
 
 	r.Get("/metrics", promhttp.Handler().ServeHTTP)
 
@@ -114,11 +122,11 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 
 	r.Get("/api/search", searchH.Search)
 
-	r.Post("/api/auth/register", authH.Register)
-	r.Post("/api/auth/login", authH.Login)
+	r.With(rl.StrictAuth).Post("/api/auth/register", authH.Register)
+	r.With(rl.StrictAuth).Post("/api/auth/login", authH.Login)
 	r.Post("/api/auth/refresh", authH.Refresh)
-	r.Post("/api/auth/forgot-password", authH.ForgotPassword)
-	r.Post("/api/auth/reset-password", authH.ResetPassword)
+	r.With(rl.StrictAuth).Post("/api/auth/forgot-password", authH.ForgotPassword)
+	r.With(rl.StrictAuth).Post("/api/auth/reset-password", authH.ResetPassword)
 	if d.VerifyEmail != nil {
 		r.Get("/api/auth/verify-email/{token}", d.VerifyEmail.Verify)
 	}
@@ -129,7 +137,7 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 		r.With(middleware.AuthMiddleware(jwtManager)).Post("/api/auth/2fa/disable", d.TwoFA.Disable)
 	}
 	if d.TwoFAVerify != nil {
-		r.Post("/api/auth/2fa/verify", d.TwoFAVerify.Verify)
+		r.With(rl.StrictAuth).Post("/api/auth/2fa/verify", d.TwoFAVerify.Verify)
 	}
 	if d.DevMail != nil {
 		r.Get("/api/dev/mail", d.DevMail.List)

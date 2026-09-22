@@ -68,9 +68,10 @@ type Deps struct {
 	AdminSub       *handler.AdminSubmissionHandler
 	Backup         *handler.AdminBackupHandler
 	Generate       *handler.GenerateHandler
-	AIModel      *handler.AdminAIModelHandler
-	DevMail      *handler.DevMailHandler
-	VerifyEmail  *handler.EmailVerificationHandler
-	TwoFA       *handler.TwoFactorHandler
-	TwoFAVerify *handler.TwoFactorVerifyHandler
+	AIModel        *handler.AdminAIModelHandler
+	DevMail        *handler.DevMailHandler
+	VerifyEmail    *handler.EmailVerificationHandler
+	TwoFA          *handler.TwoFactorHandler
+	TwoFAVerify    *handler.TwoFactorVerifyHandler
+	CSRFSecret     string
 }

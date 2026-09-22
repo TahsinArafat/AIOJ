@@ -95,6 +95,26 @@ func (rl *RateLimiter) Stop() {
 	close(rl.stop)
 }
 
+// StrictAuth is a chi-compatible middleware enforcing a tight per-IP+path
+// budget on auth endpoints (5 burst, 1 req / 5s sustained).
+func (rl *RateLimiter) StrictAuth(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		key := "strict:" + r.RemoteAddr + ":" + r.URL.Path
+		limiter, _ := rl.visitors.LoadOrStore(key, &visitor{
+			limiter:  rate.NewLimiter(rate.Limit(1.0/5.0), 5),
+			lastSeen: time.Now(),
+		})
+		vis := limiter.(*visitor)
+		vis.lastSeen = time.Now()
+		if !vis.limiter.Allow() {
+			w.Header().Set("Retry-After", "5")
+			http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 // RateLimit returns chi-compatible middleware that enforces per-IP rate limits.
 // Paths listed in skipPaths bypass rate limiting entirely.
 func RateLimit(rl *RateLimiter, skipPaths ...string) func(http.Handler) http.Handler {

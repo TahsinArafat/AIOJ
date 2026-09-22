@@ -62,19 +62,29 @@ export function clearTokens() {
 
 export function getAccessToken(): string | null { return accessToken }
 
+function getCsrfToken(): string {
+    const m = document.cookie.match(/(?:^|;\s*)csrf=([^;]+)/)
+    return m ? decodeURIComponent(m[1]) : ''
+}
+
 async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
+    const method = (opts.method || 'GET').toUpperCase()
     const headers: Record<string, string> = {
         ...(opts.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
         ...(opts.headers as Record<string, string> || {}),
     }
     if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`
+    // Echo double-submit cookie for non-Bearer mutations (login/register/refresh).
+    if (method !== 'GET' && method !== 'HEAD' && !headers['Authorization']) {
+        headers['X-CSRF-Token'] = getCsrfToken()
+    }
 
     let res = await fetch(BASE + path, { ...opts, headers })
 
     if (res.status === 401 && refreshToken) {
         const ref = await fetch(BASE + '/auth/refresh', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
             body: JSON.stringify({ refresh_token: refreshToken }),
         })
         if (ref.ok) {
