@@ -20,3 +20,17 @@ i18n
   });
 
 export default i18n;
+
+/**
+ * Mirror the active language onto <html lang>.
+ *
+ * Previously the attribute was hardcoded to "en" in index.html and never
+ * updated, so a Bengali session still advertised lang="en" to screen readers
+ * and crawlers. Runs once for the detected language and on every change.
+ */
+function syncDocumentLang(code: string) {
+  if (typeof document !== 'undefined') document.documentElement.lang = code;
+}
+
+syncDocumentLang(i18n.language);
+i18n.on('languageChanged', syncDocumentLang);

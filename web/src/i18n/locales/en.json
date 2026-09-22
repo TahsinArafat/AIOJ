@@ -31,9 +31,23 @@
   },
   "home": {
     "title": "AIOJ",
-    "subtitle": "Lightweight Online Judge for Competitive Programming",
+    "subtitle": "A lightweight online judge for competitive programming. Practice problems, join contests, and improve your skills.",
     "browseProblems": "Browse Problems",
-    "viewContests": "View Contests"
+    "viewContests": "View Contests",
+    "welcome": "Welcome to AIOJ",
+    "problems": "Problems",
+    "users": "Users",
+    "submissions": "Submissions",
+    "latestPosts": "Latest Posts",
+    "viewAll": "View all",
+    "noPostsYet": "No posts yet.",
+    "joinCommunity": "Join the Community",
+    "signInPrompt": "Sign in to solve problems, compete in contests, and read posts.",
+    "recentContests": "Recent & Upcoming Contests",
+    "noContests": "No contests",
+    "topRated": "Top Rated Users",
+    "noRankings": "No rankings",
+    "quickLinks": "Quick Links"
   },
   "problems": {
     "title": "Problems",

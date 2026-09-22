@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Link } from 'react-router-dom'
 import { api, contestSlug } from './lib/api'
 import { ThemeProvider } from './context/ThemeContext'
+import { useTranslation } from 'react-i18next'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import ForgotPassword from './pages/ForgotPassword'
@@ -60,6 +61,7 @@ import GenerateProblem from './pages/GenerateProblem'
 import './global.css'
 
 function Home() {
+    const { t } = useTranslation()
     const [contests, setContests] = useState<any[]>([])
     const [posts, setPosts] = useState<any[]>([])
     const [stats, setStats] = useState({ problems: 0, users: 0, submissions: 0 })
@@ -79,7 +81,7 @@ function Home() {
             setPosts(blogData.data || [])
             setStats(statsData)
             setRankings(rankData.data || [])
-        }).catch(() => {}).finally(() => setLoading(false))
+        }).catch(() => { }).finally(() => setLoading(false))
     }, [])
 
     const contestStatus = (c: any) => {
@@ -97,20 +99,20 @@ function Home() {
             <div className="lg:col-span-3 space-y-6">
                 {/* Hero */}
                 <section className="bg-gradient-to-r from-blue-500 to-blue-700 text-white rounded-lg px-8 py-12">
-                    <h1 className="text-3xl font-bold mb-2">Welcome to AIOJ</h1>
-                    <p className="text-blue-100 mb-6 max-w-lg">A lightweight online judge for competitive programming. Practice problems, join contests, and improve your skills.</p>
+                    <h1 className="text-3xl font-bold mb-2">{t('home.welcome')}</h1>
+                    <p className="text-blue-100 mb-6 max-w-lg">{t('home.subtitle')}</p>
                     <div className="flex gap-3">
-                        <Link to="/problems" className="bg-white dark:bg-gray-800 text-blue-700 dark:text-blue-300 px-5 py-2 rounded font-medium hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">Browse Problems</Link>
-                        <Link to="/contests" className="border border-white/40 px-5 py-2 rounded font-medium hover:bg-white dark:hover:bg-gray-700/10 transition-colors">View Contests</Link>
+                        <Link to="/problems" className="bg-white dark:bg-gray-800 text-blue-700 dark:text-blue-300 px-5 py-2 rounded font-medium hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">{t('home.browseProblems')}</Link>
+                        <Link to="/contests" className="border border-white/40 px-5 py-2 rounded font-medium hover:bg-white dark:hover:bg-gray-700/10 transition-colors">{t('home.viewContests')}</Link>
                     </div>
                 </section>
 
                 {/* Stats */}
                 <section className="grid grid-cols-3 gap-4">
                     {[
-                        { label: 'Problems', value: stats.problems },
-                        { label: 'Users', value: stats.users },
-                        { label: 'Submissions', value: stats.submissions },
+                        { label: t('home.problems'), value: stats.problems },
+                        { label: t('home.users'), value: stats.users },
+                        { label: t('home.submissions'), value: stats.submissions },
                     ].map(s => (
                         <div key={s.label} className="border border-gray-200 dark:border-gray-700 rounded-lg p-5 text-center bg-white dark:bg-gray-800">
                             <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">{s.value.toLocaleString()}</div>
@@ -122,13 +124,13 @@ function Home() {
                 {/* Recent Blog Posts */}
                 <section className="space-y-4">
                     <div className="flex justify-between items-center">
-                        <h2 className="text-xl font-bold">Latest Posts</h2>
-                        <Link to="/blog" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">View all</Link>
+                        <h2 className="text-xl font-bold">{t('home.latestPosts')}</h2>
+                        <Link to="/blog" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">{t('home.viewAll')}</Link>
                     </div>
                     {loading ? (
                         <div className="text-center py-8 text-gray-400 dark:text-gray-500">Loading...</div>
                     ) : posts.length === 0 ? (
-                        <div className="text-center py-8 text-gray-400 dark:text-gray-500">No posts yet.</div>
+                        <div className="text-center py-8 text-gray-400 dark:text-gray-500">{t('home.noPostsYet')}</div>
                     ) : (
                         <div className="space-y-3">
                             {posts.map(p => (
@@ -262,65 +264,65 @@ export default function App() {
                     <Navbar />
                     <main className="max-w-[1400px] mx-auto px-6 py-6">
                         <Routes>
-                        <Route path="/" element={<Home />} />
-                        <Route path="/problems" element={<ProblemList />} />
-                        <Route path="/problems/:slug" element={<ProblemDetail />} />
-                        <Route path="/login" element={<Login />} />
-                        <Route path="/register" element={<Register />} />
-                        <Route path="/forgot-password" element={<ForgotPassword />} />
-                        <Route path="/reset-password" element={<ResetPassword />} />
-                        <Route path="/contests" element={<ContestList />} />
-                        <Route path="/contests/:id" element={<ContestDetail />} />
-                        <Route path="/contests/:id/scoreboard" element={<ContestScoreboard />} />
-                        <Route path="/contests/:id/plagiarism" element={<ContestPlagiarism />} />
-                        <Route path="/contests/:contestId/problem/:index" element={<ContestProblem />} />
-                        <Route path="/setter/contest/:id/edit" element={<ContestEdit />} />
-                        <Route path="/setter/contest/:id/manage" element={<ContestManage />} />
-                        <Route path="/gym" element={<GymList />} />
-                        <Route path="/gym/:id" element={<GymDetail />} />
-                        <Route path="/hack/:contestId/:problemId" element={<HackPanel />} />
-                        <Route path="/groups" element={<GroupList />} />
-                        <Route path="/groups/create" element={<GroupCreate />} />
-                        <Route path="/groups/join" element={<GroupJoin />} />
-                        <Route path="/groups/:id" element={<GroupDetail />} />
-                        <Route path="/teams" element={<TeamList />} />
-                        <Route path="/teams/create" element={<TeamCreate />} />
-                        <Route path="/teams/:id" element={<TeamDetail />} />
-                        <Route path="/blog" element={<BlogList />} />
-                        <Route path="/blog/create" element={<BlogCreate />} />
-                        <Route path="/blog/:id" element={<BlogDetail />} />
-                        <Route path="/editorials" element={<EditorialList />} />
-                        <Route path="/editorials/:id" element={<EditorialDetail />} />
-                        <Route path="/settings/api" element={<APISettings />} />
-                        <Route path="/settings/notifications" element={<NotificationPreferences />} />
-                        <Route path="/notifications" element={<Notifications />} />
-                        <Route path="/submissions" element={<Submissions />} />
-                        <Route path="/submissions/:id" element={<SubmissionDetail />} />
-                        <Route path="/admin" element={<AdminDashboard />} />
-                        <Route path="/setter" element={<SetterPanel />} />
-                        <Route path="/setter/create" element={<ProblemCreate />} />
-                        <Route path="/setter/:slug" element={<SetterProblemWorkspace />} />
-                        <Route path="/setter/contest/create" element={<ContestCreate />} />
-                        <Route path="/generate/problem" element={<GenerateProblem />} />
+                            <Route path="/" element={<Home />} />
+                            <Route path="/problems" element={<ProblemList />} />
+                            <Route path="/problems/:slug" element={<ProblemDetail />} />
+                            <Route path="/login" element={<Login />} />
+                            <Route path="/register" element={<Register />} />
+                            <Route path="/forgot-password" element={<ForgotPassword />} />
+                            <Route path="/reset-password" element={<ResetPassword />} />
+                            <Route path="/contests" element={<ContestList />} />
+                            <Route path="/contests/:id" element={<ContestDetail />} />
+                            <Route path="/contests/:id/scoreboard" element={<ContestScoreboard />} />
+                            <Route path="/contests/:id/plagiarism" element={<ContestPlagiarism />} />
+                            <Route path="/contests/:contestId/problem/:index" element={<ContestProblem />} />
+                            <Route path="/setter/contest/:id/edit" element={<ContestEdit />} />
+                            <Route path="/setter/contest/:id/manage" element={<ContestManage />} />
+                            <Route path="/gym" element={<GymList />} />
+                            <Route path="/gym/:id" element={<GymDetail />} />
+                            <Route path="/hack/:contestId/:problemId" element={<HackPanel />} />
+                            <Route path="/groups" element={<GroupList />} />
+                            <Route path="/groups/create" element={<GroupCreate />} />
+                            <Route path="/groups/join" element={<GroupJoin />} />
+                            <Route path="/groups/:id" element={<GroupDetail />} />
+                            <Route path="/teams" element={<TeamList />} />
+                            <Route path="/teams/create" element={<TeamCreate />} />
+                            <Route path="/teams/:id" element={<TeamDetail />} />
+                            <Route path="/blog" element={<BlogList />} />
+                            <Route path="/blog/create" element={<BlogCreate />} />
+                            <Route path="/blog/:id" element={<BlogDetail />} />
+                            <Route path="/editorials" element={<EditorialList />} />
+                            <Route path="/editorials/:id" element={<EditorialDetail />} />
+                            <Route path="/settings/api" element={<APISettings />} />
+                            <Route path="/settings/notifications" element={<NotificationPreferences />} />
+                            <Route path="/notifications" element={<Notifications />} />
+                            <Route path="/submissions" element={<Submissions />} />
+                            <Route path="/submissions/:id" element={<SubmissionDetail />} />
+                            <Route path="/admin" element={<AdminDashboard />} />
+                            <Route path="/setter" element={<SetterPanel />} />
+                            <Route path="/setter/create" element={<ProblemCreate />} />
+                            <Route path="/setter/:slug" element={<SetterProblemWorkspace />} />
+                            <Route path="/setter/contest/create" element={<ContestCreate />} />
+                            <Route path="/generate/problem" element={<GenerateProblem />} />
 
-                        <Route path="/practice" element={<Practice />} />
-                        <Route path="/organizations" element={<OrganizationList />} />
-                        <Route path="/organizations/create" element={<OrganizationCreate />} />
-                        <Route path="/organizations/:id" element={<OrganizationDetail />} />
-                        <Route path="/classes/:id" element={<ClassDetail />} />
-                        <Route path="/training" element={<TrainingPlanList />} />
-                        <Route path="/training/create" element={<TrainingPlanCreate />} />
-                        <Route path="/training/:id" element={<TrainingPlanDetail />} />
-                        <Route path="/ide" element={<IDE />} />
-                        <Route path="/profile" element={<Profile />} />
-                        <Route path="/virtual" element={<VirtualContest />} />
-                        <Route path="/rating-history" element={<RatingHistory />} />
-                        <Route path="/rankings" element={<Rankings />} />
-                        <Route path="/user/:username" element={<UserPublicProfile />} />
-                        <Route path="*" element={<div className="text-center py-20 text-gray-400 dark:text-gray-500">404 Not Found</div>} />
-                    </Routes>
-                </main>
-            </div>
+                            <Route path="/practice" element={<Practice />} />
+                            <Route path="/organizations" element={<OrganizationList />} />
+                            <Route path="/organizations/create" element={<OrganizationCreate />} />
+                            <Route path="/organizations/:id" element={<OrganizationDetail />} />
+                            <Route path="/classes/:id" element={<ClassDetail />} />
+                            <Route path="/training" element={<TrainingPlanList />} />
+                            <Route path="/training/create" element={<TrainingPlanCreate />} />
+                            <Route path="/training/:id" element={<TrainingPlanDetail />} />
+                            <Route path="/ide" element={<IDE />} />
+                            <Route path="/profile" element={<Profile />} />
+                            <Route path="/virtual" element={<VirtualContest />} />
+                            <Route path="/rating-history" element={<RatingHistory />} />
+                            <Route path="/rankings" element={<Rankings />} />
+                            <Route path="/user/:username" element={<UserPublicProfile />} />
+                            <Route path="*" element={<div className="text-center py-20 text-gray-400 dark:text-gray-500">404 Not Found</div>} />
+                        </Routes>
+                    </main>
+                </div>
             </ThemeProvider>
         </BrowserRouter>
     )
