@@ -1,0 +1,18 @@
+# Indexer / tooling exclusions that must live in the repo, not in a user's
+# global editor config, so every contributor and every agent sees the same
+# view of the project.
+#
+# `.worktrees/` is a full git worktree containing complete checkouts of
+# feature/global-readiness-phase-a, -b, and feature/production-oj. That is
+# 47k+ files that duplicate main's symbols. It is gitignored, but ignoring
+# alone did not stop indexing. Excluded here so symbol lookup and search
+# resolve to main instead of an arbitrary mix of branch copies.
+.worktrees/
+Reference_Projects/
+backups/
+node_modules/
+web/dist/
+web/e2e/artifacts/
+web/test-results/
+web/playwright-report/
+docs/
