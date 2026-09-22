@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 	"unicode/utf8"
@@ -23,6 +24,7 @@ import (
 	"github.com/tahsinarafat/aioj/internal/judge"
 	"github.com/tahsinarafat/aioj/internal/judge/executor"
 	"github.com/tahsinarafat/aioj/internal/mail"
+	"github.com/tahsinarafat/aioj/internal/oauth"
 	"github.com/tahsinarafat/aioj/internal/plagiarism"
 	"github.com/tahsinarafat/aioj/internal/queue"
 	"github.com/tahsinarafat/aioj/internal/store/postgres"
@@ -110,6 +112,7 @@ func main() {
 	onsiteUserStore := postgres.NewOnsiteUserStore(db)
 	evtStore := postgres.NewEmailVerificationTokenStore(db)
 	totpStore := postgres.NewTOTPSecretStore(db)
+	oauthLinkStore := postgres.NewOAuthLinkStore(db)
 	backupCodeStore := postgres.NewBackupCodeStore(db)
 
 	var mailSender mail.Sender
@@ -273,15 +276,60 @@ func main() {
 	twoFAH := &handler.TwoFactorHandler{Users: userStore, Secrets: totpStore, Backups: backupCodeStore}
 	twoFAVerifyH := &handler.TwoFactorVerifyHandler{Secrets: totpStore, Backups: backupCodeStore, JWT: jwtManager, Users: userStore, Refresh: refreshTokenStore}
 
+	// OAuth providers (empty client_id disables the start redirect until configured).
+	publicOrigin := cfg.Mail.PublicURL
+	if publicOrigin == "" {
+		publicOrigin = "http://localhost:8081"
+	}
+	oauthProviders := map[string]oauth.Provider{
+		"github": oauth.NewGitHubProvider(oauth.GitHubConfig{}),
+		"google": oauth.NewGoogleProvider(oauth.GoogleConfig{}),
+	}
+	if cfg.OAuth.GitHub.ClientID != "" {
+		gh := oauthProviders["github"].(*oauth.GitHubProvider)
+		gh.Config().ClientID = cfg.OAuth.GitHub.ClientID
+		gh.Config().ClientSecret = cfg.OAuth.GitHub.ClientSecret
+		ru := cfg.OAuth.GitHub.RedirectURL
+		if ru == "" {
+			ru = strings.TrimRight(publicOrigin, "/") + "/api/auth/oauth/github/callback"
+		}
+		gh.Config().RedirectURL = ru
+	}
+	if cfg.OAuth.Google.ClientID != "" {
+		gp := oauthProviders["google"].(*oauth.GoogleProvider)
+		gp.Config().ClientID = cfg.OAuth.Google.ClientID
+		gp.Config().ClientSecret = cfg.OAuth.Google.ClientSecret
+		ru := cfg.OAuth.Google.RedirectURL
+		if ru == "" {
+			ru = strings.TrimRight(publicOrigin, "/") + "/api/auth/oauth/google/callback"
+		}
+		gp.Config().RedirectURL = ru
+	}
+	stateSecret := []byte(cfg.OAuth.StateSecret)
+	if len(stateSecret) == 0 {
+		stateSecret = []byte(cfg.Auth.CSRFSecret)
+	}
+	oauthStartH := &handler.OAuthStartHandler{
+		Providers: oauthProviders, StateSecret: stateSecret, StateTTL: 10 * time.Minute,
+	}
+	oauthCallbackH := &handler.OAuthCallbackHandler{
+		Users: userStore, Links: oauthLinkStore, Providers: oauthProviders,
+		JWT: jwtManager, Refresh: refreshTokenStore,
+		StateTTL: 10 * time.Minute, StateSecret: stateSecret,
+		PublicURL: publicOrigin,
+	}
+
 	router := api.NewRouter(api.Deps{
-		Auth:        authH,
-		VerifyEmail: verifyH,
-		TwoFA:       twoFAH,
-		TwoFAVerify: twoFAVerifyH,
-		CSRFSecret:  cfg.Auth.CSRFSecret,
-		DevMail:     devMailH,
-		Problem:     problemH,
-		ProblemI18n: problemI18nH,
+		Auth:          authH,
+		VerifyEmail:   verifyH,
+		TwoFA:         twoFAH,
+		TwoFAVerify:   twoFAVerifyH,
+		OAuthStart:    oauthStartH,
+		OAuthCallback: oauthCallbackH,
+		CSRFSecret:    cfg.Auth.CSRFSecret,
+		DevMail:       devMailH,
+		Problem:       problemH,
+		ProblemI18n:   problemI18nH,
 		// Each section is gathered independently, and the error is carried out
 		// in the SitemapSection rather than logged and dropped. Dropping it is
 		// what previously turned a query against a non-existent column into a

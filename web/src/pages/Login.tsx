@@ -110,6 +110,10 @@ export default function Login() {
                     {loading ? 'Logging in...' : 'Login'}
                 </button>
             </form>
+            <div className="mt-6 space-y-2">
+                <a href="/api/auth/oauth/github/start" className="block w-full border border-gray-300 dark:border-gray-600 py-2 rounded-md text-sm font-medium text-center hover:bg-gray-50 dark:hover:bg-gray-800">Continue with GitHub</a>
+                <a href="/api/auth/oauth/google/start" className="block w-full border border-gray-300 dark:border-gray-600 py-2 rounded-md text-sm font-medium text-center hover:bg-gray-50 dark:hover:bg-gray-800">Continue with Google</a>
+            </div>
             <div className="text-center text-sm text-gray-500 dark:text-gray-400 mt-4 space-y-1">
                 <p>Don't have an account? <Link to="/register" className="text-blue-600 dark:text-blue-400 hover:underline">Register</Link></p>
                 <p><Link to="/forgot-password" className="text-blue-600 dark:text-blue-400 hover:underline">Forgot Password?</Link></p>

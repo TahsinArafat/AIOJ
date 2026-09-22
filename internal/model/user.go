@@ -70,6 +70,15 @@ type TOTPSecret struct {
 	CreatedAt time.Time  `json:"created_at"`
 }
 
+// OAuthLink binds an external provider identity to a local user account.
+type OAuthLink struct {
+	ID             string    `json:"id"`
+	UserID         string    `json:"user_id"`
+	Provider       string    `json:"provider"`
+	ProviderUserID string    `json:"provider_user_id"`
+	LinkedAt       time.Time `json:"linked_at"`
+}
+
 type PublicProfile struct {
 	ID             string    `json:"id"`
 	Username       string    `json:"username"`

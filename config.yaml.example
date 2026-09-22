@@ -28,4 +28,14 @@ mail:
   password: ""                # override with MAIL_PASSWORD
   from: "noreply@aioj.com"    # override with MAIL_FROM
   public_url: "http://localhost:8081"  # override with MAIL_PUBLIC_URL / PUBLIC_ORIGIN
+oauth:
+  state_secret: ""            # override with OAUTH_STATE_SECRET
+  github:
+    client_id: ""             # override with GITHUB_CLIENT_ID
+    client_secret: ""         # override with GITHUB_CLIENT_SECRET
+    redirect_url: "http://localhost:8081/api/auth/oauth/github/callback"
+  google:
+    client_id: ""             # override with GOOGLE_CLIENT_ID
+    client_secret: ""         # override with GOOGLE_CLIENT_SECRET
+    redirect_url: "http://localhost:8081/api/auth/oauth/google/callback"
 lang_dir: "./lang"

@@ -143,6 +143,12 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 		r.Get("/api/dev/mail", d.DevMail.List)
 		r.Delete("/api/dev/mail", d.DevMail.Clear)
 	}
+	if d.OAuthStart != nil {
+		r.Get("/api/auth/oauth/{provider}/start", d.OAuthStart.Start)
+	}
+	if d.OAuthCallback != nil {
+		r.Get("/api/auth/oauth/{provider}/callback", d.OAuthCallback.Callback)
+	}
 
 	r.Get("/api/users/{username}", usersH.GetByUsername)
 	r.Get("/api/users/{username}/submissions", usersH.GetUserSubmissions)

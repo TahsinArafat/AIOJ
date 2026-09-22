@@ -11,6 +11,7 @@ type Config struct {
 	Server   ServerConfig   `yaml:"server"`
 	Database DatabaseConfig `yaml:"database"`
 	Auth     AuthConfig     `yaml:"auth"`
+	OAuth    OAuthConfig    `yaml:"oauth"`
 	Judge    JudgeConfig    `yaml:"judge"`
 	Redis    RedisConfig    `yaml:"redis"`
 	AI       AIConfig       `yaml:"ai"`
@@ -49,6 +50,19 @@ type AuthConfig struct {
 	JWTSecret  string `yaml:"jwt_secret"`
 	AccessTTL  string `yaml:"access_ttl"`
 	RefreshTTL string `yaml:"refresh_ttl"`
+}
+
+// OAuthConfig holds optional GitHub/Google SSO credentials.
+type OAuthConfig struct {
+	StateSecret string              `yaml:"state_secret"`
+	GitHub      OAuthProviderConfig `yaml:"github"`
+	Google      OAuthProviderConfig `yaml:"google"`
+}
+
+type OAuthProviderConfig struct {
+	ClientID     string `yaml:"client_id"`
+	ClientSecret string `yaml:"client_secret"`
+	RedirectURL  string `yaml:"redirect_url"`
 }
 
 type JudgeConfig struct {
@@ -114,6 +128,27 @@ func Load(path string) (*Config, error) {
 	}
 	if v := os.Getenv("CSRF_SECRET"); v != "" {
 		cfg.Auth.CSRFSecret = v
+	}
+	if v := os.Getenv("OAUTH_STATE_SECRET"); v != "" {
+		cfg.OAuth.StateSecret = v
+	}
+	if v := os.Getenv("GITHUB_CLIENT_ID"); v != "" {
+		cfg.OAuth.GitHub.ClientID = v
+	}
+	if v := os.Getenv("GITHUB_CLIENT_SECRET"); v != "" {
+		cfg.OAuth.GitHub.ClientSecret = v
+	}
+	if v := os.Getenv("GITHUB_REDIRECT_URL"); v != "" {
+		cfg.OAuth.GitHub.RedirectURL = v
+	}
+	if v := os.Getenv("GOOGLE_CLIENT_ID"); v != "" {
+		cfg.OAuth.Google.ClientID = v
+	}
+	if v := os.Getenv("GOOGLE_CLIENT_SECRET"); v != "" {
+		cfg.OAuth.Google.ClientSecret = v
+	}
+	if v := os.Getenv("GOOGLE_REDIRECT_URL"); v != "" {
+		cfg.OAuth.Google.RedirectURL = v
 	}
 	if v := os.Getenv("MAIL_DRIVER"); v != "" {
 		cfg.Mail.Driver = v

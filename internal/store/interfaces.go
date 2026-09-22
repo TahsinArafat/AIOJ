@@ -103,6 +103,14 @@ type BackupCodeStore interface {
 	Consume(ctx context.Context, id string) error
 }
 
+// OAuthLinkStore maps external provider identities onto local users.
+type OAuthLinkStore interface {
+	Create(ctx context.Context, link *model.OAuthLink) error
+	GetByProviderUser(ctx context.Context, provider, providerUserID string) (*model.OAuthLink, error)
+	ListByUser(ctx context.Context, userID string) ([]model.OAuthLink, error)
+	Delete(ctx context.Context, id string) error
+}
+
 type ContestStore interface {
 	Create(ctx context.Context, c *model.Contest) error
 	GetByID(ctx context.Context, id string) (*model.Contest, error)

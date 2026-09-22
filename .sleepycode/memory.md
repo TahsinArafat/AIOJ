@@ -26,6 +26,8 @@
 - **Security middleware (A.23–A.25): DONE** — CSRF double-submit (Bearer exempt), SecurityHeaders, StrictAuth rate limit on auth POSTs, CSRF_SECRET config. Verified middleware/handler/auth/mail tests + tsc. Next: A.17–A.22 OAuth or A.26+ Sentry.
 - Already present before this slice (do not re-do): `internal/mail` package, ForgotPassword email (no token in response), register verification email, `GET /api/auth/verify-email/{token}`, ForgotPassword/ResetPassword pages, migration 000059 email_verified, DevMail inspector.
 
+- **OAuth (A.17–A.22): DONE** — `internal/oauth` state+GitHub+Google, migration `000061_oauth` (plan said 000052; renumbered), start/callback handlers (SPA fragment tokens via `/oauth/complete`), Login SSO buttons, config `oauth:` + env overrides. Verified: `go build`, `go test ./internal/oauth ./internal/api/handler …`, `tsc`. Next: A.26+ Sentry or legal pages A.28.
+
 ## Deferred work (agreed with user)
 - Frontend smell batch: 23 hand-decoded `atob(token.split('.')[1])` across 18 files; **101 alert() calls across 32 files** (~30 `catch (e: any)`); api.ts = 761 lines / ~173 `any`s; 6 near-identical importX() functions in api.ts; zero AbortController; ContestManage.tsx 14 effects/0 cleanups; no ErrorBoundary; no react-query/SWR; hardcoded 130-country list.
 - Judge sandbox config-driven limits deserve explicit isolate/network/resource review (executor = external go-judge HTTP service).
