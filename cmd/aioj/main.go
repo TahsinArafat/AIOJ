@@ -294,6 +294,39 @@ func main() {
 			}
 			return items, nil
 		},
+		CommentFeed: func(ctx context.Context) ([]handler.FeedItem, error) {
+			origin := handler.NormalizeOrigin(os.Getenv("PUBLIC_ORIGIN"))
+			if origin == "" {
+				origin = "http://localhost:8081"
+			}
+			entries, err := feedStore.RecentComments(ctx, 25)
+			if err != nil {
+				return nil, err
+			}
+			items := make([]handler.FeedItem, 0, len(entries))
+			for _, e := range entries {
+				// Link to the thread the comment belongs to, not the bare id.
+				var link string
+				switch e.ParentType {
+				case "problem":
+					link = origin + "/problems/" + strconv.FormatInt(e.ParentID, 10)
+				case "contest":
+					link = origin + "/contests/" + strconv.FormatInt(e.ParentID, 10)
+				case "blog":
+					link = origin + "/blog/" + strconv.FormatInt(e.ParentID, 10)
+				default:
+					link = origin + "/"
+				}
+				items = append(items, handler.FeedItem{
+					Title:   e.Username + " commented",
+					Link:    link,
+					ID:      origin + "/comments/" + strconv.FormatInt(e.ID, 10),
+					Summary: truncateForFeed(e.Content, 500),
+					Updated: toTime(e.Created),
+				})
+			}
+			return items, nil
+		},
 		BlogFeed: func(ctx context.Context) ([]handler.FeedItem, error) {
 			origin := handler.NormalizeOrigin(os.Getenv("PUBLIC_ORIGIN"))
 			if origin == "" {

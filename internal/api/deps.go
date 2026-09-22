@@ -23,7 +23,9 @@ type Deps struct {
 	// BlogFeed returns items for the blog Atom feed, plus any fetch error.
 	BlogFeed func(ctx context.Context) ([]handler.FeedItem, error)
 	// ContestFeed returns items for the contests Atom feed, plus any fetch error.
-	ContestFeed    func(ctx context.Context) ([]handler.FeedItem, error)
+	ContestFeed func(ctx context.Context) ([]handler.FeedItem, error)
+	// CommentFeed returns items for the comments Atom feed, plus any fetch error.
+	CommentFeed    func(ctx context.Context) ([]handler.FeedItem, error)
 	Submission     *handler.SubmissionHandler
 	Contest        *handler.ContestHandler
 	ContestProblem *handler.ContestProblemHandler
