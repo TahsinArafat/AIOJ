@@ -90,7 +90,7 @@ func (h *FriendshipHandler) Status(w http.ResponseWriter, r *http.Request) {
 	}
 	followingN, followersN, _ := h.Friends.Counts(r.Context(), followeeID)
 	respondJSON(w, http.StatusOK, map[string]any{
-		"following":      following,
+		"following":       following,
 		"following_count": followingN,
 		"follower_count":  followersN,
 	})
