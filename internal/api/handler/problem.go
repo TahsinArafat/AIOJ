@@ -29,6 +29,10 @@ func NewProblemHandler(s store.ProblemStore) *ProblemHandler {
 	return &ProblemHandler{store: s}
 }
 
+func visibleForCreator(requested bool, role string) bool {
+	return requested && (role == "admin" || role == "setter")
+}
+
 func (h *ProblemHandler) List(w http.ResponseWriter, r *http.Request) {
 	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
@@ -299,7 +303,7 @@ func (h *ProblemHandler) Create(w http.ResponseWriter, r *http.Request) {
 		InteractorLanguage:   req.InteractorLanguage,
 		InteractorSourceCode: req.InteractorSourceCode,
 		Source:               "local",
-		Visible:              false,
+		Visible:              visibleForCreator(req.Visible, claims.Role),
 		CreatedBy:            claims.UserID,
 	}
 	if err := h.store.Create(r.Context(), prob); err != nil {

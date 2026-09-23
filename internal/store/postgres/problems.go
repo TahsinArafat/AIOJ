@@ -168,11 +168,11 @@ func (s *ProblemStore) Update(ctx context.Context, id string, p *model.Problem) 
 	_, err = s.db.ExecContext(ctx, `UPDATE problems SET
 		title=$2, description=$3, input_format=$4, output_format=$5, hint=$6, sample_cases=$7,
 		time_limit=$8, memory_limit=$9, difficulty=$10, tags=$11, visible=$12,
-		testcase_score=$13, spj=$14, spj_language=$15, spj_source_code=$16, checker_type=$17, float_epsilon=$18,
-		interactive=$19, interactor_language=$20, interactor_source_code=$21,
-		scoring_mode=$22, subtask_aggregation=$23, updated_at=NOW() WHERE id=$1`,
+		testdata_path=$13, testcase_score=$14, spj=$15, spj_language=$16, spj_source_code=$17, checker_type=$18, float_epsilon=$19,
+		interactive=$20, interactor_language=$21, interactor_source_code=$22,
+		scoring_mode=$23, subtask_aggregation=$24, updated_at=NOW() WHERE id=$1`,
 		id, p.Title, p.Description, p.InputFormat, p.OutputFormat, p.Hint, samples,
-		p.TimeLimit, p.MemoryLimit, p.Difficulty, pq.Array(p.Tags), p.Visible,
+		p.TimeLimit, p.MemoryLimit, p.Difficulty, pq.Array(p.Tags), p.Visible, p.TestdataPath,
 		scores, p.SPJ, p.SPJLanguage, p.SPJSourceCode, p.CheckerType, p.FloatEpsilon,
 		p.Interactive, p.InteractorLanguage, p.InteractorSourceCode,
 		p.ScoringMode, p.SubtaskAggregation)

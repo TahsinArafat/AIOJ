@@ -118,20 +118,26 @@ func (h *ContestHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	c := &model.Contest{
-		ID:           uuid.New().String(),
-		Slug:         req.Slug,
-		Title:        req.Title,
-		Type:         req.Type,
-		Format:       fmtName,
-		FormatConfig: formatConfigJSON,
-		StartTime:    req.StartTime,
-		EndTime:      req.EndTime,
-		FreezeTime:   req.FreezeTime,
-		Password:     password,
-		Description:  req.Description,
-		Visible:      true,
-		GroupID:      req.GroupID,
-		CreatedBy:    claims.UserID,
+		ID:                   uuid.New().String(),
+		Slug:                 req.Slug,
+		Title:                req.Title,
+		Type:                 req.Type,
+		Format:               fmtName,
+		FormatConfig:         formatConfigJSON,
+		StartTime:            req.StartTime,
+		EndTime:              req.EndTime,
+		FreezeTime:           req.FreezeTime,
+		Password:             password,
+		Description:          req.Description,
+		Visible:              true,
+		GroupID:              req.GroupID,
+		CreatedBy:            claims.UserID,
+		RegistrationRequired: req.RegistrationRequired,
+		RegistrationDeadline: req.RegistrationDeadline,
+		MaxParticipants:      req.MaxParticipants,
+	}
+	if req.Visible != nil {
+		c.Visible = *req.Visible
 	}
 	if err := h.store.Create(r.Context(), c); err != nil {
 		http.Error(w, "create failed", http.StatusInternalServerError)

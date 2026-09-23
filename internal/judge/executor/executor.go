@@ -11,20 +11,41 @@ import (
 )
 
 type CmdFile struct {
-	Content string `json:"content"`
+	Content string `json:"content,omitempty"`
+	FileID  string `json:"fileId,omitempty"`
 	Src     string `json:"src,omitempty"`
 }
 
+// MarshalJSON emits exactly one go-judge file variant. In particular, an
+// empty input file must still contain `"content": ""`; omitempty would turn it
+// into `{}`, which go-judge rejects as an invalid file type.
+func (f CmdFile) MarshalJSON() ([]byte, error) {
+	type wire struct {
+		Content *string `json:"content,omitempty"`
+		FileID  string  `json:"fileId,omitempty"`
+		Src     string  `json:"src,omitempty"`
+	}
+	if f.FileID != "" {
+		return json.Marshal(wire{FileID: f.FileID})
+	}
+	if f.Src != "" {
+		return json.Marshal(wire{Src: f.Src})
+	}
+	content := f.Content
+	return json.Marshal(wire{Content: &content})
+}
+
 type Cmd struct {
-	Args        []string           `json:"args"`
-	Env         []string           `json:"env,omitempty"`
-	Files       []CmdFile          `json:"files,omitempty"`
-	CPULimit    uint64             `json:"cpuLimit"`
-	MemoryLimit uint64             `json:"memoryLimit"`
-	ProcLimit   uint64             `json:"procLimit"`
-	CopyIn      map[string]CmdFile `json:"copyIn,omitempty"`
-	CopyOut     []string           `json:"copyOut,omitempty"`
-	CopyOutDir  string             `json:"copyOutDir,omitempty"`
+	Args          []string           `json:"args"`
+	Env           []string           `json:"env,omitempty"`
+	Files         []CmdFile          `json:"files,omitempty"`
+	CPULimit      uint64             `json:"cpuLimit"`
+	MemoryLimit   uint64             `json:"memoryLimit"`
+	ProcLimit     uint64             `json:"procLimit"`
+	CopyIn        map[string]CmdFile `json:"copyIn,omitempty"`
+	CopyOut       []string           `json:"copyOut,omitempty"`
+	CopyOutCached []string           `json:"copyOutCached,omitempty"`
+	CopyOutDir    string             `json:"copyOutDir,omitempty"`
 }
 
 type ExecRequest struct {
@@ -40,6 +61,7 @@ type CmdResult struct {
 	Memory     uint64            `json:"memory"`
 	RunDir     string            `json:"runDir"`
 	Files      map[string]string `json:"files,omitempty"`
+	FileIDs    map[string]string `json:"fileIds,omitempty"`
 }
 
 type Client struct {

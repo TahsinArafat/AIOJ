@@ -5,4 +5,7 @@ ALTER TABLE bot_accounts ADD COLUMN IF NOT EXISTS consecutive_failures INTEGER D
 ALTER TABLE bot_accounts ADD COLUMN IF NOT EXISTS last_error_at TIMESTAMP WITH TIME ZONE;
 ALTER TABLE bot_accounts ADD COLUMN IF NOT EXISTS last_poll_at TIMESTAMP WITH TIME ZONE;
 
-CREATE INDEX IF NOT EXISTS idx_submissions_pending_poll ON submissions(status, remote_id) WHERE remote_id != '' AND status IN ('pending','rejudging');
+CREATE INDEX IF NOT EXISTS idx_submissions_pending_poll
+    ON submissions(status, remote_id)
+    WHERE remote_id != '' AND status = 'pending';
+-- 000055 replaces this index after adding the rejudging enum value.

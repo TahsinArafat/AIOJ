@@ -67,6 +67,17 @@ type SubmissionStore interface {
 	ListByContest(ctx context.Context, contestID string, offset, limit int, filter model.SubmissionFilter) ([]model.Submission, int, error)
 	UpdateStatus(ctx context.Context, id string, status model.SubmissionStatus)
 	UpdateResult(ctx context.Context, id string, status model.SubmissionStatus, score, timeUsed, memoryUsed int, compileOutput string, results []model.TestCaseResult) error
+	// ClaimPending atomically acquires a pending submission for one judge
+	// worker. The claim token fences late results from an older worker after a
+	// stale claim has been reclaimed and re-judged.
+	ClaimPending(ctx context.Context, id, claimToken string) (bool, error)
+	// UpdateResultClaimed persists a result only while claimToken still owns
+	// the judging row. It returns false when a newer claim has superseded it.
+	UpdateResultClaimed(ctx context.Context, id, claimToken string, status model.SubmissionStatus, score, timeUsed, memoryUsed int, compileOutput string, results []model.TestCaseResult) (bool, error)
+	// RequeueStale atomically moves submissions stuck in "judging" for longer
+	// than olderThan back to "pending", clears their claim, and returns their
+	// IDs. Concurrent reclaimer sweeps cannot return the same row twice.
+	RequeueStale(ctx context.Context, olderThan time.Duration) ([]string, error)
 	UpdateRemoteID(ctx context.Context, id string, remoteID string, remoteURL string) error
 	UpdateBotID(ctx context.Context, id string, botID string, botSlug string) error
 	GetPendingRemoteSubmissions(ctx context.Context) ([]model.PendingRemoteSubmission, error)

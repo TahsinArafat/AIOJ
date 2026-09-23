@@ -10,6 +10,8 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"net/http/cookiejar"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -26,7 +28,7 @@ import (
 type Config struct {
 	BackendURL  string // http://backend:8080
 	AdminUser   string // "ai"
-	AdminPass   string // "aiseedpass"
+	AdminPass   string // "Aioj-Sim-Admin-2026!"
 	ProblemSlug string // "hello"
 
 	// DSN is used for exactly one write: promoting the first user to admin.
@@ -48,7 +50,7 @@ type Result struct {
 const (
 	defaultBackendURL  = "http://backend:8080"
 	defaultAdminUser   = "ai"
-	defaultAdminPass   = "aiseedpass"
+	defaultAdminPass   = "Aioj-Sim-Admin-2026!"
 	defaultProblemSlug = "hello"
 
 	helloExpected = "Hello, AIOJ!"
@@ -86,8 +88,18 @@ func Seed(ctx context.Context, cfg Config) (Result, error) {
 	cfg = fillDefaults(cfg)
 	res := Result{}
 
-	client := &http.Client{Timeout: 30 * time.Second}
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		return res, fmt.Errorf("seed: create cookie jar: %w", err)
+	}
+	client := &http.Client{Timeout: 30 * time.Second, Jar: jar}
 	base := cfg.BackendURL
+
+	// Prime the double-submit CSRF cookie before the first unauthenticated POST.
+	// The API deliberately rejects writes without the cookie/header pair.
+	if err := primeCSRF(ctx, client, base); err != nil {
+		return res, err
+	}
 
 	// 1. Register the admin (or log back in if it already exists — the
 	// idempotent path, not an error).
@@ -133,6 +145,13 @@ func Seed(ctx context.Context, cfg Config) (Result, error) {
 // --- auth ----------------------------------------------------------------
 
 func registerOrLogin(ctx context.Context, c *http.Client, base, user, pass string) (token string, created bool, err error) {
+	// Try login first. This keeps seeding idempotent when the account already
+	// exists (including databases created before the password policy changed),
+	// and avoids making registration the first request on every rerun.
+	if token, err = login(ctx, c, base, user, pass); err == nil {
+		return token, false, nil
+	}
+
 	body := map[string]string{
 		"username": user,
 		"email":    user + "@aioj.test",
@@ -209,8 +228,11 @@ func promoteAdmin(ctx context.Context, cfg Config) (bool, error) {
 	defer db.Close()
 
 	res, err := db.ExecContext(ctx,
-		`UPDATE users SET role = 'admin' WHERE username = $1 AND role <> 'admin'`,
-		cfg.AdminUser)
+		`UPDATE users
+		    SET role = 'admin',
+		        email_verified = TRUE,
+		        email_verified_at = COALESCE(email_verified_at, NOW())
+		  WHERE username = $1`, cfg.AdminUser)
 	if err != nil {
 		return false, fmt.Errorf("seed: promote admin: %w", err)
 	}
@@ -332,6 +354,23 @@ func withToken(token string) requestOption {
 	return func(r *http.Request) { r.Header.Set("Authorization", "Bearer "+token) }
 }
 
+func primeCSRF(ctx context.Context, c *http.Client, base string) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/api/auth/csrf", nil)
+	if err != nil {
+		return fmt.Errorf("seed: build csrf request: %w", err)
+	}
+	resp, err := c.Do(req)
+	if err != nil {
+		return fmt.Errorf("seed: prime csrf: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("seed: prime csrf: api error %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+	return nil
+}
+
 func postJSON(ctx context.Context, c *http.Client, u string, body interface{}, opts ...requestOption) (*http.Response, error) {
 	b, err := json.Marshal(body)
 	if err != nil {
@@ -344,6 +383,18 @@ func postJSON(ctx context.Context, c *http.Client, u string, body interface{}, o
 	req.Header.Set("Content-Type", "application/json")
 	for _, opt := range opts {
 		opt(req)
+	}
+	// Unauthenticated API writes require the double-submit pair. The cookie is
+	// retained by the client jar; echo its value in the header.
+	if req.Header.Get("Authorization") == "" && c.Jar != nil {
+		if u, err := url.Parse(req.URL.String()); err == nil {
+			for _, cookie := range c.Jar.Cookies(u) {
+				if cookie.Name == "csrf" && cookie.Value != "" {
+					req.Header.Set("X-CSRF-Token", cookie.Value)
+					break
+				}
+			}
+		}
 	}
 	return c.Do(req)
 }

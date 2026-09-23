@@ -108,7 +108,7 @@ func (b *BatchRunner) runOne(
 	case "Accepted":
 		output := cr.Files["output.txt"]
 		expected := loadFile(filepath.Join(prob.TestdataPath, tc.OutputName))
-		b.applyChecker(prob, tc, inputContent, output, expected, in.SPJBinContent, &r)
+		b.applyChecker(prob, tc, inputContent, output, expected, in.SPJFile, &r)
 	case "Nonzero Exit Status":
 		r.Status = model.StatusRE
 		if errOut := cr.Files["error.txt"]; errOut != "" {
@@ -135,12 +135,12 @@ func (b *BatchRunner) runOne(
 func (b *BatchRunner) applyChecker(
 	prob *model.Problem,
 	tc model.TestCaseScore,
-	inputContent, output, expected, spjBinContent string,
+	inputContent, output, expected string, spjFile executor.CmdFile,
 	r *model.TestCaseResult,
 ) {
-	if prob.SPJ && spjBinContent != "" {
+	if prob.SPJ && (spjFile.FileID != "" || spjFile.Content != "") {
 		spjCopyIn := map[string]executor.CmdFile{
-			"spj":        {Content: spjBinContent},
+			"spj":        spjFile,
 			"input.txt":  {Content: inputContent},
 			"user.txt":   {Content: output},
 			"answer.txt": {Content: expected},

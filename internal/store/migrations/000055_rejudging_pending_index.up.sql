@@ -6,6 +6,7 @@
 -- in 000054, so the index predicate below is legal.
 --
 -- IF NOT EXISTS keeps this safe on databases where 000038's index already landed.
-CREATE INDEX IF NOT EXISTS idx_submissions_pending_poll
+DROP INDEX IF EXISTS idx_submissions_pending_poll;
+CREATE INDEX idx_submissions_pending_poll
     ON submissions(status, remote_id)
     WHERE remote_id != '' AND status IN ('pending', 'rejudging');

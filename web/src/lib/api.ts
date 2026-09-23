@@ -67,6 +67,32 @@ function getCsrfToken(): string {
     return m ? decodeURIComponent(m[1]) : ''
 }
 
+let csrfPrimed: Promise<void> | null = null
+
+/**
+ * Ensure the server has minted a csrf cookie, and return its value.
+ *
+ * The cookie is only issued in response to a safe request, and the SPA is
+ * served by nginx — so a cold visitor who lands directly on /register has made
+ * no /api/* call and holds no cookie. Every unauthenticated write (register,
+ * login, forgot-password, 2FA verify) was therefore rejected with a raw
+ * "csrf cookie missing" before this existed. Prime explicitly instead.
+ *
+ * Concurrent callers share one in-flight request, so a page that fires several
+ * mutations at once does not stampede the endpoint.
+ */
+async function ensureCsrfToken(): Promise<string> {
+    const existing = getCsrfToken()
+    if (existing) return existing
+    if (!csrfPrimed) {
+        csrfPrimed = fetch(BASE + '/auth/csrf', { credentials: 'same-origin' })
+            .then(() => undefined)
+            .finally(() => { csrfPrimed = null })
+    }
+    await csrfPrimed
+    return getCsrfToken()
+}
+
 async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
     const method = (opts.method || 'GET').toUpperCase()
     const headers: Record<string, string> = {
@@ -76,7 +102,7 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
     if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`
     // Echo double-submit cookie for non-Bearer mutations (login/register/refresh).
     if (method !== 'GET' && method !== 'HEAD' && !headers['Authorization']) {
-        headers['X-CSRF-Token'] = getCsrfToken()
+        headers['X-CSRF-Token'] = await ensureCsrfToken()
     }
 
     let res = await fetch(BASE + path, { ...opts, headers })
@@ -84,7 +110,7 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
     if (res.status === 401 && refreshToken) {
         const ref = await fetch(BASE + '/auth/refresh', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': await ensureCsrfToken() },
             body: JSON.stringify({ refresh_token: refreshToken }),
         })
         if (ref.ok) {

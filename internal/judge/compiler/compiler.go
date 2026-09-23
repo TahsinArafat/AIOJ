@@ -16,16 +16,16 @@ const (
 
 // CompileResult is returned by all Compile* methods.
 type CompileResult struct {
-	// Success is true when compilation succeeded.
 	Success bool
-	// Output contains compiler stderr / error message on failure, or
-	// any informational output on success.
+	// Output contains compiler stderr / error message on failure, or any
+	// informational output on success.
 	Output string
-	// Files holds the compiled artefacts keyed by filename (e.g. "Main",
-	// "compile.tar").  Only populated on success.
+	// Files holds compiled artifacts keyed by filename. Native executables and
+	// tar archives use go-judge file IDs because JSON strings cannot safely
+	// carry arbitrary binary bytes.
 	Files map[string]executor.CmdFile
-	// TarMode is true for languages (e.g. Java) where the compiled output
-	// is a tar archive rather than a single executable.
+	// TarMode is true for languages (e.g. Java) where the compiled output is a
+	// tar archive rather than a single executable.
 	TarMode bool
 }
 
@@ -39,149 +39,93 @@ func New(exec *executor.Client) *Compiler {
 	return &Compiler{exec: exec}
 }
 
-// CompileContestant compiles a contestant's source code.
-// It handles both single-binary and tar-mode (Java) output.
-func (c *Compiler) CompileContestant(
-	ctx context.Context,
-	sourceCode string,
-	cfg *LangConfig,
-) (*CompileResult, error) {
+// CompileContestant compiles a contestant's source code. It handles both
+// single-binary and tar-mode (Java) output.
+func (c *Compiler) CompileContestant(ctx context.Context, sourceCode string, cfg *LangConfig) (*CompileResult, error) {
 	if cfg.CompileCmd == "" {
-		// Interpreted language — nothing to compile.
 		return &CompileResult{Success: true, Files: map[string]executor.CmdFile{}}, nil
 	}
 
 	srcName := "Main" + cfg.Extensions[0]
 	tarMode := cfg.Key == "java"
-
-	compileCmdStr := buildCompileCmd(cfg.CompileCmd, "Main", srcName)
-
-	var cmdArgs []string
-	var copyOut []string
+	compileCmd := buildCompileCmd(cfg.CompileCmd, "Main", srcName)
+	artifact := "Main"
+	args := []string{"/bin/sh", "-c", compileCmd}
 	if tarMode {
-		cmdArgs = []string{
-			"/bin/sh", "-c",
-			compileCmdStr + " && tar -cf compile.tar --exclude=compile.tar --exclude=" + srcName + " .",
-		}
-		copyOut = []string{"compile.tar"}
-	} else {
-		cmdArgs = []string{"/bin/sh", "-c", compileCmdStr}
-		copyOut = []string{"Main"}
+		args = []string{"/bin/sh", "-c", compileCmd + " && tar -cf compile.tar --exclude=compile.tar --exclude=" + srcName + " ."}
+		artifact = "compile.tar"
 	}
 
-	resp, err := c.exec.Run(&executor.ExecRequest{
-		Cmd: []executor.Cmd{{
-			Args:        cmdArgs,
-			Env:         []string{"PATH=/usr/bin:/bin", "HOME=/tmp"},
-			CPULimit:    compileCPULimit,
-			MemoryLimit: compileMemoryLimit,
-			ProcLimit:   compileProcLimit,
-			CopyIn:      map[string]executor.CmdFile{srcName: {Content: sourceCode}},
-			CopyOut:     copyOut,
-		}},
-	})
+	resp, err := c.exec.Run(&executor.ExecRequest{Cmd: []executor.Cmd{{
+		Args:          args,
+		Env:           []string{"PATH=/usr/bin:/bin", "HOME=/tmp"},
+		CPULimit:      compileCPULimit,
+		MemoryLimit:   compileMemoryLimit,
+		ProcLimit:     compileProcLimit,
+		CopyIn:        map[string]executor.CmdFile{srcName: {Content: sourceCode}},
+		CopyOutCached: []string{artifact},
+	}}})
 	if err != nil {
 		return nil, fmt.Errorf("contestant compile request: %w", err)
 	}
-	return parseCompileResponse(resp, srcName, tarMode)
+	return parseCompileResponse(resp, artifact, tarMode)
 }
 
-// CompileSPJ compiles a Special Judge binary.
-// Returns the compiled binary content and the executor run-dir, plus any error.
-func (c *Compiler) CompileSPJ(
-	ctx context.Context,
-	sourceCode string,
-	lang string,
-	langs map[string]*LangConfig,
-) (binContent string, err error) {
+// CompileSPJ compiles a Special Judge binary and returns its file-ID-backed
+// artifact. The caller must pass that CmdFile back to go-judge unchanged.
+func (c *Compiler) CompileSPJ(ctx context.Context, sourceCode, lang string, langs map[string]*LangConfig) (executor.CmdFile, error) {
+	return c.compileAuxiliary(ctx, sourceCode, lang, langs, "spj", "SPJ")
+}
+
+// CompileInteractor compiles an interactor binary and returns its file-ID-backed
+// artifact. The caller must pass that CmdFile back to go-judge unchanged.
+func (c *Compiler) CompileInteractor(ctx context.Context, sourceCode, lang string, langs map[string]*LangConfig) (executor.CmdFile, error) {
+	return c.compileAuxiliary(ctx, sourceCode, lang, langs, "interactor", "interactor")
+}
+
+func (c *Compiler) compileAuxiliary(ctx context.Context, sourceCode, lang string, langs map[string]*LangConfig, stem, label string) (executor.CmdFile, error) {
 	if lang == "" {
 		lang = "cpp-gpp-64"
 	}
 	cfg, ok := langs[lang]
 	if !ok {
-		return "", fmt.Errorf("unsupported SPJ language: %s", lang)
+		return executor.CmdFile{}, fmt.Errorf("unsupported %s language: %s", label, lang)
 	}
-
-	srcName := "spj" + cfg.Extensions[0]
-	exeName := "spj"
-	cmdStr := buildCompileCmd(cfg.CompileCmd, exeName, srcName)
-
-	resp, err := c.exec.Run(&executor.ExecRequest{
-		Cmd: []executor.Cmd{{
-			Args:        []string{"/bin/sh", "-c", cmdStr},
-			Env:         []string{"PATH=/usr/bin:/bin"},
-			CPULimit:    compileCPULimit,
-			MemoryLimit: compileMemoryLimit,
-			ProcLimit:   compileProcLimit,
-			CopyIn:      map[string]executor.CmdFile{srcName: {Content: sourceCode}},
-			CopyOut:     []string{exeName},
-		}},
-	})
+	srcName := stem + cfg.Extensions[0]
+	artifact := stem
+	cmd := buildCompileCmd(cfg.CompileCmd, artifact, srcName)
+	resp, err := c.exec.Run(&executor.ExecRequest{Cmd: []executor.Cmd{{
+		Args:          []string{"/bin/sh", "-c", cmd},
+		Env:           []string{"PATH=/usr/bin:/bin"},
+		CPULimit:      compileCPULimit,
+		MemoryLimit:   compileMemoryLimit,
+		ProcLimit:     compileProcLimit,
+		CopyIn:        map[string]executor.CmdFile{srcName: {Content: sourceCode}},
+		CopyOutCached: []string{artifact},
+	}}})
 	if err != nil {
-		return "", fmt.Errorf("SPJ compile request: %w", err)
+		return executor.CmdFile{}, fmt.Errorf("%s compile request: %w", label, err)
 	}
 	if len(resp) == 0 {
-		return "", fmt.Errorf("SPJ compile: no result from executor")
+		return executor.CmdFile{}, fmt.Errorf("%s compile: no result from executor", label)
 	}
 	cr := resp[0]
 	if cr.Status != "Accepted" {
 		msg := cr.Error
 		if msg == "" {
-			msg = "SPJ compile error (status: " + cr.Status + ")"
+			msg = label + " compile error (status: " + cr.Status + ")"
 		}
-		return "", fmt.Errorf("SPJ compile error: %s", msg)
+		return executor.CmdFile{}, fmt.Errorf("%s compile error: %s", label, msg)
 	}
-	return cr.Files[exeName], nil
+	return cachedArtifact(cr, artifact, label)
 }
 
-// CompileInteractor compiles an interactor binary.
-func (c *Compiler) CompileInteractor(
-	ctx context.Context,
-	sourceCode string,
-	lang string,
-	langs map[string]*LangConfig,
-) (binContent string, err error) {
-	if lang == "" {
-		lang = "cpp-gpp-64"
+func cachedArtifact(cr executor.CmdResult, name, label string) (executor.CmdFile, error) {
+	if id := cr.FileIDs[name]; id != "" {
+		return executor.CmdFile{FileID: id}, nil
 	}
-	cfg, ok := langs[lang]
-	if !ok {
-		return "", fmt.Errorf("unsupported interactor language: %s", lang)
-	}
-
-	srcName := "interactor" + cfg.Extensions[0]
-	exeName := "interactor"
-	cmdStr := buildCompileCmd(cfg.CompileCmd, exeName, srcName)
-
-	resp, err := c.exec.Run(&executor.ExecRequest{
-		Cmd: []executor.Cmd{{
-			Args:        []string{"/bin/sh", "-c", cmdStr},
-			Env:         []string{"PATH=/usr/bin:/bin"},
-			CPULimit:    compileCPULimit,
-			MemoryLimit: compileMemoryLimit,
-			ProcLimit:   compileProcLimit,
-			CopyIn:      map[string]executor.CmdFile{srcName: {Content: sourceCode}},
-			CopyOut:     []string{exeName},
-		}},
-	})
-	if err != nil {
-		return "", fmt.Errorf("interactor compile request: %w", err)
-	}
-	if len(resp) == 0 {
-		return "", fmt.Errorf("interactor compile: no result from executor")
-	}
-	cr := resp[0]
-	if cr.Status != "Accepted" {
-		msg := cr.Error
-		if msg == "" {
-			msg = "interactor compile error (status: " + cr.Status + ")"
-		}
-		return "", fmt.Errorf("interactor compile error: %s", msg)
-	}
-	return cr.Files[exeName], nil
+	return executor.CmdFile{}, fmt.Errorf("%s compile succeeded but %s artifact was not returned as a file ID", label, name)
 }
-
-// ---------- helpers ----------
 
 // buildCompileCmd substitutes {{exe}}, {{src}}, and {{dir}} in a compile
 // command template.
@@ -192,17 +136,16 @@ func buildCompileCmd(template, exe, src string) string {
 	return s
 }
 
-// parseCompileResponse converts a raw executor response into a CompileResult.
-func parseCompileResponse(resp []executor.CmdResult, srcName string, tarMode bool) (*CompileResult, error) {
+func parseCompileResponse(resp []executor.CmdResult, artifact string, tarMode bool) (*CompileResult, error) {
 	if len(resp) == 0 {
 		return &CompileResult{Success: false, Output: "no result from executor"}, nil
 	}
 	cr := resp[0]
 	if cr.Status != "Accepted" {
 		output := cr.Error
-		if v, ok := cr.Files["error.txt"]; ok && v != "" {
+		if v := cr.Files["error.txt"]; v != "" {
 			output = v
-		} else if v, ok := cr.Files["output.txt"]; ok && v != "" {
+		} else if v := cr.Files["output.txt"]; v != "" {
 			output = v
 		}
 		if output == "" {
@@ -210,12 +153,13 @@ func parseCompileResponse(resp []executor.CmdResult, srcName string, tarMode boo
 		}
 		return &CompileResult{Success: false, Output: output}, nil
 	}
-
-	files := make(map[string]executor.CmdFile)
-	for fname, content := range cr.Files {
-		if fname != srcName {
-			files[fname] = executor.CmdFile{Content: content}
-		}
+	file, err := cachedArtifact(cr, artifact, "contestant")
+	if err != nil {
+		return &CompileResult{Success: false, Output: err.Error()}, nil
 	}
-	return &CompileResult{Success: true, Files: files, TarMode: tarMode}, nil
+	return &CompileResult{
+		Success: true,
+		Files:   map[string]executor.CmdFile{artifact: file},
+		TarMode: tarMode,
+	}, nil
 }

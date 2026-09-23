@@ -96,7 +96,8 @@ services:
       DB_USER: aioj
       DB_PASSWORD: ${DB_PASSWORD:-aioj_secret}
       SEED_ADMIN_USERNAME: ${SEED_ADMIN_USERNAME:-ai}
-      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-aiseedpass}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-Aioj-Sim-Admin-2026!}
+
       SEED_PROBLEM_SLUG: ${SEED_PROBLEM_SLUG:-hello}
       BACKEND_URL: http://backend:8080
     depends_on:

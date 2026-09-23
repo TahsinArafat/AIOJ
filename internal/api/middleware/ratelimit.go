@@ -24,7 +24,12 @@ type RateLimiter struct {
 	visitors sync.Map // map[string]*visitor
 	rps      rate.Limit
 	burst    int
-	stop     chan struct{}
+	// Strict-auth budget. Defaults reproduce the previous hardcoded values
+	// (1 req / 5s, burst 5); overridable so the Playwright suite — which makes
+	// many auth calls from a single loopback IP — is not throttled in the sim.
+	strictRPS   rate.Limit
+	strictBurst int
+	stop        chan struct{}
 }
 
 // NewRateLimiter creates a RateLimiter configured from environment variables.
@@ -45,10 +50,27 @@ func NewRateLimiter() *RateLimiter {
 		}
 	}
 
+	// AUTH_RATE_LIMIT_RPS  — sustained auth requests/sec (default 0.2 = 1 per 5s)
+	// AUTH_RATE_LIMIT_BURST — auth burst (default 5)
+	strictRPS := 0.2
+	if v := os.Getenv("AUTH_RATE_LIMIT_RPS"); v != "" {
+		if f, err := strconv.ParseFloat(v, 64); err == nil && f > 0 {
+			strictRPS = f
+		}
+	}
+	strictBurst := 5
+	if v := os.Getenv("AUTH_RATE_LIMIT_BURST"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			strictBurst = n
+		}
+	}
+
 	rl := &RateLimiter{
-		rps:   rate.Limit(rps),
-		burst: burst,
-		stop:  make(chan struct{}),
+		rps:         rate.Limit(rps),
+		burst:       burst,
+		strictRPS:   rate.Limit(strictRPS),
+		strictBurst: strictBurst,
+		stop:        make(chan struct{}),
 	}
 
 	go rl.cleanup()
@@ -96,12 +118,12 @@ func (rl *RateLimiter) Stop() {
 }
 
 // StrictAuth is a chi-compatible middleware enforcing a tight per-IP+path
-// budget on auth endpoints (5 burst, 1 req / 5s sustained).
+// budget on auth endpoints (defaults: 5 burst, 1 req / 5s sustained).
 func (rl *RateLimiter) StrictAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		key := "strict:" + r.RemoteAddr + ":" + r.URL.Path
 		limiter, _ := rl.visitors.LoadOrStore(key, &visitor{
-			limiter:  rate.NewLimiter(rate.Limit(1.0/5.0), 5),
+			limiter:  rate.NewLimiter(rl.strictRPS, rl.strictBurst),
 			lastSeen: time.Now(),
 		})
 		vis := limiter.(*visitor)

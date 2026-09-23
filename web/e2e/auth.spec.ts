@@ -17,7 +17,11 @@ test('register via UI stores a real session', async ({ page }) => {
 
   await page.getByLabel('Username').fill(user);
   await page.getByLabel('Email').fill(`${user}@aioj.test`);
-  await page.getByLabel('Password').fill('strongpass1');
+  // Must satisfy BOTH gates: Register.tsx enforces length >= 12 client-side,
+  // and internal/auth.ValidatePasswordStrength additionally requires an upper,
+  // lower, digit and symbol. A value that clears only the length check (e.g.
+  // "strongpass1") is rejected by the API, so the UI never sets a session.
+  await page.getByLabel('Password').fill('Aioj-Sim-2026!');
   await page.getByRole('button', { name: /register/i }).click();
 
   // On success the SPA calls setTokens(...) and navigates to "/". A hard
@@ -41,7 +45,7 @@ test('login via UI as the seeded admin reaches an admin route', async ({ page })
 
   await page.goto('/login');
   await page.getByLabel('Username').fill(tokens.user.username);
-  await page.getByLabel('Password').fill(process.env.SEED_ADMIN_PASSWORD ?? 'aiseedpass');
+  await page.getByLabel('Password').fill(process.env.SEED_ADMIN_PASSWORD ?? 'Aioj-Sim-Admin-2026!');
   await page.getByRole('button', { name: /^login$/i }).click();
 
   // Admin-only page heading proves the JWT role round-trips end to end.

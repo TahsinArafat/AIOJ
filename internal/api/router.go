@@ -148,6 +148,10 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 
 	r.Get("/api/search", searchH.Search)
 
+	// Mint the double-submit cookie on demand: the SPA is served by nginx, so a
+	// cold visitor on /login or /register has no csrf cookie before its first
+	// POST. Public + safe method, so the CSRF middleware sets the cookie here.
+	r.Get("/api/auth/csrf", authH.CSRFToken)
 	r.With(rl.StrictAuth).Post("/api/auth/register", authH.Register)
 	r.With(rl.StrictAuth).Post("/api/auth/login", authH.Login)
 	r.Post("/api/auth/refresh", authH.Refresh)

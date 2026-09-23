@@ -100,6 +100,14 @@ type CreateContestRequest struct {
 	UpsolvingEnabled      *bool           `json:"upsolving_enabled,omitempty"`
 	VirtualContestEnabled *bool           `json:"virtual_contest_enabled,omitempty"`
 	GroupID               string          `json:"group_id,omitempty"`
+	// Registration controls. Without these on the create request there was no
+	// way to make a registration-required contest, so the registration
+	// endpoints always answered 400 "registration not required for this
+	// contest". model.Contest has always carried the fields; only the request
+	// DTO was missing them.
+	RegistrationRequired bool       `json:"registration_required"`
+	RegistrationDeadline *time.Time `json:"registration_deadline,omitempty"`
+	MaxParticipants      *int       `json:"max_participants,omitempty"`
 }
 
 type ContestRegistration struct {

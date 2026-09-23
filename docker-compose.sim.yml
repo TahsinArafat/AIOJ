@@ -30,16 +30,29 @@ services:
       - "1025:1025" # SMTP
     restart: unless-stopped
 
+  # The Playwright suite is a legitimate high-volume client that arrives from a
+  # single loopback IP, so the production auth throttle (1 req / 5s, burst 5)
+  # would 429 it. Production defaults are unchanged; only the sim is relaxed.
+  backend:
+    environment:
+      AUTH_RATE_LIMIT_RPS: "20"
+      AUTH_RATE_LIMIT_BURST: "500"
+    healthcheck:
+      test: [ "CMD-SHELL", "wget -qO- http://localhost:8080/api/health >/dev/null" ]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
   # One-shot API seeder (cmd/seed). Runs after backend is up, exits 0.
   seeder:
     build:
       context: .
       dockerfile: Dockerfile
-    entrypoint: ["/app/seed"]
+    entrypoint: [ "/app/seed" ]
     command: []
     dns:
-      - 1.1.1.1   # the seeder hits no external hosts, but the Docker embedded
-      - 8.8.8.8   # resolver can wedge mid-build; explicit DNS keeps it honest.
+      - 1.1.1.1 # the seeder hits no external hosts, but the Docker embedded
+      - 8.8.8.8 # resolver can wedge mid-build; explicit DNS keeps it honest.
     environment:
       DB_HOST: postgres
       DB_PORT: "5432"
@@ -47,10 +60,10 @@ services:
       DB_USER: aioj
       DB_PASSWORD: ${DB_PASSWORD:-aioj_secret}
       SEED_ADMIN_USERNAME: ${SEED_ADMIN_USERNAME:-ai}
-      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-aiseedpass}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-Aioj-Sim-Admin-2026!}
       SEED_PROBLEM_SLUG: ${SEED_PROBLEM_SLUG:-hello}
       BACKEND_URL: http://backend:8080
     depends_on:
       backend:
-        condition: service_started
-    profiles: ["sim"]
+        condition: service_healthy
+    profiles: [ "sim" ]

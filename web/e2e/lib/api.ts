@@ -7,6 +7,9 @@
  * All routes are served by nginx on the sim origin and proxied to the backend.
  */
 
+import { verifyEmailViaApi } from './mail';
+import { csrfHeaders } from './csrf';
+
 const BASE = (process.env.E2E_BASE_URL ?? 'http://localhost:8081').replace(/\/$/, '');
 
 /** Shared terminal verdicts — anything else means the decider is still working. */
@@ -14,7 +17,7 @@ export const TERMINAL_VERDICTS = ['ac', 'wa', 'tle', 'mle', 're', 'ce', 'pe', 'o
 export type Verdict = (typeof TERMINAL_VERDICTS)[number];
 
 const SEED_ADMIN = process.env.SEED_ADMIN_USERNAME ?? 'ai';
-const SEED_PASS = process.env.SEED_ADMIN_PASSWORD ?? 'aiseedpass';
+const SEED_PASS = process.env.SEED_ADMIN_PASSWORD ?? 'Aioj-Sim-Admin-2026!';
 
 /** A username unique enough that repeated suite runs never collide. */
 export function uniq(prefix = 'sim'): string {
@@ -46,6 +49,10 @@ async function send<T>(
   } else if (form !== undefined) {
     init.body = form;
   }
+  // Unauthenticated writes need the double-submit pair; Bearer calls bypass CSRF.
+  if (method !== 'GET' && method !== 'HEAD' && !token) {
+    Object.assign(headers, await csrfHeaders());
+  }
   init.headers = headers;
 
   const res = await fetch(`${BASE}${path}`, init);
@@ -72,7 +79,7 @@ export async function health(): Promise<{ status: string }> {
 
 // --- auth -----------------------------------------------------------------
 
-export async function register(
+export async function registerRaw(
   username: string,
   email: string,
   password: string,
@@ -83,36 +90,28 @@ export async function register(
   if (r.status !== 201 && r.status !== 200) {
     throw new Error(`register failed: ${r.status} ${JSON.stringify(r.data)}`);
   }
-  await verifyEmailFromCatcher(email);
   return r.data;
 }
 
 /**
- * Pull the verification link from the in-memory mailcatcher and call the
- * verify endpoint so new e2e users can submit (submissions require a
- * verified email).
+ * Register AND verify, for helpers that just need a usable account.
+ *
+ * Submissions require a verified email (handler/submission.go), so any spec
+ * that registers a throwaway user needs this rather than registerRaw.
+ * Prefer the golden path when the mail leg itself is under test.
  */
-export async function verifyEmailFromCatcher(email: string): Promise<void> {
-  const list = await send<{ data?: Array<{ To?: string[]; to?: string[]; Body?: string; body?: string; Subject?: string }> }>(
-    'GET',
-    '/api/dev/mail',
-  );
-  if (list.status !== 200) {
-    // catcher disabled — leave the user unverified (submit will 403)
-    return;
-  }
-  const msgs = list.data?.data ?? [];
-  const mine = msgs.filter((m) => {
-    const to = (m.To ?? m.to ?? []).map((s) => s.toLowerCase());
-    return to.includes(email.toLowerCase());
-  });
-  const last = mine[mine.length - 1];
-  if (!last) return;
-  const body = last.Body ?? last.body ?? '';
-  const match = body.match(/verify-email\?token=([0-9a-f]+)/i);
-  if (!match) return;
-  await send('GET', `/api/auth/verify-email/${match[1]}`);
+export async function register(
+  username: string,
+  email: string,
+  password: string,
+): Promise<Tokens> {
+  const tokens = await registerRaw(username, email, password);
+  await verifyEmailViaApi(email);
+  return tokens;
 }
+
+// The inbox client lives in ./mail; re-exported here so specs have one import.
+export { clearInbox, messagesFor, verifyEmailViaApi, waitForLink } from './mail';
 
 export async function login(username: string, password: string): Promise<Tokens> {
   const r = await send<Tokens>('POST', '/api/auth/login', {
@@ -168,10 +167,11 @@ export async function submit(
   problemId: string,
   language = 'cpp-gpp-64',
   sourceCode = HELLO_CPP,
+  contestId?: string,
 ): Promise<Submission> {
   const r = await send<Submission>('POST', '/api/submissions', {
     token,
-    body: { problem_id: problemId, language, source_code: sourceCode },
+    body: { problem_id: problemId, language, source_code: sourceCode, contest_id: contestId },
   });
   if (r.status !== 201 && r.status !== 200) {
     throw new Error(`submit failed: ${r.status} ${JSON.stringify(r.data)}`);
@@ -209,4 +209,80 @@ export async function pollForVerdict(
     sub = await getSubmission(token, id);
   }
   return sub;
+}
+
+// --- contests -------------------------------------------------------------
+
+export interface Contest {
+  id: string;
+  title: string;
+  slug?: string;
+  format?: string;
+}
+
+export interface ScoreboardEntry {
+  rank: number;
+  user_id: string;
+  username: string;
+  total_solved: number;
+  total_penalty: number;
+  total_score: number;
+  problems: Record<string, { solved: boolean; attempts: number; time: number; score: number }>;
+}
+
+export interface Scoreboard {
+  entries: ScoreboardEntry[];
+  problems: Array<{ problem_id: string; index: number }>;
+}
+
+/**
+ * Create a running ACM contest over the given problems.
+ *
+ * `start_time` is backdated and `end_time` is in the future so the contest is
+ * live for the duration of the test: handler/submission.go rejects submissions
+ * outside the window, which would otherwise make this spec time-of-day flaky.
+ */
+export async function createContest(
+  token: string,
+  opts: { title: string; problemIds: string[]; format?: string },
+): Promise<Contest> {
+  const now = Date.now();
+  const r = await send<Contest>('POST', '/api/contests', {
+    token,
+    body: {
+      title: opts.title,
+      type: 'acm',
+      format: opts.format ?? 'acm',
+      start_time: new Date(now - 60 * 60 * 1000).toISOString(),
+      end_time: new Date(now + 2 * 60 * 60 * 1000).toISOString(),
+      visible: true,
+      // Without this the registration handler answers 400 "registration not
+      // required for this contest" — participants are only tracked when a
+      // contest opts into registration.
+      registration_required: true,
+      problem_ids: opts.problemIds,
+    },
+  });
+  if (r.status !== 201 && r.status !== 200) {
+    throw new Error(`create contest failed: ${r.status} ${JSON.stringify(r.data)}`);
+  }
+  return r.data;
+}
+
+/** Sign a user up for a contest (POST /api/contests/{id}/register). */
+export async function registerForContest(token: string, contestId: string): Promise<void> {
+  const r = await send<{ registered: boolean }>('POST', `/api/contests/${contestId}/register`, {
+    token,
+  });
+  if (r.status !== 200 && r.status !== 201) {
+    throw new Error(`register for contest failed: ${r.status} ${JSON.stringify(r.data)}`);
+  }
+}
+
+export async function getScoreboard(contestId: string, token?: string): Promise<Scoreboard> {
+  const r = await send<Scoreboard>('GET', `/api/contests/${contestId}/scoreboard`, { token });
+  if (r.status !== 200) {
+    throw new Error(`scoreboard failed: ${r.status} ${JSON.stringify(r.data)}`);
+  }
+  return r.data;
 }

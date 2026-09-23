@@ -24,22 +24,19 @@ func NewInteractiveRunner(exec *executor.Client) *InteractiveRunner {
 }
 
 // Run implements Runner.
-// RunInput.CompiledResult must be the compiled contestant binary.
-// The interactor binary content is stored in RunInput.SPJBinContent
-// (the field is repurposed when running interactive problems).
+// RunInput.CompiledResult must be the compiled contestant binary and
+// RunInput.InteractorFile must be the compiled interactor artifact.
 func (ir *InteractiveRunner) Run(ctx context.Context, in RunInput) (RunOutput, error) {
 	prob := in.Problem
 	cfg := in.LangCfg
 	srcName := "Main" + cfg.Extensions[0]
 
-	compiledBinContent := ""
+	var compiledBin executor.CmdFile
 	if in.CompiledResult != nil && in.CompiledResult.Success {
-		if bin, ok := in.CompiledResult.Files["Main"]; ok {
-			compiledBinContent = bin.Content
-		}
+		compiledBin = in.CompiledResult.Files["Main"]
 	}
 
-	interBinContent := in.SPJBinContent // convention: interactor binary stored here
+	interactorFile := in.InteractorFile
 
 	results := make([]model.TestCaseResult, 0, len(prob.TestCaseScore))
 	finalStatus := model.StatusAC
@@ -49,7 +46,7 @@ func (ir *InteractiveRunner) Run(ctx context.Context, in RunInput) (RunOutput, e
 		inputContent := loadFile(filepath.Join(prob.TestdataPath, tc.InputName))
 
 		interRunCopyIn := map[string]executor.CmdFile{
-			"interactor": {Content: interBinContent},
+			"interactor": interactorFile,
 		}
 		if inputContent != "" {
 			interRunCopyIn["input.txt"] = executor.CmdFile{Content: inputContent}
@@ -63,7 +60,7 @@ func (ir *InteractiveRunner) Run(ctx context.Context, in RunInput) (RunOutput, e
 			contestantRunCopyIn[srcName] = executor.CmdFile{Content: in.SourceCode}
 		} else {
 			contestantArgs = []string{"/box/Main"}
-			contestantRunCopyIn["Main"] = executor.CmdFile{Content: compiledBinContent}
+			contestantRunCopyIn["Main"] = compiledBin
 		}
 
 		interArgs := []string{"/box/interactor"}

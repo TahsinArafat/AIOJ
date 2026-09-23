@@ -18,8 +18,8 @@ export default function Register() {
             const d = await api.auth.register(form)
             setTokens(d.access_token, d.refresh_token)
             setSent(true)
-        } catch (e: any) {
-            setErr(e.message || 'Registration failed')
+        } catch (e: unknown) {
+            setErr(e instanceof Error ? e.message : 'Registration failed')
         } finally {
             setLoading(false)
         }
@@ -66,18 +66,18 @@ export default function Register() {
             {err && <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-2 rounded mb-4 text-sm">{err}</div>}
             <form onSubmit={handle} className="space-y-4">
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Username</label>
-                    <input value={form.username} onChange={e => setForm(p => ({ ...p, username: e.target.value }))}
+                    <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Username</label>
+                    <input id="username" name="username" value={form.username} onChange={e => setForm(p => ({ ...p, username: e.target.value }))}
                         className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400" required />
                 </div>
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
-                    <input type="email" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
+                    <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
+                    <input id="email" name="email" type="email" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
                         className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400" required />
                 </div>
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Password</label>
-                    <input type="password" value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))}
+                    <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Password</label>
+                    <input id="password" name="password" type="password" value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))}
                         className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400" required />
                 </div>
                 <button type="submit" disabled={loading}

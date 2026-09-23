@@ -13,7 +13,8 @@ import (
 // openTestDB opens a real Postgres for integration tests and skips the test
 // when the database is unreachable (e.g. CI without a DB service).
 //
-// DSN override: AIOJ_TEST_DSN (defaults to local docker-compose credentials).
+// DSN override: AIOJ_TEST_DSN. CI should provide a migrated database; local
+// runs may use the compose network address when the host port is overridden.
 func openTestDB(t *testing.T) *sql.DB {
 	t.Helper()
 	dsn := os.Getenv("AIOJ_TEST_DSN")

@@ -192,22 +192,116 @@ func (s *SubmissionStore) ListPublicByUser(ctx context.Context, userID string, o
 }
 
 func (s *SubmissionStore) UpdateStatus(_ context.Context, id string, status model.SubmissionStatus) {
-	s.db.Exec("UPDATE submissions SET status=$1 WHERE id=$2", status, id)
+	if status == model.StatusJudging {
+		// Legacy/manual callers do not own a claim token. Keep the timestamp so
+		// RequeueStale can eventually recover the row, but local judge workers
+		// use ClaimPending below so their results can be fenced.
+		s.db.Exec("UPDATE submissions SET status=$1, judging_started_at=NOW(), judging_claim_token=NULL WHERE id=$2", status, id)
+		return
+	}
+	s.db.Exec("UPDATE submissions SET status=$1, judging_started_at=NULL, judging_claim_token=NULL WHERE id=$2", status, id)
+}
+
+// ClaimPending atomically moves one pending row to judging and records the
+// unique owner token. Multiple workers may dequeue the same id after a retry;
+// only the UPDATE from pending can win.
+func (s *SubmissionStore) ClaimPending(ctx context.Context, id, claimToken string) (bool, error) {
+	if claimToken == "" {
+		return false, fmt.Errorf("claim pending: empty claim token")
+	}
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE submissions s
+		    SET status='judging', judging_started_at=NOW(), judging_claim_token=$2
+		  WHERE s.id=$1
+		    AND s.status='pending'
+		    AND COALESCE(s.remote_id,'') = ''
+		    AND EXISTS (
+		        SELECT 1 FROM problems p
+		        WHERE p.id=s.problem_id
+		          AND COALESCE(p.source,'local') IN ('','local')
+		    )`,
+		id, claimToken)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n == 1, err
+}
+
+// RequeueStale reclaims submissions abandoned in the "judging" state.
+//
+// The single UPDATE ... WHERE status='judging' ... RETURNING id is the
+// concurrency primitive: Postgres row locks serialize competing sweeps, so a
+// row flipped back to 'pending' by one worker is no longer 'judging' and cannot
+// be returned again — which is what keeps reclamation exactly-once and stops a
+// later requeue from overwriting an already-written verdict.
+func (s *SubmissionStore) RequeueStale(ctx context.Context, olderThan time.Duration) ([]string, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`UPDATE submissions
+		    SET status='pending', judging_started_at=NULL, judging_claim_token=NULL
+		  WHERE status='judging'
+		    AND judging_started_at IS NOT NULL
+		    AND judging_started_at < NOW() - $1::interval
+		  RETURNING id`,
+		fmt.Sprintf("%d seconds", int(olderThan.Seconds())))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
 }
 
 func (s *SubmissionStore) UpdateResult(ctx context.Context, id string, status model.SubmissionStatus, score, timeUsed, memoryUsed int, compileOutput string, results []model.TestCaseResult) error {
+	_, err := s.updateResult(ctx, id, "", status, score, timeUsed, memoryUsed, compileOutput, results)
+	return err
+}
+
+// UpdateResultClaimed is the local judge-worker write path. The claim token
+// prevents a worker that was presumed dead (but later resumed) from
+// overwriting the verdict produced by the replacement worker.
+func (s *SubmissionStore) UpdateResultClaimed(ctx context.Context, id, claimToken string, status model.SubmissionStatus, score, timeUsed, memoryUsed int, compileOutput string, results []model.TestCaseResult) (bool, error) {
+	if claimToken == "" {
+		return false, fmt.Errorf("update claimed result: empty claim token")
+	}
+	return s.updateResult(ctx, id, claimToken, status, score, timeUsed, memoryUsed, compileOutput, results)
+}
+
+func (s *SubmissionStore) updateResult(ctx context.Context, id, claimToken string, status model.SubmissionStatus, score, timeUsed, memoryUsed int, compileOutput string, results []model.TestCaseResult) (bool, error) {
 	jr, _ := json.Marshal(results)
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer tx.Rollback()
 
-	_, err = tx.ExecContext(ctx,
-		`UPDATE submissions SET status=$1,score=$2,time_used=$3,memory_used=$4,compile_output=$5,judge_result=$6,judged_at=$7 WHERE id=$8`,
-		status, score, timeUsed, memoryUsed, compileOutput, jr, time.Now(), id)
+	query := `UPDATE submissions
+	             SET status=$1,score=$2,time_used=$3,memory_used=$4,compile_output=$5,judge_result=$6,judged_at=$7,
+	                 judging_started_at=NULL,judging_claim_token=NULL
+	           WHERE id=$8`
+	args := []interface{}{status, score, timeUsed, memoryUsed, compileOutput, jr, time.Now(), id}
+	if claimToken != "" {
+		query += ` AND status='judging' AND judging_claim_token=$9`
+		args = append(args, claimToken)
+	}
+	res, err := tx.ExecContext(ctx, query, args...)
 	if err != nil {
-		return err
+		return false, err
+	}
+	updated, err := res.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	if updated != 1 {
+		return false, nil
 	}
 
 	if status == model.StatusAC {
@@ -237,7 +331,10 @@ func (s *SubmissionStore) UpdateResult(ctx context.Context, id string, status mo
 		}
 	}
 
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // awardAchievementMilestones is called inside UpdateResult's transaction.
@@ -366,8 +463,16 @@ func (s *SubmissionStore) ListByContest(ctx context.Context, contestID string, o
 	return items, total, nil
 }
 
-func (s *SubmissionStore) ListPending(_ context.Context, limit int) ([]string, error) {
-	rows, err := s.db.Query(`SELECT id FROM submissions WHERE status='pending' ORDER BY created_at ASC LIMIT $1`, limit)
+func (s *SubmissionStore) ListPending(ctx context.Context, limit int) ([]string, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT s.id
+		   FROM submissions s
+		   JOIN problems p ON p.id=s.problem_id
+		  WHERE s.status='pending'
+		    AND COALESCE(s.remote_id,'') = ''
+		    AND COALESCE(p.source,'local') IN ('','local')
+		  ORDER BY s.created_at ASC
+		  LIMIT $1`, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -375,10 +480,12 @@ func (s *SubmissionStore) ListPending(_ context.Context, limit int) ([]string, e
 	var ids []string
 	for rows.Next() {
 		var id string
-		rows.Scan(&id)
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
 		ids = append(ids, id)
 	}
-	return ids, nil
+	return ids, rows.Err()
 }
 
 func (s *SubmissionStore) GetProblemStats(ctx context.Context, problemID string) (*model.ProblemStats, error) {

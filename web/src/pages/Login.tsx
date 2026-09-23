@@ -27,8 +27,8 @@ export default function Login() {
             }
             setTokens(d.access_token, d.refresh_token)
             nav('/')
-        } catch (e: any) {
-            setErr(e.message || 'Login failed')
+        } catch (e: unknown) {
+            setErr(e instanceof Error ? e.message : 'Login failed')
         } finally {
             setLoading(false)
         }
@@ -42,8 +42,8 @@ export default function Login() {
             const d = await api.auth.verify2FA(challenge, code)
             setTokens(d.access_token, d.refresh_token)
             nav('/')
-        } catch (e: any) {
-            setErr(e.message || 'Invalid code')
+        } catch (e: unknown) {
+            setErr(e instanceof Error ? e.message : 'Invalid code')
         } finally {
             setVerifying(false)
         }
@@ -84,8 +84,10 @@ export default function Login() {
             {err && <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-2 rounded mb-4 text-sm">{err}</div>}
             <form onSubmit={handle} className="space-y-4">
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Username</label>
+                    <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Username</label>
                     <input
+                        id="username"
+                        name="username"
                         value={form.username}
                         onChange={e => setForm(p => ({ ...p, username: e.target.value }))}
                         className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
@@ -93,8 +95,10 @@ export default function Login() {
                     />
                 </div>
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Password</label>
+                    <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Password</label>
                     <input
+                        id="password"
+                        name="password"
                         type="password"
                         value={form.password}
                         onChange={e => setForm(p => ({ ...p, password: e.target.value }))}

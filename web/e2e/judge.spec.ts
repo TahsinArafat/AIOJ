@@ -16,7 +16,6 @@ import {
  * "hello", testcase 1.in empty / 1.out "Hello, AIOJ!".
  */
 test('submit cpp to the seeded problem → AC, and the verdict survives a reload', async ({
-  request,
   page,
 }) => {
   const tokens = await loginAsSeedAdmin();
@@ -44,7 +43,7 @@ test('submit cpp to the seeded problem → AC, and the verdict survives a reload
   await expect(page.getByText(/accepted/i).first()).toBeVisible({ timeout: 20_000 });
 });
 
-test('a wrong program does not get AC', async ({ request }) => {
+test('a wrong program does not get AC', async () => {
   const tokens = await loginAsSeedAdmin();
   const problem = await getProblemBySlug('hello', tokens.access_token);
 
@@ -58,7 +57,7 @@ test('a wrong program does not get AC', async ({ request }) => {
   expect(graded.status.toLowerCase()).not.toBe('ac');
 });
 
-test('the canonical AC source is the one judged above', async ({ request }) => {
+test('the canonical AC source is the one judged above', async () => {
   // Guard against the helper drifting away from what the test claims to submit.
   expect(HELLO_CPP).toContain('Hello, AIOJ!');
 

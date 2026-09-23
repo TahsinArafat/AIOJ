@@ -18,6 +18,11 @@ export default defineConfig({
   // One browser, one OJ — the sim shares a single database, so parallel runs would
   // step on each other's seeded state.
   fullyParallel: false,
+  // fullyParallel only serialises tests *within* a file; Playwright still fans
+  // files out across workers. Without this the suite ran 5 spec files at once
+  // against one database, which is exactly the contention the comment above
+  // warns about.
+  workers: 1,
   retries: 1,
   reporter: [['html', { outputFolder: 'e2e/artifacts/report' }], ['list']],
   use: {

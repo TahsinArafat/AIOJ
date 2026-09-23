@@ -7,6 +7,24 @@ import (
 	"testing"
 )
 
+func TestCmdFileMarshalPreservesEmptyContent(t *testing.T) {
+	data, err := json.Marshal(CmdFile{Content: ""})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := string(data), `{"content":""}`; got != want {
+		t.Fatalf("empty content JSON = %s, want %s", got, want)
+	}
+
+	data, err = json.Marshal(CmdFile{FileID: "file-1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := string(data), `{"fileId":"file-1"}`; got != want {
+		t.Fatalf("file ID JSON = %s, want %s", got, want)
+	}
+}
+
 func TestRun_Success(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode([]CmdResult{{Status: "Accepted", ExitStatus: 0, Time: 1000000, Memory: 4096}})

@@ -99,13 +99,19 @@ func main() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	go workerPool.Start(ctx)
 
 	if *mode == "judge-worker" {
+		// Only dedicated judge processes consume the shared queue. The API
+		// server must not silently become a third decider.
+		reclaimer := judge.NewReclaimer(submissionStore, judgeQueue, judge.DefaultStaleClaimAfter, judge.DefaultReclaimInterval)
+		go reclaimer.Start(ctx)
+		go workerPool.Start(ctx)
+
 		slog.Info("running in judge-worker mode, waiting for submissions")
 		quit := make(chan os.Signal, 1)
 		signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 		<-quit
+		cancel()
 		slog.Info("judge-worker shutting down")
 		return
 	}

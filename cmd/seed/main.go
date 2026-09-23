@@ -15,7 +15,7 @@ func main() {
 	cfg := seed.Config{
 		BackendURL:  envOr("BACKEND_URL", "http://backend:8080"),
 		AdminUser:   envOr("SEED_ADMIN_USERNAME", "ai"),
-		AdminPass:   envOr("SEED_ADMIN_PASSWORD", "aiseedpass"),
+		AdminPass:   envOr("SEED_ADMIN_PASSWORD", "Aioj-Sim-Admin-2026!"),
 		ProblemSlug: envOr("SEED_PROBLEM_SLUG", "hello"),
 	}
 
