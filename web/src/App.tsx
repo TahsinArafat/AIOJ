@@ -64,6 +64,9 @@ import TermsOfService from './pages/legal/TermsOfService'
 import PrivacyPolicy from './pages/legal/PrivacyPolicy'
 import DMCA from './pages/legal/DMCA'
 import CookieConsent from './components/CookieConsent'
+import TwoFactorSetup from './pages/auth/TwoFactorSetup'
+import TwoFactorVerify from './pages/auth/TwoFactorVerify'
+import Settings from './pages/Settings'
 import './global.css'
 
 function Home() {
@@ -301,8 +304,11 @@ export default function App() {
                             <Route path="/blog/:id" element={<BlogDetail />} />
                             <Route path="/editorials" element={<EditorialList />} />
                             <Route path="/editorials/:id" element={<EditorialDetail />} />
+                            <Route path="/settings" element={<Settings />} />
                             <Route path="/settings/api" element={<APISettings />} />
                             <Route path="/settings/notifications" element={<NotificationPreferences />} />
+                            <Route path="/auth/2fa/setup" element={<TwoFactorSetup />} />
+                            <Route path="/auth/2fa/verify" element={<TwoFactorVerify />} />
                             <Route path="/notifications" element={<Notifications />} />
                             <Route path="/submissions" element={<Submissions />} />
                             <Route path="/submissions/:id" element={<SubmissionDetail />} />

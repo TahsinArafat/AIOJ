@@ -367,6 +367,9 @@ export default function Profile() {
                     <Link to="/settings/notifications" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">
                         Notification Preferences →
                     </Link>
+                    <Link to="/settings" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">
+                        Security Settings →
+                    </Link>
                     <Link to="/settings/api" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">
                         API Keys →
                     </Link>

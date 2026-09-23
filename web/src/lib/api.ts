@@ -153,6 +153,25 @@ export const api = {
         resendVerification: () =>
             request<{ message: string }>('/auth/verify-email/resend', { method: 'POST' }),
     },
+    twoFactor: {
+        begin: () =>
+            request<{ secret: string; uri: string }>('/auth/2fa/begin', { method: 'POST' }),
+        enable: (code: string) =>
+            request<{ backup_codes: string[] }>('/auth/2fa/enable', {
+                method: 'POST',
+                body: JSON.stringify({ code }),
+            }),
+        disable: (password: string) =>
+            request<{ status: string }>('/auth/2fa/disable', {
+                method: 'POST',
+                body: JSON.stringify({ password }),
+            }),
+        verify: (body: { challenge_id: string; code: string }) =>
+            request<{ access_token: string; refresh_token: string; user: any }>('/auth/2fa/verify', {
+                method: 'POST',
+                body: JSON.stringify(body),
+            }),
+    },
     problems: {
         list: (offset = 0, limit = 20, filters?: { difficulty?: string; tags?: string[]; search?: string; source?: string }) => {
             let url = `/problems?offset=${offset}&limit=${limit}`;

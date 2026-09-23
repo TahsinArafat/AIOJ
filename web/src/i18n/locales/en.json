@@ -83,7 +83,19 @@
     "confirmPassword": "Confirm Password",
     "forgotPassword": "Forgot Password?",
     "noAccount": "Don't have an account?",
-    "hasAccount": "Already have an account?"
+    "hasAccount": "Already have an account?",
+    "verifyEmail": "Verify your email",
+    "verificationSent": "A verification link has been sent to your email.",
+    "twoFactor": "Two-factor authentication",
+    "twoFactorSetupTitle": "Set up 2FA",
+    "twoFactorScanQR": "Scan the QR code with your authenticator app, then enter the 6-digit code to confirm.",
+    "twoFactorEnabled": "Two-factor authentication is enabled.",
+    "twoFactorDisabled": "Two-factor is not enabled.",
+    "linkGitHub": "Link GitHub account",
+    "linkGoogle": "Link Google account",
+    "deleteAccount": "Delete account",
+    "deleteAccountWarning": "This action is permanent. All your data will be erased.",
+    "deleteAccountConfirm": "Type your password and confirm to delete your account."
   },
   "errors": {
     "notFound": "Page not found",

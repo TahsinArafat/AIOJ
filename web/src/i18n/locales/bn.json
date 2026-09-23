@@ -83,7 +83,19 @@
     "confirmPassword": "পাসওয়ার্ড নিশ্চিত করুন",
     "forgotPassword": "পাসওয়ার্ড ভুলে গেছেন?",
     "noAccount": "অ্যাকাউন্ট নেই?",
-    "hasAccount": "ইতিমধ্যে অ্যাকাউন্ট আছে?"
+    "hasAccount": "ইতিমধ্যে অ্যাকাউন্ট আছে?",
+    "verifyEmail": "আপনার ইমেইল যাচাই করুন",
+    "verificationSent": "আপনার ইমেইলে যাচাইকরণ লিংক পাঠানো হয়েছে।",
+    "twoFactor": "দুই-ফ্যাক্টর প্রমাণীকরণ",
+    "twoFactorSetupTitle": "2FA সেটআপ করুন",
+    "twoFactorScanQR": "অথেন্টিকেটর অ্যাপে QR কোড স্ক্যান করুন, তারপর ৬-সংখ্যার কোড লিখে নিশ্চিত করুন।",
+    "twoFactorEnabled": "দুই-ফ্যাক্টর প্রমাণীকরণ চালু আছে।",
+    "twoFactorDisabled": "দুই-ফ্যাক্টর চালু নেই।",
+    "linkGitHub": "GitHub অ্যাকাউন্ট যুক্ত করুন",
+    "linkGoogle": "Google অ্যাকাউন্ট যুক্ত করুন",
+    "deleteAccount": "অ্যাকাউন্ট মুছুন",
+    "deleteAccountWarning": "এটি স্থায়ী। আপনার সমস্ত তথ্য মুছে যাবে।",
+    "deleteAccountConfirm": "অ্যাকাউন্ট মুছতে পাসওয়ার্ড লিখে নিশ্চিত করুন।"
   },
   "errors": {
     "notFound": "পৃষ্ঠা পাওয়া যায়নি",
