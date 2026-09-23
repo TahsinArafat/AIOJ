@@ -75,5 +75,6 @@ type Deps struct {
 	TwoFAVerify    *handler.TwoFactorVerifyHandler
 	OAuthStart     *handler.OAuthStartHandler
 	OAuthCallback  *handler.OAuthCallbackHandler
+	Legal          *handler.LegalHandler
 	CSRFSecret     string
 }

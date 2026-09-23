@@ -60,6 +60,9 @@ import ContestEdit from './pages/ContestEdit'
 import ContestManage from './pages/ContestManage'
 import IDE from './pages/IDE'
 import GenerateProblem from './pages/GenerateProblem'
+import TermsOfService from './pages/legal/TermsOfService'
+import PrivacyPolicy from './pages/legal/PrivacyPolicy'
+import DMCA from './pages/legal/DMCA'
 import './global.css'
 
 function Home() {
@@ -323,9 +326,17 @@ export default function App() {
                             <Route path="/rating-history" element={<RatingHistory />} />
                             <Route path="/rankings" element={<Rankings />} />
                             <Route path="/user/:username" element={<UserPublicProfile />} />
+                            <Route path="/legal/terms" element={<TermsOfService />} />
+                            <Route path="/legal/privacy" element={<PrivacyPolicy />} />
+                            <Route path="/legal/dmca" element={<DMCA />} />
                             <Route path="*" element={<div className="text-center py-20 text-gray-400 dark:text-gray-500">404 Not Found</div>} />
                         </Routes>
                     </main>
+                    <footer className="max-w-[1400px] mx-auto px-6 py-6 border-t border-gray-200 dark:border-gray-700 text-sm text-gray-500 dark:text-gray-400 flex flex-wrap gap-4">
+                        <Link to="/legal/terms" className="hover:underline">Terms of Service</Link>
+                        <Link to="/legal/privacy" className="hover:underline">Privacy Policy</Link>
+                        <Link to="/legal/dmca" className="hover:underline">DMCA</Link>
+                    </footer>
                 </div>
             </ThemeProvider>
         </BrowserRouter>

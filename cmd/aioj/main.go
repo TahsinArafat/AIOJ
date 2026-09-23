@@ -328,6 +328,7 @@ func main() {
 		TwoFAVerify:   twoFAVerifyH,
 		OAuthStart:    oauthStartH,
 		OAuthCallback: oauthCallbackH,
+		Legal:         &handler.LegalHandler{},
 		CSRFSecret:    cfg.Auth.CSRFSecret,
 		DevMail:       devMailH,
 		Problem:       problemH,

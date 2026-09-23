@@ -73,6 +73,10 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 
 	r.Get("/api/health", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte(`{"status":"ok"}`)) })
 
+	if d.Legal != nil {
+		r.Get("/api/legal/{doc}", d.Legal.Serve)
+	}
+
 	// Public sitemap for crawlers. Built from the same public-visibility rules
 	// the problem/contest APIs apply, so it never advertises an auth-gated URL.
 	if d.Sitemap != nil {
