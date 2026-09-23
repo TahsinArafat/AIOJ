@@ -233,8 +233,8 @@ func (s *SubmissionStore) ClaimPending(ctx context.Context, id, claimToken strin
 // The single UPDATE ... WHERE status='judging' ... RETURNING id is the
 // concurrency primitive: Postgres row locks serialize competing sweeps, so a
 // row flipped back to 'pending' by one worker is no longer 'judging' and cannot
-// be returned again — which is what keeps reclamation exactly-once and stops a
-// later requeue from overwriting an already-written verdict.
+// be returned again — which makes each stale claim eligible for reclamation once
+// per judging attempt and stops a later requeue from overwriting an already-written verdict.
 func (s *SubmissionStore) RequeueStale(ctx context.Context, olderThan time.Duration) ([]string, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`UPDATE submissions

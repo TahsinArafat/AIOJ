@@ -106,6 +106,19 @@ func (f *fakeSubStore) GetHackableSubmissions(context.Context, string, string) (
 	return nil, nil
 }
 
+type failOnceQueue struct {
+	*queue.MemoryQueue
+	failNext bool
+}
+
+func (q *failOnceQueue) Enqueue(ctx context.Context, id string, priority int) error {
+	if q.failNext {
+		q.failNext = false
+		return errors.New("queue unavailable")
+	}
+	return q.MemoryQueue.Enqueue(ctx, id, priority)
+}
+
 func drain(q *queue.MemoryQueue) []string {
 	var got []string
 	for q.Len() > 0 {
@@ -133,6 +146,23 @@ func TestReclaimer_RequeuesStaleAndPendingRows(t *testing.T) {
 	got := drain(q)
 	if len(got) != 2 || !contains(got, "sub-stale") || !contains(got, "sub-pending") {
 		t.Fatalf("queue after sweep = %v", got)
+	}
+}
+
+func TestReclaimer_RetriesPendingSubmissionAfterEnqueueFailure(t *testing.T) {
+	store := newFakeSubStore()
+	store.pending = append(store.pending, "sub-pending")
+	q := &failOnceQueue{MemoryQueue: queue.NewMemory(), failNext: true}
+	r := NewReclaimer(store, q, 15*time.Minute, time.Minute)
+
+	if n := r.Sweep(context.Background()); n != 0 {
+		t.Fatalf("first sweep: want 0 queued after enqueue failure, got %d", n)
+	}
+	if n := r.Sweep(context.Background()); n != 1 {
+		t.Fatalf("second sweep: want 1 queued, got %d", n)
+	}
+	if got := drain(q.MemoryQueue); len(got) != 1 || got[0] != "sub-pending" {
+		t.Fatalf("queue after retry = %v", got)
 	}
 }
 
