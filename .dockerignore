@@ -2,6 +2,7 @@
 .omo
 docs
 web/node_modules
+Reference_Projects
 web/dist
 *.md
 __pycache__

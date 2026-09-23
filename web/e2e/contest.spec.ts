@@ -2,6 +2,8 @@ import { test, expect } from '@playwright/test';
 import {
   HELLO_CPP,
   createContest,
+  addContestPermission,
+  getContest,
   getProblemBySlug,
   getScoreboard,
   loginAsSeedAdmin,
@@ -10,6 +12,7 @@ import {
   registerForContest,
   submit,
   uniq,
+  updateContest,
 } from './lib/api';
 
 /**
@@ -112,4 +115,41 @@ test('contest scoreboard: a wrong answer does not count as solved', async () => 
   const entry = board.entries.find((e) => e.username === carol);
   expect(entry, 'the contestant should appear in standings').toBeTruthy();
   expect(entry!.total_solved).toBe(0);
+});
+
+test('contest management: a manager can update settings while a participant cannot', async () => {
+  const admin = await loginAsSeedAdmin();
+  const problem = await getProblemBySlug(SEED_SLUG, admin.access_token);
+  const contest = await createContest(admin.access_token, {
+    title: `Sim Management ${uniq('c')}`,
+    problemIds: [problem.id],
+  });
+
+  const managerName = uniq('manager');
+  const outsiderName = uniq('outsider');
+  const manager = await register(managerName, `${managerName}@aioj.test`, 'Aioj-Sim-2026!');
+  const outsider = await register(outsiderName, `${outsiderName}@aioj.test`, 'Aioj-Sim-2026!');
+
+  await addContestPermission(admin.access_token, contest.id, manager.user.id, 'manager');
+
+  const title = `Managed ${uniq('title')}`;
+  const description = 'Updated through the real contest management API.';
+  const updated = await updateContest(manager.access_token, contest.id, {
+    title,
+    description,
+    visible: true,
+  });
+  expect(updated.status).toBe(200);
+
+  // The change is readable through the ordinary public contest endpoint, not
+  // only through the manager's write response.
+  const publicContest = await getContest(contest.id);
+  expect(publicContest.title).toBe(title);
+  expect(publicContest.description).toBe(description);
+  expect(publicContest.visible).toBe(true);
+
+  const forbidden = await updateContest(outsider.access_token, contest.id, {
+    title: 'Unauthorized update',
+  });
+  expect(forbidden.status).toBe(403);
 });

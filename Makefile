@@ -1,6 +1,7 @@
 .PHONY: build run test openapi cli test-frontend lint fmt fmt-check build-image migrate-up migrate-down migrate-status migrate-version migrate-force
 
 MIGRATE_DSN ?= postgres://aioj:aioj_dev@localhost:5432/aioj?sslmode=disable
+TEST_DSN    ?= $(MIGRATE_DSN)
 MIGRATE_DIR  = internal/store/migrations
 
 build:
@@ -10,7 +11,7 @@ run:
 	go run ./cmd/aioj
 
 test:
-	go test ./... -count=1
+	AIOJ_TEST_DSN="$${AIOJ_TEST_DSN:-$(TEST_DSN)}" go test ./cmd/... ./internal/... -count=1
 
 # CI parity: frontend typecheck+build+vitest
 test-frontend:
@@ -18,7 +19,7 @@ test-frontend:
 
 # Local lint: go vet + gofmt -l + eslint (mirrors .github/workflows/lint.yml)
 lint: fmt-check
-	go vet ./...
+	go vet ./cmd/... ./internal/...
 	@if command -v golangci-lint >/dev/null 2>&1; then \
 		golangci-lint run --timeout=10m; \
 	else \

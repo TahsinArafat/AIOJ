@@ -218,6 +218,8 @@ export interface Contest {
   title: string;
   slug?: string;
   format?: string;
+  description?: string;
+  visible: boolean;
 }
 
 export interface ScoreboardEntry {
@@ -267,6 +269,51 @@ export async function createContest(
     throw new Error(`create contest failed: ${r.status} ${JSON.stringify(r.data)}`);
   }
   return r.data;
+}
+
+/** Fetch the contest representation returned by the public management API. */
+export async function getContest(contestId: string, token?: string): Promise<Contest> {
+  const r = await send<{ contest: Contest }>('GET', `/api/contests/${contestId}`, { token });
+  if (r.status !== 200) {
+    throw new Error(`get contest failed: ${r.status} ${JSON.stringify(r.data)}`);
+  }
+  return r.data.contest;
+}
+
+/** Grant a contest role to a user. */
+export async function addContestPermission(
+  token: string,
+  contestId: string,
+  userId: string,
+  accessLevel: 'manager' | 'judge' | 'tester',
+): Promise<void> {
+  const r = await send<unknown>('POST', `/api/contests/${contestId}/permissions`, {
+    token,
+    body: { user_id: userId, access_level: accessLevel },
+  });
+  if (r.status !== 200 && r.status !== 201) {
+    throw new Error(`add contest permission failed: ${r.status} ${JSON.stringify(r.data)}`);
+  }
+}
+
+export interface ContestUpdateResult {
+  status: number;
+  data: unknown;
+}
+
+/**
+ * Update contest settings and return the HTTP status so tests can assert both
+ * successful manager writes and forbidden non-manager writes through one seam.
+ */
+export async function updateContest(
+  token: string,
+  contestId: string,
+  changes: { title?: string; description?: string; visible?: boolean },
+): Promise<ContestUpdateResult> {
+  return send<unknown>('PUT', `/api/contests/${contestId}`, {
+    token,
+    body: changes,
+  });
 }
 
 /** Sign a user up for a contest (POST /api/contests/{id}/register). */
