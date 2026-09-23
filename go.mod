@@ -19,7 +19,7 @@ require (
 	github.com/getsentry/sentry-go v0.49.0
 	github.com/pquerna/otp v1.5.0
 	github.com/prometheus/client_golang v1.23.2
-	github.com/redis/go-redis/v9 v9.20.0
+	github.com/redis/go-redis/v9 v9.22.0
 	github.com/sriharsha-y/go-cfscraper v1.0.0
 	golang.org/x/net v0.56.0
 	golang.org/x/oauth2 v0.37.0
