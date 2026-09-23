@@ -70,16 +70,19 @@ type Deps struct {
 	CDN            *handler.CDNHandler
 	Achievements   *handler.AchievementHandler
 	Friendships    *handler.FriendshipHandler
-	Generate       *handler.GenerateHandler
-	AIModel        *handler.AdminAIModelHandler
-	DevMail        *handler.DevMailHandler
-	VerifyEmail    *handler.EmailVerificationHandler
-	TwoFA          *handler.TwoFactorHandler
-	TwoFAVerify    *handler.TwoFactorVerifyHandler
-	OAuthStart     *handler.OAuthStartHandler
-	OAuthCallback  *handler.OAuthCallbackHandler
-	Legal          *handler.LegalHandler
-	UsersExport    *handler.UsersExportHandler
-	UsersDeletion  *handler.UsersDeletionHandler
-	CSRFSecret     string
+	AuditLog       *handler.AuditLogHandler
+	// Health is optional; when set, /api/health reports dependency status.
+	Health        *handler.HealthChecker
+	Generate      *handler.GenerateHandler
+	AIModel       *handler.AdminAIModelHandler
+	DevMail       *handler.DevMailHandler
+	VerifyEmail   *handler.EmailVerificationHandler
+	TwoFA         *handler.TwoFactorHandler
+	TwoFAVerify   *handler.TwoFactorVerifyHandler
+	OAuthStart    *handler.OAuthStartHandler
+	OAuthCallback *handler.OAuthCallbackHandler
+	Legal         *handler.LegalHandler
+	UsersExport   *handler.UsersExportHandler
+	UsersDeletion *handler.UsersDeletionHandler
+	CSRFSecret    string
 }

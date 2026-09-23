@@ -71,7 +71,11 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 
 	r.Get("/metrics", promhttp.Handler().ServeHTTP)
 
-	r.Get("/api/health", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte(`{"status":"ok"}`)) })
+	if d.Health != nil {
+		r.Get("/api/health", d.Health.Health)
+	} else {
+		r.Get("/api/health", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte(`{"status":"ok"}`)) })
+	}
 
 	if d.Legal != nil {
 		r.Get("/api/legal/{doc}", d.Legal.Serve)
@@ -309,6 +313,10 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 	r.Route("/api/admin", func(r chi.Router) {
 		r.Use(middleware.AuthMiddleware(jwtManager))
 		r.Use(middleware.RequireRole("admin"))
+		if d.AuditLog != nil {
+			am := &middleware.AuditRecorder{Store: d.AuditLog.Audit}
+			r.Use(am.Middleware)
+		}
 		r.Get("/users", adminH.ListUsers)
 		r.Put("/users/{id}/role", adminH.UpdateUserRole)
 		r.Get("/setter-applications", adminH.ListSetterApps)
@@ -333,6 +341,10 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 		if d.CDN != nil {
 			r.Get("/cdn/status", d.CDN.Status)
 			r.Post("/cdn/purge", d.CDN.Purge)
+		}
+
+		if d.AuditLog != nil {
+			r.Get("/audit-log", d.AuditLog.List)
 		}
 
 		r.Route("/languages", func(r chi.Router) {

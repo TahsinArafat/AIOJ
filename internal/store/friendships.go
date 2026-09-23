@@ -29,3 +29,9 @@ type FriendshipEdge struct {
 	Username  string `json:"username"`
 	CreatedAt string `json:"created_at"`
 }
+
+// AuditStore records admin audit entries (Phase E).
+type AuditStore interface {
+	Insert(ctx context.Context, e *model.AuditEntry) error
+	List(ctx context.Context, offset, limit int) ([]model.AuditEntry, int, error)
+}

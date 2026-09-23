@@ -26,3 +26,22 @@ groups:
           severity: critical
         annotations:
           summary: "AIOJ service is down"
+
+      # Phase E SLA: judge latency (p95 judge duration > 5s) and queue backlog
+      - alert: JudgeLatencyHigh
+        expr: histogram_quantile(0.95, rate(aioj_judge_duration_seconds_bucket[5m])) > 5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "p95 judge latency above 5s (SLA)"
+          description: "p95={{ $value }}s — scale judge-worker or inspect queue."
+
+      - alert: JudgeQueueBacklog
+        expr: aioj_judge_queue_depth > 500
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Judge queue backlog high"
+          description: "Depth={{ $value }} — consider more workers."

@@ -9,6 +9,7 @@ database:
   name: "aioj"
   max_open: 25
   max_idle: 5
+  replica_dsn: ""   # optional read replica DSN; env DATABASE_REPLICA_DSN
 auth:
   jwt_secret: "change-me-in-production"
   access_ttl: 15m

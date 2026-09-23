@@ -84,8 +84,9 @@ func main() {
 	ratingStore := postgres.NewRatingStore(db)
 
 	var judgeQueue queue.JudgeQueue = queue.NewMemory()
+	var redisClient *redis.Client
 	if cfg.Redis.URL != "" {
-		redisClient := redis.NewClient(&redis.Options{Addr: cfg.Redis.URL})
+		redisClient = redis.NewClient(&redis.Options{Addr: cfg.Redis.URL})
 		judgeQueue = queue.NewRedisQueue(redisClient)
 		slog.Info("using redis judge queue", "url", cfg.Redis.URL)
 	}
@@ -321,6 +322,17 @@ func main() {
 		PublicURL: publicOrigin,
 	}
 
+	auditStore := postgres.NewAuditStore(db)
+	healthH := &handler.HealthChecker{
+		DB:      db,
+		Started: time.Now(),
+	}
+	if redisClient != nil {
+		healthH.RedisPinger = func(ctx context.Context) error { return redisClient.Ping(ctx).Err() }
+	}
+	healthH.QueueDepth = judgeQueue.Len
+	auditH := handler.NewAuditLogHandler(auditStore)
+
 	router := api.NewRouter(api.Deps{
 		Auth:          authH,
 		VerifyEmail:   verifyH,
@@ -513,6 +525,8 @@ func main() {
 		CDN:            handler.NewCDNHandler(handler.CDNConfig{}),
 		Achievements:   handler.NewAchievementHandler(postgres.NewAchievementStore(db)),
 		Friendships:    handler.NewFriendshipHandler(postgres.NewFriendshipStore(db), userStore),
+		AuditLog:       auditH,
+		Health:         healthH,
 		Generate:       generateH,
 		AIModel:        aiModelH,
 	}, jwtManager)

@@ -54,6 +54,9 @@ type DatabaseConfig struct {
 	Name     string `yaml:"name"`
 	MaxOpen  int    `yaml:"max_open"`
 	MaxIdle  int    `yaml:"max_idle"`
+	// ReplicaDSN is an optional read-replica connection (Phase E).
+	// When empty, all reads stay on the primary.
+	ReplicaDSN string `yaml:"replica_dsn"`
 }
 
 type AuthConfig struct {
@@ -115,6 +118,9 @@ func Load(path string) (*Config, error) {
 	}
 	if v := os.Getenv("DB_PASSWORD"); v != "" {
 		cfg.Database.Password = v
+	}
+	if v := os.Getenv("DATABASE_REPLICA_DSN"); v != "" {
+		cfg.Database.ReplicaDSN = v
 	}
 	if v := os.Getenv("JUDGE_ENDPOINT"); v != "" {
 		cfg.Judge.Endpoint = v
