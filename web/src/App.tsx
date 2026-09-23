@@ -21,6 +21,7 @@ import SetterProblemWorkspace from './pages/SetterProblemWorkspace'
 import Profile from './pages/Profile'
 import ProblemCreate from './pages/ProblemCreate'
 import Navbar from './components/Navbar'
+import ActivityFeed from './components/ActivityFeed'
 import Practice from './pages/Practice'
 import VirtualContest from './pages/VirtualContest'
 import RatingHistory from './pages/RatingHistory'
@@ -129,6 +130,8 @@ function Home() {
                         </div>
                     ))}
                 </section>
+
+                <ActivityFeed limit={15} />
 
                 {/* Recent Blog Posts */}
                 <section className="space-y-4">

@@ -769,6 +769,9 @@ export const api = {
             return request<{ data: any[]; total: number }>(url);
         },
     },
+    feed: {
+        activity: (limit = 30) => request<{ data: any[] }>(`/activity?limit=${limit}`),
+    },
     users: {
         exportMyData: () => request<Record<string, unknown>>('/users/me/export'),
         deleteAccount: (d: { password: string; confirm: boolean }) =>

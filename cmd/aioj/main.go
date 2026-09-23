@@ -527,6 +527,7 @@ func main() {
 		Friendships:    handler.NewFriendshipHandler(postgres.NewFriendshipStore(db), userStore),
 		AuditLog:       auditH,
 		Health:         healthH,
+		Activity:       handler.NewActivityHandler(submissionStore, ratingStore, feedStore),
 		Generate:       generateH,
 		AIModel:        aiModelH,
 	}, jwtManager)

@@ -73,6 +73,7 @@ type Deps struct {
 	AuditLog       *handler.AuditLogHandler
 	// Health is optional; when set, /api/health reports dependency status.
 	Health        *handler.HealthChecker
+	Activity      *handler.ActivityHandler
 	Generate      *handler.GenerateHandler
 	AIModel       *handler.AdminAIModelHandler
 	DevMail       *handler.DevMailHandler

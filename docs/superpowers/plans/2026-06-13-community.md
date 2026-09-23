@@ -9,8 +9,8 @@
 | Per-country leaderboard | ✅ | rankings `?country=` already existed |
 | Achievement/badge system | ✅ | migrations 000063; awards on AC milestones |
 | Friends/follow | ✅ | migrations 000064; follow API |
-| Activity feed | ⏳ | comments atom feed exists; full feed later |
-| MOSS plagiarism | ⏳ | Phase D remainder |
+| Activity feed | ✅ | GET /api/activity + ActivityFeed on Home |
+| MOSS plagiarism | ✅ | optional MossClient (MOSS_USER/MOSS_URL); local LCS default |
 | Editorial auto-publish | ⏳ | |
 | Country flags on profile | ✅ | uses same CountryFlag where country set |
 

@@ -77,6 +77,10 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 		r.Get("/api/health", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte(`{"status":"ok"}`)) })
 	}
 
+	if d.Activity != nil {
+		r.Get("/api/activity", d.Activity.List)
+	}
+
 	if d.Legal != nil {
 		r.Get("/api/legal/{doc}", d.Legal.Serve)
 	}
