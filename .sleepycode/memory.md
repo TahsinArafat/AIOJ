@@ -1,1 +1,2 @@
+Next: A.32 frontend auth settings, OAuth buttons, verify email, 2FA pages.
 - **Cookie consent banner (A.31): DONE** — `CookieConsent` mounted in App.tsx; Accept/Decline store `cookie-consent` in localStorage; links Privacy Policy. Tests: show/accept/decline/already-decided (vitest CookieConsent 4/4). Verified: tsc, CookieConsent vitest. Next: A.32 frontend auth settings, OAuth buttons, verify email, 2FA pages.
