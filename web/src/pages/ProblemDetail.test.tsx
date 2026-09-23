@@ -16,7 +16,8 @@ vi.mock('../lib/api', () => ({
                 memory_limit: 262144,
                 difficulty: 'easy',
                 sample_cases: []
-            })
+            }),
+            listI18n: vi.fn().mockResolvedValue([]),
         },
         editorials: {
             getByProblem: vi.fn().mockResolvedValue({ data: [] })
@@ -28,6 +29,9 @@ vi.mock('../lib/api', () => ({
                 ],
                 total: 1
             })
+        },
+        remoteLanguages: {
+            list: vi.fn().mockResolvedValue({ data: [] })
         }
     },
     getAccessToken: vi.fn().mockReturnValue('mock-token')

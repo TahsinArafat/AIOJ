@@ -1,4 +1,4 @@
-.PHONY: build run test migrate-up migrate-down migrate-status migrate-version migrate-force
+.PHONY: build run test test-frontend lint fmt fmt-check build-image migrate-up migrate-down migrate-status migrate-version migrate-force
 
 MIGRATE_DSN ?= postgres://aioj:aioj_dev@localhost:5432/aioj?sslmode=disable
 MIGRATE_DIR  = internal/store/migrations
@@ -10,7 +10,33 @@ run:
 	go run ./cmd/aioj
 
 test:
-	go test ./... -v -count=1
+	go test ./... -count=1
+
+# CI parity: frontend typecheck+build+vitest
+test-frontend:
+	cd web && npm test
+
+# Local lint: go vet + gofmt -l + eslint (mirrors .github/workflows/lint.yml)
+lint: fmt-check
+	go vet ./...
+	@if command -v golangci-lint >/dev/null 2>&1; then \
+		golangci-lint run --timeout=10m; \
+	else \
+		echo "golangci-lint not installed; skipped (CI runs it)"; \
+	fi
+	cd web && npm run lint
+
+fmt:
+	gofmt -w $$(git ls-files '*.go' 2>/dev/null || find . -name '*.go' -not -path './Reference_Projects/*')
+
+fmt-check:
+	@unformatted=$$(gofmt -l $$(git ls-files '*.go' 2>/dev/null || find . -name '*.go' -not -path './Reference_Projects/*')); \
+	if [ -n "$$unformatted" ]; then \
+		echo "gofmt needed:"; echo "$$unformatted"; exit 1; \
+	fi
+
+build-image:
+	docker build -t aioj:local .
 
 migrate-up:
 	DB_DSN="$(MIGRATE_DSN)" go run ./cmd/migrate -dir $(MIGRATE_DIR) up

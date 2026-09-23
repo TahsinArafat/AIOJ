@@ -1,0 +1,19 @@
+# Optional pre-commit hooks — install with: lefthook install
+# https://github.com/evilmartians/lefthook
+pre-commit:
+  jobs:
+    - name: gofmt
+      run: |
+        files=$(git diff --cached --name-only --diff-filter=ACM | grep '\.go$' || true)
+        if [ -n "$files" ]; then
+          unformatted=$(gofmt -l $files)
+          if [ -n "$unformatted" ]; then
+            echo "gofmt needed:" && echo "$unformatted" && exit 1
+          fi
+        fi
+    - name: eslint
+      run: |
+        files=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^web/src/.*\.(ts|tsx)$' || true)
+        if [ -n "$files" ]; then
+          cd web && npx eslint --no-warn-ignored $files
+        fi

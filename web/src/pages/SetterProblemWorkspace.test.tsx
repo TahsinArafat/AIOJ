@@ -44,7 +44,12 @@ const mockProblem = {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  ;(api.problems.get as Mock).mockResolvedValue(mockProblem)
+    ; (api.problems.get as Mock).mockResolvedValue(mockProblem)
+    ; (api.problems.update as Mock).mockResolvedValue({})
+    ; (api.problems.getPermissions as Mock).mockResolvedValue({ data: [] })
+    ; (api.problems.listI18n as Mock | undefined)?.mockResolvedValue?.([])
+  // Workspace persists active tab in location.hash — reset so each test starts on Statement.
+  window.location.hash = ''
 })
 
 function renderWorkspace() {
@@ -126,7 +131,7 @@ test('save statement calls api.problems.update with correct payload', async () =
 })
 
 test('shows error banner on API failure', async () => {
-  ;(api.problems.getPermissions as Mock).mockRejectedValue(new Error('Network error'))
+  ; (api.problems.getPermissions as Mock).mockRejectedValue(new Error('Network error'))
   renderWorkspace()
   await waitFor(() => {
     expect(screen.getByText('Network error')).toBeInTheDocument()

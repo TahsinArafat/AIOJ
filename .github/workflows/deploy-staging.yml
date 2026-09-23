@@ -1,0 +1,65 @@
+name: Deploy staging
+
+on:
+  workflow_run:
+    workflows: ["Docker image"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+
+jobs:
+  deploy:
+    name: SSH compose pull && up -d
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Only run when the image workflow succeeded (or manual dispatch).
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push')
+    steps:
+      - name: Check required secrets
+        id: check
+        env:
+          HOST: ${{ secrets.STAGING_HOST }}
+          USER: ${{ secrets.STAGING_USER }}
+          KEY: ${{ secrets.STAGING_SSH_KEY }}
+        run: |
+          missing=0
+          for v in HOST USER KEY; do
+            if [ -z "${!v}" ]; then echo "Missing secret STAGING_${v}"; missing=1; fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "::error::Configure STAGING_HOST, STAGING_USER, STAGING_SSH_KEY (and optional STAGING_PORT, STAGING_DIR)."
+            exit 1
+          fi
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          port: ${{ secrets.STAGING_PORT || 22 }}
+          script: |
+            set -euo pipefail
+            cd "${STAGING_DIR:-/opt/aioj}"
+            export IMAGE="${{ env.IMAGE }}:latest"
+            # Prefer compose with remote image; fall back to git pull + build if no compose image override.
+            if grep -q "image:.*ghcr.io" docker-compose.yml 2>/dev/null || [ -f docker-compose.staging.yml ]; then
+              docker compose -f docker-compose.yml ${COMPOSE_FILES:-} pull backend || true
+              docker compose -f docker-compose.yml ${COMPOSE_FILES:-} up -d --remove-orphans
+            else
+              git pull --ff-only origin main
+              docker compose build backend || docker compose build
+              docker compose up -d --remove-orphans
+            fi
+            docker compose ps
+          envs: STAGING_DIR,COMPOSE_FILES

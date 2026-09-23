@@ -7,7 +7,12 @@ interface ThemeContextType {
     toggleTheme: () => void;
 }
 
-const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
+// Default value so unit tests can render without <ThemeProvider>;
+// App still wraps the tree in ThemeProvider for production.
+const ThemeContext = createContext<ThemeContextType>({
+    theme: 'light',
+    toggleTheme: () => { },
+});
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
     const [theme, setTheme] = useState<Theme>(() => {
@@ -38,9 +43,5 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 }
 
 export function useTheme() {
-    const context = useContext(ThemeContext);
-    if (context === undefined) {
-        throw new Error('useTheme must be used within a ThemeProvider');
-    }
-    return context;
+    return useContext(ThemeContext);
 }

@@ -30,13 +30,13 @@ test('renders all statement form fields', () => {
   const onUpdate = vi.fn()
   render(<StatementTab formState={baseState} onUpdate={onUpdate} onSave={vi.fn()} saving={false} uploadingImage={false} onImageUpload={vi.fn()} />)
 
+  // Plain inputs (description/inputFormat use VisualEditor, not display-value inputs)
   expect(screen.getByDisplayValue('Test Problem')).toBeInTheDocument()
-  expect(screen.getByDisplayValue('Description here')).toBeInTheDocument()
-  expect(screen.getByDisplayValue('Two ints')).toBeInTheDocument()
-  expect(screen.getByDisplayValue('Sum')).toBeInTheDocument()
   expect(screen.getByDisplayValue('1000')).toBeInTheDocument()
   expect(screen.getByDisplayValue('262144')).toBeInTheDocument()
   expect(screen.getByDisplayValue('math, ad-hoc')).toBeInTheDocument()
+  expect(screen.getByText(/Description \(Markdown/)).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: /Save Statement/ })).toBeInTheDocument()
 })
 
 test('calls onUpdate when title changes', () => {
