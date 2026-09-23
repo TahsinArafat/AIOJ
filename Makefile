@@ -27,11 +27,13 @@ lint: fmt-check
 	fi
 	cd web && npm run lint
 
+GO_FILES = $(shell find cmd internal -type f -name '*.go')
+
 fmt:
-	gofmt -w $$(git ls-files '*.go' 2>/dev/null || find . -name '*.go' -not -path './Reference_Projects/*')
+	gofmt -w $(GO_FILES)
 
 fmt-check:
-	@unformatted=$$(gofmt -l $$(git ls-files '*.go' 2>/dev/null || find . -name '*.go' -not -path './Reference_Projects/*')); \
+	@unformatted=$$(gofmt -l $(GO_FILES)); \
 	if [ -n "$$unformatted" ]; then \
 		echo "gofmt needed:"; echo "$$unformatted"; exit 1; \
 	fi
