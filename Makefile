@@ -1,4 +1,4 @@
-.PHONY: build run test test-frontend lint fmt fmt-check build-image migrate-up migrate-down migrate-status migrate-version migrate-force
+.PHONY: build run test openapi cli test-frontend lint fmt fmt-check build-image migrate-up migrate-down migrate-status migrate-version migrate-force
 
 MIGRATE_DSN ?= postgres://aioj:aioj_dev@localhost:5432/aioj?sslmode=disable
 MIGRATE_DIR  = internal/store/migrations
@@ -94,3 +94,12 @@ sim-logs:
 
 e2e:
 	cd web && npx playwright test
+
+
+# --- OpenAPI / CLI (Phase D) -----------------------------------------------
+openapi:
+	@test -f docs/openapi/openapi.yaml
+	@command -v oapi-codegen >/dev/null 2>&1 && oapi-codegen -generate types -package apitypes docs/openapi/openapi.yaml > web/src/lib/api-types.ts || echo "spec ready: docs/openapi/openapi.yaml (install oapi-codegen for types)"
+
+cli:
+	go build -o bin/aioj-cli ./cmd/aioj-cli

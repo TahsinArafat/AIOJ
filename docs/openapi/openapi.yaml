@@ -1,0 +1,119 @@
+openapi: 3.0.3
+info:
+  title: AIOJ API
+  version: 0.1.0
+  description: |
+    AIOJ public HTTP API. This is a starter OpenAPI document for codegen
+    (`make openapi`) and client stubs — routes are extended as handlers land.
+servers:
+  - url: http://localhost:8081
+    description: local dev
+tags:
+  - name: health
+  - name: activity
+  - name: rankings
+  - name: auth
+paths:
+  /api/health:
+    get:
+      tags: [health]
+      summary: Liveness/readiness (DB, Redis, judge queue)
+      responses:
+        "200":
+          description: OK or degraded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [ok, degraded, down] }
+                  uptime_sec: { type: number }
+        "503":
+          description: Database down
+  /api/activity:
+    get:
+      tags: [activity]
+      summary: Unified community activity (AC, ratings, comments)
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 30 }
+      responses:
+        "200":
+          description: Activity items
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, type, username, title, created_at]
+                      properties:
+                        id: { type: string }
+                        type: { type: string, enum: [ac, rating, comment] }
+                        username: { type: string }
+                        title: { type: string }
+                        summary: { type: string }
+                        link: { type: string }
+                        created_at: { type: string, format: date-time }
+  /api/rankings:
+    get:
+      tags: [rankings]
+      summary: Global / country rankings by rating
+      parameters:
+        - { name: offset, in: query, schema: { type: integer, default: 0 } }
+        - { name: limit, in: query, schema: { type: integer, default: 50 } }
+        - { name: country, in: query, schema: { type: string } }
+        - { name: organization, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: Ranking page
+  /api/auth/login:
+    post:
+      tags: [auth]
+      summary: Password login → access + refresh tokens
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string }
+                password: { type: string }
+      responses:
+        "200":
+          description: Tokens
+        "401":
+          description: Invalid credentials
+  /api/submissions:
+    post:
+      tags: [auth]
+      summary: Create submission (Bearer)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [problem_id, language, source_code]
+              properties:
+                problem_id: { type: string }
+                language: { type: string }
+                source_code: { type: string }
+                contest_id: { type: string }
+      responses:
+        "201":
+          description: Accepted
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

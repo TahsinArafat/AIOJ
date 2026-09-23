@@ -38,7 +38,8 @@ func (s *EditorialStore) GetByID(ctx context.Context, id string) (*model.Editori
 		 FROM editorials e
 		 JOIN problems p ON e.problem_id = p.id
 		 JOIN users u ON e.user_id = u.id
-		 WHERE e.id = $1`,
+		 WHERE e.id = $1
+		   AND editorialVisible(e.contest_id)`,
 		id).Scan(&e.ID, &e.ProblemID, &e.ProblemTitle, &e.ContestID, &e.UserID, &e.Username,
 		&e.Title, &e.Content, &e.SolutionCode, &e.SolutionLanguage, &e.Approach,
 		&e.TimeComplexity, &e.SpaceComplexity, &e.IsOfficial, &e.Upvotes, &e.CreatedAt, &e.UpdatedAt)
@@ -56,7 +57,8 @@ func (s *EditorialStore) GetByProblem(ctx context.Context, problemID string) ([]
 		`SELECT e.id, e.problem_id, e.user_id, u.username, e.title, e.approach,
 		        e.time_complexity, e.is_official, e.upvotes, e.created_at
 		 FROM editorials e JOIN users u ON e.user_id = u.id
-		 WHERE e.problem_id = $1 ORDER BY e.is_official DESC, e.upvotes DESC`,
+		 WHERE e.problem_id = $1 AND editorialVisible(e.contest_id)
+		 ORDER BY e.is_official DESC, e.upvotes DESC`,
 		problemID)
 	if err != nil {
 		return nil, err
@@ -87,6 +89,7 @@ func (s *EditorialStore) List(ctx context.Context, offset, limit int) ([]model.E
 		 FROM editorials e
 		 JOIN problems p ON e.problem_id = p.id
 		 JOIN users u ON e.user_id = u.id
+		 WHERE editorialVisible(e.contest_id)
 		 ORDER BY e.created_at DESC OFFSET $1 LIMIT $2`,
 		offset, limit)
 	if err != nil {

@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"os"
 
 	"github.com/go-chi/chi/v5"
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
@@ -80,6 +81,18 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 	if d.Activity != nil {
 		r.Get("/api/activity", d.Activity.List)
 	}
+
+	// Public status page (Phase C/D) — static HTML polling /api/health.
+	r.Get("/status", func(w http.ResponseWriter, _ *http.Request) {
+		b, err := os.ReadFile("deploy/status.html")
+		if err != nil {
+			http.Error(w, "status page missing", http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Header().Set("Cache-Control", "public, max-age=30")
+		_, _ = w.Write(b)
+	})
 
 	if d.Legal != nil {
 		r.Get("/api/legal/{doc}", d.Legal.Serve)
