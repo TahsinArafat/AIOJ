@@ -752,6 +752,8 @@ export const api = {
     },
     users: {
         exportMyData: () => request<Record<string, unknown>>('/users/me/export'),
+        deleteAccount: (d: { password: string; confirm: boolean }) =>
+            request<{ status: string }>('/users/me', { method: 'DELETE', body: JSON.stringify(d) }),
         getByUsername: (username: string) =>
             request<any>(`/users/${encodeURIComponent(username)}`),
         getSubmissions: (username: string, offset = 0, limit = 20) =>

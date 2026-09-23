@@ -162,6 +162,9 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 	if d.UsersExport != nil {
 		r.With(middleware.AuthMiddleware(jwtManager)).Get("/api/users/me/export", d.UsersExport.ExportMyData)
 	}
+	if d.UsersDeletion != nil {
+		r.With(middleware.AuthMiddleware(jwtManager)).Delete("/api/users/me", d.UsersDeletion.DeleteAccount)
+	}
 	r.With(middleware.AuthMiddleware(jwtManager)).Get("/api/users/profile/edit", usersH.GetProfile)
 	r.With(middleware.AuthMiddleware(jwtManager)).Put("/api/users/profile/edit", usersH.UpdateProfile)
 	r.With(middleware.AuthMiddleware(jwtManager)).Put("/api/users/profile/password", usersH.UpdatePassword)

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { api, getAccessToken } from '../lib/api'
+import { Link, useNavigate } from 'react-router-dom'
+import { api, getAccessToken, clearTokens } from '../lib/api'
 import RatingBadge from '../components/RatingBadge'
 import SetterApplication from '../components/SetterApplication'
 
@@ -344,7 +344,7 @@ export default function Profile() {
                     <div>
                         <label className="block text-sm text-gray-500 dark:text-gray-400 mb-1">Role</label>
                         <span className={`px-2 py-1 rounded text-xs font-medium ${user.role === 'admin' ? 'bg-purple-100 text-purple-800' :
-                                user.role === 'setter' ? 'bg-orange-100 text-orange-800' : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200'
+                            user.role === 'setter' ? 'bg-orange-100 text-orange-800' : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200'
                             }`}>{user.role || 'user'}</span>
                     </div>
                     <div>
@@ -399,8 +399,8 @@ export default function Profile() {
                     {TABS.map(tab => (
                         <button key={tab} onClick={() => setActiveTab(tab)}
                             className={`pb-3 text-sm font-medium border-b-2 transition-colors ${activeTab === tab
-                                    ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400'
-                                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                                ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400'
+                                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
                                 }`}>
                             {tab}
                         </button>
@@ -420,6 +420,80 @@ export default function Profile() {
                     <SetterApplication />
                 </section>
             )}
+
+            {/* GDPR danger zone */}
+            <section className="bg-white dark:bg-gray-800 border border-red-200 dark:border-red-900 rounded-lg p-6 mt-6">
+                <h2 className="text-lg font-semibold text-red-700 dark:text-red-400 mb-2">Danger Zone</h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                    Permanently delete your account and personal data. Shared content you authored is kept with authorship cleared where required.
+                    Download a copy first if you need it.
+                </p>
+                <DeleteAccountSection />
+            </section>
+        </div>
+    )
+}
+
+function DeleteAccountSection() {
+    const navigate = useNavigate()
+    const [password, setPassword] = useState('')
+    const [confirm, setConfirm] = useState(false)
+    const [busy, setBusy] = useState(false)
+    const [error, setError] = useState('')
+
+    const handleDelete = async () => {
+        if (!confirm) {
+            setError('Confirm the permanent deletion to proceed')
+            return
+        }
+        setBusy(true)
+        setError('')
+        try {
+            await api.users.deleteAccount({ password, confirm: true })
+            clearTokens()
+            navigate('/')
+        } catch (e: any) {
+            setError(e?.message || 'Delete failed')
+        } finally {
+            setBusy(false)
+        }
+    }
+
+    return (
+        <div className="space-y-3 max-w-md">
+            <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Current password{' '}
+                    <span className="text-gray-400 font-normal">
+                        (leave blank if you signed up with OAuth only)
+                    </span>
+                </label>
+                <input
+                    type="password"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-900 text-sm"
+                    autoComplete="current-password"
+                />
+            </div>
+            <label className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
+                <input
+                    type="checkbox"
+                    checked={confirm}
+                    onChange={e => setConfirm(e.target.checked)}
+                    className="mt-0.5"
+                />
+                I understand this action is permanent and cannot be undone.
+            </label>
+            {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+            <button
+                type="button"
+                onClick={handleDelete}
+                disabled={busy || !confirm}
+                className="bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded"
+            >
+                {busy ? 'Deleting…' : 'Delete My Account'}
+            </button>
         </div>
     )
 }
