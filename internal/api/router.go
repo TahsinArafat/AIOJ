@@ -159,6 +159,9 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 	r.Get("/api/users/{username}/submissions", usersH.GetUserSubmissions)
 	r.Get("/api/users/{username}/blogs", usersH.GetUserBlogs)
 	r.Get("/api/users/{username}/comments", usersH.GetUserComments)
+	if d.UsersExport != nil {
+		r.With(middleware.AuthMiddleware(jwtManager)).Get("/api/users/me/export", d.UsersExport.ExportMyData)
+	}
 	r.With(middleware.AuthMiddleware(jwtManager)).Get("/api/users/profile/edit", usersH.GetProfile)
 	r.With(middleware.AuthMiddleware(jwtManager)).Put("/api/users/profile/edit", usersH.UpdateProfile)
 	r.With(middleware.AuthMiddleware(jwtManager)).Put("/api/users/profile/password", usersH.UpdatePassword)

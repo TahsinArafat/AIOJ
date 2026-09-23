@@ -178,7 +178,7 @@ function PendingInvitesTab({ userId }: { userId: string }) {
         setLoading(true)
         api.users.getPendingInvites()
             .then(d => setInvites({ teams: d.teams || [], groups: d.groups || [] }))
-            .catch(() => {})
+            .catch(() => { })
             .finally(() => setLoading(false))
     }
 
@@ -343,10 +343,9 @@ export default function Profile() {
                     </div>
                     <div>
                         <label className="block text-sm text-gray-500 dark:text-gray-400 mb-1">Role</label>
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${
-                            user.role === 'admin' ? 'bg-purple-100 text-purple-800' :
-                            user.role === 'setter' ? 'bg-orange-100 text-orange-800' : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200'
-                        }`}>{user.role || 'user'}</span>
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${user.role === 'admin' ? 'bg-purple-100 text-purple-800' :
+                                user.role === 'setter' ? 'bg-orange-100 text-orange-800' : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200'
+                            }`}>{user.role || 'user'}</span>
                     </div>
                     <div>
                         <label className="block text-sm text-gray-500 dark:text-gray-400 mb-1">Rating</label>
@@ -364,13 +363,33 @@ export default function Profile() {
                         </Link>
                     </div>
                 )}
-                <div className="flex gap-4">
+                <div className="flex gap-4 flex-wrap">
                     <Link to="/settings/notifications" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">
                         Notification Preferences →
                     </Link>
                     <Link to="/settings/api" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">
                         API Keys →
                     </Link>
+                    <button
+                        type="button"
+                        onClick={async () => {
+                            try {
+                                const data = await api.users.exportMyData()
+                                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+                                const url = URL.createObjectURL(blob)
+                                const a = document.createElement('a')
+                                a.href = url
+                                a.download = 'aioj-data-export.json'
+                                a.click()
+                                URL.revokeObjectURL(url)
+                            } catch (e: any) {
+                                alert(e?.message || 'Export failed')
+                            }
+                        }}
+                        className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                    >
+                        Download My Data →
+                    </button>
                 </div>
             </div>
 
@@ -379,11 +398,10 @@ export default function Profile() {
                 <nav className="flex gap-6">
                     {TABS.map(tab => (
                         <button key={tab} onClick={() => setActiveTab(tab)}
-                            className={`pb-3 text-sm font-medium border-b-2 transition-colors ${
-                                activeTab === tab
+                            className={`pb-3 text-sm font-medium border-b-2 transition-colors ${activeTab === tab
                                     ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400'
                                     : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
-                            }`}>
+                                }`}>
                             {tab}
                         </button>
                     ))}

@@ -329,6 +329,7 @@ func main() {
 		OAuthStart:    oauthStartH,
 		OAuthCallback: oauthCallbackH,
 		Legal:         &handler.LegalHandler{},
+		UsersExport:   &handler.UsersExportHandler{Data: handler.NewUserDataAggregator(userStore, submissionStore)},
 		CSRFSecret:    cfg.Auth.CSRFSecret,
 		DevMail:       devMailH,
 		Problem:       problemH,

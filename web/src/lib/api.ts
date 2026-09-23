@@ -751,6 +751,7 @@ export const api = {
         },
     },
     users: {
+        exportMyData: () => request<Record<string, unknown>>('/users/me/export'),
         getByUsername: (username: string) =>
             request<any>(`/users/${encodeURIComponent(username)}`),
         getSubmissions: (username: string, offset = 0, limit = 20) =>

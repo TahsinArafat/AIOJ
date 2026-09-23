@@ -76,5 +76,6 @@ type Deps struct {
 	OAuthStart     *handler.OAuthStartHandler
 	OAuthCallback  *handler.OAuthCallbackHandler
 	Legal          *handler.LegalHandler
+	UsersExport    *handler.UsersExportHandler
 	CSRFSecret     string
 }
