@@ -63,6 +63,7 @@ import GenerateProblem from './pages/GenerateProblem'
 import TermsOfService from './pages/legal/TermsOfService'
 import PrivacyPolicy from './pages/legal/PrivacyPolicy'
 import DMCA from './pages/legal/DMCA'
+import CookieConsent from './components/CookieConsent'
 import './global.css'
 
 function Home() {
@@ -337,6 +338,7 @@ export default function App() {
                         <Link to="/legal/privacy" className="hover:underline">Privacy Policy</Link>
                         <Link to="/legal/dmca" className="hover:underline">DMCA</Link>
                     </footer>
+                    <CookieConsent />
                 </div>
             </ThemeProvider>
         </BrowserRouter>
