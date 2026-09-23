@@ -9,7 +9,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /app/aioj ./cmd/aioj &
     CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /app/seed ./cmd/seed
 
 # Stage 2: Run
-FROM alpine:3.19
+FROM alpine:3.24
 RUN apk add --no-cache ca-certificates tzdata \
     g++ gcc make musl-dev python3 openjdk21-jdk rust cargo nodejs npm bash tar
 RUN apk add --no-cache --repository=https://dl-cdn.alpinelinux.org/alpine/edge/main postgresql18-client
