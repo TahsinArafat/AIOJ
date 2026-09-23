@@ -11,6 +11,18 @@ yourdomain.com {
     # Optional: Enable gzip compression for faster page loads
     encode gzip zstd
 
+    # --- Phase C: CDN / per-locale caching -------------------------------
+    # Locale JSON is content-hashed by Vite in production (or immutable under
+    # /assets/). Serve long-cache at the edge; SPA shell stays short-cache.
+    header /assets/* Cache-Control "public, max-age=31536000, immutable"
+    header *.woff2 Cache-Control "public, max-age=31536000, immutable"
+    header *.woff Cache-Control "public, max-age=31536000, immutable"
+    header *.ttf Cache-Control "public, max-age=31536000, immutable"
+    header /index.html Cache-Control "no-cache, must-revalidate"
+    # Media (problem images) — long cache, purge via /api/admin/cdn/purge
+    header /media/* Cache-Control "public, max-age=604800"
+    # ---------------------------------------------------------------------
+
     # Optional: Security headers (uncomment for production)
     # header {
     #     X-Content-Type-Options "nosniff"

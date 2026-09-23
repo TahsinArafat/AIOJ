@@ -510,6 +510,7 @@ func main() {
 		RemoteLang:     remoteLangH,
 		AdminSub:       adminSubH,
 		Backup:         backupH,
+		CDN:            handler.NewCDNHandler(handler.CDNConfig{}),
 		Generate:       generateH,
 		AIModel:        aiModelH,
 	}, jwtManager)

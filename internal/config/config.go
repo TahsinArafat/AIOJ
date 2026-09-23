@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"strconv"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -16,7 +17,17 @@ type Config struct {
 	Redis    RedisConfig    `yaml:"redis"`
 	AI       AIConfig       `yaml:"ai"`
 	Mail     MailConfig     `yaml:"mail"`
+	Features FeaturesConfig `yaml:"features"`
 	LangDir  string         `yaml:"lang_dir"`
+}
+
+// FeaturesConfig holds geolocation / rollout toggles.
+// Remote bot platforms (CF, AtCoder, …) can be restricted by ISO country code
+// so we do not hammer regions where they are blocked or rate-limited hard.
+type FeaturesConfig struct {
+	// RemoteBotsRegions is an allowlist of ISO 3166-1 alpha-2 codes.
+	// Empty means "enabled everywhere".
+	RemoteBotsRegions []string `yaml:"remote_bots_regions"`
 }
 
 // MailConfig selects the transactional mail backend and builds absolute links.
@@ -174,10 +185,38 @@ func Load(path string) (*Config, error) {
 	if v := os.Getenv("PUBLIC_ORIGIN"); v != "" && cfg.Mail.PublicURL == "" {
 		cfg.Mail.PublicURL = v
 	}
+	if v := os.Getenv("REMOTE_BOTS_REGIONS"); v != "" {
+		// Comma-separated ISO country codes; empty string clears the allowlist.
+		parts := strings.Split(v, ",")
+		cfg.Features.RemoteBotsRegions = nil
+		for _, p := range parts {
+			if p = strings.TrimSpace(strings.ToUpper(p)); p != "" {
+				cfg.Features.RemoteBotsRegions = append(cfg.Features.RemoteBotsRegions, p)
+			}
+		}
+	}
 	return &cfg, nil
 }
 
 func atoi(s string) int {
 	n, _ := strconv.Atoi(s)
 	return n
+}
+
+// RemoteBotsAllowed reports whether remote-bot features may run for a viewer
+// country (ISO 3166-1 alpha-2). Empty allowlist = allowed everywhere.
+func (f FeaturesConfig) RemoteBotsAllowed(country string) bool {
+	if len(f.RemoteBotsRegions) == 0 {
+		return true
+	}
+	c := strings.ToUpper(strings.TrimSpace(country))
+	if c == "" {
+		return false // deny when region known-restricted but country unknown
+	}
+	for _, r := range f.RemoteBotsRegions {
+		if strings.EqualFold(r, c) {
+			return true
+		}
+	}
+	return false
 }

@@ -1,15 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { LOCALES, DEFAULT_LOCALE, resources, supportedCodes, isSupported } from './index';
+import { LOCALES, DEFAULT_LOCALE, resources, supportedCodes, isSupported, isRtl } from './index';
 import en from './en.json';
-import bn from './bn.json';
 
 /**
  * Guards the multilingual system's extensibility contract.
  *
- * The catalogs were already in perfect 64/64 parity when this was written, but
- * nothing enforced it — a key added to en.json alone would silently render
- * English inside a Bengali session because `fallbackLng` makes it invisible.
- * These tests turn that silent drift into a failure.
+ * Catalogs must stay in key-parity with English (including Phase C zh/ru/ja/es)
+ * or a key added to en alone renders English inside another locale because
+ * `fallbackLng` makes the missing key invisible.
  */
 
 type Tree = { [k: string]: string | Tree };
@@ -23,6 +21,8 @@ function flat(obj: Tree, prefix = ''): Record<string, string> {
     return acc;
   }, {});
 }
+
+const enKeys = Object.keys(flat(en as Tree)).sort();
 
 describe('locale registry', () => {
   it('exposes the default locale', () => {
@@ -46,25 +46,33 @@ describe('locale registry', () => {
       expect(label.trim(), `locale ${code} needs a label`).not.toBe('');
     }
   });
+
+  it('registers Phase C expansion locales', () => {
+    for (const code of ['zh', 'ru', 'ja', 'es']) {
+      expect(isSupported(code), `missing locale ${code}`).toBe(true);
+    }
+  });
+
+  it('marks only RTL locales as rtl', () => {
+    expect(isRtl('en')).toBe(false);
+    expect(isRtl('bn')).toBe(false);
+    // When ar/he are added with rtl: true, isRtl must return true.
+  });
 });
 
-describe('catalog parity', () => {
-  const enKeys = Object.keys(flat(en as Tree)).sort();
-  const bnKeys = Object.keys(flat(bn as Tree)).sort();
-
+describe('catalog parity (all registered locales)', () => {
   it('en catalog is non-empty', () => {
     expect(enKeys.length).toBeGreaterThan(0);
   });
 
-  it('every English key exists in Bengali', () => {
-    expect(bnKeys).toEqual(enKeys);
-  });
-
-  it('no Bengali catalog is empty and no value is untranslated', () => {
-    const bnValues = Object.values(flat(bn as Tree));
-    expect(bnValues.length).toBe(enKeys.length);
-    for (const [key, value] of Object.entries(flat(bn as Tree))) {
-      expect(value.trim(), `bn key "${key}" is blank`).not.toBe('');
-    }
-  });
+  for (const { code, catalog } of LOCALES) {
+    it(`${code} has exact key parity with en and no blank values`, () => {
+      const keys = Object.keys(flat(catalog as unknown as Tree)).sort();
+      expect(keys).toEqual(enKeys);
+      const values = flat(catalog as unknown as Tree);
+      for (const [key, value] of Object.entries(values)) {
+        expect(value.trim(), `${code} key "${key}" is blank`).not.toBe('');
+      }
+    });
+  }
 });

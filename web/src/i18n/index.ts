@@ -1,7 +1,7 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
-import { DEFAULT_LOCALE, resources, supportedCodes } from './locales';
+import { DEFAULT_LOCALE, resources, supportedCodes, isRtl } from './locales';
 
 i18n
   .use(LanguageDetector)
@@ -29,7 +29,9 @@ export default i18n;
  * and crawlers. Runs once for the detected language and on every change.
  */
 function syncDocumentLang(code: string) {
-  if (typeof document !== 'undefined') document.documentElement.lang = code;
+  if (typeof document === 'undefined') return;
+  document.documentElement.lang = code;
+  document.documentElement.dir = isRtl(code) ? 'rtl' : 'ltr';
 }
 
 syncDocumentLang(i18n.language);

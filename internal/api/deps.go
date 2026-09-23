@@ -67,6 +67,7 @@ type Deps struct {
 	RemoteLang     *handler.RemoteLanguageHandler
 	AdminSub       *handler.AdminSubmissionHandler
 	Backup         *handler.AdminBackupHandler
+	CDN            *handler.CDNHandler
 	Generate       *handler.GenerateHandler
 	AIModel        *handler.AdminAIModelHandler
 	DevMail        *handler.DevMailHandler

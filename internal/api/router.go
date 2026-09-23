@@ -317,6 +317,11 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 			r.Delete("/{key}", settingsH.Delete)
 		})
 
+		if d.CDN != nil {
+			r.Get("/cdn/status", d.CDN.Status)
+			r.Post("/cdn/purge", d.CDN.Purge)
+		}
+
 		r.Route("/languages", func(r chi.Router) {
 			r.Get("/", langAdminH.List)
 			r.Post("/", langAdminH.Create)
