@@ -25,11 +25,13 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      # v1.64 is built with Go < 1.26 and refuses to lint this module (exit 3).
+      # Prebuilt binaries for v2.1.6 are still built with go1.24 and refuse to
+      # lint a go 1.26 module (exit 3). Build the same version with setup-go.
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v8
         with:
           version: v2.1.6
+          install-mode: goinstall
           args: --timeout=10m
 
   eslint:
