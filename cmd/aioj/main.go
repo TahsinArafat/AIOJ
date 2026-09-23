@@ -511,6 +511,8 @@ func main() {
 		AdminSub:       adminSubH,
 		Backup:         backupH,
 		CDN:            handler.NewCDNHandler(handler.CDNConfig{}),
+		Achievements:   handler.NewAchievementHandler(postgres.NewAchievementStore(db)),
+		Friendships:    handler.NewFriendshipHandler(postgres.NewFriendshipStore(db), userStore),
 		Generate:       generateH,
 		AIModel:        aiModelH,
 	}, jwtManager)

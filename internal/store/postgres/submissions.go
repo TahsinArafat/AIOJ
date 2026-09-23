@@ -223,9 +223,41 @@ func (s *SubmissionStore) UpdateResult(ctx context.Context, id string, status mo
 			 DO UPDATE SET completed = true, completed_at = NOW()
 			 WHERE NOT training_plan_progress.completed`,
 			id)
+		// Achievement milestones (first_ac, ten_ac, …) from distinct AC problems.
+		var userID string
+		var solved int
+		_ = tx.QueryRowContext(ctx,
+			`SELECT s.user_id,
+				COUNT(DISTINCT s.problem_id) FILTER (WHERE s.status = 'ac')
+			 FROM submissions s WHERE s.user_id = (
+			   SELECT user_id FROM submissions WHERE id = $1
+			 ) GROUP BY s.user_id`, id).Scan(&userID, &solved)
+		if userID != "" && solved > 0 {
+			awardAchievementMilestones(ctx, tx, userID, solved)
+		}
 	}
 
 	return tx.Commit()
+}
+
+// awardAchievementMilestones is called inside UpdateResult's transaction.
+// Kept package-level so the store does not need a second DB handle.
+func awardAchievementMilestones(ctx context.Context, tx *sql.Tx, userID string, solved int) {
+	type ms struct {
+		n    int
+		code string
+	}
+	for _, m := range []ms{{1, "first_ac"}, {10, "ten_ac"}, {55, "fifty_ac"}, {100, "hundred_ac"}} {
+		if solved < m.n {
+			continue
+		}
+		_, _ = tx.ExecContext(ctx, `
+			INSERT INTO user_achievements (user_id, achievement_id)
+			SELECT u.id, a.id FROM achievements a
+			CROSS JOIN (SELECT $1::uuid AS id) u
+			WHERE a.code = $2
+			ON CONFLICT DO NOTHING`, userID, m.code)
+	}
 }
 
 func (s *SubmissionStore) UpdateRemoteID(ctx context.Context, id string, remoteID string, remoteURL string) error {

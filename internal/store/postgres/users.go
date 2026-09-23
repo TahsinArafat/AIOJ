@@ -265,7 +265,8 @@ func (s *UserStore) ListUsersByRating(ctx context.Context, offset, limit int, co
 			COALESCE((
 				SELECT rh.rating_change FROM rating_history rh
 				WHERE rh.user_id = u.id ORDER BY rh.created_at DESC LIMIT 1
-			), 0)
+			), 0),
+			COALESCE(up.country, '')
 		FROM users u
 		JOIN user_profiles up ON up.user_id = u.id
 		WHERE u.role != 'admin'%s
@@ -282,7 +283,7 @@ func (s *UserStore) ListUsersByRating(ctx context.Context, offset, limit int, co
 	var items []model.RankingEntry
 	for rows.Next() {
 		var e model.RankingEntry
-		if err := rows.Scan(&e.ID, &e.Username, &e.Rating, &e.ContestsPlayed, &e.RatingChange); err != nil {
+		if err := rows.Scan(&e.ID, &e.Username, &e.Rating, &e.ContestsPlayed, &e.RatingChange, &e.Country); err != nil {
 			return nil, 0, err
 		}
 		items = append(items, e)

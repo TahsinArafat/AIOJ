@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
 import RatingBadge from '../components/RatingBadge'
+import CountryFlag from '../components/CountryFlag'
 
 const RANK_STYLES: Record<number, string> = {
     1: 'text-amber-700 bg-amber-50 font-bold',
@@ -57,7 +58,7 @@ export default function Rankings() {
         api.rankings.list(off, limit, co || undefined, org || undefined).then(d => {
             setUsers(prev => append ? [...prev, ...(d.data || [])] : (d.data || []))
             setTotal(d.total || 0)
-        }).catch(() => {}).finally(() => setLoading(false))
+        }).catch(() => { }).finally(() => setLoading(false))
     }, [])
 
     useEffect(() => {
@@ -139,6 +140,11 @@ export default function Rankings() {
                                             <Link to={`/user/${u.username}`} className="font-medium text-blue-600 dark:text-blue-400 hover:underline">
                                                 {u.username}
                                             </Link>
+                                            {u.country ? (
+                                                <span className="ml-2 text-xs align-middle">
+                                                    <CountryFlag country={u.country} />
+                                                </span>
+                                            ) : null}
                                         </td>
                                         <td className="px-4 py-3 text-right">
                                             <RatingBadge rating={u.rating} size="sm" />

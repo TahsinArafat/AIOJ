@@ -159,6 +159,19 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 	r.Get("/api/users/{username}/submissions", usersH.GetUserSubmissions)
 	r.Get("/api/users/{username}/blogs", usersH.GetUserBlogs)
 	r.Get("/api/users/{username}/comments", usersH.GetUserComments)
+
+	// Phase D: achievements + social graph
+	if d.Achievements != nil {
+		r.With(middleware.AuthMiddleware(jwtManager)).Get("/api/users/{userId}/achievements", d.Achievements.List)
+		r.With(middleware.AuthMiddleware(jwtManager)).Post("/api/users/{userId}/achievements/{code}", d.Achievements.Award)
+	}
+	if d.Friendships != nil {
+		r.With(middleware.AuthMiddleware(jwtManager)).Post("/api/users/{username}/follow", d.Friendships.Follow)
+		r.With(middleware.AuthMiddleware(jwtManager)).Delete("/api/users/{username}/follow", d.Friendships.Unfollow)
+		r.Get("/api/users/{username}/follow/status", d.Friendships.Status)
+		r.Get("/api/users/{username}/followers", d.Friendships.ListFollowers)
+		r.Get("/api/users/{username}/following", d.Friendships.ListFollowing)
+	}
 	if d.UsersExport != nil {
 		r.With(middleware.AuthMiddleware(jwtManager)).Get("/api/users/me/export", d.UsersExport.ExportMyData)
 	}

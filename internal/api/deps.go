@@ -68,6 +68,8 @@ type Deps struct {
 	AdminSub       *handler.AdminSubmissionHandler
 	Backup         *handler.AdminBackupHandler
 	CDN            *handler.CDNHandler
+	Achievements   *handler.AchievementHandler
+	Friendships    *handler.FriendshipHandler
 	Generate       *handler.GenerateHandler
 	AIModel        *handler.AdminAIModelHandler
 	DevMail        *handler.DevMailHandler

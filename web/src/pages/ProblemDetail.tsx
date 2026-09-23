@@ -9,6 +9,7 @@ import { api, getAccessToken } from '../lib/api'
 import ProblemStats from '../components/ProblemStats'
 import CodeEditor from '../components/CodeEditor'
 import AddEditorialModal from '../components/AddEditorialModal'
+import CommentSection from '../components/CommentSection'
 import { Download, Copy, Check } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
@@ -743,6 +744,7 @@ export default function ProblemDetail() {
                         {(!problem.tags?.length && !problem.source && !problem.interactive && problem.scoring_mode !== 'partial') && (
                             <p className="text-gray-500 dark:text-gray-400 text-sm py-4">No additional information available for this problem.</p>
                         )}
+                        <CommentSection parentType="problem" parentId={problem.id} />
                     </div>
                 ) : tab === 'stats' ? (
                     <ProblemStats problemId={problem.id} />

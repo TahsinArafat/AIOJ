@@ -114,6 +114,7 @@ type RankingEntry struct {
 	Rating         int    `json:"rating"`
 	RatingChange   int    `json:"rating_change"`
 	ContestsPlayed int    `json:"contests_played"`
+	Country        string `json:"country,omitempty"`
 }
 
 type PasswordResetToken struct {

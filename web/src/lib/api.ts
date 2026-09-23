@@ -787,6 +787,20 @@ export const api = {
             request<any>('/users/profile/edit', { method: 'PUT', body: JSON.stringify(d) }),
         updatePassword: (d: { current_password: string; new_password: string }) =>
             request<{ message: string }>('/users/profile/password', { method: 'PUT', body: JSON.stringify(d) }),
+        follow: (username: string) =>
+            request<{ following: boolean }>(`/users/${encodeURIComponent(username)}/follow`, { method: 'POST' }),
+        unfollow: (username: string) =>
+            request<{ following: boolean }>(`/users/${encodeURIComponent(username)}/follow`, { method: 'DELETE' }),
+        followStatus: (username: string) =>
+            request<{ following: boolean; following_count: number; follower_count: number }>(
+                `/users/${encodeURIComponent(username)}/follow/status`,
+            ),
+        followers: (username: string) =>
+            request<{ data: any[] }>(`/users/${encodeURIComponent(username)}/followers`),
+        following: (username: string) =>
+            request<{ data: any[] }>(`/users/${encodeURIComponent(username)}/following`),
+        achievements: (userId: string) =>
+            request<{ data: any[] }>(`/users/${encodeURIComponent(userId)}/achievements`),
         getPendingInvites: () =>
             request<{ teams: any[]; groups: any[] }>('/users/profile/invites'),
     },
