@@ -25,6 +25,8 @@ jobs:
       (github.event.workflow_run.conclusion == 'success' &&
        github.event.workflow_run.event == 'push')
     steps:
+      # Soft-skip when secrets are not configured yet so main stays green
+      # and failure emails stop until ops adds STAGING_* credentials.
       - name: Check required secrets
         id: check
         env:
@@ -37,11 +39,14 @@ jobs:
             if [ -z "${!v}" ]; then echo "Missing secret STAGING_${v}"; missing=1; fi
           done
           if [ "$missing" -ne 0 ]; then
-            echo "::error::Configure STAGING_HOST, STAGING_USER, STAGING_SSH_KEY (and optional STAGING_PORT, STAGING_DIR)."
-            exit 1
+            echo "::notice::Staging secrets not configured — skipping deploy. Set STAGING_HOST, STAGING_USER, STAGING_SSH_KEY (optional STAGING_PORT, STAGING_DIR)."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Deploy via SSH
+        if: steps.check.outputs.skip != 'true'
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.STAGING_HOST }}

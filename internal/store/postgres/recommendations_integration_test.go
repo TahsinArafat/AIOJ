@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"testing"
 
 	"github.com/google/uuid"
@@ -11,11 +10,7 @@ import (
 
 func TestGetRecommendationsDB(t *testing.T) {
 	// Connect to test database
-	dsn := "postgres://aioj:aioj_secret@localhost:5432/aioj?sslmode=disable"
-	db, err := sql.Open("postgres", dsn)
-	if err != nil {
-		t.Fatalf("failed to connect to test db: %v", err)
-	}
+	db := openTestDB(t)
 	defer db.Close()
 
 	ctx := context.Background()

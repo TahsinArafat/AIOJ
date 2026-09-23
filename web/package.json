@@ -33,7 +33,7 @@
     "codemirror": "^6.0.2",
     "i18next": "^26.3.0",
     "i18next-browser-languagedetector": "^8.2.1",
-    "katex": "^0.17.0",
+    "katex": "^0.16.47",
     "lowlight": "^3.3.0",
     "lucide-react": "^1.17.0",
     "monaco-editor": "^0.55.1",

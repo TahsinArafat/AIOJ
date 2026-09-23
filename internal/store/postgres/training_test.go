@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"testing"
 
 	"github.com/google/uuid"
@@ -10,11 +9,7 @@ import (
 )
 
 func TestTrainingPlanStore_LifeCycle(t *testing.T) {
-	dsn := "postgres://aioj:aioj_secret@localhost:5432/aioj?sslmode=disable"
-	db, err := sql.Open("postgres", dsn)
-	if err != nil {
-		t.Fatalf("failed to connect to database: %v", err)
-	}
+	db := openTestDB(t)
 	defer db.Close()
 
 	ctx := context.Background()
@@ -119,11 +114,7 @@ func TestTrainingPlanStore_LifeCycle(t *testing.T) {
 }
 
 func TestTrainingPlanStore_AutoCompleteOnAC(t *testing.T) {
-	dsn := "postgres://aioj:aioj_secret@localhost:5432/aioj?sslmode=disable"
-	db, err := sql.Open("postgres", dsn)
-	if err != nil {
-		t.Fatalf("failed to connect to database: %v", err)
-	}
+	db := openTestDB(t)
 	defer db.Close()
 
 	ctx := context.Background()
@@ -204,7 +195,7 @@ func TestTrainingPlanStore_AutoCompleteOnAC(t *testing.T) {
 	}
 	defer db.ExecContext(ctx, "DELETE FROM submissions WHERE id = $1", subID)
 
-	err = subStore.UpdateResult(ctx, subID, model.StatusAC, 100, 10, 2048, "", []model.TestCaseResult{})
+	err := subStore.UpdateResult(ctx, subID, model.StatusAC, 100, 10, 2048, "", []model.TestCaseResult{})
 	if err != nil {
 		t.Fatalf("failed to update result to AC: %v", err)
 	}

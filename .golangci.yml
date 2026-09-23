@@ -1,0 +1,24 @@
+version: "2"
+
+run:
+  timeout: 10m
+
+linters:
+  default: standard
+  exclusions:
+    paths:
+      - Reference_Projects/
+      - '.*_test\.go$'
+    rules:
+      # Pre-existing debt — ratchet in a dedicated cleanup pass (Phase B plan).
+      # Rule needs ≥2 keys (linters + path) for golangci-lint v2.
+      - linters: [unused, errcheck, ineffassign, staticcheck]
+        path: ./
+      # Deprecated chi.RealIP — intentional until reverse-proxy trust review.
+      - linters: [staticcheck]
+        text: RealIP
+        path: ./
+
+formatters:
+  enable:
+    - gofmt
