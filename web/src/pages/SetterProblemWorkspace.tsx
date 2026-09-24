@@ -335,6 +335,20 @@ export default function SetterProblemWorkspace() {
   }
 
   if (!problem) {
+    if (error) {
+      return (
+        <div className="text-center py-20 space-y-4">
+          <p className="text-red-600 dark:text-red-400 text-sm font-semibold">{error}</p>
+          <button
+            type="button"
+            onClick={() => loadProblem()}
+            className="bg-blue-600 text-white px-4 py-2 rounded text-sm font-semibold hover:bg-blue-700 transition-colors cursor-pointer"
+          >
+            Retry
+          </button>
+        </div>
+      )
+    }
     return <div className="text-center py-20 text-gray-400 dark:text-gray-500">Loading problem workspace...</div>
   }
 

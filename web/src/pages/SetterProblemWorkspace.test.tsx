@@ -140,3 +140,17 @@ test('shows error banner on API failure', async () => {
     expect(screen.getByText('Network error')).toBeInTheDocument()
   })
 })
+
+test('shows a retry screen instead of endless loading when the problem fetch fails', async () => {
+  ; (api.problems.get as Mock).mockRejectedValueOnce(new Error('Problem not found'))
+  renderWorkspace()
+
+  expect(await screen.findByText('Problem not found')).toBeInTheDocument()
+  expect(screen.queryByText('Loading problem workspace...')).not.toBeInTheDocument()
+
+  fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+  await waitFor(() => {
+    expect(screen.getByText('Test Problem')).toBeInTheDocument()
+  })
+  expect(api.problems.get).toHaveBeenCalledTimes(2)
+})
