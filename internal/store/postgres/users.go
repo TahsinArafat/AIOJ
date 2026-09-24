@@ -13,11 +13,33 @@ type UserStore struct{ db *sql.DB }
 func NewUserStore(db *sql.DB) *UserStore { return &UserStore{db: db} }
 
 func (s *UserStore) Create(ctx context.Context, user *model.User) error {
-	return s.db.QueryRowContext(ctx,
+	// Both rows in one transaction: a user without a `user_profiles` row is
+	// invisible to the leaderboard (and to any other INNER JOIN on the profile),
+	// because that row used to be created lazily by GetProfile alone. The
+	// lazy path is kept as a repair path, but registration should never rely
+	// on somebody opening a profile first.
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if err := tx.QueryRowContext(ctx,
 		`INSERT INTO users (id, username, email, password_hash, role, is_bot)
          VALUES ($1,$2,$3,$4,$5,$6) RETURNING created_at, updated_at`,
 		user.ID, user.Username, user.Email, user.PasswordHash, user.Role, user.IsBot,
-	).Scan(&user.CreatedAt, &user.UpdatedAt)
+	).Scan(&user.CreatedAt, &user.UpdatedAt); err != nil {
+		return err
+	}
+
+	// Every NOT NULL column on user_profiles has a default, so the defaults are
+	// the correct initial state for a freshly registered user.
+	if _, err := tx.ExecContext(ctx,
+		`INSERT INTO user_profiles (user_id) VALUES ($1)`, user.ID); err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }
 
 func (s *UserStore) GetByID(ctx context.Context, id string) (*model.User, error) {
@@ -254,7 +276,12 @@ func (s *UserStore) ListUsersByRating(ctx context.Context, offset, limit int, co
 		argIdx++
 	}
 
-	countQuery := "SELECT COUNT(*) FROM user_profiles up JOIN users u ON u.id = up.user_id WHERE u.role != 'admin'" + whereClause
+	// LEFT JOIN, not INNER: a user with no `user_profiles` row (legacy data, or
+	// a registration that predates the row being created in Create) must still
+	// appear with zeroes rather than vanishing from the leaderboard. The country
+	// and organization filters need the join to be a LEFT one too, or a user
+	// with no profile silently disappears from a filtered view.
+	countQuery := "SELECT COUNT(*) FROM users u LEFT JOIN user_profiles up ON up.user_id = u.id WHERE u.role != 'admin'" + whereClause
 	var total int
 	if err := s.db.QueryRowContext(ctx, countQuery, args...).Scan(&total); err != nil {
 		return nil, 0, err
@@ -268,7 +295,7 @@ func (s *UserStore) ListUsersByRating(ctx context.Context, offset, limit int, co
 			), 0),
 			COALESCE(up.country, '')
 		FROM users u
-		JOIN user_profiles up ON up.user_id = u.id
+		LEFT JOIN user_profiles up ON up.user_id = u.id
 		WHERE u.role != 'admin'%s
 		ORDER BY COALESCE(up.rating, 0) DESC, u.username ASC
 		OFFSET $%d LIMIT $%d
