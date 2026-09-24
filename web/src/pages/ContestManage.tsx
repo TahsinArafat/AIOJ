@@ -1,12 +1,12 @@
 import React from 'react'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { api } from '../lib/api'
 import { useTheme } from '../context/ThemeContext'
 import {
     FileText, FileDown, MessageSquare, Users, FileCode, Printer,
     Trophy, BarChart3, Search, CircleDot, Megaphone, Shield, Settings,
-    Loader2, Play, Check, EyeOff, UserPlus
+    Loader2, Play, Check, EyeOff, UserPlus, ArrowDown, ArrowUp
 } from 'lucide-react'
 import { useConfirm } from '../components/ConfirmDialog'
 import { useToast } from '../components/Toast'
@@ -151,7 +151,8 @@ export default function ContestManage() {
 // ═══════════════════════════════════════════════
 // CHALLENGES TAB
 // ═══════════════════════════════════════════════
-function ChallengesTab({ contestId }: { contestId: string }) {
+// Exported for focused tests; the default export remains the routed page.
+export function ChallengesTab({ contestId }: { contestId: string }) {
     const confirm = useConfirm()
     const toast = useToast()
     const [problems, setProblems] = useState<any[]>([])
@@ -159,9 +160,11 @@ function ChallengesTab({ contestId }: { contestId: string }) {
     const [showAdd, setShowAdd] = useState(false)
     const [search, setSearch] = useState('')
     const [loading, setLoading] = useState(true)
+    const [reordering, setReordering] = useState(false)
+    const reorderInFlight = useRef(false)
 
     const load = useCallback(() => {
-        api.contests.get(contestId).then(d => {
+        return api.contests.get(contestId).then(d => {
             setProblems(d.problems || [])
             setLoading(false)
         })
@@ -189,27 +192,49 @@ function ChallengesTab({ contestId }: { contestId: string }) {
     }
 
     const moveProblem = async (idx: number, dir: -1 | 1) => {
+        if (reorderInFlight.current) return
         const target = idx + dir
         if (target < 0 || target >= problems.length) return
         const next = [...problems]
             ;[next[idx], next[target]] = [next[target], next[idx]]
 
-        next.forEach((p, i) => {
-            p.index = indexLabel(i)
-            p.sort_order = i
-        })
+        const updates = next.map((p, i) => ({
+            problem_id: p.problem_id,
+            index: indexLabel(i),
+            score: p.score || 100,
+            sort_order: i,
+        }))
 
+        reorderInFlight.current = true
+        setReordering(true)
         try {
-            await Promise.all(next.map((p, i) =>
-                api.contests.updateProblem(contestId, p.problem_id, {
-                    index: p.index,
-                    score: p.score || 100,
-                    sort_order: i
+            const results = await Promise.allSettled(updates.map(update =>
+                api.contests.updateProblem(contestId, update.problem_id, {
+                    index: update.index,
+                    score: update.score,
+                    sort_order: update.sort_order,
                 })
             ))
-            load()
+            const failed = results.find(result => result.status === 'rejected')
+            if (failed?.status === 'rejected') {
+                throw failed.reason
+            }
+            setProblems(next.map((p, i) => ({
+                ...p,
+                index: updates[i].index,
+                sort_order: updates[i].sort_order,
+            })))
+            toast.success('Challenge order updated')
         } catch (e: any) {
-            toast.error('Failed to reorder: ' + e.message)
+            toast.error('Failed to update challenge order: ' + (e.message || 'Please try again'))
+            try {
+                await load()
+            } catch {
+                // Keep the last known-good order visible if reconciliation also fails.
+            }
+        } finally {
+            reorderInFlight.current = false
+            setReordering(false)
         }
     }
 
@@ -238,7 +263,7 @@ function ChallengesTab({ contestId }: { contestId: string }) {
             )}
             <table className="w-full text-sm">
                 <thead><tr className="border-b border-gray-200 dark:border-gray-700 text-left text-xs text-gray-500 uppercase">
-                    <th className="py-2 pr-4 w-12">#</th><th className="py-2 pr-4">Problem</th><th className="py-2 pr-4 w-20">Score</th><th className="py-2 w-32 text-right">Actions</th>
+                    <th className="py-2 pr-4 w-12">#</th><th className="py-2 pr-4">Problem</th><th className="py-2 pr-4 w-20">Score</th><th className="py-2 w-40 text-right">Actions</th>
                 </tr></thead>
                 <tbody className="divide-y divide-gray-100">
                     {problems.map((p: any, idx: number) => (
@@ -257,14 +282,30 @@ function ChallengesTab({ contestId }: { contestId: string }) {
                             <td className="py-2.5 pr-4">{p.score ?? 100}</td>
                             <td className="py-2.5 text-right">
                                 <div className="flex items-center justify-end gap-2">
-                                    <button onClick={() => moveProblem(idx, -1)} disabled={idx === 0}
-                                        className="p-1 border rounded text-xs text-gray-400 hover:text-gray-700 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed">
-                                        ▲
-                                    </button>
-                                    <button onClick={() => moveProblem(idx, 1)} disabled={idx === problems.length - 1}
-                                        className="p-1 border rounded text-xs text-gray-400 hover:text-gray-700 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed">
-                                        ▼
-                                    </button>
+                                    <div className="flex items-center gap-1" role="group" aria-label={`Reorder ${p.title || p.problem_id}`}>
+                                        <button
+                                            type="button"
+                                            onClick={() => moveProblem(idx, -1)}
+                                            disabled={reordering || idx === 0}
+                                            aria-label={`Move ${p.title || p.problem_id} up`}
+                                            aria-busy={reordering}
+                                            title="Move up"
+                                            className="h-10 w-10 inline-flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-800 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-30 dark:border-gray-600 dark:hover:bg-gray-700"
+                                        >
+                                            {reordering ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => moveProblem(idx, 1)}
+                                            disabled={reordering || idx === problems.length - 1}
+                                            aria-label={`Move ${p.title || p.problem_id} down`}
+                                            aria-busy={reordering}
+                                            title="Move down"
+                                            className="h-10 w-10 inline-flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-800 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-30 dark:border-gray-600 dark:hover:bg-gray-700"
+                                        >
+                                            {reordering ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowDown className="h-4 w-4" />}
+                                        </button>
+                                    </div>
                                     {p.slug && (
                                         <Link to={`/setter/${p.slug}`} className="px-2 py-1 bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200 text-xs rounded">
                                             Edit
@@ -279,7 +320,11 @@ function ChallengesTab({ contestId }: { contestId: string }) {
                     ))}
                 </tbody>
             </table>
-            {problems.length === 0 && <EmptyState icon={<FileText className="w-5 h-5 text-gray-400" />} text="No problems added yet" />}
+            {problems.length === 0 && <EmptyState
+                icon={<FileText className="w-5 h-5 text-gray-400" />}
+                text="No problems added yet"
+                description="Use Add Problem to build the contest challenge list."
+            />}
         </TabShell>
     )
 }
@@ -328,7 +373,11 @@ function ClarificationsTab({ contestId }: { contestId: string }) {
 
     return (
         <TabShell title="Clarifications">
-            {items.length === 0 ? <EmptyState icon={<MessageSquare className="w-5 h-5 text-gray-400" />} text="No clarifications yet" /> : (
+            {items.length === 0 ? <EmptyState
+                icon={<MessageSquare className="w-5 h-5 text-gray-400" />}
+                text="No clarifications yet"
+                description="Participant questions and your replies will appear here."
+            /> : (
                 <div className="space-y-3">
                     {items.map((c: any) => (
                         <div key={c.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
@@ -377,7 +426,11 @@ function ParticipantsTab({ contestId }: { contestId: string }) {
 
     return (
         <TabShell title="Participants" subtitle={`${data?.count ?? participants.length} registered`}>
-            {participants.length === 0 ? <EmptyState icon={<Users className="w-5 h-5 text-gray-400" />} text="No participants yet" /> : (
+            {participants.length === 0 ? <EmptyState
+                icon={<Users className="w-5 h-5 text-gray-400" />}
+                text="No participants yet"
+                description="Registered contestants will appear here."
+            /> : (
                 <table className="w-full text-sm">
                     <thead><tr className="border-b border-gray-200 dark:border-gray-700 text-left text-xs text-gray-500 uppercase">
                         <th className="py-2 pr-4">#</th><th className="py-2 pr-4">Username</th><th className="py-2">Registered</th>
@@ -418,7 +471,11 @@ function SubmissionsTab({ contestId }: { contestId: string }) {
 
     return (
         <TabShell title="Submissions" subtitle={`${items.length} total`}>
-            {items.length === 0 ? <EmptyState icon={<FileCode className="w-5 h-5 text-gray-400" />} text="No submissions yet" /> : (
+            {items.length === 0 ? <EmptyState
+                icon={<FileCode className="w-5 h-5 text-gray-400" />}
+                text="No submissions yet"
+                description="Contest submissions will appear here as participants submit solutions."
+            /> : (
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                         <thead><tr className="border-b border-gray-200 dark:border-gray-700 text-left text-xs text-gray-500 uppercase">
@@ -472,7 +529,11 @@ function PrintsTab({ contestId }: { contestId: string }) {
 
     return (
         <TabShell title="Print Requests" subtitle={`${items.length} requests`}>
-            {items.length === 0 ? <EmptyState icon={<Printer className="w-5 h-5 text-gray-400" />} text="No print requests" /> : (
+            {items.length === 0 ? <EmptyState
+                icon={<Printer className="w-5 h-5 text-gray-400" />}
+                text="No print requests"
+                description="Onsite print requests will appear here for review."
+            /> : (
                 <div className="space-y-3">
                     {items.map((p: any) => (
                         <div key={p.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
@@ -665,7 +726,17 @@ function BalloonsTab({ contestId }: { contestId: string }) {
                     </button>
                 ))}
             </div>
-            {filtered.length === 0 ? <EmptyState icon={<CircleDot className="w-5 h-5 text-gray-400" />} text="No balloons" /> : (
+            {filtered.length === 0 ? <EmptyState
+                icon={<CircleDot className="w-5 h-5 text-gray-400" />}
+                text={items.length === 0 ? 'No balloons yet' : `No ${filter} balloons`}
+                description={items.length === 0
+                    ? 'Balloons will appear here as contestants submit and dispatch achievements.'
+                    : filter === 'pending'
+                        ? 'Dispatched balloons are hidden by this filter.'
+                        : filter === 'dispatched'
+                            ? 'Balloons waiting to be dispatched are hidden by this filter.'
+                            : 'No balloon records are available for this contest.'}
+            /> : (
                 <div className="space-y-2">
                     {filtered.map((b: any) => (
                         <div key={b.id} className={`flex items-center justify-between p-3 rounded-lg border ${b.dispatched ? 'bg-gray-50 border-gray-200 dark:border-gray-700' : 'bg-white dark:bg-gray-800 border-blue-200'}`}>
@@ -729,7 +800,11 @@ function AnnouncementsTab({ contestId }: { contestId: string }) {
                     placeholder="Write an announcement..." className="flex-1 border rounded-lg px-3 py-2 text-sm" />
                 <button onClick={create} className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">Post</button>
             </div>
-            {items.length === 0 ? <EmptyState icon={<Megaphone className="w-5 h-5 text-gray-400" />} text="No announcements" /> : (
+            {items.length === 0 ? <EmptyState
+                icon={<Megaphone className="w-5 h-5 text-gray-400" />}
+                text="No announcements yet"
+                description="Post a contest update above to notify participants."
+            /> : (
                 <div className="space-y-2">
                     {items.map((n: any) => (
                         <div key={n.id} className="flex items-start justify-between p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
@@ -791,7 +866,11 @@ function ModeratorsTab({ contestId }: { contestId: string }) {
                 </select>
                 <button onClick={add} className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">Add</button>
             </div>
-            {items.length === 0 ? <EmptyState icon={<Shield className="w-5 h-5 text-gray-400" />} text="No moderators added" /> : (
+            {items.length === 0 ? <EmptyState
+                icon={<Shield className="w-5 h-5 text-gray-400" />}
+                text="No moderators added"
+                description="Use the User ID and access-level controls above to add one."
+            /> : (
                 <div className="space-y-2">
                     {items.map((p: any) => (
                         <div key={p.user_id} className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
@@ -920,7 +999,11 @@ function OnsiteTeamsTab({ contestId }: { contestId: string }) {
                     </div>
                 </>
             )}
-            {teams.length === 0 && <EmptyState icon={<UserPlus className="w-5 h-5 text-gray-400" />} text="No team credentials generated yet" />}
+            {teams.length === 0 && <EmptyState
+                icon={<UserPlus className="w-5 h-5 text-gray-400" />}
+                text="No team credentials generated yet"
+                description="Enter team names above, then generate credentials for the onsite contest."
+            />}
         </TabShell>
     )
 }
@@ -1136,11 +1219,12 @@ function TabLoading() {
     )
 }
 
-function EmptyState({ icon, text }: { icon: React.ReactNode; text: string }) {
+function EmptyState({ icon, text, description }: { icon: React.ReactNode; text: string; description?: string }) {
     return (
         <div className="text-center py-10">
             <div className="text-4xl mb-2">{icon}</div>
-            <p className="text-gray-400 text-sm">{text}</p>
+            <p className="text-gray-500 dark:text-gray-400 text-sm font-medium">{text}</p>
+            {description && <p className="text-gray-400 dark:text-gray-500 text-sm mt-1 max-w-md mx-auto">{description}</p>}
         </div>
     )
 }
