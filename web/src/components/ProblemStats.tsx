@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../lib/api'
+import { EmptyState } from './EmptyState'
 
 interface ProblemStatsProps {
     problemId: string
@@ -17,7 +18,14 @@ export default function ProblemStats({ problemId }: ProblemStatsProps) {
     }, [problemId])
 
     if (loading) return <div className="text-sm text-gray-500 dark:text-gray-400">Loading statistics...</div>
-    if (!stats) return <div className="text-sm text-gray-400 dark:text-gray-500">No statistics available.</div>
+    if (!stats) {
+        return (
+            <EmptyState
+                text="No statistics available"
+                description="Submission stats will appear after the first solutions to this problem."
+            />
+        )
+    }
 
     const total = Object.values(stats.language_distribution || {}).reduce((a: any, b: any) => a + b, 0) as number
 
@@ -49,7 +57,7 @@ export default function ProblemStats({ problemId }: ProblemStatsProps) {
             <div>
                 <h3 className="font-semibold text-sm text-gray-700 dark:text-gray-300 uppercase tracking-wide mb-3">Languages Used</h3>
                 {total === 0 ? (
-                    <p className="text-sm text-gray-400 dark:text-gray-500">No language data yet.</p>
+                    <EmptyState text="No language data yet" description="The language breakdown fills in as people submit solutions." />
                 ) : (
                     <div className="space-y-2">
                         {Object.entries(stats.language_distribution || {}).map(([lang, count]: any) => (

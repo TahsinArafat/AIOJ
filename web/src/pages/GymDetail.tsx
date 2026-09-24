@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { api, getAccessToken, contestSlug } from '../lib/api'
 import { useToast } from '../components/Toast'
+import { EmptyState } from '../components/EmptyState'
+import { AlertTriangle } from 'lucide-react'
 
 export default function GymDetail() {
     const toast = useToast()
@@ -28,7 +30,13 @@ export default function GymDetail() {
     }
 
     if (loading) return <div className="text-center py-20 text-gray-400 dark:text-gray-500">Loading...</div>
-    if (!gym) return <div className="text-center py-20 text-gray-400 dark:text-gray-500">Gym contest not found</div>
+    if (!gym) {
+        return (
+            <div className="py-16">
+                <EmptyState icon={<AlertTriangle className="w-12 h-12 text-red-400" />} text="Gym contest not found" description="This gym contest may have been removed, or the link is incorrect." />
+            </div>
+        )
+    }
 
     return (
         <div className="space-y-6">

@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback, useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { api, getAccessToken } from '../lib/api'
 import DivisionBadge from '../components/DivisionBadge'
+import { EmptyState } from '../components/EmptyState'
 import {
     Trophy, FileText, MessageSquare, Users, Zap, FileDown, Pencil, Gamepad2,
     AlertTriangle, Megaphone, Settings, BookOpen, Info, Clock, Shield, CheckCircle2, X, ExternalLink,
@@ -534,10 +535,7 @@ export default function ContestDetail() {
                         <div>
                             <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">Problems</h2>
                             {problems.length === 0 ? (
-                                <div className="text-center py-16">
-                                    <FileText className="w-12 h-12 text-gray-700 dark:text-gray-300 mx-auto mb-3" />
-                                    <p className="text-gray-500 dark:text-gray-400">No problems added yet.</p>
-                                </div>
+                                <EmptyState icon={<FileText className="w-12 h-12 text-gray-700 dark:text-gray-300" />} text="No problems added yet" description="Contest organizers haven't published problems for this contest yet." />
                             ) : (
                                 <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm overflow-hidden">
                                     <table className="w-full text-sm">
@@ -604,9 +602,7 @@ export default function ContestDetail() {
                             </div>
                             {standings.length === 0 ? (
                                 <div className="text-center py-16 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl">
-                                    <Trophy className="w-12 h-12 text-gray-600 dark:text-gray-400 mx-auto mb-3" />
-                                    <p className="text-gray-500 dark:text-gray-400 font-medium">No submissions yet</p>
-                                    <p className="text-gray-500 text-sm mt-1">Standings will appear once participants start solving</p>
+                                    <EmptyState icon={<Trophy className="w-12 h-12 text-gray-600 dark:text-gray-400" />} text="No submissions yet" description="Standings will appear once participants start solving" />
                                 </div>
                             ) : (
                                 <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-md overflow-x-auto">
@@ -859,18 +855,13 @@ export default function ContestDetail() {
                             )}
 
                             {!getAccessToken() ? (
-                                <div className="text-center py-16">
-                                    <Send className="w-12 h-12 text-gray-700 dark:text-gray-300 mx-auto mb-3" />
-                                    <p className="text-gray-500 dark:text-gray-400">Please log in to view submissions.</p>
-                                </div>
+                                <EmptyState icon={<Send className="w-12 h-12 text-gray-700 dark:text-gray-300" />} text="Please log in to view submissions" description="Sign in to follow this contest's submissions in real time." />
                             ) : filteredSubmissions.length === 0 ? (
-                                <div className="text-center py-16">
-                                    <Send className="w-12 h-12 text-gray-700 dark:text-gray-300 mx-auto mb-3" />
-                                    <p className="text-gray-500 font-medium">No submissions found</p>
-                                    {(subFilterProblem || subFilterLang || subFilterStatus || subFilterId) && (
-                                        <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">Try adjusting your filters</p>
-                                    )}
-                                </div>
+                                <EmptyState
+                                    icon={<Send className="w-12 h-12 text-gray-700 dark:text-gray-300" />}
+                                    text="No submissions found"
+                                    description={(subFilterProblem || subFilterLang || subFilterStatus || subFilterId) ? 'Try adjusting your filters' : undefined}
+                                />
                             ) : (
                                 <>
                                     <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm overflow-x-auto">
@@ -993,10 +984,7 @@ export default function ContestDetail() {
                             )}
 
                             {clarifications.length === 0 ? (
-                                <div className="text-center py-16">
-                                    <MessageSquare className="w-12 h-12 text-gray-700 dark:text-gray-300 mx-auto mb-3" />
-                                    <p className="text-gray-500 dark:text-gray-400">No clarifications yet.</p>
-                                </div>
+                                <EmptyState icon={<MessageSquare className="w-12 h-12 text-gray-700 dark:text-gray-300" />} text="No clarifications yet" description="Questions from participants and official responses will appear here." />
                             ) : (
                                 <div className="space-y-3">
                                     {clarifications.map((c: any) => (
@@ -1053,11 +1041,7 @@ export default function ContestDetail() {
                             )}
 
                             {announcements.length === 0 ? (
-                                <div className="text-center py-16">
-                                    <Megaphone className="w-12 h-12 text-gray-700 dark:text-gray-300 mx-auto mb-3" />
-                                    <p className="text-gray-500 font-medium">No announcements yet</p>
-                                    <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">Announcements from judges will appear here</p>
-                                </div>
+                                <EmptyState icon={<Megaphone className="w-12 h-12 text-gray-700 dark:text-gray-300" />} text="No announcements yet" description="Announcements from judges will appear here" />
                             ) : (
                                 <div className="space-y-3">
                                     {announcements.map((a: any, i: number) => (
