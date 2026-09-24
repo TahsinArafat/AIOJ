@@ -103,10 +103,14 @@ func (h *ClarificationHandler) Answer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	contestID := chi.URLParam(r, "contestId")
+	contest, err := resolveContest(r.Context(), chi.URLParam(r, "contestId"), h.contestStore)
+	if err != nil {
+		respondContestLookupError(w, err)
+		return
+	}
 	clarificationID := chi.URLParam(r, "id")
 
-	if claims.Role != "admin" && !h.contestStore.HasAccess(r.Context(), contestID, claims.UserID, "manager", "judge") {
+	if claims.Role != "admin" && !h.contestStore.HasAccess(r.Context(), contest.ID, claims.UserID, "manager", "judge") {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}

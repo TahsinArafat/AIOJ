@@ -56,14 +56,14 @@ func (h *RegistrationHandler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if contest.MaxParticipants != nil {
-		count, _ := h.registrationStore.GetRegistrationCount(r.Context(), contestID)
+		count, _ := h.registrationStore.GetRegistrationCount(r.Context(), contest.ID)
 		if count >= *contest.MaxParticipants {
 			http.Error(w, "contest is full", http.StatusBadRequest)
 			return
 		}
 	}
 
-	if err := h.registrationStore.Register(r.Context(), contestID, claims.UserID); err != nil {
+	if err := h.registrationStore.Register(r.Context(), contest.ID, claims.UserID); err != nil {
 		http.Error(w, "registration failed", http.StatusInternalServerError)
 		return
 	}
@@ -78,8 +78,12 @@ func (h *RegistrationHandler) Unregister(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	contestID := chi.URLParam(r, "id")
-	if err := h.registrationStore.Unregister(r.Context(), contestID, claims.UserID); err != nil {
+	contest, err := h.contestStore.GetByID(r.Context(), chi.URLParam(r, "id"))
+	if err != nil || contest == nil {
+		http.Error(w, "contest not found", http.StatusNotFound)
+		return
+	}
+	if err := h.registrationStore.Unregister(r.Context(), contest.ID, claims.UserID); err != nil {
 		http.Error(w, "unregister failed", http.StatusInternalServerError)
 		return
 	}
@@ -94,20 +98,28 @@ func (h *RegistrationHandler) CheckRegistration(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	contestID := chi.URLParam(r, "id")
-	registered, _ := h.registrationStore.IsRegistered(r.Context(), contestID, claims.UserID)
+	contest, err := h.contestStore.GetByID(r.Context(), chi.URLParam(r, "id"))
+	if err != nil || contest == nil {
+		http.Error(w, "contest not found", http.StatusNotFound)
+		return
+	}
+	registered, _ := h.registrationStore.IsRegistered(r.Context(), contest.ID, claims.UserID)
 	respondJSON(w, http.StatusOK, map[string]bool{"registered": registered})
 }
 
 func (h *RegistrationHandler) ListRegistrations(w http.ResponseWriter, r *http.Request) {
-	contestID := chi.URLParam(r, "id")
-	registrations, err := h.registrationStore.GetRegistrations(r.Context(), contestID)
+	contest, err := h.contestStore.GetByID(r.Context(), chi.URLParam(r, "id"))
+	if err != nil || contest == nil {
+		http.Error(w, "contest not found", http.StatusNotFound)
+		return
+	}
+	registrations, err := h.registrationStore.GetRegistrations(r.Context(), contest.ID)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
-	count, _ := h.registrationStore.GetRegistrationCount(r.Context(), contestID)
+	count, _ := h.registrationStore.GetRegistrationCount(r.Context(), contest.ID)
 	respondJSON(w, http.StatusOK, map[string]interface{}{
 		"data":  registrations,
 		"count": count,

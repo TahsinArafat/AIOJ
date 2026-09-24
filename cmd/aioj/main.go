@@ -220,7 +220,7 @@ func main() {
 	gymH := handler.NewGymHandler(gymStore)
 	hackStore := postgres.NewHackStore(db)
 	hackService := hack.NewService(hackStore, contestStore, submissionStore)
-	hackH := handler.NewHackHandler(hackService, hackStore)
+	hackH := handler.NewHackHandler(hackService, hackStore, contestStore)
 	statsH := handler.NewStatsHandler(submissionStore)
 	notifStore := postgres.NewNotificationStore(db)
 	notifH := handler.NewNotificationHandler(notifStore)

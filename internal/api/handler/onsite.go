@@ -1,21 +1,28 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
-	"github.com/tahsinarafat/aioj/internal/store/postgres"
+	"github.com/tahsinarafat/aioj/internal/model"
+	"github.com/tahsinarafat/aioj/internal/store"
 )
 
-type OnsiteHandler struct {
-	balloonStore *postgres.BalloonStore
-	printStore   *postgres.PrintStore
-	contestStore *postgres.ContestStore
+type contestLookup interface {
+	GetByID(context.Context, string) (*model.Contest, error)
+	HasAccess(context.Context, string, string, ...string) bool
 }
 
-func NewOnsiteHandler(bs *postgres.BalloonStore, ps *postgres.PrintStore, cs *postgres.ContestStore) *OnsiteHandler {
+type OnsiteHandler struct {
+	balloonStore store.BalloonStore
+	printStore   store.PrintStore
+	contestStore contestLookup
+}
+
+func NewOnsiteHandler(bs store.BalloonStore, ps store.PrintStore, cs contestLookup) *OnsiteHandler {
 	return &OnsiteHandler{
 		balloonStore: bs,
 		printStore:   ps,
@@ -23,21 +30,33 @@ func NewOnsiteHandler(bs *postgres.BalloonStore, ps *postgres.PrintStore, cs *po
 	}
 }
 
+func (h *OnsiteHandler) resolveContest(w http.ResponseWriter, r *http.Request) (*model.Contest, bool) {
+	contest, err := resolveContest(r.Context(), chi.URLParam(r, "id"), h.contestStore)
+	if err != nil {
+		respondContestLookupError(w, err)
+		return nil, false
+	}
+	return contest, true
+}
+
 func (h *OnsiteHandler) ListBalloons(w http.ResponseWriter, r *http.Request) {
-	contestID := chi.URLParam(r, "id")
 	claims := middleware.GetUserClaims(r)
 	if claims == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
+	contest, ok := h.resolveContest(w, r)
+	if !ok {
+		return
+	}
 
-	// Verify manager or admin access
-	if claims.Role != "admin" && !h.contestStore.HasAccess(r.Context(), contestID, claims.UserID, "manager", "tester") {
+	// Verify manager or admin access against the canonical contest UUID.
+	if claims.Role != "admin" && !h.contestStore.HasAccess(r.Context(), contest.ID, claims.UserID, "manager", "tester") {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
 
-	list, err := h.balloonStore.ListByContest(r.Context(), contestID)
+	list, err := h.balloonStore.ListByContest(r.Context(), contest.ID)
 	if err != nil {
 		http.Error(w, "failed to list balloons: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -46,15 +65,18 @@ func (h *OnsiteHandler) ListBalloons(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *OnsiteHandler) DispatchBalloon(w http.ResponseWriter, r *http.Request) {
-	contestID := chi.URLParam(r, "id")
 	balloonID := chi.URLParam(r, "balloonId")
 	claims := middleware.GetUserClaims(r)
 	if claims == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
+	contest, ok := h.resolveContest(w, r)
+	if !ok {
+		return
+	}
 
-	if claims.Role != "admin" && !h.contestStore.HasAccess(r.Context(), contestID, claims.UserID, "manager", "tester") {
+	if claims.Role != "admin" && !h.contestStore.HasAccess(r.Context(), contest.ID, claims.UserID, "manager", "tester") {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
@@ -68,10 +90,13 @@ func (h *OnsiteHandler) DispatchBalloon(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *OnsiteHandler) RequestPrint(w http.ResponseWriter, r *http.Request) {
-	contestID := chi.URLParam(r, "id")
 	claims := middleware.GetUserClaims(r)
 	if claims == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	contest, ok := h.resolveContest(w, r)
+	if !ok {
 		return
 	}
 
@@ -92,7 +117,7 @@ func (h *OnsiteHandler) RequestPrint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := h.printStore.Create(r.Context(), contestID, claims.UserID, req.Filename, req.Content)
+	err := h.printStore.Create(r.Context(), contest.ID, claims.UserID, req.Filename, req.Content)
 	if err != nil {
 		http.Error(w, "failed to create print request: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -101,19 +126,22 @@ func (h *OnsiteHandler) RequestPrint(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *OnsiteHandler) ListPrints(w http.ResponseWriter, r *http.Request) {
-	contestID := chi.URLParam(r, "id")
 	claims := middleware.GetUserClaims(r)
 	if claims == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
+	contest, ok := h.resolveContest(w, r)
+	if !ok {
+		return
+	}
 
-	if claims.Role != "admin" && !h.contestStore.HasAccess(r.Context(), contestID, claims.UserID, "manager", "tester") {
+	if claims.Role != "admin" && !h.contestStore.HasAccess(r.Context(), contest.ID, claims.UserID, "manager", "tester") {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
 
-	list, err := h.printStore.ListByContest(r.Context(), contestID)
+	list, err := h.printStore.ListByContest(r.Context(), contest.ID)
 	if err != nil {
 		http.Error(w, "failed to list prints: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -122,15 +150,18 @@ func (h *OnsiteHandler) ListPrints(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *OnsiteHandler) UpdatePrintStatus(w http.ResponseWriter, r *http.Request) {
-	contestID := chi.URLParam(r, "id")
 	printID := chi.URLParam(r, "printId")
 	claims := middleware.GetUserClaims(r)
 	if claims == nil {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
+	contest, ok := h.resolveContest(w, r)
+	if !ok {
+		return
+	}
 
-	if claims.Role != "admin" && !h.contestStore.HasAccess(r.Context(), contestID, claims.UserID, "manager", "tester") {
+	if claims.Role != "admin" && !h.contestStore.HasAccess(r.Context(), contest.ID, claims.UserID, "manager", "tester") {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}

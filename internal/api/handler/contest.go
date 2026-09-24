@@ -291,8 +291,12 @@ func (h *ContestHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
-	id := chi.URLParam(r, "id")
-	if err := h.store.Delete(r.Context(), id); err != nil {
+	contest, err := resolveContest(r.Context(), chi.URLParam(r, "id"), h.store)
+	if err != nil {
+		respondContestLookupError(w, err)
+		return
+	}
+	if err := h.store.Delete(r.Context(), contest.ID); err != nil {
 		http.Error(w, "delete failed", http.StatusInternalServerError)
 		return
 	}
@@ -699,7 +703,11 @@ func (h *ContestHandler) RegisterTeam(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	contestID := chi.URLParam(r, "id")
+	contest, err := resolveContest(r.Context(), chi.URLParam(r, "id"), h.store)
+	if err != nil {
+		respondContestLookupError(w, err)
+		return
+	}
 	var req struct {
 		TeamID string `json:"team_id"`
 	}
@@ -728,7 +736,7 @@ func (h *ContestHandler) RegisterTeam(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tr, err := h.store.RegisterTeam(r.Context(), contestID, req.TeamID)
+	tr, err := h.store.RegisterTeam(r.Context(), contest.ID, req.TeamID)
 	if err != nil {
 		http.Error(w, "registration failed", http.StatusInternalServerError)
 		return
@@ -737,8 +745,12 @@ func (h *ContestHandler) RegisterTeam(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ContestHandler) ListTeamRegistrations(w http.ResponseWriter, r *http.Request) {
-	contestID := chi.URLParam(r, "id")
-	teams, err := h.store.ListTeamRegistrations(r.Context(), contestID)
+	contest, err := resolveContest(r.Context(), chi.URLParam(r, "id"), h.store)
+	if err != nil {
+		respondContestLookupError(w, err)
+		return
+	}
+	teams, err := h.store.ListTeamRegistrations(r.Context(), contest.ID)
 	if err != nil {
 		http.Error(w, "failed to list registrations", http.StatusInternalServerError)
 		return
@@ -791,7 +803,7 @@ func (h *ContestHandler) AddProblem(w http.ResponseWriter, r *http.Request) {
 		req.Score = 100
 	}
 
-	if err := h.store.AddProblem(r.Context(), id, req.ProblemID, req.Index, req.Score, 0); err != nil {
+	if err := h.store.AddProblem(r.Context(), c.ID, req.ProblemID, req.Index, req.Score, 0); err != nil {
 		http.Error(w, "failed to add problem", http.StatusInternalServerError)
 		return
 	}
@@ -819,7 +831,7 @@ func (h *ContestHandler) RemoveProblem(w http.ResponseWriter, r *http.Request) {
 	}
 
 	problemID := chi.URLParam(r, "problemId")
-	if err := h.store.RemoveProblem(r.Context(), id, problemID); err != nil {
+	if err := h.store.RemoveProblem(r.Context(), c.ID, problemID); err != nil {
 		http.Error(w, "failed to remove problem", http.StatusInternalServerError)
 		return
 	}
@@ -922,7 +934,7 @@ func (h *ContestHandler) UpdateProblem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.store.UpdateProblem(r.Context(), id, problemID, req.Index, req.Score, req.SortOrder); err != nil {
+	if err := h.store.UpdateProblem(r.Context(), c.ID, problemID, req.Index, req.Score, req.SortOrder); err != nil {
 		http.Error(w, "failed to update problem", http.StatusInternalServerError)
 		return
 	}

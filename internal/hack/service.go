@@ -53,7 +53,7 @@ func (s *Service) SubmitHack(ctx context.Context, hackerID string, req model.Hac
 	}
 
 	h := &model.Hack{
-		ContestID:    req.ContestID,
+		ContestID:    contest.ID,
 		ProblemID:    req.ProblemID,
 		HackerID:     hackerID,
 		DefenderID:   sub.UserID,
