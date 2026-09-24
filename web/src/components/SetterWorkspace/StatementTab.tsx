@@ -1,11 +1,30 @@
-import { useRef } from 'react'
+import { lazy, Suspense, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkMath from 'remark-math'
 import remarkGfm from 'remark-gfm'
 import rehypeKatex from 'rehype-katex'
 import 'katex/dist/katex.min.css'
-import VisualEditor from '../VisualEditor'
 import type { ProblemFormState } from '../../types/problem-workspace'
+
+// The tiptap/lowlight/turndown stack is by far the heaviest part of the
+// setter workspace. Lazy-loading it keeps StatementTab itself small and
+// defers the editor bundle until React actually mounts the first field.
+const VisualEditor = lazy(() => import('../VisualEditor'))
+
+function VisualEditorField(props: { content: string; onChange: (markdown: string) => void; placeholder?: string }) {
+  return (
+    <Suspense
+      fallback={
+        <div
+          aria-label="Loading editor"
+          className="border border-gray-300 dark:border-gray-600 rounded-lg min-h-[200px] animate-pulse bg-gray-50 dark:bg-gray-800"
+        />
+      }
+    >
+      <VisualEditor {...props} />
+    </Suspense>
+  )
+}
 
 interface StatementTabProps {
   formState: ProblemFormState
@@ -116,7 +135,7 @@ export default function StatementTab({
                 {uploadingImage ? 'Uploading...' : 'Insert Image'}
               </button>
             </div>
-            <VisualEditor
+            <VisualEditorField
               content={formState.description}
               onChange={(markdown) => onUpdate('description', markdown)}
               placeholder="Write your problem statement..."
@@ -126,7 +145,7 @@ export default function StatementTab({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Input Format</label>
-              <VisualEditor
+              <VisualEditorField
                 content={formState.inputFormat}
                 onChange={(markdown) => onUpdate('inputFormat', markdown)}
                 placeholder="Describe the input format..."
@@ -134,7 +153,7 @@ export default function StatementTab({
             </div>
             <div>
               <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Output Format</label>
-              <VisualEditor
+              <VisualEditorField
                 content={formState.outputFormat}
                 onChange={(markdown) => onUpdate('outputFormat', markdown)}
                 placeholder="Describe the output format..."
@@ -144,7 +163,7 @@ export default function StatementTab({
 
           <div>
             <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Constraints</label>
-            <VisualEditor
+            <VisualEditorField
               content={formState.hint}
               onChange={(markdown) => onUpdate('hint', markdown)}
               placeholder="Add constraints..."
