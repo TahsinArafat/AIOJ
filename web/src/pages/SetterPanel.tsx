@@ -424,7 +424,7 @@ export default function SetterPanel() {
                                         </td>
                                         <td className="px-4 py-3 text-right flex gap-2 justify-end items-center">
                                             <Link to={`/contests/${c.id}`} className="text-blue-600 dark:text-blue-400 hover:underline text-xs">View</Link>
-                                            <Link to={`/setter/contest/${c.id}/edit`} className="bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 border border-orange-200 text-orange-700 dark:text-orange-300 px-2.5 py-1 rounded text-xs">Edit</Link>
+                                            <Link to={`/setter/contest/${c.id}/manage#settings`} className="bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 border border-orange-200 text-orange-700 dark:text-orange-300 px-2.5 py-1 rounded text-xs">Edit settings</Link>
                                             <Link to={`/setter/contest/${c.id}/manage`} className="bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 border border-blue-200 text-blue-700 dark:text-blue-300 px-2.5 py-1 rounded text-xs">Manage</Link>
                                         </td>
                                     </tr>
@@ -458,7 +458,7 @@ export default function SetterPanel() {
                                         <td className="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">{p.source || 'local'}</td>
                                         <td className="px-4 py-3">
                                             <span className={`px-2 py-1 rounded text-xs font-medium ${p.difficulty === 'easy' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' :
-                                                    p.difficulty === 'medium' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300' : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
+                                                p.difficulty === 'medium' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300' : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
                                                 }`}>{p.difficulty}</span>
                                         </td>
                                         <td className="px-4 py-3 text-right flex gap-2 justify-end items-center">
