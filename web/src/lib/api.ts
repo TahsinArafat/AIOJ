@@ -93,6 +93,42 @@ async function ensureCsrfToken(): Promise<string> {
     return getCsrfToken()
 }
 
+// ── Token refresh (single-flight) ────────────────────────────────────────────
+//
+// Several in-flight requests can 401 at the same time (the notification bell
+// polls, plus any page load firing 3-4 reads). Each one used to POST
+// /auth/refresh independently, and because the server rotates refresh tokens
+// the later call presented an already-consumed token and logged the user out.
+// One shared promise means concurrent 401s all await the same refresh.
+let refreshInFlight: Promise<boolean> | null = null
+
+async function refreshAccessToken(): Promise<boolean> {
+    if (!refreshToken) return false
+    if (refreshInFlight) return refreshInFlight
+
+    refreshInFlight = (async () => {
+        try {
+            const res = await fetch(BASE + '/auth/refresh', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': await ensureCsrfToken() },
+                body: JSON.stringify({ refresh_token: refreshToken }),
+            })
+            if (!res.ok) return false
+            const data = await res.json()
+            setTokens(data.access_token, data.refresh_token)
+            return true
+        } catch {
+            return false
+        } finally {
+            // Cleared in a microtask so callers awaiting this promise all see
+            // the same result before a new refresh can start.
+            queueMicrotask(() => { refreshInFlight = null })
+        }
+    })()
+
+    return refreshInFlight
+}
+
 async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
     const method = (opts.method || 'GET').toUpperCase()
     const headers: Record<string, string> = {
@@ -108,14 +144,7 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
     let res = await fetch(BASE + path, { ...opts, headers })
 
     if (res.status === 401 && refreshToken) {
-        const ref = await fetch(BASE + '/auth/refresh', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': await ensureCsrfToken() },
-            body: JSON.stringify({ refresh_token: refreshToken }),
-        })
-        if (ref.ok) {
-            const d = await ref.json()
-            setTokens(d.access_token, d.refresh_token)
+        if (await refreshAccessToken()) {
             headers['Authorization'] = `Bearer ${accessToken}`
             res = await fetch(BASE + path, { ...opts, headers })
         } else {
