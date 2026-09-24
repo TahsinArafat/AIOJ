@@ -43,3 +43,7 @@ web/playwright-report/
 
 # Keep the shared VS Code exclusions; other .vscode files stay local.
 !.vscode/settings.json
+
+# Browser-audit artefacts (screenshots captured during manual UI review)
+audit/
+screenshots/
