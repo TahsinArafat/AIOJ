@@ -33,8 +33,20 @@ export default function SetterProblemWorkspace() {
     return validTabs.includes(hash) ? hash : 'statement'
   })
 
+  // Two-way hash sync — the initializer only reads the hash once, so a deep
+  // link or a Back/Forward step that changes the hash alone left the workspace
+  // on the previous tab. replaceState avoids stacking history per tab click.
   useEffect(() => {
-    window.location.hash = activeTab
+    if (window.location.hash.replace('#', '') !== activeTab) {
+      window.history.replaceState(null, '', `#${activeTab}`)
+    }
+    const onHashChange = () => {
+      const next = window.location.hash.replace('#', '') as WorkspaceTab
+      const valid: WorkspaceTab[] = ['statement', 'testcases', 'checker', 'permissions', 'settings', 'editorial', 'translations']
+      if (valid.includes(next)) setActiveTab(next)
+    }
+    window.addEventListener('hashchange', onHashChange)
+    return () => window.removeEventListener('hashchange', onHashChange)
   }, [activeTab])
 
   const [saving, setSaving] = useState(false)
@@ -356,50 +368,52 @@ export default function SetterProblemWorkspace() {
         </div>
       )}
 
-      {/* Main content */}
-      <div className="flex gap-6 items-start">
+      {/* Main content. Stacks under lg — a 14rem tab rail beside the panel left
+          ~150px for the editor on a 390px phone. On mobile the rail scrolls
+          horizontally so every tab stays reachable. */}
+      <div className="flex flex-col lg:flex-row gap-6 items-start">
         {/* Tabs Sidebar */}
-        <div className="w-56 shrink-0 flex flex-col border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 overflow-hidden text-sm">
+        <div className="w-full lg:w-56 lg:shrink-0 flex lg:flex-col flex-row overflow-x-auto lg:overflow-hidden border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm">
           <button
             onClick={() => setActiveTab('statement')}
-            className={`px-4 py-3 text-left border-b border-gray-100 dark:border-gray-700 font-medium ${activeTab === 'statement' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-l-4 border-l-blue-600' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-black dark:hover:text-white'}`}
+            className={`px-4 py-3 text-left shrink-0 whitespace-nowrap border-r lg:border-r-0 lg:border-b border-gray-100 dark:border-gray-700 font-medium ${activeTab === 'statement' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-l-4 border-l-blue-600' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-black dark:hover:text-white'}`}
           >
             Statement & Details
           </button>
           <button
             onClick={() => setActiveTab('testcases')}
-            className={`px-4 py-3 text-left border-b border-gray-100 dark:border-gray-700 font-medium ${activeTab === 'testcases' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-l-4 border-l-blue-600' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-black dark:hover:text-white'}`}
+            className={`px-4 py-3 text-left shrink-0 whitespace-nowrap border-r lg:border-r-0 lg:border-b border-gray-100 dark:border-gray-700 font-medium ${activeTab === 'testcases' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-l-4 border-l-blue-600' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-black dark:hover:text-white'}`}
           >
             Test Cases / Data
           </button>
           <button
             onClick={() => setActiveTab('checker')}
-            className={`px-4 py-3 text-left border-b border-gray-100 dark:border-gray-700 font-medium ${activeTab === 'checker' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-l-4 border-l-blue-600' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-black dark:hover:text-white'}`}
+            className={`px-4 py-3 text-left shrink-0 whitespace-nowrap border-r lg:border-r-0 lg:border-b border-gray-100 dark:border-gray-700 font-medium ${activeTab === 'checker' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-l-4 border-l-blue-600' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-black dark:hover:text-white'}`}
           >
             Checker / Special Judge
           </button>
           <button
             onClick={() => setActiveTab('permissions')}
-            className={`px-4 py-3 text-left border-b border-gray-100 dark:border-gray-700 font-medium ${activeTab === 'permissions' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-l-4 border-l-blue-600' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-black dark:hover:text-white'}`}
+            className={`px-4 py-3 text-left shrink-0 whitespace-nowrap border-r lg:border-r-0 lg:border-b border-gray-100 dark:border-gray-700 font-medium ${activeTab === 'permissions' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-l-4 border-l-blue-600' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-black dark:hover:text-white'}`}
           >
             Collaborators
           </button>
           <button
             onClick={() => setActiveTab('settings')}
-            className={`px-4 py-3 text-left border-b border-gray-100 dark:border-gray-700 font-medium ${activeTab === 'settings' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-l-4 border-l-blue-600' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-black dark:hover:text-white'}`}
+            className={`px-4 py-3 text-left shrink-0 whitespace-nowrap border-r lg:border-r-0 lg:border-b border-gray-100 dark:border-gray-700 font-medium ${activeTab === 'settings' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-l-4 border-l-blue-600' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-black dark:hover:text-white'}`}
           >
             Workspace Settings
           </button>
           <button
             onClick={() => setActiveTab('editorial')}
-            className={`px-4 py-3 text-left font-medium ${activeTab === 'editorial' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-l-4 border-l-blue-600' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-black dark:hover:text-white'}`}
+            className={`px-4 py-3 text-left shrink-0 whitespace-nowrap font-medium ${activeTab === 'editorial' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-l-4 border-l-blue-600' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-black dark:hover:text-white'}`}
           >
             Editorials
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('translations')}
-            className={`px-4 py-3 text-left font-medium ${activeTab === 'translations' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-l-4 border-l-blue-600' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-black dark:hover:text-white'}`}
+            className={`px-4 py-3 text-left shrink-0 whitespace-nowrap font-medium ${activeTab === 'translations' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-l-4 border-l-blue-600' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-black dark:hover:text-white'}`}
           >
             Translations
           </button>

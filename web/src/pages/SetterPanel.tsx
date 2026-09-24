@@ -44,7 +44,7 @@ export default function SetterPanel() {
         if (!contestId || !problemIndex) return alert('Contest ID and Problem Index are required')
         setImporting(true)
         setImportResults(null)
-        
+
         // Handle bulk problem index split by comma or whitespace
         const indices = problemIndex.split(/[\s,]+/).filter(Boolean)
         const success: string[] = []
@@ -214,9 +214,11 @@ export default function SetterPanel() {
 
     return (
         <div>
-            <div className="flex items-center justify-between mb-6">
+            {/* Stacks under sm — the three action buttons are 276px of
+                min-content and sat beside the heading, overflowing a phone. */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
                 <h1 className="text-2xl font-bold">Problem Setter Workspace</h1>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                     <Link to="/setter/contest/create" className="bg-green-600 text-white px-4 py-2 rounded text-sm hover:bg-green-700 transition-colors">+ Create Contest</Link>
                     <Link to="/setter/create" className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 transition-colors">+ Create Problem</Link>
                     <Link to="/generate/problem" className="bg-purple-600 text-white px-4 py-2 rounded text-sm hover:bg-purple-700 transition-colors flex items-center gap-1">✦ Generate with AI</Link>
@@ -274,7 +276,7 @@ export default function SetterPanel() {
                     </div>
 
                     <h3 className="font-semibold text-sm mt-6 mb-3">Import from Remote Platforms</h3>
-                    
+
                     {importResults && (
                         <div className="border rounded-lg p-4 bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 space-y-3">
                             <h3 className="font-semibold text-sm">Import Results</h3>
@@ -453,10 +455,9 @@ export default function SetterPanel() {
                                         <td className="px-4 py-3 font-medium">{p.title}</td>
                                         <td className="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">{p.source || 'local'}</td>
                                         <td className="px-4 py-3">
-                                            <span className={`px-2 py-1 rounded text-xs font-medium ${
-                                                p.difficulty === 'easy' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' :
-                                                p.difficulty === 'medium' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300' : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
-                                            }`}>{p.difficulty}</span>
+                                            <span className={`px-2 py-1 rounded text-xs font-medium ${p.difficulty === 'easy' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' :
+                                                    p.difficulty === 'medium' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300' : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
+                                                }`}>{p.difficulty}</span>
                                         </td>
                                         <td className="px-4 py-3 text-right flex gap-2 justify-end items-center">
                                             <Link to={`/problems/${p.slug}`} className="text-blue-600 dark:text-blue-400 hover:underline text-xs">View</Link>

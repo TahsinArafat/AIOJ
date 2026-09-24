@@ -317,7 +317,7 @@ export default function ContestDetail() {
             const newCount = items.filter((c: any) => new Date(c.created_at).getTime() > Number(lastSeen)).length
             setUnreadClarifications(newCount)
             setClarifications(items)
-        }).catch(() => {})
+        }).catch(() => { })
     }, [id])
 
     useEffect(() => {
@@ -343,7 +343,7 @@ export default function ContestDetail() {
                 setStandingsProblems(res.problems || [])
                 setStandingsFrozen(res.frozen || false)
                 setStandingsPagination(res.pagination || null)
-            }).catch(() => {})
+            }).catch(() => { })
         }
     }, [activeTab, id, standingsPage])
 
@@ -357,7 +357,7 @@ export default function ContestDetail() {
                 setSubmissions(res.data || [])
                 setSubmissionsTotal(res.total || 0)
                 setIsJudge(res.is_judge || false)
-            }).catch(() => {})
+            }).catch(() => { })
         }
     }, [activeTab, id, submissionsOffset, submissionsMine, subFilterProblem, subFilterLang, subFilterStatus])
 
@@ -399,7 +399,7 @@ export default function ContestDetail() {
                 // Calculate unread from localStorage
                 const lastSeen = localStorage.getItem(`contest_${id}_last_notice`) || '0'
                 setUnreadAnnouncements(items.filter((a: any) => new Date(a.created_at).getTime() > Number(lastSeen)).length)
-            }).catch(() => {})
+            }).catch(() => { })
         }
         pollNotices()
         const interval = setInterval(pollNotices, 15000)
@@ -439,7 +439,7 @@ export default function ContestDetail() {
         try {
             await api.contests.postAnnouncement(id, announceText.trim())
             setAnnounceText('')
-            api.contests.announcements(id).then((res: any) => setAnnouncements(Array.isArray(res) ? res : res.data || [])).catch(() => {})
+            api.contests.announcements(id).then((res: any) => setAnnouncements(Array.isArray(res) ? res : res.data || [])).catch(() => { })
         } catch (e: any) { alert(e.message) }
     }
 
@@ -464,7 +464,9 @@ export default function ContestDetail() {
         <div className="max-w-7xl mx-auto px-4 py-6">
             {/* ── Hero Header ──────────────────────────────────────────────── */}
             <div className="mb-6">
-                <div className="flex items-center gap-3 mb-2">
+                {/* flex-wrap: the title plus four badges is 526px of
+                    min-content, which overflowed a 390px phone. */}
+                <div className="flex flex-wrap items-center gap-3 mb-2">
                     <h1 className="text-3xl font-extrabold text-gray-900 dark:text-gray-100">{contest.title}</h1>
                     <StatusBadge status={status} />
                     {contest.format && <FormatBadge format={contest.format} />}
@@ -486,8 +488,11 @@ export default function ContestDetail() {
             )}
 
             {/* ── Tab Navigation ───────────────────────────────────────────── */}
-            <div className="border-b border-gray-200 dark:border-gray-700 mb-6">
-                <nav className="flex gap-6">
+            {/* overflow-x-auto: five tabs (with unread badges) are 623px of
+                min-content, so without a scroller they pushed the document to
+                663px on a 390px phone. */}
+            <div className="border-b border-gray-200 dark:border-gray-700 mb-6 overflow-x-auto">
+                <nav className="flex gap-6 min-w-max">
                     {([
                         { key: 'problems', label: 'Problems', icon: 'problems' },
                         { key: 'standings', label: 'Standings', icon: 'standings' },
@@ -498,11 +503,10 @@ export default function ContestDetail() {
                         <button
                             key={tab.key}
                             onClick={() => setActiveTab(tab.key)}
-                            className={`pb-3 text-sm font-semibold transition-colors flex items-center gap-1.5 ${
-                                activeTab === tab.key
-                                    ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600'
-                                    : 'text-gray-500 hover:text-gray-700 border-b-2 border-transparent'
-                            }`}
+                            className={`pb-3 text-sm font-semibold transition-colors flex items-center gap-1.5 ${activeTab === tab.key
+                                ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600'
+                                : 'text-gray-500 hover:text-gray-700 border-b-2 border-transparent'
+                                }`}
                         >
                             {tab.icon === 'problems' && <FileText className="w-4 h-4" />}
                             {tab.icon === 'standings' && <Trophy className="w-4 h-4" />}
@@ -631,16 +635,15 @@ export default function ContestDetail() {
                                                 const ph = Math.floor(sec / 3600)
                                                 const pm = Math.floor((sec % 3600) / 60)
                                                 const ps = sec % 60
-                                                const penaltyStr = ph > 0 ? `${ph}:${String(pm).padStart(2,'0')}:${String(ps).padStart(2,'0')}` : `${pm}:${String(ps).padStart(2,'0')}`
+                                                const penaltyStr = ph > 0 ? `${ph}:${String(pm).padStart(2, '0')}:${String(ps).padStart(2, '0')}` : `${pm}:${String(ps).padStart(2, '0')}`
                                                 return (
                                                     <tr key={row.user_id || idx} className={`transition-colors ${isMe ? 'bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30' : idx % 2 === 0 ? 'bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800' : 'bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
                                                         <td className="text-center px-3 py-2.5">
                                                             {medal ? (
-                                                                <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-sm font-black border ${
-                                                                    medal === 'gold' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 border-yellow-300 dark:border-yellow-700' :
+                                                                <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-sm font-black border ${medal === 'gold' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 border-yellow-300 dark:border-yellow-700' :
                                                                     medal === 'silver' ? 'bg-gray-200 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600' :
-                                                                    'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 border-orange-300 dark:border-orange-700'
-                                                                }`}>{rank}</span>
+                                                                        'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 border-orange-300 dark:border-orange-700'
+                                                                    }`}>{rank}</span>
                                                             ) : (
                                                                 <span className="text-sm font-bold text-gray-500 dark:text-gray-400">{rank}</span>
                                                             )}
@@ -737,11 +740,10 @@ export default function ContestDetail() {
                                                         <button
                                                             key={p}
                                                             onClick={() => setStandingsPage(p)}
-                                                            className={`min-w-[36px] px-2 py-1.5 text-sm font-medium rounded-md border transition-colors ${
-                                                                p === page
-                                                                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                                                                    : 'bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-gray-700'
-                                                            }`}
+                                                            className={`min-w-[36px] px-2 py-1.5 text-sm font-medium rounded-md border transition-colors ${p === page
+                                                                ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                                                                : 'bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-gray-700'
+                                                                }`}
                                                         >
                                                             {p}
                                                         </button>
@@ -1086,150 +1088,149 @@ export default function ContestDetail() {
 
                 {/* Right: Sidebar — hidden on standings/submissions tab to maximize table width */}
                 {activeTab !== 'standings' && activeTab !== 'submissions' && (
-                <div className="w-80 flex-shrink-0 space-y-4 hidden lg:block">
-                    {/* Contest Info */}
-                    <SidebarBox title="Contest Info" icon="info">
-                        <dl className="space-y-2.5 text-sm">
-                            <div className="flex justify-between">
-                                <dt className="text-gray-500">Start</dt>
-                                <dd className="text-gray-800 dark:text-gray-300 font-medium text-right">{formatDateTime(contest.start_time)}</dd>
-                            </div>
-                            <div className="flex justify-between">
-                                <dt className="text-gray-500">End</dt>
-                                <dd className="text-gray-800 dark:text-gray-300 font-medium text-right">{formatDateTime(contest.end_time)}</dd>
-                            </div>
-                            <div className="flex justify-between">
-                                <dt className="text-gray-500">Duration</dt>
-                                <dd className="text-gray-800 dark:text-gray-300 font-medium">{formatDuration(totalDuration)}</dd>
-                            </div>
-                            {contest.freeze_time && (
+                    <div className="w-80 flex-shrink-0 space-y-4 hidden lg:block">
+                        {/* Contest Info */}
+                        <SidebarBox title="Contest Info" icon="info">
+                            <dl className="space-y-2.5 text-sm">
                                 <div className="flex justify-between">
-                                    <dt className="text-gray-500">Standings freeze</dt>
-                                    <dd className="text-gray-800 dark:text-gray-300 font-medium text-right">{formatDateTime(contest.freeze_time)}</dd>
+                                    <dt className="text-gray-500">Start</dt>
+                                    <dd className="text-gray-800 dark:text-gray-300 font-medium text-right">{formatDateTime(contest.start_time)}</dd>
                                 </div>
-                            )}
-                            <div className="border-t border-gray-100 dark:border-gray-800 pt-2 flex justify-between">
-                                <dt className="text-gray-500">Format</dt>
-                                <dd className="text-gray-800 dark:text-gray-300 font-medium uppercase">{contest.format || 'N/A'}</dd>
-                            </div>
-                            <div className="flex justify-between">
-                                <dt className="text-gray-500">Type</dt>
-                                <dd className="text-gray-800 dark:text-gray-300 font-medium capitalize">{contest.type || 'Standard'}</dd>
-                            </div>
-                            <div className="flex justify-between">
-                                <dt className="text-gray-500">Problems</dt>
-                                <dd className="text-gray-800 dark:text-gray-300 font-medium">{problems.length}</dd>
-                            </div>
-                        </dl>
-                    </SidebarBox>
+                                <div className="flex justify-between">
+                                    <dt className="text-gray-500">End</dt>
+                                    <dd className="text-gray-800 dark:text-gray-300 font-medium text-right">{formatDateTime(contest.end_time)}</dd>
+                                </div>
+                                <div className="flex justify-between">
+                                    <dt className="text-gray-500">Duration</dt>
+                                    <dd className="text-gray-800 dark:text-gray-300 font-medium">{formatDuration(totalDuration)}</dd>
+                                </div>
+                                {contest.freeze_time && (
+                                    <div className="flex justify-between">
+                                        <dt className="text-gray-500">Standings freeze</dt>
+                                        <dd className="text-gray-800 dark:text-gray-300 font-medium text-right">{formatDateTime(contest.freeze_time)}</dd>
+                                    </div>
+                                )}
+                                <div className="border-t border-gray-100 dark:border-gray-800 pt-2 flex justify-between">
+                                    <dt className="text-gray-500">Format</dt>
+                                    <dd className="text-gray-800 dark:text-gray-300 font-medium uppercase">{contest.format || 'N/A'}</dd>
+                                </div>
+                                <div className="flex justify-between">
+                                    <dt className="text-gray-500">Type</dt>
+                                    <dd className="text-gray-800 dark:text-gray-300 font-medium capitalize">{contest.type || 'Standard'}</dd>
+                                </div>
+                                <div className="flex justify-between">
+                                    <dt className="text-gray-500">Problems</dt>
+                                    <dd className="text-gray-800 dark:text-gray-300 font-medium">{problems.length}</dd>
+                                </div>
+                            </dl>
+                        </SidebarBox>
 
-                    {/* Registration */}
-                    {contest.registration_required && (
-                        <SidebarBox title="Registration" icon="users">
-                            <div className="space-y-3">
-                                <div className="flex items-center justify-between text-sm">
-                                    <span className="text-gray-500">Participants</span>
-                                    <span className="font-semibold text-gray-800 dark:text-gray-300">
-                                        {registrationCount}{contest.max_participants ? ` / ${contest.max_participants}` : ''}
-                                    </span>
-                                </div>
-                                {contest.max_participants && (
-                                    <div className="w-full bg-gray-100 dark:bg-gray-900/30 rounded-full h-1.5">
-                                        <div
-                                            className="bg-blue-50 dark:bg-blue-900/200 rounded-full h-1.5 transition-all"
-                                            style={{ width: `${Math.min(100, (registrationCount / contest.max_participants) * 100)}%` }}
-                                        />
+                        {/* Registration */}
+                        {contest.registration_required && (
+                            <SidebarBox title="Registration" icon="users">
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between text-sm">
+                                        <span className="text-gray-500">Participants</span>
+                                        <span className="font-semibold text-gray-800 dark:text-gray-300">
+                                            {registrationCount}{contest.max_participants ? ` / ${contest.max_participants}` : ''}
+                                        </span>
                                     </div>
-                                )}
-                                {registered && (
-                                    <div className="flex items-center gap-1.5 text-sm text-green-600 dark:text-green-400 font-medium">
-                                        <CheckCircle2 className="w-4 h-4" />
-                                        You are registered
-                                    </div>
-                                )}
-                                {isUpcoming && getAccessToken() && (
-                                    <button
-                                        onClick={() => registered ? handleUnregister() : handleRegister()}
-                                        className={`w-full py-2 rounded-lg text-sm font-semibold transition-colors ${
-                                            registered
+                                    {contest.max_participants && (
+                                        <div className="w-full bg-gray-100 dark:bg-gray-900/30 rounded-full h-1.5">
+                                            <div
+                                                className="bg-blue-50 dark:bg-blue-900/200 rounded-full h-1.5 transition-all"
+                                                style={{ width: `${Math.min(100, (registrationCount / contest.max_participants) * 100)}%` }}
+                                            />
+                                        </div>
+                                    )}
+                                    {registered && (
+                                        <div className="flex items-center gap-1.5 text-sm text-green-600 dark:text-green-400 font-medium">
+                                            <CheckCircle2 className="w-4 h-4" />
+                                            You are registered
+                                        </div>
+                                    )}
+                                    {isUpcoming && getAccessToken() && (
+                                        <button
+                                            onClick={() => registered ? handleUnregister() : handleRegister()}
+                                            className={`w-full py-2 rounded-lg text-sm font-semibold transition-colors ${registered
                                                 ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 border border-red-200 dark:border-red-700'
                                                 : 'bg-blue-600 text-white hover:bg-blue-700'
-                                        }`}
-                                    >
-                                        {registered ? 'Unregister' : 'Register Now'}
-                                    </button>
-                                )}
-                            </div>
-                        </SidebarBox>
-                    )}
+                                                }`}
+                                        >
+                                            {registered ? 'Unregister' : 'Register Now'}
+                                        </button>
+                                    )}
+                                </div>
+                            </SidebarBox>
+                        )}
 
-                    {/* Quick Links */}
-                    {(isRunning || isEnded) && (
-                        <SidebarBox title="Quick Links" icon="zap">
-                            <div className="space-y-2">
-                                <Link
-                                    to={`/contests/${id}/scoreboard`}
-                                    className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 hover:underline"
-                                >
-                                    <Trophy className="w-4 h-4" /> View Full Scoreboard
-                                </Link>
-                                {contest.pdf_enabled && (
-                                    <a
-                                        href={`/api/contests/${id}/pdf`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
+                        {/* Quick Links */}
+                        {(isRunning || isEnded) && (
+                            <SidebarBox title="Quick Links" icon="zap">
+                                <div className="space-y-2">
+                                    <Link
+                                        to={`/contests/${id}/scoreboard`}
                                         className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 hover:underline"
                                     >
-                                        <FileDown className="w-4 h-4" /> Download PDF
-                                    </a>
-                                )}
-                                {contest.upsolving_enabled && (
-                                    <span className="flex items-center gap-2 text-sm text-gray-500">
-                                        <Pencil className="w-4 h-4" /> Upsolving is enabled
-                                    </span>
-                                )}
-                            </div>
-                        </SidebarBox>
-                    )}
+                                        <Trophy className="w-4 h-4" /> View Full Scoreboard
+                                    </Link>
+                                    {contest.pdf_enabled && (
+                                        <a
+                                            href={`/api/contests/${id}/pdf`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 hover:underline"
+                                        >
+                                            <FileDown className="w-4 h-4" /> Download PDF
+                                        </a>
+                                    )}
+                                    {contest.upsolving_enabled && (
+                                        <span className="flex items-center gap-2 text-sm text-gray-500">
+                                            <Pencil className="w-4 h-4" /> Upsolving is enabled
+                                        </span>
+                                    )}
+                                </div>
+                            </SidebarBox>
+                        )}
 
-                    {/* Judge Panel */}
-                    {isAdmin && (
-                        <SidebarBox title="Judge Panel" icon="settings" accent="purple">
-                            <div className="space-y-2">
-                                <Link
-                                    to={`/setter/contest/${id}/manage`}
-                                    className="flex items-center gap-2 w-full px-3 py-2 bg-purple-600 text-white text-sm font-semibold rounded-lg hover:bg-purple-700 transition-colors text-center justify-center"
-                                >
-                                    <Settings className="w-4 h-4" /> Manage Contest
-                                </Link>
-                                {isRunning && contest.statement_hidden && (
-                                    <p className="text-xs text-yellow-700 dark:text-yellow-300 font-medium flex items-center gap-1">
-                                        <AlertTriangle className="w-3 h-3" /> Statement hidden mode is ON
-                                    </p>
-                                )}
-                            </div>
-                        </SidebarBox>
-                    )}
+                        {/* Judge Panel */}
+                        {isAdmin && (
+                            <SidebarBox title="Judge Panel" icon="settings" accent="purple">
+                                <div className="space-y-2">
+                                    <Link
+                                        to={`/setter/contest/${id}/manage`}
+                                        className="flex items-center gap-2 w-full px-3 py-2 bg-purple-600 text-white text-sm font-semibold rounded-lg hover:bg-purple-700 transition-colors text-center justify-center"
+                                    >
+                                        <Settings className="w-4 h-4" /> Manage Contest
+                                    </Link>
+                                    {isRunning && contest.statement_hidden && (
+                                        <p className="text-xs text-yellow-700 dark:text-yellow-300 font-medium flex items-center gap-1">
+                                            <AlertTriangle className="w-3 h-3" /> Statement hidden mode is ON
+                                        </p>
+                                    )}
+                                </div>
+                            </SidebarBox>
+                        )}
 
-                    {/* Educational Round Info */}
-                    {contest.type === 'educational' && (
-                        <SidebarBox title="Educational Round" icon="book" accent="green">
-                            <p className="text-sm text-gray-600 dark:text-gray-400">
-                                This is an educational contest. Problems are designed for learning and practice.
-                            </p>
-                        </SidebarBox>
-                    )}
+                        {/* Educational Round Info */}
+                        {contest.type === 'educational' && (
+                            <SidebarBox title="Educational Round" icon="book" accent="green">
+                                <p className="text-sm text-gray-600 dark:text-gray-400">
+                                    This is an educational contest. Problems are designed for learning and practice.
+                                </p>
+                            </SidebarBox>
+                        )}
 
-                    {/* Virtual Contest */}
-                    {contest.virtual_contest_enabled && (
-                        <SidebarBox title="Virtual Contest" icon="game">
-                            <p className="text-sm text-gray-600 dark:text-gray-400">
-                                Virtual contests are available. Join anytime to practice with real contest timing.
-                            </p>
-                        </SidebarBox>
-                    )}
+                        {/* Virtual Contest */}
+                        {contest.virtual_contest_enabled && (
+                            <SidebarBox title="Virtual Contest" icon="game">
+                                <p className="text-sm text-gray-600 dark:text-gray-400">
+                                    Virtual contests are available. Join anytime to practice with real contest timing.
+                                </p>
+                            </SidebarBox>
+                        )}
 
-                </div>
+                    </div>
                 )}
             </div>
         </div>

@@ -78,11 +78,11 @@ export default function GroupList() {
 
             {/* Join by Code */}
             {getAccessToken() && (
-                <div className="flex gap-2 items-center mb-6 p-3 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg">
+                <div className="flex flex-wrap gap-2 items-center mb-6 p-3 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg">
                     <label className="text-sm font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">Join with Code:</label>
                     <input type="text" placeholder="Enter invite code..." value={joinCode}
                         onChange={e => setJoinCode(e.target.value)}
-                        className="flex-1 border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 rounded px-3 py-2 text-sm"
+                        className="flex-1 min-w-[10rem] border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 rounded px-3 py-2 text-sm"
                         onKeyDown={e => e.key === 'Enter' && handleJoinByCode()} />
                     <button onClick={handleJoinByCode} disabled={joining || !joinCode.trim()}
                         className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm font-medium disabled:opacity-50 cursor-pointer">

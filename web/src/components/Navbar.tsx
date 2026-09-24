@@ -22,7 +22,7 @@ function decodeRole(): string | null {
     }
 }
 
-function NavDropdown({ label, icon: Icon, align = 'left', children }: { label: string; icon: any; align?: 'left' | 'right'; children: React.ReactNode }) {
+function NavDropdown({ label, icon: Icon, align = 'left', ariaLabel, children }: { label: string; icon: any; align?: 'left' | 'right'; ariaLabel?: string; children: React.ReactNode }) {
     const [open, setOpen] = useState(false)
     const ref = useRef<HTMLDivElement>(null)
 
@@ -38,6 +38,9 @@ function NavDropdown({ label, icon: Icon, align = 'left', children }: { label: s
         <div ref={ref} className="relative">
             <button
                 onClick={() => setOpen(!open)}
+                aria-label={ariaLabel || label || undefined}
+                aria-expanded={open}
+                aria-haspopup="menu"
                 className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white transition-colors cursor-pointer"
             >
                 <Icon className="w-4 h-4" />
@@ -81,34 +84,39 @@ export default function Navbar() {
 
     return (
         <nav className="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-800 sticky top-0 z-50 transition-colors duration-200">
-            <div className="px-6 py-3 flex items-center justify-between">
+            {/* The full desktop nav (logo + Compete + Community + Problems + IDE +
+                Admin + search + language + theme + account) needs ~964px. It used
+                to switch on at `md` (768px), so on 768–964px tablets the right
+                cluster was clipped off-screen and unreachable. `lg` (1024px) is
+                the first width that actually fits it. */}
+            <div className="px-6 py-3 flex items-center justify-between gap-3">
                 {/* Left: Logo + Main nav */}
-                <div className="flex gap-6 items-center">
+                <div className="flex gap-6 items-center min-w-0">
                     <Link to="/" onClick={() => setMobileMenuOpen(false)} className="font-bold text-blue-600 dark:text-blue-400 text-lg">AIOJ</Link>
-                    <div className="hidden md:flex gap-4 items-center">
+                    <div className="hidden lg:flex gap-4 items-center">
                         {!isContestant && (
                             <>
-                        <NavDropdown label="Compete" icon={Trophy}>
-                            <NavLink to="/contests" icon={Trophy}>Contests</NavLink>
-                            <NavLink to="/gym" icon={Dumbbell}>Gym</NavLink>
-                            <NavLink to="/practice" icon={BookOpen}>Practice</NavLink>
-                        </NavDropdown>
-                        <NavDropdown label="Community" icon={Users}>
-                            <NavLink to="/organizations" icon={Building2}>Organizations</NavLink>
-                            <NavLink to="/groups" icon={Users}>Groups</NavLink>
-                            <NavLink to="/teams" icon={UserCheck}>Teams</NavLink>
-                            <NavLink to="/blog" icon={MessageSquare}>Blog</NavLink>
-                            <NavLink to="/training" icon={GraduationCap}>Training Plans</NavLink>
-                            <NavLink to="/rankings" icon={BarChart3}>Rankings</NavLink>
-                        </NavDropdown>
-                        <Link to="/problems" className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white transition-colors">
-                            <Code2 className="w-4 h-4" />
-                            <span>Problems</span>
-                        </Link>
-                        <Link to="/ide" className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white transition-colors">
-                            <Terminal className="w-4 h-4" />
-                            <span>IDE</span>
-                        </Link>
+                                <NavDropdown label="Compete" icon={Trophy}>
+                                    <NavLink to="/contests" icon={Trophy}>Contests</NavLink>
+                                    <NavLink to="/gym" icon={Dumbbell}>Gym</NavLink>
+                                    <NavLink to="/practice" icon={BookOpen}>Practice</NavLink>
+                                </NavDropdown>
+                                <NavDropdown label="Community" icon={Users}>
+                                    <NavLink to="/organizations" icon={Building2}>Organizations</NavLink>
+                                    <NavLink to="/groups" icon={Users}>Groups</NavLink>
+                                    <NavLink to="/teams" icon={UserCheck}>Teams</NavLink>
+                                    <NavLink to="/blog" icon={MessageSquare}>Blog</NavLink>
+                                    <NavLink to="/training" icon={GraduationCap}>Training Plans</NavLink>
+                                    <NavLink to="/rankings" icon={BarChart3}>Rankings</NavLink>
+                                </NavDropdown>
+                                <Link to="/problems" className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white transition-colors">
+                                    <Code2 className="w-4 h-4" />
+                                    <span>Problems</span>
+                                </Link>
+                                <Link to="/ide" className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white transition-colors">
+                                    <Terminal className="w-4 h-4" />
+                                    <span>IDE</span>
+                                </Link>
                             </>
                         )}
                         {isAdmin && (
@@ -121,7 +129,7 @@ export default function Navbar() {
                 </div>
 
                 {/* Right: Search + User */}
-                <div className="hidden md:flex gap-3 items-center">
+                <div className="hidden lg:flex gap-3 items-center shrink-0">
                     <GlobalSearch />
                     <LanguageSwitcher />
                     <button
@@ -133,16 +141,15 @@ export default function Navbar() {
                     </button>
                     {loggedIn ? (
                         <>
-                            <NotificationBell />
-                            <NavDropdown label="" icon={User} align="right">
+                            <NavDropdown label="" icon={User} align="right" ariaLabel="Account menu">
                                 <NavLink to="/profile" icon={User}>Profile</NavLink>
                                 <NavLink to="/notifications" icon={Bell}>Notifications</NavLink>
                                 <NavLink to="/submissions" icon={FileCode}>My Submissions</NavLink>
                                 <NavLink to="/setter" icon={FileCode}>Setter Workspace</NavLink>
                                 {!isContestant && (
                                     <>
-                                <NavLink to="/settings/api" icon={Key}>API Keys</NavLink>
-                                <NavLink to="/settings/notifications" icon={Bell}>Notification Settings</NavLink>
+                                        <NavLink to="/settings/api" icon={Key}>API Keys</NavLink>
+                                        <NavLink to="/settings/notifications" icon={Bell}>Notification Settings</NavLink>
                                     </>
                                 )}
                                 <hr className="border-gray-200 dark:border-gray-700 my-1" />
@@ -158,7 +165,7 @@ export default function Navbar() {
                 </div>
 
                 {/* Mobile Menu Button */}
-                <div className="flex md:hidden items-center gap-3">
+                <div className="flex lg:hidden items-center gap-3">
                     <GlobalSearch />
                     <LanguageSwitcher />
                     <button
@@ -181,39 +188,39 @@ export default function Navbar() {
 
             {/* Mobile Drawer */}
             {mobileMenuOpen && (
-                <div className="md:hidden border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 py-4 px-6 space-y-1 flex flex-col transition-all duration-200">
+                <div className="lg:hidden border-t border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 py-4 px-6 space-y-1 flex flex-col transition-all duration-200">
                     {!isContestant && (
                         <>
-                    <div className="px-3 py-1 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Compete</div>
-                    <Link to="/contests" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white font-medium py-2 px-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
-                        <Trophy className="w-4 h-4" /> Contests
-                    </Link>
-                    <Link to="/gym" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white font-medium py-2 px-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
-                        <Dumbbell className="w-4 h-4" /> Gym
-                    </Link>
-                    <Link to="/practice" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white font-medium py-2 px-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
-                        <BookOpen className="w-4 h-4" /> Practice
-                    </Link>
-                    <Link to="/problems" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white font-medium py-2 px-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
-                        <Code2 className="w-4 h-4" /> Problems
-                    </Link>
-                    <Link to="/ide" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white font-medium py-2 px-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
-                        <Terminal className="w-4 h-4" /> IDE
-                    </Link>
+                            <div className="px-3 py-1 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Compete</div>
+                            <Link to="/contests" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white font-medium py-2 px-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
+                                <Trophy className="w-4 h-4" /> Contests
+                            </Link>
+                            <Link to="/gym" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white font-medium py-2 px-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
+                                <Dumbbell className="w-4 h-4" /> Gym
+                            </Link>
+                            <Link to="/practice" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white font-medium py-2 px-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
+                                <BookOpen className="w-4 h-4" /> Practice
+                            </Link>
+                            <Link to="/problems" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white font-medium py-2 px-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
+                                <Code2 className="w-4 h-4" /> Problems
+                            </Link>
+                            <Link to="/ide" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white font-medium py-2 px-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
+                                <Terminal className="w-4 h-4" /> IDE
+                            </Link>
 
-                    <div className="px-3 py-1 mt-2 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Community</div>
-                    <Link to="/groups" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white font-medium py-2 px-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
-                        <Users className="w-4 h-4" /> Groups
-                    </Link>
-                    <Link to="/teams" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white font-medium py-2 px-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
-                        <UserCheck className="w-4 h-4" /> Teams
-                    </Link>
-                    <Link to="/blog" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white font-medium py-2 px-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
-                        <MessageSquare className="w-4 h-4" /> Blog
-                    </Link>
-                    <Link to="/rankings" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white font-medium py-2 px-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
-                        <BarChart3 className="w-4 h-4" /> Rankings
-                    </Link>
+                            <div className="px-3 py-1 mt-2 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Community</div>
+                            <Link to="/groups" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white font-medium py-2 px-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
+                                <Users className="w-4 h-4" /> Groups
+                            </Link>
+                            <Link to="/teams" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white font-medium py-2 px-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
+                                <UserCheck className="w-4 h-4" /> Teams
+                            </Link>
+                            <Link to="/blog" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white font-medium py-2 px-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
+                                <MessageSquare className="w-4 h-4" /> Blog
+                            </Link>
+                            <Link to="/rankings" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white font-medium py-2 px-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
+                                <BarChart3 className="w-4 h-4" /> Rankings
+                            </Link>
                         </>
                     )}
 

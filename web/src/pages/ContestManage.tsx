@@ -54,8 +54,25 @@ export default function ContestManage() {
     })
     const [loading, setLoading] = useState(true)
 
+    // Two-way hash sync. The initializer above reads the hash once, so without
+    // a hashchange listener a deep link to #balloons (or a Back/Forward step)
+    // changed the URL but left the sidebar on Challenges. replaceState keeps
+    // tab clicks from piling entries on the history stack.
     useEffect(() => {
-        window.location.hash = tab
+        if (window.location.hash.replace('#', '') !== tab) {
+            window.history.replaceState(null, '', `#${tab}`)
+        }
+        const onHashChange = () => {
+            const next = window.location.hash.replace('#', '') as TabKey
+            const valid: TabKey[] = [
+                'challenges', 'booklet', 'clarifications', 'participants', 'submissions',
+                'prints', 'standings', 'statistics', 'plagiarisms', 'balloons',
+                'announcements', 'moderators', 'onsite-teams', 'settings'
+            ]
+            if (valid.includes(next)) setTab(next)
+        }
+        window.addEventListener('hashchange', onHashChange)
+        return () => window.removeEventListener('hashchange', onHashChange)
     }, [tab])
 
     useEffect(() => {
@@ -77,19 +94,21 @@ export default function ContestManage() {
                 <h1 className="text-2xl font-bold mt-1">Contest Management</h1>
             </div>
 
-            <div className="flex gap-6">
+            {/* Stack under lg: the 14rem tab rail sat beside the panel on a 390px
+                phone, squeezing the panel to ~150px. On mobile the rail scrolls
+                horizontally so all 14 tabs stay reachable. */}
+            <div className="flex flex-col lg:flex-row gap-6">
                 {/* Sidebar */}
-                <aside className="w-56 shrink-0">
-                    <nav className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden sticky top-4">
+                <aside className="w-full lg:w-56 lg:shrink-0">
+                    <nav className="flex lg:block overflow-x-auto lg:overflow-hidden bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl lg:sticky lg:top-4">
                         {TABS.map(t => (
                             <button
                                 key={t.key}
                                 onClick={() => setTab(t.key)}
-                                className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors text-left ${
-                                    tab === t.key
-                                        ? 'bg-blue-50 text-blue-700 font-medium border-l-3 border-blue-600'
-                                        : 'text-gray-600 hover:bg-gray-50 border-l-3 border-transparent'
-                                }`}
+                                className={`w-auto lg:w-full shrink-0 whitespace-nowrap flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors text-left ${tab === t.key
+                                    ? 'bg-blue-50 text-blue-700 font-medium border-l-3 border-blue-600'
+                                    : 'text-gray-600 hover:bg-gray-50 border-l-3 border-transparent'
+                                    }`}
                             >
                                 <t.Icon className="w-4 h-4" />
                                 {t.label}
@@ -97,7 +116,7 @@ export default function ContestManage() {
                         ))}
                         <Link
                             to={`/contests/${id}/problem/${problems[0]?.index || 'A'}`}
-                            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-600 hover:bg-green-50 hover:text-green-700 transition-colors border-t border-gray-100 border-l-3 border-transparent"
+                            className="w-auto lg:w-full shrink-0 whitespace-nowrap flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-600 hover:bg-green-50 hover:text-green-700 transition-colors border-t lg:border-t-0 border-l-3 border-transparent"
                         >
                             <span className="text-base"><Play className="w-4 h-4" /></span>
                             Arena
@@ -169,15 +188,15 @@ function ChallengesTab({ contestId }: { contestId: string }) {
         const target = idx + dir
         if (target < 0 || target >= problems.length) return
         const next = [...problems]
-        ;[next[idx], next[target]] = [next[target], next[idx]]
-        
+            ;[next[idx], next[target]] = [next[target], next[idx]]
+
         next.forEach((p, i) => {
             p.index = indexLabel(i)
             p.sort_order = i
         })
-        
+
         try {
-            await Promise.all(next.map((p, i) => 
+            await Promise.all(next.map((p, i) =>
                 api.contests.updateProblem(contestId, p.problem_id, {
                     index: p.index,
                     score: p.score || 100,
@@ -944,7 +963,7 @@ function SettingsTab({ contestId }: { contestId: string }) {
 
         api.groups.list(0, 100).then(res => {
             setGroups(res.data || [])
-        }).catch(() => {})
+        }).catch(() => { })
     }, [contestId])
 
     const handleSave = async () => {

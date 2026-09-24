@@ -23,7 +23,7 @@ export default function CookieConsent() {
         <div
             role="dialog"
             aria-label="Cookie consent"
-            className="fixed bottom-4 left-4 right-4 md:left-8 md:right-auto md:max-w-md bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-4 z-50"
+            className="fixed bottom-4 left-4 right-4 max-w-[calc(100vw-2rem)] md:left-8 md:right-auto md:max-w-md bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-4 z-50"
         >
             <div className="flex items-start gap-3">
                 <div className="flex-1 text-sm text-gray-700 dark:text-gray-200">
