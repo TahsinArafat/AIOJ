@@ -64,7 +64,8 @@ const MONACO_LANG_MAP: Record<string, string> = {
 
 function mapLanguage(lang: string): string {
   if (MONACO_LANG_MAP[lang]) return MONACO_LANG_MAP[lang]
-  if (lang.startsWith('cpp') || lang.startsWith('c-')) return 'cpp'
+  if (lang.startsWith('cpp')) return 'cpp'
+  if (lang.startsWith('c-')) return 'c'
   if (lang.startsWith('csharp')) return 'csharp'
   if (lang.startsWith('python') || lang.startsWith('pypy')) return 'python'
   if (lang.startsWith('java')) return 'java'
@@ -258,12 +259,12 @@ export default function CodeEditor({
 
   return (
     <div
-      className="flex flex-col overflow-hidden rounded border border-gray-300 dark:border-gray-600"
+      className="flex flex-col overflow-hidden rounded border border-gray-300 dark:border-gray-600 w-full h-full min-h-0"
       style={{ height }}
     >
       <Toolbar settings={settings} onSettingsChange={setSettings} />
 
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 w-full h-full relative">
         <Editor
           height="100%"
           language={monacoLang}

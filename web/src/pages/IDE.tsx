@@ -222,9 +222,9 @@ export default function IDE() {
             </div>
 
             {/* Main content area: editor + drawer + footer */}
-            <div className="relative flex flex-col flex-1 min-h-0">
+            <div className="relative flex flex-col flex-1 min-h-0 overflow-hidden">
                 {/* Code Editor — takes remaining space */}
-                <div className="flex-1 min-h-0 min-w-0">
+                <div className="flex-1 min-h-[180px] min-w-0 h-full">
                     <CodeEditor
                         language={language}
                         value={code}
@@ -235,32 +235,29 @@ export default function IDE() {
 
                 {/* Console Drawer — slides up from bottom, above the 56px footer */}
                 <div
-                    className={`absolute bottom-14 left-0 right-0 bg-gray-100 dark:bg-gray-950 border-t border-gray-200 dark:border-gray-700 transition-[height] duration-200 ease-in-out overflow-hidden z-20 shadow-[0_-4px_12px_rgba(0,0,0,0.15)] dark:shadow-[0_-4px_12px_rgba(0,0,0,0.4)] flex flex-col ${
-                        consoleOpen
-                            ? 'h-[200px] md:h-[320px]'
-                            : 'h-0'
-                    }`}
+                    className={`absolute bottom-14 left-0 right-0 bg-gray-100 dark:bg-gray-950 border-t border-gray-200 dark:border-gray-700 transition-[height] duration-200 ease-in-out overflow-hidden z-20 shadow-[0_-4px_12px_rgba(0,0,0,0.15)] dark:shadow-[0_-4px_12px_rgba(0,0,0,0.4)] flex flex-col ${consoleOpen
+                        ? 'h-[200px] md:h-[320px]'
+                        : 'h-0'
+                        }`}
                 >
                     {/* Drawer Header: tabs + close */}
                     <div className="flex items-center justify-between bg-gray-200 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 flex-shrink-0">
                         <div className="flex gap-4">
                             <button
                                 onClick={() => setConsoleTab('custom')}
-                                className={`px-0 py-2.5 text-[11px] font-semibold uppercase tracking-wider border-b-2 transition-colors cursor-pointer ${
-                                    consoleTab === 'custom'
-                                        ? 'text-gray-900 dark:text-white border-blue-500'
-                                        : 'text-gray-500 dark:text-gray-400 border-transparent hover:text-gray-700 dark:hover:text-gray-300'
-                                }`}
+                                className={`px-0 py-2.5 text-[11px] font-semibold uppercase tracking-wider border-b-2 transition-colors cursor-pointer ${consoleTab === 'custom'
+                                    ? 'text-gray-900 dark:text-white border-blue-500'
+                                    : 'text-gray-500 dark:text-gray-400 border-transparent hover:text-gray-700 dark:hover:text-gray-300'
+                                    }`}
                             >
                                 Custom Test
                             </button>
                             <button
                                 onClick={() => setConsoleTab('result')}
-                                className={`px-0 py-2.5 text-[11px] font-semibold uppercase tracking-wider border-b-2 transition-colors cursor-pointer ${
-                                    consoleTab === 'result'
-                                        ? 'text-gray-900 dark:text-white border-blue-500'
-                                        : 'text-gray-500 dark:text-gray-400 border-transparent hover:text-gray-700 dark:hover:text-gray-300'
-                                }`}
+                                className={`px-0 py-2.5 text-[11px] font-semibold uppercase tracking-wider border-b-2 transition-colors cursor-pointer ${consoleTab === 'result'
+                                    ? 'text-gray-900 dark:text-white border-blue-500'
+                                    : 'text-gray-500 dark:text-gray-400 border-transparent hover:text-gray-700 dark:hover:text-gray-300'
+                                    }`}
                             >
                                 Result
                             </button>
@@ -315,17 +312,16 @@ export default function IDE() {
                                                     {typeof output.memory_used === 'number' && output.memory_used > 0 ? `${Math.round(output.memory_used / 1024)}MB` : '—'}
                                                     {output.status === 'MLE' && <span className="text-red-500">(limit {IDE_MEMORY_LIMIT_KB / 1024}MB)</span>}
                                                 </span>
-                                                <span className={`ml-auto font-medium px-2 py-0.5 rounded text-xs ${
-                                                    isError
-                                                        ? 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20'
-                                                        : 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20'
-                                                }`}>
+                                                <span className={`ml-auto font-medium px-2 py-0.5 rounded text-xs ${isError
+                                                    ? 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20'
+                                                    : 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20'
+                                                    }`}>
                                                     {output.status === 'CE' ? 'Compile Error' :
-                                                     output.status === 'RE' ? 'Runtime Error' :
-                                                     output.status === 'TLE' ? 'Time Limit Exceeded' :
-                                                     output.status === 'MLE' ? 'Memory Limit Exceeded' :
-                                                     output.status === 'SE' ? 'System Error' :
-                                                     'Executed'}
+                                                        output.status === 'RE' ? 'Runtime Error' :
+                                                            output.status === 'TLE' ? 'Time Limit Exceeded' :
+                                                                output.status === 'MLE' ? 'Memory Limit Exceeded' :
+                                                                    output.status === 'SE' ? 'System Error' :
+                                                                        'Executed'}
                                                 </span>
                                             </div>
 
@@ -371,21 +367,7 @@ export default function IDE() {
                 </div>
 
                 {/* Action Footer */}
-                <div className="h-14 bg-gray-100 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between px-4 flex-shrink-0 z-30">
-                    <button
-                        onClick={() => setConsoleOpen(prev => !prev)}
-                        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-colors cursor-pointer border ${
-                            consoleOpen
-                                ? 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white border-gray-300 dark:border-gray-600'
-                                : 'bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-300 dark:hover:bg-gray-700'
-                        }`}
-                    >
-                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="4 17 10 11 4 5" />
-                            <line x1="12" y1="19" x2="20" y2="19" />
-                        </svg>
-                        Console
-                    </button>
+                <div className="h-14 bg-gray-100 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 flex items-center justify-end gap-2 px-4 flex-shrink-0 z-30">
                     <div className="flex items-center gap-2">
                         <button
                             onClick={openCustomTest}
@@ -420,7 +402,7 @@ export default function IDE() {
     }
 
     return (
-        <div className="h-full flex flex-col">
+        <div className="flex-1 min-h-0 flex flex-col w-full overflow-hidden">
             {content}
         </div>
     )
