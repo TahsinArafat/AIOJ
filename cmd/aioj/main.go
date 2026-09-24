@@ -210,7 +210,7 @@ func main() {
 
 	testcaseH := handler.NewTestcaseHandler(problemStore, "./testdata")
 	importH := handler.NewImportHandler(problemStore, "./testdata")
-	ratingH := handler.NewRatingHandler(ratingStore)
+	ratingH := handler.NewRatingHandler(ratingStore, contestStore)
 	registrationStore := postgres.NewRegistrationStore(db)
 	registrationH := handler.NewRegistrationHandler(registrationStore, contestStore)
 	virtualStore := postgres.NewVirtualStore(db)
