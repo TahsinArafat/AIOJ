@@ -7,6 +7,8 @@ import {
     AlertTriangle, Megaphone, Settings, BookOpen, Info, Clock, Shield, CheckCircle2, X, ExternalLink,
     ChevronLeft, ChevronRight, Send, Filter, Eye, EyeOff
 } from 'lucide-react'
+import { useConfirm } from '../components/ConfirmDialog'
+import { useToast } from '../components/Toast'
 
 function decodeRole(): string | null {
     const token = localStorage.getItem('access_token')
@@ -228,6 +230,8 @@ function SidebarBox({ title, icon, children, accent }: {
 type Tab = 'problems' | 'standings' | 'submissions' | 'clarifications' | 'announcements'
 
 export default function ContestDetail() {
+    const confirm = useConfirm()
+    const toast = useToast()
     const { id } = useParams<{ id: string }>()
     const role = decodeRole()
     const userId = decodeUserId()
@@ -392,7 +396,7 @@ export default function ContestDetail() {
                         } else if (Notification.permission !== 'denied') {
                             Notification.requestPermission()
                         }
-                        alert(`New Announcement:\n\n${newest.content}`)
+                        toast.error(`New Announcement:\n\n${newest.content}`)
                     }
                 }
                 setAnnouncements(items)
@@ -412,7 +416,7 @@ export default function ContestDetail() {
             await api.contests.register(id)
             setRegistered(true)
             setRegistrationCount(c => c + 1)
-        } catch (e: any) { alert(e.message) }
+        } catch (e: any) { toast.error(e.message) }
     }
 
     const handleUnregister = async () => {
@@ -421,7 +425,7 @@ export default function ContestDetail() {
             await api.contests.unregister(id)
             setRegistered(false)
             setRegistrationCount(c => Math.max(0, c - 1))
-        } catch (e: any) { alert(e.message) }
+        } catch (e: any) { toast.error(e.message) }
     }
 
     const handleAsk = async () => {
@@ -431,7 +435,7 @@ export default function ContestDetail() {
             setQuestion('')
             setShowForm(false)
             fetchClarifications()
-        } catch (e: any) { alert(e.message) }
+        } catch (e: any) { toast.error(e.message) }
     }
 
     const handleAnnounce = async () => {
@@ -440,15 +444,15 @@ export default function ContestDetail() {
             await api.contests.postAnnouncement(id, announceText.trim())
             setAnnounceText('')
             api.contests.announcements(id).then((res: any) => setAnnouncements(Array.isArray(res) ? res : res.data || [])).catch(() => { })
-        } catch (e: any) { alert(e.message) }
+        } catch (e: any) { toast.error(e.message) }
     }
 
     const handleDeleteAnnouncement = async (announcementId: string) => {
-        if (!id || !confirm('Delete this announcement?')) return
+        if (!id || !(await confirm({ message: 'Delete this announcement?', variant: 'danger' }))) return
         try {
             await api.contests.deleteAnnouncement(id, announcementId)
             setAnnouncements(a => a.filter((x: any) => x.id !== announcementId))
-        } catch (e: any) { alert(e.message) }
+        } catch (e: any) { toast.error(e.message) }
     }
 
     if (loading) return <div className="text-center py-20 text-gray-500 dark:text-gray-400">Loading...</div>
@@ -619,7 +623,7 @@ export default function ContestDetail() {
                                                     <th key={i} className="text-center px-1 py-3 font-bold text-xs uppercase tracking-wider w-16">
                                                         <div className="flex flex-col items-center">
                                                             <span className="text-base">{String.fromCharCode(65 + i)}</span>
-                                                            {p.title && <span className="text-[10px] text-gray-500 dark:text-gray-400 font-normal normal-case truncate max-w-[60px]" title={p.title}>{p.title}</span>}
+                                                            {p.title && <span className="text-[11px] text-gray-500 dark:text-gray-400 font-normal normal-case truncate max-w-[60px]" title={p.title}>{p.title}</span>}
                                                         </div>
                                                     </th>
                                                 ))}
@@ -650,7 +654,7 @@ export default function ContestDetail() {
                                                         </td>
                                                         <td className={`px-4 py-2.5 font-semibold ${isMe ? 'text-blue-700 dark:text-blue-400' : 'text-gray-800 dark:text-gray-200'}`}>
                                                             {row.username}
-                                                            {isMe && <span className="ml-2 text-[10px] bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 px-1.5 py-0.5 rounded font-bold border border-blue-200 dark:border-blue-800">YOU</span>}
+                                                            {isMe && <span className="ml-2 text-[11px] bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 px-1.5 py-0.5 rounded font-bold border border-blue-200 dark:border-blue-800">YOU</span>}
                                                         </td>
                                                         <td className="text-center px-3 py-2.5">
                                                             <span className="text-lg font-black text-gray-900 dark:text-gray-100">{row.total_solved ?? 0}</span>

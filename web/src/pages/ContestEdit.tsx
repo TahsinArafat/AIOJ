@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { api } from '../lib/api'
 import { resolveProblemTitle } from '../lib/problemSlugResolver'
+import { useConfirm } from '../components/ConfirmDialog'
+import { useToast } from '../components/Toast'
 
 function indexLabel(i: number): string {
     let s = ''
@@ -14,6 +16,8 @@ function indexLabel(i: number): string {
 }
 
 export default function ContestEdit() {
+    const confirm = useConfirm()
+    const toast = useToast()
     const { id } = useParams<{ id: string }>()
     const nav = useNavigate()
     const [contest, setContest] = useState<any>(null)
@@ -113,17 +117,17 @@ export default function ContestEdit() {
             setSearchQuery('')
             setSearchResults([])
         } catch (err: any) {
-            alert('Failed to add problem: ' + err.message)
+            toast.error('Failed to add problem: ' + err.message)
         }
     }
 
     const handleRemoveProblem = async (problemId: string) => {
-        if (!id || !confirm('Remove this problem from the contest?')) return
+        if (!id || !(await confirm({ message: 'Remove this problem from the contest?', variant: 'danger' }))) return
         try {
             await api.contests.removeProblem(id, problemId)
             await loadData()
         } catch (err: any) {
-            alert('Failed to remove problem: ' + err.message)
+            toast.error('Failed to remove problem: ' + err.message)
         }
     }
 

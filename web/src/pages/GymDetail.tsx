@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { api, getAccessToken, contestSlug } from '../lib/api'
+import { useToast } from '../components/Toast'
 
 export default function GymDetail() {
+    const toast = useToast()
     const { id } = useParams<{ id: string }>()
     const [gym, setGym] = useState<any>(null)
     const [loading, setLoading] = useState(true)
@@ -22,7 +24,7 @@ export default function GymDetail() {
             await api.gym.markSolved(id)
             setSolved(true)
             if (gym) setGym({ ...gym, solve_count: gym.solve_count + 1 })
-        } catch (e: any) { alert('Failed: ' + e.message) }
+        } catch (e: any) { toast.error('Failed: ' + e.message) }
     }
 
     if (loading) return <div className="text-center py-20 text-gray-400 dark:text-gray-500">Loading...</div>

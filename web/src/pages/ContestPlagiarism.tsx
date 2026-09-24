@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { api, getAccessToken } from '../lib/api'
+import { useToast } from '../components/Toast'
 
 export default function ContestPlagiarism() {
+    const toast = useToast()
 	const { id } = useParams<{ id: string }>()
 	const [report, setReport] = useState<any>(null)
 	const [pairs, setPairs] = useState<any[]>([])
@@ -42,7 +44,7 @@ export default function ContestPlagiarism() {
 		try {
 			await api.plagiarism.runCheck(id, 0.70)
 			fetchReport()
-		} catch (e: any) { alert(e.message) }
+		} catch (e: any) { toast.error(e.message) }
 		finally { setChecking(false) }
 	}
 

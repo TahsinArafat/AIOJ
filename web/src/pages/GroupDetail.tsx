@@ -1,6 +1,8 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { api, getAccessToken } from '../lib/api'
+import { useConfirm } from '../components/ConfirmDialog'
+import { useToast } from '../components/Toast'
 
 function getUserId(): string | null {
     const token = getAccessToken()
@@ -21,6 +23,8 @@ function getRole(): string | null {
 }
 
 export default function GroupDetail() {
+    const confirm = useConfirm()
+    const toast = useToast()
     const { id } = useParams<{ id: string }>()
     const navigate = useNavigate()
     const [group, setGroup] = useState<any>(null)
@@ -83,7 +87,7 @@ export default function GroupDetail() {
         try {
             await api.groups.join(id)
             fetchGroupData()
-        } catch (e: any) { alert('Failed: ' + e.message) }
+        } catch (e: any) { toast.error('Failed: ' + e.message) }
     }
 
     const handleLeave = async () => {
@@ -91,7 +95,7 @@ export default function GroupDetail() {
         try {
             await api.groups.leave(id)
             fetchGroupData()
-        } catch (e: any) { alert('Failed: ' + e.message) }
+        } catch (e: any) { toast.error('Failed: ' + e.message) }
     }
 
     const handleStartEdit = () => {
@@ -113,16 +117,16 @@ export default function GroupDetail() {
             })
             setGroup(updated)
             setEditing(false)
-        } catch (e: any) { alert('Update failed: ' + e.message) }
+        } catch (e: any) { toast.error('Update failed: ' + e.message) }
     }
 
     const handleDelete = async () => {
         if (!id) return
-        if (!confirm('Are you sure you want to delete this group?')) return
+        if (!(await confirm({ message: 'Are you sure you want to delete this group?', variant: 'danger' }))) return
         try {
             await api.groups.delete(id)
             navigate('/groups')
-        } catch (e: any) { alert('Delete failed: ' + e.message) }
+        } catch (e: any) { toast.error('Delete failed: ' + e.message) }
     }
 
     const handleAddContest = async () => {
@@ -132,17 +136,17 @@ export default function GroupDetail() {
             setNewContestId('')
             const c = await api.groups.getContests(id)
             setContests(c.data || [])
-        } catch (e: any) { alert('Failed to add contest: ' + e.message) }
+        } catch (e: any) { toast.error('Failed to add contest: ' + e.message) }
     }
 
     const handleRemoveContest = async (contestId: string) => {
         if (!id) return
-        if (!confirm('Remove this contest from the group?')) return
+        if (!(await confirm({ message: 'Remove this contest from the group?', variant: 'danger' }))) return
         try {
             await api.groups.removeContest(id, contestId)
             const c = await api.groups.getContests(id)
             setContests(c.data || [])
-        } catch (e: any) { alert('Failed to remove contest: ' + e.message) }
+        } catch (e: any) { toast.error('Failed to remove contest: ' + e.message) }
     }
 
     const handleInvite = async () => {
@@ -152,7 +156,7 @@ export default function GroupDetail() {
             await api.groups.invite(id, { username: inviteUsername.trim() })
             setInviteUsername('')
             fetchPending()
-        } catch (e: any) { alert('Invite failed: ' + e.message) }
+        } catch (e: any) { toast.error('Invite failed: ' + e.message) }
         finally { setInviting(false) }
     }
 
@@ -163,7 +167,7 @@ export default function GroupDetail() {
             await api.groups.respond(id, { user_id: userId, action })
             fetchPending()
             fetchGroupData()
-        } catch (e: any) { alert('Failed: ' + e.message) }
+        } catch (e: any) { toast.error('Failed: ' + e.message) }
         finally { setActing(null) }
     }
 
@@ -171,7 +175,7 @@ export default function GroupDetail() {
         if (group?.invite_code) {
             const url = `${window.location.origin}/groups/join?code=${group.invite_code}`
             navigator.clipboard.writeText(url).then(() => {
-                alert('Invite link copied to clipboard!')
+                toast.success('Invite link copied to clipboard!')
             }).catch(() => {
                 // fallback
                 const ta = document.createElement('textarea')
@@ -180,7 +184,7 @@ export default function GroupDetail() {
                 ta.select()
                 document.execCommand('copy')
                 document.body.removeChild(ta)
-                alert('Invite link copied!')
+                toast.success('Invite link copied!')
             })
         }
     }

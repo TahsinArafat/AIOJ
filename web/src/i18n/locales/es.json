@@ -12,7 +12,9 @@
     "submit": "Enviar",
     "back": "Atrás",
     "next": "Siguiente",
-    "prev": "Anterior"
+    "prev": "Anterior",
+    "loggedIn": "Sesión iniciada",
+    "viewProfile": "Ver perfil"
   },
   "nav": {
     "home": "Inicio",

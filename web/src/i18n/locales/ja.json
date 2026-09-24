@@ -12,7 +12,9 @@
     "submit": "送信",
     "back": "戻る",
     "next": "次へ",
-    "prev": "前へ"
+    "prev": "前へ",
+    "loggedIn": "ログイン中",
+    "viewProfile": "プロフィールを見る"
   },
   "nav": {
     "home": "ホーム",

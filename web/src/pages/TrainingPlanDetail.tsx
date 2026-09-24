@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { api, getAccessToken } from '../lib/api'
+import { useToast } from '../components/Toast'
 
 export default function TrainingPlanDetail() {
+    const toast = useToast()
 	const { id } = useParams<{ id: string }>()
 	const [data, setData] = useState<any>(null)
 	const [loading, setLoading] = useState(true)
@@ -44,7 +46,7 @@ export default function TrainingPlanDetail() {
 				setData((p: any) => ({ ...p, enrolled: true, progress: { total_problems: p.problem_count, completed_problems: 0, percentage: 0 } }))
 				window.location.reload()
 			}
-		} catch (e: any) { alert(e.message) }
+		} catch (e: any) { toast.error(e.message) }
 		finally { setEnrolling(false) }
 	}
 

@@ -2,6 +2,8 @@ import { useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { api, getAccessToken } from '../lib/api'
 import RatingBadge from '../components/RatingBadge'
+import { useConfirm } from '../components/ConfirmDialog'
+import { useToast } from '../components/Toast'
 
 function getUserId(): string | null {
     const token = getAccessToken()
@@ -22,6 +24,8 @@ function getRole(): string | null {
 }
 
 export default function TeamDetail() {
+    const confirm = useConfirm()
+    const toast = useToast()
     const { id } = useParams<{ id: string }>()
     const navigate = useNavigate()
     const [team, setTeam] = useState<any>(null)
@@ -78,7 +82,7 @@ export default function TeamDetail() {
         try {
             await api.teams.join(id)
             fetchTeamData()
-        } catch (e: any) { alert('Failed: ' + e.message) }
+        } catch (e: any) { toast.error('Failed: ' + e.message) }
     }
 
     const handleRequestJoin = async () => {
@@ -86,7 +90,7 @@ export default function TeamDetail() {
         try {
             await api.teams.requestJoin(id)
             fetchTeamData()
-        } catch (e: any) { alert('Failed: ' + e.message) }
+        } catch (e: any) { toast.error('Failed: ' + e.message) }
     }
 
     const handleLeave = async () => {
@@ -94,7 +98,7 @@ export default function TeamDetail() {
         try {
             await api.teams.leave(id)
             fetchTeamData()
-        } catch (e: any) { alert('Failed: ' + e.message) }
+        } catch (e: any) { toast.error('Failed: ' + e.message) }
     }
 
     const handleStartEdit = () => {
@@ -114,16 +118,16 @@ export default function TeamDetail() {
             })
             setTeam(updated)
             setEditing(false)
-        } catch (e: any) { alert('Update failed: ' + e.message) }
+        } catch (e: any) { toast.error('Update failed: ' + e.message) }
     }
 
     const handleDelete = async () => {
         if (!id) return
-        if (!confirm('Are you sure you want to delete this team? This cannot be undone.')) return
+        if (!(await confirm({ message: 'Are you sure you want to delete this team? This cannot be undone.', variant: 'danger' }))) return
         try {
             await api.teams.delete(id)
             navigate('/teams')
-        } catch (e: any) { alert('Delete failed: ' + e.message) }
+        } catch (e: any) { toast.error('Delete failed: ' + e.message) }
     }
 
     const handleInvite = async () => {
@@ -133,7 +137,7 @@ export default function TeamDetail() {
             await api.teams.invite(id, { username: inviteUsername.trim() })
             setInviteUsername('')
             fetchPending()
-        } catch (e: any) { alert('Invite failed: ' + e.message) }
+        } catch (e: any) { toast.error('Invite failed: ' + e.message) }
         finally { setInviting(false) }
     }
 
@@ -144,7 +148,7 @@ export default function TeamDetail() {
             await api.teams.respond(id, { user_id: userId, action })
             fetchPending()
             fetchTeamData()
-        } catch (e: any) { alert('Failed: ' + e.message) }
+        } catch (e: any) { toast.error('Failed: ' + e.message) }
         finally { setActing(null) }
     }
 

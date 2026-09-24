@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react'
 import { api } from '../../lib/api'
+import { useConfirm } from '../../components/ConfirmDialog'
+import { useToast } from '../../components/Toast'
 
 export default function UsersPanel() {
+    const confirm = useConfirm()
+    const toast = useToast()
     const [users, setUsers] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
 
@@ -13,12 +17,12 @@ export default function UsersPanel() {
     useEffect(() => { loadUsers() }, [])
 
     const handleRoleChange = async (userId: string, newRole: string) => {
-        if (!confirm(`Change role to ${newRole}?`)) return
+        if (!(await confirm({ message: `Change role to ${newRole}?`, variant: 'danger' }))) return
         try {
             await api.admin.updateRole(userId, newRole)
             loadUsers()
         } catch (e: any) {
-            alert(e.message)
+            toast.error(e.message)
         }
     }
 
@@ -34,7 +38,6 @@ export default function UsersPanel() {
                             <th className="px-4 py-3 text-left">Username</th>
                             <th className="px-4 py-3 text-left">Email</th>
                             <th className="px-4 py-3 text-left">Role</th>
-                            <th className="px-4 py-3 text-right">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -55,14 +58,11 @@ export default function UsersPanel() {
                                         <option value="bot">Bot</option>
                                     </select>
                                 </td>
-                                <td className="px-4 py-3 text-right">
-                                    {/* Actions */}
-                                </td>
                             </tr>
                         ))}
                         {users.length === 0 && (
                             <tr>
-                                <td colSpan={4} className="px-4 py-8 text-center text-gray-400 dark:text-gray-500">
+                                <td colSpan={3} className="px-4 py-8 text-center text-gray-400 dark:text-gray-500">
                                     No users found.
                                 </td>
                             </tr>

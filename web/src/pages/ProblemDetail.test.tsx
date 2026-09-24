@@ -2,6 +2,8 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { expect, test, vi } from 'vitest'
 import ProblemDetail from './ProblemDetail'
+import { ToastProvider } from '../components/Toast'
+import { ConfirmProvider } from '../components/ConfirmDialog'
 import { api } from '../lib/api'
 
 vi.mock('../lib/api', () => ({
@@ -40,9 +42,13 @@ vi.mock('../lib/api', () => ({
 test('renders submissions tab and handles list load clicks', async () => {
     render(
         <MemoryRouter initialEntries={['/problems/two-sum']}>
-            <Routes>
-                <Route path="/problems/:slug" element={<ProblemDetail />} />
-            </Routes>
+            <ToastProvider>
+                <ConfirmProvider>
+                    <Routes>
+                        <Route path="/problems/:slug" element={<ProblemDetail />} />
+                    </Routes>
+                </ConfirmProvider>
+            </ToastProvider>
         </MemoryRouter>
     )
 

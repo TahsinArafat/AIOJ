@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../lib/api'
+import { useToast } from '../components/Toast'
 
 export default function BlogCreate() {
+    const toast = useToast()
     const navigate = useNavigate()
     const [title, setTitle] = useState('')
     const [content, setContent] = useState('')
@@ -21,7 +23,7 @@ export default function BlogCreate() {
             })
             navigate(`/blog/${post.id}`)
         } catch (e: any) {
-            alert('Failed: ' + e.message)
+            toast.error('Failed: ' + e.message)
         } finally {
             setSubmitting(false)
         }

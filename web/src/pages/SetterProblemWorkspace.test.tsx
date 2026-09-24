@@ -2,6 +2,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { expect, test, vi, beforeEach } from 'vitest'
 import SetterProblemWorkspace from './SetterProblemWorkspace'
+import { ConfirmProvider } from '../components/ConfirmDialog'
 import { api } from '../lib/api'
 import type { Mock } from 'vitest'
 
@@ -54,11 +55,13 @@ beforeEach(() => {
 
 function renderWorkspace() {
   return render(
-    <MemoryRouter initialEntries={['/setter/problem/test-problem']}>
-      <Routes>
-        <Route path="/setter/problem/:slug" element={<SetterProblemWorkspace />} />
-      </Routes>
-    </MemoryRouter>
+    <ConfirmProvider>
+      <MemoryRouter initialEntries={['/setter/problem/test-problem']}>
+        <Routes>
+          <Route path="/setter/problem/:slug" element={<SetterProblemWorkspace />} />
+        </Routes>
+      </MemoryRouter>
+    </ConfirmProvider>
   )
 }
 

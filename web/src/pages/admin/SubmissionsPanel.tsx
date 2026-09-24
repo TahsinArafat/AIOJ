@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { api } from '../../lib/api'
 import { RefreshCw, RotateCcw } from 'lucide-react'
+import { useConfirm } from '../../components/ConfirmDialog'
+import { useToast } from '../../components/Toast'
 
 interface PendingSub {
     id: string
@@ -12,6 +14,8 @@ interface PendingSub {
 }
 
 export default function SubmissionsPanel() {
+    const confirm = useConfirm()
+    const toast = useToast()
     const [subs, setSubs] = useState<PendingSub[]>([])
     const [loading, setLoading] = useState(true)
     const [refreshing, setRefreshing] = useState<Set<string>>(new Set())
@@ -27,12 +31,12 @@ export default function SubmissionsPanel() {
     useEffect(() => { loadSubs() }, [])
 
     const rejudge = async (id: string) => {
-        if (!confirm('Rejudge this submission? It will be re-submitted to Codeforces.')) return
+        if (!(await confirm({ message: 'Rejudge this submission? It will be re-submitted to Codeforces.', variant: 'danger' }))) return
         try {
             await api.admin.submissions.rejudge(id)
             loadSubs()
         } catch (err: any) {
-            alert(err.message)
+            toast.error(err.message)
         }
     }
 
@@ -42,7 +46,7 @@ export default function SubmissionsPanel() {
             await api.admin.submissions.refresh(id)
             setTimeout(loadSubs, 5000)
         } catch (err: any) {
-            alert(err.message)
+            toast.error(err.message)
         } finally {
             setRefreshing(prev => {
                 const next = new Set(prev)

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, getAccessToken } from '../lib/api'
+import { useToast } from './Toast.tsx'
 
 interface Props {
     parentType: string
@@ -7,6 +8,7 @@ interface Props {
 }
 
 export default function CommentSection({ parentType, parentId }: Props) {
+    const toast = useToast()
     const [comments, setComments] = useState<any[]>([])
     const [newComment, setNewComment] = useState('')
     const [loading, setLoading] = useState(true)
@@ -32,14 +34,14 @@ export default function CommentSection({ parentType, parentId }: Props) {
             })
             setComments(prev => [...prev, c])
             setNewComment('')
-        } catch (e: any) { alert('Failed: ' + e.message) }
+        } catch (e: any) { toast.error('Failed: ' + e.message) }
     }
 
     const handleCommentVote = async (commentId: string, value: number) => {
         try {
             await api.blog.vote({ target_type: 'comment', target_id: commentId, value })
             fetchComments()
-        } catch (e: any) { alert('Vote failed: ' + e.message) }
+        } catch (e: any) { toast.error('Vote failed: ' + e.message) }
     }
 
     return (

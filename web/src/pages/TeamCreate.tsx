@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../lib/api'
+import { useToast } from '../components/Toast'
 
 export default function TeamCreate() {
+    const toast = useToast()
     const navigate = useNavigate()
     const [name, setName] = useState('')
     const [description, setDescription] = useState('')
@@ -17,7 +19,7 @@ export default function TeamCreate() {
             const team = await api.teams.create({ name, description, is_public: isPublic })
             navigate(`/teams/${team.id}`)
         } catch (e: any) {
-            alert('Failed to create team: ' + e.message)
+            toast.error('Failed to create team: ' + e.message)
         } finally {
             setSubmitting(false)
         }

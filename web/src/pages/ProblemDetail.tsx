@@ -12,6 +12,7 @@ import AddEditorialModal from '../components/AddEditorialModal'
 import CommentSection from '../components/CommentSection'
 import { Download, Copy, Check } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { useToast } from '../components/Toast'
 
 function useIsDesktop(breakpoint = 768) {
     const [isDesktop, setIsDesktop] = useState(
@@ -183,6 +184,7 @@ const STATUS_LABELS: Record<string, string> = {
 }
 
 export default function ProblemDetail() {
+    const toast = useToast()
     const { slug } = useParams<{ slug: string }>()
     const [searchParams] = useSearchParams()
     const isUpsolving = searchParams.get('upsolving') === 'true'
@@ -341,7 +343,7 @@ export default function ProblemDetail() {
     }
 
     const runCustomCode = async () => {
-        if (!code.trim()) { alert('Please write some code'); return }
+        if (!code.trim()) { toast.info('Please write some code'); return }
         setRunningCustom(true)
         setCustomOutput(null)
         try {
@@ -354,7 +356,7 @@ export default function ProblemDetail() {
                 setCustomOutput(res)
             }
         } catch (e: any) {
-            alert('Custom run failed: ' + e.message)
+            toast.error('Custom run failed: ' + e.message)
         } finally {
             if (isMountedRef.current) {
                 setRunningCustom(false)
@@ -363,11 +365,11 @@ export default function ProblemDetail() {
     }
 
     const testWithSamples = async () => {
-        if (!getAccessToken()) { alert('Please login first'); return }
-        if (!code.trim()) { alert('Please write some code'); return }
-        if (!problem?.sample_cases?.length) { alert('No sample cases available'); return }
+        if (!getAccessToken()) { toast.info('Please login first'); return }
+        if (!code.trim()) { toast.info('Please write some code'); return }
+        if (!problem?.sample_cases?.length) { toast.info('No sample cases available'); return }
         const now = Date.now()
-        if (now - lastTestTime < 5000) { alert('Please wait 5 seconds between Test Samples runs'); return }
+        if (now - lastTestTime < 5000) { toast.info('Please wait 5 seconds between Test Samples runs'); return }
         setLastTestTime(now)
         setRunningSamples(true)
         setSampleResults([])
@@ -417,10 +419,10 @@ export default function ProblemDetail() {
     }
 
     const submit = async () => {
-        if (!getAccessToken()) { alert('Please login first'); return }
-        if (!code.trim()) { alert('Please write some code'); return }
+        if (!getAccessToken()) { toast.info('Please login first'); return }
+        if (!code.trim()) { toast.info('Please write some code'); return }
         const now = Date.now()
-        if (now - lastSubmitTime < 5000) { alert('Please wait 5 seconds between submissions'); return }
+        if (now - lastSubmitTime < 5000) { toast.info('Please wait 5 seconds between submissions'); return }
         setLastSubmitTime(now)
         setSubmitting(true)
         setResult(null)
@@ -466,7 +468,7 @@ export default function ProblemDetail() {
             }
             poll()
         } catch (e: any) {
-            alert('Submit failed: ' + e.message)
+            toast.error('Submit failed: ' + e.message)
         } finally {
             if (isMountedRef.current) {
                 setSubmitting(false)
@@ -573,7 +575,7 @@ export default function ProblemDetail() {
                                         a.click()
                                         URL.revokeObjectURL(url)
                                     } catch (e: any) {
-                                        alert('Export failed: ' + e.message)
+                                        toast.error('Export failed: ' + e.message)
                                     }
                                 }}
                                 className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"

@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react'
 import { api } from '../lib/api'
+import { useConfirm } from '../components/ConfirmDialog'
+import { useToast } from '../components/Toast'
 
 export default function APISettings() {
+    const confirm = useConfirm()
+    const toast = useToast()
     const [keys, setKeys] = useState<any[]>([])
     const [name, setName] = useState('')
     const [newSecret, setNewSecret] = useState('')
@@ -29,15 +33,15 @@ export default function APISettings() {
             setNewSecret(result.secret)
             setName('')
             api.apiKeys.list().then(d => setKeys(d.data || []))
-        } catch (e: any) { alert('Failed: ' + e.message) }
+        } catch (e: any) { toast.error('Failed: ' + e.message) }
     }
 
     const handleDelete = async (id: string) => {
-        if (!confirm('Delete this API key?')) return
+        if (!(await confirm({ message: 'Delete this API key?', variant: 'danger' }))) return
         try {
             await api.apiKeys.delete(id)
             setKeys(prev => prev.filter(k => k.id !== id))
-        } catch (e: any) { alert('Failed: ' + e.message) }
+        } catch (e: any) { toast.error('Failed: ' + e.message) }
     }
 
     if (loading) return <div className="text-center py-20 text-gray-400 dark:text-gray-500">Loading...</div>

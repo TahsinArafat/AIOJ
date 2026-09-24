@@ -2,8 +2,8 @@ import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { expect, test, vi, beforeEach } from 'vitest'
 import AdminDashboard from './AdminDashboard'
-import { api } from '../lib/api'
-import type { Mock } from 'vitest'
+import { ToastProvider } from '../components/Toast'
+import { ConfirmProvider } from '../components/ConfirmDialog'
 
 /**
  * Regression coverage for the tabbed-workspace hash bug.
@@ -55,9 +55,13 @@ beforeEach(() => {
 function renderAdmin() {
     return render(
         <MemoryRouter initialEntries={['/admin']}>
-            <Routes>
-                <Route path="/admin" element={<AdminDashboard />} />
-            </Routes>
+            <ToastProvider>
+                <ConfirmProvider>
+                    <Routes>
+                        <Route path="/admin" element={<AdminDashboard />} />
+                    </Routes>
+                </ConfirmProvider>
+            </ToastProvider>
         </MemoryRouter>
     )
 }

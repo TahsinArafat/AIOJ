@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { api, getAccessToken } from '../lib/api'
+import { useConfirm } from '../components/ConfirmDialog'
 import type { ProblemFormState, TestCase, Collaborator } from '../types/problem-workspace'
 import StatementTab from '../components/SetterWorkspace/StatementTab'
 import TestCasesTab from '../components/SetterWorkspace/TestCasesTab'
@@ -24,6 +25,7 @@ function decodeRole(): string | null {
 export default function SetterProblemWorkspace() {
   const { slug } = useParams<{ slug: string }>()
   const navigate = useNavigate()
+  const confirm = useConfirm()
   const [problem, setProblem] = useState<any>(null)
   type WorkspaceTab = 'statement' | 'testcases' | 'checker' | 'permissions' | 'settings' | 'editorial' | 'translations'
 
@@ -314,7 +316,11 @@ export default function SetterProblemWorkspace() {
 
   const handleDeleteProblem = async () => {
     if (!problem) return
-    if (!window.confirm('Are you absolutely sure you want to delete this problem? This action CANNOT be undone.')) return
+    if (!(await confirm({
+      message: 'Are you absolutely sure you want to delete this problem? This action cannot be undone.',
+      confirmLabel: 'Delete Problem',
+      variant: 'danger',
+    }))) return
     setError(null)
     try {
       await api.problems.delete(problem.slug as string)

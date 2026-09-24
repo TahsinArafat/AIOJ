@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { api } from '../../lib/api'
 import { Plus, Pencil, Trash2, X, Save, Search, Check, AlertTriangle } from 'lucide-react'
+import { useConfirm } from '../../components/ConfirmDialog'
+import { useToast } from '../../components/Toast'
 
 interface RemoteLanguage {
     id: string
@@ -22,6 +24,8 @@ const PLATFORMS = [
 ]
 
 export default function RemoteLanguagesPanel() {
+    const confirm = useConfirm()
+    const toast = useToast()
     const [platform, setPlatform] = useState('codeforces')
     const [langs, setLangs] = useState<RemoteLanguage[]>([])
     const [loading, setLoading] = useState(true)
@@ -73,17 +77,17 @@ export default function RemoteLanguagesPanel() {
             resetForm()
             loadLangs()
         } catch (err: any) {
-            alert(err.message)
+            toast.error(err.message)
         }
     }
 
     const handleDelete = async (id: string) => {
-        if (!confirm('Delete this language mapping?')) return
+        if (!(await confirm({ message: 'Delete this language mapping?', variant: 'danger' }))) return
         try {
             await api.admin.remoteLanguages.delete(id)
             loadLangs()
         } catch (err: any) {
-            alert(err.message)
+            toast.error(err.message)
         }
     }
 
@@ -92,7 +96,7 @@ export default function RemoteLanguagesPanel() {
             await api.admin.remoteLanguages.update(lang.id, { enabled: !lang.enabled })
             loadLangs()
         } catch (err: any) {
-            alert(err.message)
+            toast.error(err.message)
         }
     }
 
@@ -104,7 +108,7 @@ export default function RemoteLanguagesPanel() {
             setSelectedForSave(new Set(result.matched.map((_, i) => i)))
             setShowDetectModal(true)
         } catch (err: any) {
-            alert(err.message)
+            toast.error(err.message)
         } finally {
             setDetecting(false)
         }
@@ -126,7 +130,7 @@ export default function RemoteLanguagesPanel() {
             setShowDetectModal(false)
             setDetectResults(null)
         } catch (err: any) {
-            alert(err.message)
+            toast.error(err.message)
         }
     }
 

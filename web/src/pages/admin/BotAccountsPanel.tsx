@@ -1,6 +1,8 @@
 import { useEffect, useState, useRef } from 'react'
 import { api } from '../../lib/api'
 import { Plus, Pencil, Trash2, X } from 'lucide-react'
+import { useConfirm } from '../../components/ConfirmDialog'
+import { useToast } from '../../components/Toast'
 
 interface BotAccount {
     id: string
@@ -66,6 +68,8 @@ const PLATFORMS = [
 ]
 
 export default function BotAccountsPanel() {
+    const confirm = useConfirm()
+    const toast = useToast()
     const [bots, setBots] = useState<BotAccount[]>([])
     const [loading, setLoading] = useState(true)
     const [showForm, setShowForm] = useState(false)
@@ -161,19 +165,19 @@ export default function BotAccountsPanel() {
             resetForm()
             loadBots()
         } catch (err: any) {
-            alert(err.message)
+            toast.error(err.message)
         } finally {
             setSaving(false)
         }
     }
 
     const handleDelete = async (id: string) => {
-        if (!confirm('Delete this bot account?')) return
+        if (!(await confirm({ message: 'Delete this bot account?', variant: 'danger' }))) return
         try {
             await api.admin.botAccounts.delete(id)
             loadBots()
         } catch (err: any) {
-            alert(err.message)
+            toast.error(err.message)
         }
     }
 
@@ -183,7 +187,7 @@ export default function BotAccountsPanel() {
             await api.admin.botAccounts.update(bot.id, { status: newStatus })
             loadBots()
         } catch (err: any) {
-            alert(err.message)
+            toast.error(err.message)
         }
     }
 
@@ -426,9 +430,9 @@ export default function BotAccountsPanel() {
                                         platform_pass: form.platform_pass,
                                         session_data: sessionData,
                                     })
-                                    alert(result.message)
+                                    toast.error(result.message)
                                 } catch (err: any) {
-                                    alert('Test failed: ' + err.message)
+                                    toast.error('Test failed: ' + err.message)
                                 }
                             }}
                                 className="px-4 py-2 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 border border-blue-300 dark:border-blue-700 rounded transition-colors">

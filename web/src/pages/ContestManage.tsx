@@ -8,6 +8,8 @@ import {
     Trophy, BarChart3, Search, CircleDot, Megaphone, Shield, Settings,
     Loader2, Play, Check, EyeOff, UserPlus
 } from 'lucide-react'
+import { useConfirm } from '../components/ConfirmDialog'
+import { useToast } from '../components/Toast'
 
 function indexLabel(i: number): string {
     let s = ''
@@ -150,6 +152,8 @@ export default function ContestManage() {
 // CHALLENGES TAB
 // ═══════════════════════════════════════════════
 function ChallengesTab({ contestId }: { contestId: string }) {
+    const confirm = useConfirm()
+    const toast = useToast()
     const [problems, setProblems] = useState<any[]>([])
     const [allProblems, setAllProblems] = useState<any[]>([])
     const [showAdd, setShowAdd] = useState(false)
@@ -179,7 +183,7 @@ function ChallengesTab({ contestId }: { contestId: string }) {
     }
 
     const removeProblem = async (problemId: string) => {
-        if (!confirm('Remove this problem?')) return
+        if (!(await confirm({ message: 'Remove this problem?', variant: 'danger' }))) return
         await api.contests.removeProblem(contestId, problemId)
         load()
     }
@@ -205,7 +209,7 @@ function ChallengesTab({ contestId }: { contestId: string }) {
             ))
             load()
         } catch (e: any) {
-            alert('Failed to reorder: ' + e.message)
+            toast.error('Failed to reorder: ' + e.message)
         }
     }
 
@@ -808,6 +812,8 @@ function ModeratorsTab({ contestId }: { contestId: string }) {
 // ONSITE TEAMS TAB
 // ═══════════════════════════════════════════════
 function OnsiteTeamsTab({ contestId }: { contestId: string }) {
+    const confirm = useConfirm()
+    const toast = useToast()
     const [teams, setTeams] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const [generating, setGenerating] = useState(false)
@@ -832,21 +838,21 @@ function OnsiteTeamsTab({ contestId }: { contestId: string }) {
             const created = res.users || []
             setTeams(prev => [...created, ...prev])
             setTeamInput('')
-        } catch (e: any) { alert(e.message) }
+        } catch (e: any) { toast.error(e.message) }
         finally { setGenerating(false) }
     }
 
     const copyAllCredentials = () => {
         const text = teams.map(t => `Team: ${t.team_name}${t.institution ? ' (' + t.institution + ')' : ''}\nUsername: ${t.username}\nPassword: ${t.password || '—'}\n`).join('\n---\n')
-        navigator.clipboard.writeText(text).then(() => alert('Credentials copied to clipboard'))
+        navigator.clipboard.writeText(text).then(() => toast.success('Credentials copied to clipboard'))
     }
 
     const deleteUser = async (userId: string) => {
-        if (!confirm('Delete these credentials?')) return
+        if (!(await confirm({ message: 'Delete these credentials?', variant: 'danger' }))) return
         try {
             await api.onsite.deleteUser(contestId, userId)
             setTeams(prev => prev.filter(t => t.id !== userId))
-        } catch (e: any) { alert(e.message) }
+        } catch (e: any) { toast.error(e.message) }
     }
 
     if (loading) return <TabLoading />

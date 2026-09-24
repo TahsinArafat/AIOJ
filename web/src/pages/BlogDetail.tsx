@@ -7,6 +7,8 @@ import remarkMath from 'remark-math'
 import remarkGfm from 'remark-gfm'
 import rehypeKatex from 'rehype-katex'
 import 'katex/dist/katex.min.css'
+import { useConfirm } from '../components/ConfirmDialog'
+import { useToast } from '../components/Toast'
 
 function getUserId(): string | null {
     const token = localStorage.getItem('access_token')
@@ -31,6 +33,8 @@ function getRole(): string | null {
 }
 
 export default function BlogDetail() {
+    const confirm = useConfirm()
+    const toast = useToast()
     const { id } = useParams<{ id: string }>()
     const navigate = useNavigate()
     const [post, setPost] = useState<any>(null)
@@ -57,7 +61,7 @@ export default function BlogDetail() {
             setVote(value)
             const updated = await api.blog.get(id)
             setPost(updated)
-        } catch (e: any) { alert('Vote failed: ' + e.message) }
+        } catch (e: any) { toast.error('Vote failed: ' + e.message) }
     }
 
     const handleStartEdit = () => {
@@ -75,16 +79,16 @@ export default function BlogDetail() {
             const updated = await api.blog.update(id, { title: editTitle, content: editContent, tags: parsedTags })
             setPost(updated)
             setEditing(false)
-        } catch (e: any) { alert('Update failed: ' + e.message) }
+        } catch (e: any) { toast.error('Update failed: ' + e.message) }
     }
 
     const handleDelete = async () => {
         if (!id) return
-        if (!confirm('Are you sure you want to delete this post?')) return
+        if (!(await confirm({ message: 'Are you sure you want to delete this post?', variant: 'danger' }))) return
         try {
             await api.blog.delete(id)
             navigate('/blog')
-        } catch (e: any) { alert('Delete failed: ' + e.message) }
+        } catch (e: any) { toast.error('Delete failed: ' + e.message) }
     }
 
     if (loading) return <div className="text-center py-20 text-gray-400 dark:text-gray-500">Loading...</div>

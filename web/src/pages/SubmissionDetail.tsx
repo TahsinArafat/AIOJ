@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { api, type TestCaseResult } from '../lib/api'
 import { resolveProblemSlug, resolveProblemTitle } from '../lib/problemSlugResolver'
+import { useToast } from '../components/Toast'
 
 const STATUS_LABEL: Record<string, string> = {
     ac: 'Accepted', wa: 'Wrong Answer', tle: 'Time Limit Exceeded',
@@ -34,6 +35,7 @@ function groupBySubtask(results: TestCaseResult[]): Map<number, TestCaseResult[]
 }
 
 export default function SubmissionDetail() {
+    const toast = useToast()
     const { id } = useParams<{ id: string }>()
     const [sub, setSub] = useState<any>(null)
     const [loading, setLoading] = useState(true)
@@ -78,7 +80,7 @@ export default function SubmissionDetail() {
             await api.submissions.retryRemote(id)
             setPollTrigger(prev => prev + 1)
         } catch (err: any) {
-            alert('Failed to retry: ' + err.message)
+            toast.error('Failed to retry: ' + err.message)
         } finally {
             setActionLoading(false)
         }
@@ -91,7 +93,7 @@ export default function SubmissionDetail() {
             await api.submissions.recheckRemote(id)
             setPollTrigger(prev => prev + 1)
         } catch (err: any) {
-            alert('Failed to recheck: ' + err.message)
+            toast.error('Failed to recheck: ' + err.message)
         } finally {
             setActionLoading(false)
         }

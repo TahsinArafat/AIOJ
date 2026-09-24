@@ -45,19 +45,21 @@ export default function Practice() {
         <div className="max-w-4xl mx-auto">
             <header className="mb-8">
                 <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 dark:text-gray-100">Personalized Practice</h1>
-                <p className="mt-2 text-gray-600 dark:text-gray-400">Smart problem recommendations tailored to your rating and weak areas.</p>
             </header>
 
-            {/* Profile summary banner */}
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-100 dark:border-blue-800 mb-8 flex justify-between items-center">
-                <div>
-                    <h3 className="font-semibold text-blue-900 text-lg">Practice Mode Active</h3>
-                    <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">Analyzing your contest ratings and submissions to offer smart challenges.</p>
-                </div>
-                <div className="bg-blue-600 text-white font-mono px-4 py-2 rounded-lg text-sm font-bold shadow-sm">
-                    Level Up
-                </div>
-            </div>
+            {/* Recommendation summary: counts drawn from the actual payload */}
+            <dl className="grid grid-cols-3 gap-3 mb-8">
+                {[
+                    { label: 'Daily picks', value: rec?.hybrid?.length ?? 0 },
+                    { label: 'Progression', value: rec?.progression?.length ?? 0 },
+                    { label: 'Weak tags', value: rec?.weak_tags?.tags?.length ?? 0 },
+                ].map(s => (
+                    <div key={s.label} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-white dark:bg-gray-800">
+                        <dt className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">{s.label}</dt>
+                        <dd className="mt-1 text-2xl font-bold text-gray-900 dark:text-gray-100">{s.value}</dd>
+                    </div>
+                ))}
+            </dl>
 
             {/* Tabs selector */}
             <div className="border-b border-gray-200 dark:border-gray-700 mb-6">
@@ -87,11 +89,10 @@ export default function Practice() {
                                     {p.title}
                                 </Link>
                                 <div className="flex flex-wrap gap-2 pt-1 items-center">
-                                    <span className={`px-2 py-0.5 rounded text-xs font-semibold uppercase ${
-                                        p.difficulty === 'easy' ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border border-green-100 dark:border-green-800' :
+                                    <span className={`px-2 py-0.5 rounded text-xs font-semibold uppercase ${p.difficulty === 'easy' ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border border-green-100 dark:border-green-800' :
                                         p.difficulty === 'medium' ? 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300 border border-yellow-100 dark:border-yellow-800' :
-                                        'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border border-red-100 dark:border-red-800'
-                                    }`}>
+                                            'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border border-red-100 dark:border-red-800'
+                                        }`}>
                                         {p.difficulty}
                                     </span>
                                     {p.tags && p.tags.map((t: string) => (

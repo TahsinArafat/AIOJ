@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Plus, Pencil, Trash2, Zap } from 'lucide-react'
 import { api } from '../../lib/api'
+import { useConfirm } from '../../components/ConfirmDialog'
+import { useToast } from '../../components/Toast'
 
 interface AIModel {
     id: string
@@ -28,6 +30,8 @@ const emptyForm = {
 type TestState = 'idle' | 'testing' | 'ok' | 'fail'
 
 export default function AIModelsPanel() {
+    const confirm = useConfirm()
+    const toast = useToast()
     const [models, setModels] = useState<AIModel[]>([])
     const [loading, setLoading] = useState(true)
     const [showForm, setShowForm] = useState(false)
@@ -94,7 +98,7 @@ export default function AIModelsPanel() {
             handleCancel()
             loadModels()
         } catch (err: any) {
-            alert('Save failed: ' + (err.message || err))
+            toast.error('Save failed: ' + (err.message || err))
         } finally {
             setSaving(false)
         }
@@ -105,23 +109,23 @@ export default function AIModelsPanel() {
             await api.admin.aiModels.toggle(m.id)
             loadModels()
         } catch (err: any) {
-            alert('Toggle failed: ' + (err.message || err))
+            toast.error('Toggle failed: ' + (err.message || err))
         }
     }
 
     const handleDelete = async (m: AIModel) => {
-        if (!confirm(`Delete AI model "${m.name}"? This cannot be undone.`)) return
+        if (!(await confirm({ message: `Delete AI model "${m.name}"? This cannot be undone.`, variant: 'danger' }))) return
         try {
             await api.admin.aiModels.delete(m.id)
             loadModels()
         } catch (err: any) {
-            alert('Delete failed: ' + (err.message || err))
+            toast.error('Delete failed: ' + (err.message || err))
         }
     }
 
     const handleTestConnection = async () => {
         if (!form.endpoint || !form.model_name) {
-            alert('Fill in Endpoint and Model Name before testing.')
+            toast.error('Fill in Endpoint and Model Name before testing.')
             return
         }
         setTestState('testing')

@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { api, getAccessToken } from '../lib/api'
+import { useToast } from '../components/Toast'
 
 export default function OrganizationDetail() {
+    const toast = useToast()
 	const { id } = useParams<{ id: string }>()
 	const [org, setOrg] = useState<any>(null)
 	const [classes, setClasses] = useState<any[]>([])
@@ -56,7 +58,7 @@ export default function OrganizationDetail() {
 				setIsMember(true)
 				window.location.reload()
 			}
-		} catch (e: any) { alert(e.message) }
+		} catch (e: any) { toast.error(e.message) }
 		finally { setJoining(false) }
 	}
 

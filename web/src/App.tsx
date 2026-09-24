@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom'
 import { api, contestSlug } from './lib/api'
 import { ThemeProvider } from './context/ThemeContext'
+import { ConfirmProvider } from './components/ConfirmDialog'
+import { ToastProvider } from './components/Toast'
 import { useTranslation } from 'react-i18next'
 import Login from './pages/Login'
 import Register from './pages/Register'
@@ -140,7 +142,7 @@ function Home() {
                         <Link to="/blog" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">{t('home.viewAll')}</Link>
                     </div>
                     {loading ? (
-                        <div className="text-center py-8 text-gray-400 dark:text-gray-500">Loading...</div>
+                        <div className="text-center py-8 text-gray-400 dark:text-gray-500">{t('common.loading')}</div>
                     ) : posts.length === 0 ? (
                         <div className="text-center py-8 text-gray-400 dark:text-gray-500">{t('home.noPostsYet')}</div>
                     ) : (
@@ -174,22 +176,22 @@ function Home() {
                             </div>
                             <div>
                                 <h3 className="font-bold text-gray-950 dark:text-gray-50">{username}</h3>
-                                <p className="text-xs text-gray-500">Logged in</p>
+                                <p className="text-xs text-gray-500">{t('common.loggedIn')}</p>
                             </div>
                             <Link to="/profile" className="block text-xs bg-blue-600 text-white py-1.5 px-3 rounded hover:bg-blue-700 transition-colors font-medium">
-                                View Profile
+                                {t('common.viewProfile')}
                             </Link>
                         </div>
                     ) : (
                         <div className="space-y-3 text-center">
-                            <h3 className="font-bold text-gray-800 dark:text-gray-200 text-sm">Join the Community</h3>
-                            <p className="text-xs text-gray-500">Sign in to solve problems, compete in contests, and read posts.</p>
+                            <h3 className="font-bold text-gray-800 dark:text-gray-200 text-sm">{t('home.joinCommunity')}</h3>
+                            <p className="text-xs text-gray-500">{t('home.signInPrompt')}</p>
                             <div className="flex gap-2 justify-center">
                                 <Link to="/login" className="text-xs bg-blue-600 text-white py-1.5 px-4 rounded hover:bg-blue-700 transition-colors font-medium">
-                                    Login
+                                    {t('common.login')}
                                 </Link>
                                 <Link to="/register" className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 py-1.5 px-4 rounded transition-colors font-medium">
-                                    Register
+                                    {t('common.register')}
                                 </Link>
                             </div>
                         </div>
@@ -198,11 +200,11 @@ function Home() {
 
                 {/* Contests Block */}
                 <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-5 bg-white dark:bg-gray-800 shadow-sm">
-                    <h3 className="font-bold text-sm mb-3 border-b pb-2 border-gray-100 dark:border-gray-700">Recent & Upcoming Contests</h3>
+                    <h3 className="font-bold text-sm mb-3 border-b pb-2 border-gray-100 dark:border-gray-700">{t('home.recentContests')}</h3>
                     {loading ? (
-                        <div className="text-xs text-gray-400 py-2">Loading...</div>
+                        <div className="text-xs text-gray-400 py-2">{t('common.loading')}</div>
                     ) : contests.length === 0 ? (
-                        <div className="text-xs text-gray-400 py-2">No contests</div>
+                        <div className="text-xs text-gray-400 py-2">{t('home.noContests')}</div>
                     ) : (
                         <div className="space-y-2">
                             {contests.map(c => {
@@ -228,11 +230,11 @@ function Home() {
 
                 {/* Top Rated Users rankings widget */}
                 <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-5 bg-white dark:bg-gray-800 shadow-sm">
-                    <h3 className="font-bold text-sm mb-3 border-b pb-2 border-gray-100 dark:border-gray-700">Top Rated Users</h3>
+                    <h3 className="font-bold text-sm mb-3 border-b pb-2 border-gray-100 dark:border-gray-700">{t('home.topRated')}</h3>
                     {loading ? (
-                        <div className="text-xs text-gray-400 py-2">Loading...</div>
+                        <div className="text-xs text-gray-400 py-2">{t('common.loading')}</div>
                     ) : rankings.length === 0 ? (
-                        <div className="text-xs text-gray-400 py-2">No rankings</div>
+                        <div className="text-xs text-gray-400 py-2">{t('home.noRankings')}</div>
                     ) : (
                         <div className="space-y-2">
                             {rankings.map((user, i) => (
@@ -255,7 +257,7 @@ function Home() {
 
                 {/* Quick Links */}
                 <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-5 bg-white dark:bg-gray-800 shadow-sm">
-                    <h3 className="font-bold text-sm mb-3 border-b pb-2 border-gray-100 dark:border-gray-700">Quick Links</h3>
+                    <h3 className="font-bold text-sm mb-3 border-b pb-2 border-gray-100 dark:border-gray-700">{t('home.quickLinks')}</h3>
                     <div className="grid grid-cols-2 gap-2 text-center">
                         <Link to="/problems" className="bg-gray-50 hover:bg-gray-100 dark:bg-gray-900/50 dark:hover:bg-gray-900 border border-gray-100 dark:border-gray-750 text-xs py-2 rounded text-gray-700 dark:text-gray-300 font-medium transition-colors">Problems</Link>
                         <Link to="/practice" className="bg-gray-50 hover:bg-gray-100 dark:bg-gray-900/50 dark:hover:bg-gray-900 border border-gray-100 dark:border-gray-750 text-xs py-2 rounded text-gray-700 dark:text-gray-300 font-medium transition-colors">Practice</Link>
@@ -382,7 +384,11 @@ export default function App() {
     return (
         <BrowserRouter>
             <ThemeProvider>
-                <AppShell />
+                <ToastProvider>
+                    <ConfirmProvider>
+                        <AppShell />
+                    </ConfirmProvider>
+                </ToastProvider>
             </ThemeProvider>
         </BrowserRouter>
     )

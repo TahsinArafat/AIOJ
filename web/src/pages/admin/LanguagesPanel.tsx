@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { api } from '../../lib/api'
 import { Save, RefreshCw, Play, Trash2, Plus, X, Code, Cpu, Zap } from 'lucide-react'
+import { useConfirm } from '../../components/ConfirmDialog'
+import { useToast } from '../../components/Toast'
 
 interface LanguageConfig {
     name: string
@@ -33,6 +35,8 @@ const emptyLang: LanguageConfig = {
 const seccompOptions = ['general', 'c_cpp', 'java', 'node', 'none']
 
 export default function LanguagesPanel() {
+    const confirm = useConfirm()
+    const toast = useToast()
     const [langs, setLangs] = useState<LanguageConfig[]>([])
     const [loading, setLoading] = useState(true)
     const [editKey, setEditKey] = useState<string | null>(null)
@@ -69,7 +73,7 @@ export default function LanguagesPanel() {
             const raw = await api.admin.languages.getRaw(key)
             setRawYaml(typeof raw === 'string' ? raw : JSON.stringify(raw, null, 2))
         } catch (e: any) {
-            alert('Failed to load language: ' + e.message)
+            toast.error('Failed to load language: ' + e.message)
         }
     }
 
@@ -85,14 +89,14 @@ export default function LanguagesPanel() {
             setEditKey(null)
             loadLangs()
         } catch (e: any) {
-            alert('Save failed: ' + e.message)
+            toast.error('Save failed: ' + e.message)
         } finally {
             setSaving(false)
         }
     }
 
     const handleCreate = async () => {
-        if (!form.key || !form.name) { alert('Key and Name are required'); return }
+        if (!form.key || !form.name) { toast.info('Key and Name are required'); return }
         setSaving(true)
         try {
             await api.admin.languages.create(form)
@@ -100,19 +104,19 @@ export default function LanguagesPanel() {
             setForm(emptyLang)
             loadLangs()
         } catch (e: any) {
-            alert('Create failed: ' + e.message)
+            toast.error('Create failed: ' + e.message)
         } finally {
             setSaving(false)
         }
     }
 
     const handleDelete = async (key: string) => {
-        if (!confirm(`Delete language "${key}"? This cannot be undone.`)) return
+        if (!(await confirm({ message: `Delete language "${key}"? This cannot be undone.`, variant: 'danger' }))) return
         try {
             await api.admin.languages.delete(key)
             loadLangs()
         } catch (e: any) {
-            alert('Delete failed: ' + e.message)
+            toast.error('Delete failed: ' + e.message)
         }
     }
 
@@ -136,7 +140,7 @@ export default function LanguagesPanel() {
             const result = await api.admin.languages.detect()
             setDetected(result)
         } catch (e: any) {
-            alert('Detection failed: ' + e.message)
+            toast.error('Detection failed: ' + e.message)
         }
     }
 
@@ -147,7 +151,7 @@ export default function LanguagesPanel() {
             const result = await api.admin.languages.templates()
             setTemplates(result.data || [])
         } catch (e: any) {
-            alert('Failed to load templates: ' + e.message)
+            toast.error('Failed to load templates: ' + e.message)
         }
     }
 

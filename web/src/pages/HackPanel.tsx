@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { api } from '../lib/api'
+import { useToast } from '../components/Toast'
 
 export default function HackPanel() {
+    const toast = useToast()
     const { contestId, problemId } = useParams<{ contestId: string; problemId: string }>()
     const navigate = useNavigate()
     const [submissions, setSubmissions] = useState<any[]>([])
@@ -32,7 +34,7 @@ export default function HackPanel() {
             })
             setResult(res)
         } catch (e: any) {
-            alert('Hack failed: ' + e.message)
+            toast.error('Hack failed: ' + e.message)
         } finally {
             setSubmitting(false)
         }

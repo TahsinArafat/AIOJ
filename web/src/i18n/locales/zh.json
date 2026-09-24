@@ -12,7 +12,9 @@
     "submit": "提交",
     "back": "返回",
     "next": "下一页",
-    "prev": "上一页"
+    "prev": "上一页",
+    "loggedIn": "已登录",
+    "viewProfile": "查看个人主页"
   },
   "nav": {
     "home": "首页",

@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../lib/api'
+import { useToast } from '../components/Toast'
 
 export default function GroupCreate() {
+    const toast = useToast()
     const navigate = useNavigate()
     const [name, setName] = useState('')
     const [description, setDescription] = useState('')
@@ -18,7 +20,7 @@ export default function GroupCreate() {
             const group = await api.groups.create({ name, description, is_public: isPublic, join_policy: joinPolicy })
             navigate(`/groups/${group.id}`)
         } catch (e: any) {
-            alert('Failed to create group: ' + e.message)
+            toast.error('Failed to create group: ' + e.message)
         } finally {
             setSubmitting(false)
         }

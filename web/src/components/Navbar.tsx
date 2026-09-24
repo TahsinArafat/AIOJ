@@ -41,7 +41,7 @@ function NavDropdown({ label, icon: Icon, align = 'left', ariaLabel, children }:
                 aria-label={ariaLabel || label || undefined}
                 aria-expanded={open}
                 aria-haspopup="menu"
-                className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white transition-colors cursor-pointer"
+                className="flex items-center gap-1 py-2 px-2 -my-2 rounded-md text-sm text-gray-600 dark:text-gray-300 hover:text-black hover:bg-gray-50 dark:hover:text-white dark:hover:bg-gray-800 transition-colors cursor-pointer"
             >
                 <Icon className="w-4 h-4" />
                 {label && <span>{label}</span>}
@@ -109,18 +109,18 @@ export default function Navbar() {
                                     <NavLink to="/training" icon={GraduationCap}>Training Plans</NavLink>
                                     <NavLink to="/rankings" icon={BarChart3}>Rankings</NavLink>
                                 </NavDropdown>
-                                <Link to="/problems" className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white transition-colors">
+                                <Link to="/problems" className="flex items-center gap-1.5 py-2 px-2 -my-2 rounded-md text-sm text-gray-600 dark:text-gray-300 hover:text-black hover:bg-gray-50 dark:hover:text-white dark:hover:bg-gray-800 transition-colors">
                                     <Code2 className="w-4 h-4" />
                                     <span>Problems</span>
                                 </Link>
-                                <Link to="/ide" className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white transition-colors">
+                                <Link to="/ide" className="flex items-center gap-1.5 py-2 px-2 -my-2 rounded-md text-sm text-gray-600 dark:text-gray-300 hover:text-black hover:bg-gray-50 dark:hover:text-white dark:hover:bg-gray-800 transition-colors">
                                     <Terminal className="w-4 h-4" />
                                     <span>IDE</span>
                                 </Link>
                             </>
                         )}
                         {isAdmin && (
-                            <Link to="/admin" className="flex items-center gap-1.5 text-sm font-medium text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 transition-colors">
+                            <Link to="/admin" className="flex items-center gap-1.5 py-2 px-2 -my-2 rounded-md text-sm font-medium text-purple-600 dark:text-purple-400 hover:text-purple-800 hover:bg-purple-50 dark:hover:text-purple-300 dark:hover:bg-purple-900/20 transition-colors">
                                 <Settings className="w-4 h-4" />
                                 <span>Admin</span>
                             </Link>

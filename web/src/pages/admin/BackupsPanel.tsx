@@ -1,6 +1,8 @@
 import { useEffect, useState, useRef } from 'react'
 import { api } from '../../lib/api'
 import { Database, HardDrive, Archive, Upload, Download, Trash2, RefreshCw, AlertTriangle, X, FolderArchive, ShieldAlert } from 'lucide-react'
+import { useConfirm } from '../../components/ConfirmDialog'
+import { useToast } from '../../components/Toast'
 
 interface BackupFile {
     filename: string
@@ -10,6 +12,8 @@ interface BackupFile {
 }
 
 export default function BackupsPanel() {
+    const confirm = useConfirm()
+    const toast = useToast()
     const [backups, setBackups] = useState<BackupFile[]>([])
     const [loading, setLoading] = useState(true)
     const [creating, setCreating] = useState(false)
@@ -104,7 +108,7 @@ export default function BackupsPanel() {
     }
 
     const handleDelete = async (filename: string) => {
-        if (!confirm(`Delete backup "${filename}"?`)) return
+        if (!(await confirm({ message: `Delete backup "${filename}"?`, variant: 'danger' }))) return
         setError(null)
         try {
             await api.admin.backups.delete(filename)
@@ -133,7 +137,7 @@ export default function BackupsPanel() {
             await api.admin.backups.restore(restoreModal.backup.filename, password, restoreModal.type)
             setRestoreModal(null)
             setPassword('')
-            alert('Restore completed successfully')
+            toast.success('Restore completed successfully')
         } catch (err: any) {
             setError(err.message)
         } finally {

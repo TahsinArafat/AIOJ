@@ -45,13 +45,31 @@ body {
     min-height: 100%;
 }
 
-* { box-sizing: border-box; }
+* {
+    box-sizing: border-box;
+}
 
-.prose :where(code):not(:where([class~="not-prose"],[class~="not-prose"] *)):before,
-.prose :where(code):not(:where([class~="not-prose"],[class~="not-prose"] *)):after {
+.prose :where(code):not(:where([class~="not-prose"], [class~="not-prose"] *)):before,
+.prose :where(code):not(:where([class~="not-prose"], [class~="not-prose"] *)):after {
     content: none !important;
 }
 
-.prose :where(pre):not(:where([class~="not-prose"],[class~="not-prose"] *)) {
+.prose :where(pre):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
     font-size: 0.875em !important;
+}
+
+/* Respect the OS "reduce motion" accessibility setting. The app uses ~240
+   transition/animate utilities; this collapses them all to near-zero duration
+   without needing to touch individual components. Durations are not set to 0
+   so transitionend/animationend listeners still fire. */
+@media (prefers-reduced-motion: reduce) {
+
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
 }

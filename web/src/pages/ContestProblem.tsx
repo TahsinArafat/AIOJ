@@ -8,6 +8,7 @@ import 'katex/dist/katex.min.css'
 import { api, getAccessToken } from '../lib/api'
 import CodeEditor from '../components/CodeEditor'
 import { Copy, Check, Lightbulb, ClipboardList, BarChart3, FileText, Download } from 'lucide-react'
+import { useToast } from '../components/Toast'
 
 function isPdfUrl(url: string | undefined | null): boolean {
     if (!url) return false
@@ -440,6 +441,7 @@ function MySubmissionsTab({ problemId, contestId }: { problemId: string; contest
 }
 
 export default function ContestProblem() {
+    const toast = useToast()
     const { contestId, index } = useParams<{ contestId: string; index: string }>()
     const [problem, setProblem] = useState<any>(null)
     const [contest, setContest] = useState<any>(null)
@@ -553,7 +555,7 @@ export default function ContestProblem() {
     }
 
     const runCustomCode = async () => {
-        if (!code.trim()) { alert('Please write some code'); return }
+        if (!code.trim()) { toast.info('Please write some code'); return }
         setRunningCustom(true)
         setCustomOutput(null)
         try {
@@ -566,7 +568,7 @@ export default function ContestProblem() {
                 setCustomOutput(res)
             }
         } catch (e: any) {
-            alert('Custom run failed: ' + e.message)
+            toast.error('Custom run failed: ' + e.message)
         } finally {
             if (isMounted.current) {
                 setRunningCustom(false)
@@ -575,11 +577,11 @@ export default function ContestProblem() {
     }
 
     const testWithSamples = async () => {
-        if (!getAccessToken()) { alert('Please login first'); return }
-        if (!code.trim()) { alert('Please write some code'); return }
-        if (!problem?.sample_cases?.length) { alert('No sample cases available'); return }
+        if (!getAccessToken()) { toast.info('Please login first'); return }
+        if (!code.trim()) { toast.info('Please write some code'); return }
+        if (!problem?.sample_cases?.length) { toast.info('No sample cases available'); return }
         const now = Date.now()
-        if (now - lastTestTime < 5000) { alert('Please wait 5 seconds between Test Samples runs'); return }
+        if (now - lastTestTime < 5000) { toast.info('Please wait 5 seconds between Test Samples runs'); return }
         setLastTestTime(now)
         setRunningSamples(true)
         setSampleResults([])
@@ -629,10 +631,10 @@ export default function ContestProblem() {
     }
 
     const handleSubmit = async () => {
-        if (!getAccessToken()) { alert('Please login first'); return }
-        if (!code.trim()) { alert('Please write some code'); return }
+        if (!getAccessToken()) { toast.info('Please login first'); return }
+        if (!code.trim()) { toast.info('Please write some code'); return }
         const now = Date.now()
-        if (now - lastSubmitTime < 5000) { alert('Please wait 5 seconds between submissions'); return }
+        if (now - lastSubmitTime < 5000) { toast.info('Please wait 5 seconds between submissions'); return }
         setLastSubmitTime(now)
         setSubmitting(true)
         setResult(null)

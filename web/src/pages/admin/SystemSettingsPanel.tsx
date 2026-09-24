@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../../lib/api'
 import { Save, RefreshCw } from 'lucide-react'
+import { useToast } from '../../components/Toast'
 
 interface Setting {
     key: string
@@ -42,6 +43,7 @@ function getMeta(key: string) {
 }
 
 export default function SystemSettingsPanel() {
+    const toast = useToast()
     const [settings, setSettings] = useState<Setting[]>([])
     const [loading, setLoading] = useState(true)
     const [savingKey, setSavingKey] = useState<string | null>(null)
@@ -74,7 +76,7 @@ export default function SystemSettingsPanel() {
             await api.admin.settings.update(key, value)
             loadSettings()
         } catch (err: any) {
-            alert(err.message)
+            toast.error(err.message)
         } finally {
             setSavingKey(null)
         }

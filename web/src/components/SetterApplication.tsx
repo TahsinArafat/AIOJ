@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { api } from '../lib/api'
+import { useToast } from './Toast.tsx'
 
 export default function SetterApplication() {
+    const toast = useToast()
     const [status, setStatus] = useState<string | null>(null)
     const [reason, setReason] = useState('')
     const [submitted, setSubmitted] = useState(false)
@@ -17,7 +19,7 @@ export default function SetterApplication() {
             setSubmitted(true)
             setStatus('pending')
         } catch (e: any) {
-            alert('Failed: ' + e.message)
+            toast.error('Failed: ' + e.message)
         }
     }
 

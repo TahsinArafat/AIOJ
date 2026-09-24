@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { api, getAccessToken, clearTokens } from '../lib/api'
 import RatingBadge from '../components/RatingBadge'
 import SetterApplication from '../components/SetterApplication'
+import { useToast } from '../components/Toast'
 
 function decodeUser() {
     const token = getAccessToken()
@@ -170,6 +171,7 @@ function ChangePasswordTab() {
 }
 
 function PendingInvitesTab({ userId }: { userId: string }) {
+    const toast = useToast()
     const [invites, setInvites] = useState<{ teams: any[]; groups: any[] }>({ teams: [], groups: [] })
     const [loading, setLoading] = useState(true)
     const [acting, setActing] = useState<string | null>(null)
@@ -194,7 +196,7 @@ function PendingInvitesTab({ userId }: { userId: string }) {
             }
             fetchInvites()
         } catch (e: any) {
-            alert('Failed: ' + e.message)
+            toast.error('Failed: ' + e.message)
         } finally {
             setActing(null)
         }
@@ -314,6 +316,7 @@ function PendingInvitesTab({ userId }: { userId: string }) {
 }
 
 export default function Profile() {
+    const toast = useToast()
     const user = decodeUser()
     const [activeTab, setActiveTab] = useState<Tab>('Edit Profile')
 
@@ -386,7 +389,7 @@ export default function Profile() {
                                 a.click()
                                 URL.revokeObjectURL(url)
                             } catch (e: any) {
-                                alert(e?.message || 'Export failed')
+                                toast.error(e?.message || 'Export failed')
                             }
                         }}
                         className="text-sm text-blue-600 dark:text-blue-400 hover:underline"

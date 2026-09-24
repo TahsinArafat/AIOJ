@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react'
 import { api } from '../../lib/api'
+import { useConfirm } from '../../components/ConfirmDialog'
+import { useToast } from '../../components/Toast'
 
 export default function SetterAppsPanel() {
+    const confirm = useConfirm()
+    const toast = useToast()
     const [apps, setApps] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
 
@@ -13,12 +17,12 @@ export default function SetterAppsPanel() {
     useEffect(() => { loadApps() }, [])
 
     const handleAppReview = async (userId: string, status: string) => {
-        if (!confirm(`Mark application as ${status}?`)) return
+        if (!(await confirm({ message: `Mark application as ${status}?`, variant: 'danger' }))) return
         try {
             await api.admin.reviewApp(userId, status)
             loadApps()
         } catch (e: any) {
-            alert(e.message)
+            toast.error(e.message)
         }
     }
 

@@ -12,7 +12,9 @@
     "submit": "Submit",
     "back": "Back",
     "next": "Next",
-    "prev": "Previous"
+    "prev": "Previous",
+    "loggedIn": "Logged in",
+    "viewProfile": "View Profile"
   },
   "nav": {
     "home": "Home",

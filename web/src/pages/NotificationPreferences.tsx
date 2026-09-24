@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../lib/api'
+import { useToast } from '../components/Toast'
 
 interface NotificationPrefs {
     email_contest_reminders: boolean
@@ -35,6 +36,7 @@ const PREF_LABELS: Record<keyof NotificationPrefs, string> = {
 }
 
 export default function NotificationPreferences() {
+    const toast = useToast()
     const [prefs, setPrefs] = useState<NotificationPrefs>(DEFAULT_PREFS)
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
@@ -59,7 +61,7 @@ export default function NotificationPreferences() {
             setSaved(true)
             setTimeout(() => setSaved(false), 3000)
         } catch (e: any) {
-            alert('Failed to save: ' + e.message)
+            toast.error('Failed to save: ' + e.message)
         } finally {
             setSaving(false)
         }

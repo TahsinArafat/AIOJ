@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
 import SetterApplication from '../components/SetterApplication'
+import { useToast } from '../components/Toast'
 
 function decodeRole(): string | null {
     const token = localStorage.getItem('access_token')
@@ -15,6 +16,7 @@ function decodeRole(): string | null {
 }
 
 export default function SetterPanel() {
+    const toast = useToast()
     const [problems, setProblems] = useState<any[]>([])
     const [contests, setContests] = useState<any[]>([])
     const [activeTab, setActiveTab] = useState<'my-problems' | 'my-contests' | 'all-problems' | 'import'>('my-problems')
@@ -41,7 +43,7 @@ export default function SetterPanel() {
     useEffect(() => { loadData() }, [activeTab])
 
     const handleImport = async () => {
-        if (!contestId || !problemIndex) return alert('Contest ID and Problem Index are required')
+        if (!contestId || !problemIndex) toast.info('Contest ID and Problem Index are required'); return
         setImporting(true)
         setImportResults(null)
 
@@ -69,7 +71,7 @@ export default function SetterPanel() {
     }
 
     const handleCSESImport = async () => {
-        if (!csesProblemId) return alert('Problem ID is required')
+        if (!csesProblemId) toast.info('Problem ID is required'); return
         setImporting(true)
         setImportResults(null)
 
@@ -95,7 +97,7 @@ export default function SetterPanel() {
     }
 
     const handleAtCoderImport = async () => {
-        if (!atcoderContestId || !atcoderProblemId) return alert('Contest ID and Problem ID are required')
+        if (!atcoderContestId || !atcoderProblemId) toast.info('Contest ID and Problem ID are required'); return
         setImporting(true)
         setImportResults(null)
 
@@ -122,7 +124,7 @@ export default function SetterPanel() {
     }
 
     const handleTophImport = async () => {
-        if (!tophProblemId) return alert('Problem ID is required')
+        if (!tophProblemId) toast.info('Problem ID is required'); return
         setImporting(true)
         setImportResults(null)
 
@@ -148,7 +150,7 @@ export default function SetterPanel() {
     }
 
     const handleQOJImport = async () => {
-        if (!qojProblemId) return alert('Problem ID is required')
+        if (!qojProblemId) toast.info('Problem ID is required'); return
         setImporting(true)
         setImportResults(null)
 
