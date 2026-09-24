@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
 import RatingBadge from '../components/RatingBadge'
 import CountryFlag from '../components/CountryFlag'
+import { EmptyState } from '../components/EmptyState'
 
 const RANK_STYLES: Record<number, string> = {
     1: 'text-amber-700 bg-amber-50 font-bold',
@@ -161,7 +162,7 @@ export default function Rankings() {
                                 )
                             })}
                             {users.length === 0 && !loading && (
-                                <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400 dark:text-gray-500">No rankings yet.</td></tr>
+                                <tr><td colSpan={5} className="text-gray-400 dark:text-gray-500"><EmptyState text="No rankings yet" description="Standings fill in as users solve problems and compete in contests." /></td></tr>
                             )}
                         </tbody>
                     </table>

@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { api, getAccessToken } from '../lib/api'
+import { EmptyState } from '../components/EmptyState'
 import RatingBadge from '../components/RatingBadge'
 import { useConfirm } from '../components/ConfirmDialog'
 import { useToast } from '../components/Toast'
@@ -339,7 +340,7 @@ export default function TeamDetail() {
                                 </div>
                             ))}
                             {activeMembers.length === 0 && (
-                                <p className="px-4 py-6 text-sm text-gray-400 dark:text-gray-500 text-center">No members yet.</p>
+                                <EmptyState text="No members yet" description="Members appear here once they join this team." />
                             )}
                         </div>
                     </div>

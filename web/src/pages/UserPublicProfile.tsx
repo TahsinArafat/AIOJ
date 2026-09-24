@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { api } from '../lib/api'
+import { EmptyState } from '../components/EmptyState'
 import RatingBadge from '../components/RatingBadge'
 import RatingGraph from '../components/RatingGraph'
 import { getRatingColor, getRatingTitle } from '../lib/rating'
@@ -450,7 +451,7 @@ export default function UserPublicProfile() {
             {blogsLoading ? (
               <div className="text-center py-12 text-gray-400 text-sm">Loading...</div>
             ) : blogs.length === 0 ? (
-              <p className="text-center py-12 text-gray-400 dark:text-gray-500 text-sm">No blog posts yet</p>
+              <EmptyState text="No blog posts yet" description="Posts they publish will appear in this tab." />
             ) : (
               <>
                 <div className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -490,7 +491,7 @@ export default function UserPublicProfile() {
             {commentsLoading ? (
               <div className="text-center py-12 text-gray-400 text-sm">Loading...</div>
             ) : comments.length === 0 ? (
-              <p className="text-center py-12 text-gray-400 dark:text-gray-500 text-sm">No comments yet</p>
+              <EmptyState text="No comments yet" description="Comments they write on posts and problems will appear here." />
             ) : (
               <>
                 <div className="divide-y divide-gray-100 dark:divide-gray-700">

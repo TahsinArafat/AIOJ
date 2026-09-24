@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
+import { EmptyState } from '../components/EmptyState'
 import { api, getAccessToken } from '../lib/api'
 import { useConfirm } from '../components/ConfirmDialog'
 import { useToast } from '../components/Toast'
@@ -313,7 +314,7 @@ export default function GroupDetail() {
                                 </div>
                             ))}
                             {activeMembers.length === 0 && (
-                                <p className="p-4 text-sm text-gray-400 dark:text-gray-500 text-center">No members yet.</p>
+                                <EmptyState text="No members yet" description="Members appear here once they join this group." />
                             )}
                         </div>
                     )}

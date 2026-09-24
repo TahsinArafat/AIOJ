@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { EmptyState } from '../components/EmptyState'
 import { useParams, Link } from 'react-router-dom'
 import { api, getAccessToken } from '../lib/api'
 import { useToast } from '../components/Toast'
@@ -152,7 +153,7 @@ export default function OrganizationDetail() {
 							<span className="text-xs font-semibold px-2 py-1 rounded bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300">{c.student_count || 0} Students</span>
 						</div>
 					))}
-					{classes.length === 0 && <p className="text-gray-400 dark:text-gray-500 text-center py-10 w-full col-span-2">No classes yet.</p>}
+					{classes.length === 0 && <div className="w-full col-span-2"><EmptyState text="No classes yet" description="Use Add Class to create your first class for this organization." /></div>}
 				</div>
 			) : (
 				<div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">

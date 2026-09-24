@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { EmptyState } from '../components/EmptyState'
 import { useParams, Link } from 'react-router-dom'
 import { api, getAccessToken } from '../lib/api'
 import { useToast } from '../components/Toast'
@@ -124,7 +125,7 @@ export default function TrainingPlanDetail() {
 					</div>
 				))}
 				{(!data.sections || data.sections.length === 0) && (
-					<p className="text-gray-400 dark:text-gray-500 text-center py-10">No sections added yet.</p>
+					<EmptyState text="No sections added yet" description="Sections organize problems into a learning path and appear here once added." />
 				)}
 			</div>
 		</div>

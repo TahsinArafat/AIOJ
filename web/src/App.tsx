@@ -188,10 +188,10 @@ function Home() {
                             <p className="text-xs text-gray-500">{t('home.signInPrompt')}</p>
                             <div className="flex gap-2 justify-center">
                                 <Link to="/login" className="text-xs bg-blue-600 text-white py-1.5 px-4 rounded hover:bg-blue-700 transition-colors font-medium">
-                                    {t('common.login')}
+                                    {t('nav.login')}
                                 </Link>
                                 <Link to="/register" className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 py-1.5 px-4 rounded transition-colors font-medium">
-                                    {t('common.register')}
+                                    {t('nav.register')}
                                 </Link>
                             </div>
                         </div>

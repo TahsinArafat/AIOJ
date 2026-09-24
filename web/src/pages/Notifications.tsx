@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../lib/api'
+import { EmptyState } from '../components/EmptyState'
 
 interface Notification {
     id: string
@@ -56,7 +57,7 @@ export default function Notifications() {
             </div>
 
             {notifications.length === 0 ? (
-                <p className="text-gray-400 dark:text-gray-500 text-center py-8">No notifications yet.</p>
+                <EmptyState text="No notifications yet" description="You're all caught up — activity on your account will show up here." />
             ) : (
                 <div className="space-y-2">
                     {notifications.map(n => (

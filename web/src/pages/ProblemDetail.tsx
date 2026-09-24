@@ -10,6 +10,7 @@ import ProblemStats from '../components/ProblemStats'
 import CodeEditor from '../components/CodeEditor'
 import AddEditorialModal from '../components/AddEditorialModal'
 import CommentSection from '../components/CommentSection'
+import { EmptyState } from '../components/EmptyState'
 import { Download, Copy, Check } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '../components/Toast'
@@ -770,7 +771,7 @@ export default function ProblemDetail() {
                             return null
                         })()}
                         {editorials.length === 0 ? (
-                            <p className="text-gray-400 dark:text-gray-500 text-sm">No editorials yet for this problem.</p>
+                            <EmptyState text="No editorials yet for this problem" description="Published write-ups from other solvers will appear here." />
                         ) : (
                             editorials.map(e => (
                                 <Link key={e.id} to={`/editorials/${e.id}`} className="block border rounded p-4 hover:bg-gray-50 dark:hover:bg-gray-700">
@@ -803,7 +804,7 @@ export default function ProblemDetail() {
                         {loadingSubs ? (
                             <div className="text-center py-8 text-gray-400 dark:text-gray-500">Loading submissions...</div>
                         ) : mySubs.length === 0 ? (
-                            <p className="text-gray-400 dark:text-gray-500 text-sm text-center py-8">No submissions yet for this problem.</p>
+                            <EmptyState text="No submissions yet for this problem" description="Submit a solution to start your attempt record." />
                         ) : (
                             <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-x-auto">
                                 <table className="w-full text-sm">

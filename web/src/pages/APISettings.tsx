@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { EmptyState } from '../components/EmptyState'
 import { api } from '../lib/api'
 import { useConfirm } from '../components/ConfirmDialog'
 import { useToast } from '../components/Toast'
@@ -90,7 +91,7 @@ export default function APISettings() {
                     <div>
                         <h2 className="font-semibold mb-3">Your API Keys</h2>
                         {keys.length === 0 ? (
-                            <p className="text-sm text-gray-400 dark:text-gray-500">No API keys created yet.</p>
+                            <EmptyState text="No API keys yet" description="Create one above to authenticate your scripts and tools." />
                         ) : (
                             <div className="space-y-2">
                                 {keys.map(k => (

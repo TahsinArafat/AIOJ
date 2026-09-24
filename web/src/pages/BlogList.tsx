@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
+import { EmptyState } from '../components/EmptyState'
 
 export default function BlogList() {
     const [posts, setPosts] = useState<any[]>([])
@@ -64,7 +65,7 @@ export default function BlogList() {
                     </Link>
                 ))}
                 {posts.length === 0 && (
-                    <div className="text-center py-16 text-gray-400 dark:text-gray-500">No blog posts yet.</div>
+                    <EmptyState text="No blog posts yet" description="Posts from the community will show up here." />
                 )}
             </div>
 

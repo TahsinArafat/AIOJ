@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { useConfirm } from '../components/ConfirmDialog'
 import { useToast } from '../components/Toast'
+import { EmptyState } from '../components/EmptyState'
 
 function indexLabel(i: number): string {
     let s = ''
@@ -1219,12 +1220,3 @@ function TabLoading() {
     )
 }
 
-function EmptyState({ icon, text, description }: { icon: React.ReactNode; text: string; description?: string }) {
-    return (
-        <div className="text-center py-10">
-            <div className="text-4xl mb-2">{icon}</div>
-            <p className="text-gray-500 dark:text-gray-400 text-sm font-medium">{text}</p>
-            {description && <p className="text-gray-400 dark:text-gray-500 text-sm mt-1 max-w-md mx-auto">{description}</p>}
-        </div>
-    )
-}

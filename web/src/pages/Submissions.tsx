@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
+import { EmptyState } from '../components/EmptyState'
 
 const STATUS_COLORS: Record<string, string> = {
     ac: 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20', wa: 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20', tle: 'text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20',
@@ -64,7 +65,7 @@ export default function Submissions() {
                             </tr>
                         ))}
                         {subs.length === 0 && (
-                            <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400 dark:text-gray-500">No submissions yet.</td></tr>
+                            <tr><td colSpan={5} className="text-gray-400 dark:text-gray-500"><EmptyState text="No submissions yet" description="Submissions appear here as soon as solutions are judged." /></td></tr>
                         )}
                     </tbody>
                 </table>
