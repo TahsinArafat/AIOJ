@@ -23,6 +23,11 @@ services:
       context: .
       dockerfile: Dockerfile.judge
     privileged: true
+    # go-judge >= 1.11 reads its cgroup parent from /proc/self/cgroup. Docker's
+    # default private cgroup namespace rewrites that path to "/", which the
+    # binary rejects with "cgroup path is empty" (fatal restart loop). Host
+    # namespace is what criyle/go-judge requires for a privileged container.
+    cgroup: host
     ports:
       - "5050:5050"
     restart: unless-stopped
