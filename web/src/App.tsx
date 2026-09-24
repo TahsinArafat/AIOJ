@@ -1,75 +1,75 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense, lazy } from 'react'
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom'
 import { api, contestSlug } from './lib/api'
 import { ThemeProvider } from './context/ThemeContext'
 import { ConfirmProvider } from './components/ConfirmDialog'
 import { ToastProvider } from './components/Toast'
 import { useTranslation } from 'react-i18next'
-import Login from './pages/Login'
-import Register from './pages/Register'
-import ForgotPassword from './pages/ForgotPassword'
-import ResetPassword from './pages/ResetPassword'
-import VerifyEmail from './pages/VerifyEmail'
-import OAuthComplete from './pages/OAuthComplete'
-import ProblemList from './pages/ProblemList'
-import ProblemDetail from './pages/ProblemDetail'
-import ContestList from './pages/ContestList'
-import ContestDetail from './pages/ContestDetail'
-import ContestScoreboard from './pages/ContestScoreboard'
-import AdminDashboard from './pages/AdminDashboard'
-import SetterPanel from './pages/SetterPanel'
-import SetterProblemWorkspace from './pages/SetterProblemWorkspace'
+const Login = lazy(() => import('./pages/Login'))
+const Register = lazy(() => import('./pages/Register'))
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'))
+const ResetPassword = lazy(() => import('./pages/ResetPassword'))
+const VerifyEmail = lazy(() => import('./pages/VerifyEmail'))
+const OAuthComplete = lazy(() => import('./pages/OAuthComplete'))
+const ProblemList = lazy(() => import('./pages/ProblemList'))
+const ProblemDetail = lazy(() => import('./pages/ProblemDetail'))
+const ContestList = lazy(() => import('./pages/ContestList'))
+const ContestDetail = lazy(() => import('./pages/ContestDetail'))
+const ContestScoreboard = lazy(() => import('./pages/ContestScoreboard'))
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'))
+const SetterPanel = lazy(() => import('./pages/SetterPanel'))
+const SetterProblemWorkspace = lazy(() => import('./pages/SetterProblemWorkspace'))
 
-import Profile from './pages/Profile'
-import ProblemCreate from './pages/ProblemCreate'
+const Profile = lazy(() => import('./pages/Profile'))
+const ProblemCreate = lazy(() => import('./pages/ProblemCreate'))
 import Navbar from './components/Navbar'
 import ActivityFeed from './components/ActivityFeed'
-import Practice from './pages/Practice'
-import VirtualContest from './pages/VirtualContest'
-import RatingHistory from './pages/RatingHistory'
-import Submissions from './pages/Submissions'
-import SubmissionDetail from './pages/SubmissionDetail'
-import GymList from './pages/GymList'
-import GymDetail from './pages/GymDetail'
-import HackPanel from './pages/HackPanel'
-import GroupList from './pages/GroupList'
-import GroupCreate from './pages/GroupCreate'
-import GroupDetail from './pages/GroupDetail'
-import GroupJoin from './pages/GroupJoin'
-import TeamList from './pages/TeamList'
-import TeamCreate from './pages/TeamCreate'
-import TeamDetail from './pages/TeamDetail'
-import BlogList from './pages/BlogList'
-import BlogCreate from './pages/BlogCreate'
-import BlogDetail from './pages/BlogDetail'
-import EditorialList from './pages/EditorialList'
-import EditorialDetail from './pages/EditorialDetail'
-import APISettings from './pages/APISettings'
-import Rankings from './pages/Rankings'
-import UserPublicProfile from './pages/UserPublicProfile'
-import ContestCreate from './pages/ContestCreate'
-import NotificationPreferences from './pages/NotificationPreferences'
-import Notifications from './pages/Notifications'
-import OrganizationList from './pages/OrganizationList'
-import OrganizationCreate from './pages/OrganizationCreate'
-import OrganizationDetail from './pages/OrganizationDetail'
-import ClassDetail from './pages/ClassDetail'
-import TrainingPlanList from './pages/TrainingPlanList'
-import TrainingPlanCreate from './pages/TrainingPlanCreate'
-import TrainingPlanDetail from './pages/TrainingPlanDetail'
-import ContestPlagiarism from './pages/ContestPlagiarism'
-import ContestProblem from './pages/ContestProblem'
-import ContestEdit from './pages/ContestEdit'
-import ContestManage from './pages/ContestManage'
-import IDE from './pages/IDE'
-import GenerateProblem from './pages/GenerateProblem'
-import TermsOfService from './pages/legal/TermsOfService'
-import PrivacyPolicy from './pages/legal/PrivacyPolicy'
-import DMCA from './pages/legal/DMCA'
+const Practice = lazy(() => import('./pages/Practice'))
+const VirtualContest = lazy(() => import('./pages/VirtualContest'))
+const RatingHistory = lazy(() => import('./pages/RatingHistory'))
+const Submissions = lazy(() => import('./pages/Submissions'))
+const SubmissionDetail = lazy(() => import('./pages/SubmissionDetail'))
+const GymList = lazy(() => import('./pages/GymList'))
+const GymDetail = lazy(() => import('./pages/GymDetail'))
+const HackPanel = lazy(() => import('./pages/HackPanel'))
+const GroupList = lazy(() => import('./pages/GroupList'))
+const GroupCreate = lazy(() => import('./pages/GroupCreate'))
+const GroupDetail = lazy(() => import('./pages/GroupDetail'))
+const GroupJoin = lazy(() => import('./pages/GroupJoin'))
+const TeamList = lazy(() => import('./pages/TeamList'))
+const TeamCreate = lazy(() => import('./pages/TeamCreate'))
+const TeamDetail = lazy(() => import('./pages/TeamDetail'))
+const BlogList = lazy(() => import('./pages/BlogList'))
+const BlogCreate = lazy(() => import('./pages/BlogCreate'))
+const BlogDetail = lazy(() => import('./pages/BlogDetail'))
+const EditorialList = lazy(() => import('./pages/EditorialList'))
+const EditorialDetail = lazy(() => import('./pages/EditorialDetail'))
+const APISettings = lazy(() => import('./pages/APISettings'))
+const Rankings = lazy(() => import('./pages/Rankings'))
+const UserPublicProfile = lazy(() => import('./pages/UserPublicProfile'))
+const ContestCreate = lazy(() => import('./pages/ContestCreate'))
+const NotificationPreferences = lazy(() => import('./pages/NotificationPreferences'))
+const Notifications = lazy(() => import('./pages/Notifications'))
+const OrganizationList = lazy(() => import('./pages/OrganizationList'))
+const OrganizationCreate = lazy(() => import('./pages/OrganizationCreate'))
+const OrganizationDetail = lazy(() => import('./pages/OrganizationDetail'))
+const ClassDetail = lazy(() => import('./pages/ClassDetail'))
+const TrainingPlanList = lazy(() => import('./pages/TrainingPlanList'))
+const TrainingPlanCreate = lazy(() => import('./pages/TrainingPlanCreate'))
+const TrainingPlanDetail = lazy(() => import('./pages/TrainingPlanDetail'))
+const ContestPlagiarism = lazy(() => import('./pages/ContestPlagiarism'))
+const ContestProblem = lazy(() => import('./pages/ContestProblem'))
+const ContestEdit = lazy(() => import('./pages/ContestEdit'))
+const ContestManage = lazy(() => import('./pages/ContestManage'))
+const IDE = lazy(() => import('./pages/IDE'))
+const GenerateProblem = lazy(() => import('./pages/GenerateProblem'))
+const TermsOfService = lazy(() => import('./pages/legal/TermsOfService'))
+const PrivacyPolicy = lazy(() => import('./pages/legal/PrivacyPolicy'))
+const DMCA = lazy(() => import('./pages/legal/DMCA'))
 import CookieConsent from './components/CookieConsent'
-import TwoFactorSetup from './pages/auth/TwoFactorSetup'
-import TwoFactorVerify from './pages/auth/TwoFactorVerify'
-import Settings from './pages/Settings'
+const TwoFactorSetup = lazy(() => import('./pages/auth/TwoFactorSetup'))
+const TwoFactorVerify = lazy(() => import('./pages/auth/TwoFactorVerify'))
+const Settings = lazy(() => import('./pages/Settings'))
 import './global.css'
 
 function Home() {
@@ -272,6 +272,7 @@ function Home() {
 
 function AppShell() {
     const location = useLocation()
+    const { t } = useTranslation()
     // Full-height workbench routes (no page chrome/footer so flex height can fill the viewport).
     const isFullscreenRoute = location.pathname === '/ide'
 
@@ -301,6 +302,7 @@ function AppShell() {
                         : 'max-w-[1400px] mx-auto w-full min-w-0 px-6 py-6 flex-1 min-h-0 flex flex-col [&>*]:w-full [&>*]:min-w-0'
                 }
             >
+                <Suspense fallback={<div className="text-center py-8 text-gray-400 dark:text-gray-500">{t('common.loading')}</div>}>
                 <Routes>
                     <Route path="/" element={<Home />} />
                     <Route path="/problems" element={<ProblemList />} />
@@ -367,6 +369,7 @@ function AppShell() {
                     <Route path="/legal/dmca" element={<DMCA />} />
                     <Route path="*" element={<div className="text-center py-20 text-gray-400 dark:text-gray-500">404 Not Found</div>} />
                 </Routes>
+                </Suspense>
             </main>
             {!isFullscreenRoute && (
                 <footer className="max-w-[1400px] mx-auto w-full px-6 py-6 border-t border-gray-200 dark:border-gray-700 text-sm text-gray-500 dark:text-gray-400 flex flex-wrap gap-4">
