@@ -34,6 +34,9 @@ const emptyLang: LanguageConfig = {
 
 const seccompOptions = ['general', 'c_cpp', 'java', 'node', 'none']
 
+interface DetectedTool { name: string; path: string; version?: string }
+interface TestResult { status?: string; key?: string; message?: string }
+
 export default function LanguagesPanel() {
     const confirm = useConfirm()
     const toast = useToast()
@@ -45,11 +48,11 @@ export default function LanguagesPanel() {
     const [useRawEditor, setUseRawEditor] = useState(false)
     const [saving, setSaving] = useState(false)
     const [testing, setTesting] = useState<string | null>(null)
-    const [testResult, setTestResult] = useState<any>(null)
+    const [testResult, setTestResult] = useState<TestResult | null>(null)
     const [showCreate, setShowCreate] = useState(false)
     const [extInput, setExtInput] = useState('')
-    const [detected, setDetected] = useState<{ compilers: any[]; interpreters: any[] } | null>(null)
-    const [templates, setTemplates] = useState<any[]>([])
+    const [detected, setDetected] = useState<{ compilers: DetectedTool[]; interpreters: DetectedTool[] } | null>(null)
+    const [templates, setTemplates] = useState<LanguageConfig[]>([])
     const [showDetect, setShowDetect] = useState(false)
     const [showTemplates, setShowTemplates] = useState(false)
 
@@ -61,7 +64,9 @@ export default function LanguagesPanel() {
             .finally(() => setLoading(false))
     }
 
-    useEffect(() => { loadLangs() }, [])
+    // deferred one microtask: loadLangs opens with a synchronous setLoading(true),
+    // which react-hooks/set-state-in-effect rejects in an effect body
+    useEffect(() => { queueMicrotask(loadLangs) }, [])
 
     const handleEdit = async (key: string) => {
         setEditKey(key)
@@ -72,8 +77,8 @@ export default function LanguagesPanel() {
             setForm(lang)
             const raw = await api.admin.languages.getRaw(key)
             setRawYaml(typeof raw === 'string' ? raw : JSON.stringify(raw, null, 2))
-        } catch (e: any) {
-            toast.error('Failed to load language: ' + e.message)
+        } catch (e) {
+            toast.error('Failed to load language: ' + (e instanceof Error ? e.message : String(e)))
         }
     }
 
@@ -88,8 +93,8 @@ export default function LanguagesPanel() {
             }
             setEditKey(null)
             loadLangs()
-        } catch (e: any) {
-            toast.error('Save failed: ' + e.message)
+        } catch (e) {
+            toast.error('Save failed: ' + (e instanceof Error ? e.message : String(e)))
         } finally {
             setSaving(false)
         }
@@ -103,8 +108,8 @@ export default function LanguagesPanel() {
             setShowCreate(false)
             setForm(emptyLang)
             loadLangs()
-        } catch (e: any) {
-            toast.error('Create failed: ' + e.message)
+        } catch (e) {
+            toast.error('Create failed: ' + (e instanceof Error ? e.message : String(e)))
         } finally {
             setSaving(false)
         }
@@ -115,8 +120,8 @@ export default function LanguagesPanel() {
         try {
             await api.admin.languages.delete(key)
             loadLangs()
-        } catch (e: any) {
-            toast.error('Delete failed: ' + e.message)
+        } catch (e) {
+            toast.error('Delete failed: ' + (e instanceof Error ? e.message : String(e)))
         }
     }
 
@@ -126,8 +131,8 @@ export default function LanguagesPanel() {
         try {
             const result = await api.admin.languages.test(key)
             setTestResult(result)
-        } catch (e: any) {
-            setTestResult({ status: 'error', message: e.message })
+        } catch (e) {
+            setTestResult({ status: 'error', message: e instanceof Error ? e.message : String(e) })
         } finally {
             setTesting(null)
         }
@@ -139,8 +144,8 @@ export default function LanguagesPanel() {
         try {
             const result = await api.admin.languages.detect()
             setDetected(result)
-        } catch (e: any) {
-            toast.error('Detection failed: ' + e.message)
+        } catch (e) {
+            toast.error('Detection failed: ' + (e instanceof Error ? e.message : String(e)))
         }
     }
 
@@ -150,24 +155,24 @@ export default function LanguagesPanel() {
         try {
             const result = await api.admin.languages.templates()
             setTemplates(result.data || [])
-        } catch (e: any) {
-            toast.error('Failed to load templates: ' + e.message)
+        } catch (e) {
+            toast.error('Failed to load templates: ' + (e instanceof Error ? e.message : String(e)))
         }
     }
 
-    const useDetectedCompiler = (tool: any) => {
+    const applyDetectedCompiler = (tool: DetectedTool) => {
         setForm({ ...form, compile: `${tool.path} -O2 -o {{exe}} {{src}}` })
         setShowCreate(true)
         setEditKey(null)
     }
 
-    const useDetectedInterpreter = (tool: any) => {
+    const applyDetectedInterpreter = (tool: DetectedTool) => {
         setForm({ ...form, runtime: tool.path })
         setShowCreate(true)
         setEditKey(null)
     }
 
-    const useTemplate = (tmpl: any) => {
+    const applyTemplate = (tmpl: LanguageConfig) => {
         setForm(tmpl)
         setShowCreate(true)
         setShowTemplates(false)
@@ -336,14 +341,14 @@ export default function LanguagesPanel() {
                         <div>
                             <h4 className="font-medium text-sm text-gray-700 dark:text-gray-300 mb-2">Compilers</h4>
                             <div className="space-y-2 max-h-48 overflow-y-auto">
-                                {detected.compilers.map((c: any, i: number) => (
+                                {detected.compilers.map((c, i) => (
                                     <div key={i} className="flex items-center justify-between bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded px-3 py-2">
                                         <div>
                                             <div className="text-sm font-medium">{c.name}</div>
                                             <div className="text-xs text-gray-500 dark:text-gray-400 font-mono">{c.path}</div>
                                             {c.version && <div className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{c.version}</div>}
                                         </div>
-                                        <button onClick={() => useDetectedCompiler(c)}
+                                        <button onClick={() => applyDetectedCompiler(c)}
                                             className="text-xs px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-200 cursor-pointer">Use</button>
                                     </div>
                                 ))}
@@ -353,14 +358,14 @@ export default function LanguagesPanel() {
                         <div>
                             <h4 className="font-medium text-sm text-gray-700 dark:text-gray-300 mb-2">Interpreters</h4>
                             <div className="space-y-2 max-h-48 overflow-y-auto">
-                                {detected.interpreters.map((i: any, idx: number) => (
+                                {detected.interpreters.map((i, idx) => (
                                     <div key={idx} className="flex items-center justify-between bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded px-3 py-2">
                                         <div>
                                             <div className="text-sm font-medium">{i.name}</div>
                                             <div className="text-xs text-gray-500 dark:text-gray-400 font-mono">{i.path}</div>
                                             {i.version && <div className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{i.version}</div>}
                                         </div>
-                                        <button onClick={() => useDetectedInterpreter(i)}
+                                        <button onClick={() => applyDetectedInterpreter(i)}
                                             className="text-xs px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-200 cursor-pointer">Use</button>
                                     </div>
                                 ))}
@@ -381,14 +386,14 @@ export default function LanguagesPanel() {
                     <p className="text-sm text-gray-500 dark:text-gray-400">Quick-start templates for common languages. Click "Use" to pre-fill the create form.</p>
 
                     <div className="grid grid-cols-3 gap-3">
-                        {templates.map((t: any) => (
+                        {templates.map(t => (
                             <div key={t.key} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-3 hover:border-purple-300 transition-colors">
                                 <div className="font-medium text-sm">{t.name}</div>
                                 <div className="text-xs text-gray-500 dark:text-gray-400 font-mono mt-1">{t.key}</div>
                                 <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                                     {t.compile ? `compile: ${t.compile.substring(0, 30)}...` : `runtime: ${t.runtime}`}
                                 </div>
-                                <button onClick={() => useTemplate(t)}
+                                <button onClick={() => applyTemplate(t)}
                                     className="mt-2 text-xs px-2 py-1 bg-purple-100 text-purple-700 dark:text-purple-300 rounded hover:bg-purple-200 cursor-pointer w-full">Use Template</button>
                             </div>
                         ))}

@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback, useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { api, getAccessToken } from '../lib/api'
 import DivisionBadge from '../components/DivisionBadge'
+import type { Division } from '../lib/divisions'
 import { EmptyState } from '../components/EmptyState'
 import {
     Trophy, FileText, MessageSquare, Users, Zap, FileDown, Pencil, Gamepad2,
@@ -162,11 +163,12 @@ function CountdownTimer({ target, label }: { target: string; label: string }) {
 }
 
 function RunningTimer({ start, end }: { start: string; end: string }) {
-    const [now, setNow] = useState(Date.now())
+    const [now, setNow] = useState(() => Date.parse(start))
 
     useEffect(() => {
         const iv = setInterval(() => setNow(Date.now()), 1000)
-        return () => clearInterval(iv)
+        const seed = setTimeout(() => setNow(Date.now()), 0)
+        return () => { clearInterval(iv); clearTimeout(seed) }
     }, [])
 
     const startTime = new Date(start).getTime()
@@ -230,6 +232,28 @@ function SidebarBox({ title, icon, children, accent }: {
 
 type Tab = 'problems' | 'standings' | 'submissions' | 'clarifications' | 'announcements'
 
+interface ContestInfo {
+    title: string
+    type: string
+    format: string
+    division?: Division
+    start_time: string
+    end_time: string
+    freeze_time?: string
+    max_participants?: number
+    pdf_enabled?: boolean
+    registration_required?: boolean
+    statement_hidden?: boolean
+    upsolving_enabled?: boolean
+    virtual_contest_enabled?: boolean
+}
+interface ProblemRow { problem_id?: string; index?: string; title?: string; score?: number }
+interface ClarificationItem { id?: string; created_at: string; question?: string; answer?: string; username?: string; is_public?: boolean }
+interface AnnouncementItem { id: string; created_at: string; content?: string; username?: string }
+interface SubmissionRow { id?: string; created_at: string; status: string; language?: string; problem_id?: string; user_id?: string; username?: string; time_used?: number; memory_used?: number; score?: number }
+interface StandingsCell { solved?: boolean; attempts?: number; time?: number; pending?: number }
+interface StandingsEntry { user_id?: string; username?: string; rank?: number; total_solved?: number; total_penalty?: number; problems?: Record<string, StandingsCell> }
+
 export default function ContestDetail() {
     const confirm = useConfirm()
     const toast = useToast()
@@ -238,8 +262,8 @@ export default function ContestDetail() {
     const userId = decodeUserId()
     const isAdmin = role === 'admin' || role === 'owner'
 
-    const [contest, setContest] = useState<any>(null)
-    const [problems, setProblems] = useState<any[]>([])
+    const [contest, setContest] = useState<ContestInfo | null>(null)
+    const [problems, setProblems] = useState<ProblemRow[]>([])
     const [loading, setLoading] = useState(true)
     const [activeTab, setActiveTab] = useState<Tab>(() => {
         const hash = window.location.hash.replace('#', '') as Tab
@@ -257,13 +281,13 @@ export default function ContestDetail() {
     const [registrationCount, setRegistrationCount] = useState(0)
 
     // Clarifications
-    const [clarifications, setClarifications] = useState<any[]>([])
+    const [clarifications, setClarifications] = useState<ClarificationItem[]>([])
     const [showForm, setShowForm] = useState(false)
     const [question, setQuestion] = useState('')
 
     // Standings
-    const [standings, setStandings] = useState<any[]>([])
-    const [standingsProblems, setStandingsProblems] = useState<any[]>([])
+    const [standings, setStandings] = useState<StandingsEntry[]>([])
+    const [standingsProblems, setStandingsProblems] = useState<ProblemRow[]>([])
     const [standingsFrozen, setStandingsFrozen] = useState(false)
     const [standingsPage, setStandingsPage] = useState(1)
     const [standingsPagination, setStandingsPagination] = useState<{ page: number; total_pages: number; total: number } | null>(null)
@@ -276,10 +300,10 @@ export default function ContestDetail() {
             for (let pi = 0; pi < probList.length; pi++) {
                 const pidx = probList[pi].index || String.fromCharCode(65 + pi)
                 const c = row.problems?.[pidx]
-                if (c?.solved && c.attempts > 0) {
-                    if (!(pidx in bestTime) || c.time < bestTime[pidx]) {
-                        bestTime[pidx] = c.time
-                        map[pidx] = row.user_id
+                if (c?.solved && (c.attempts ?? 0) > 0) {
+                    if (!(pidx in bestTime) || (c.time ?? Infinity) < bestTime[pidx]) {
+                        bestTime[pidx] = c.time ?? Infinity
+                        map[pidx] = row.user_id ?? ''
                     }
                 }
             }
@@ -287,13 +311,13 @@ export default function ContestDetail() {
         return map
     }, [standings, standingsProblems, problems])
     // Announcements
-    const [announcements, setAnnouncements] = useState<any[]>([])
+    const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([])
     const [announceText, setAnnounceText] = useState('')
     const [unreadAnnouncements, setUnreadAnnouncements] = useState(0)
     const [unreadClarifications, setUnreadClarifications] = useState(0)
 
     // Submissions
-    const [submissions, setSubmissions] = useState<any[]>([])
+    const [submissions, setSubmissions] = useState<SubmissionRow[]>([])
     const [submissionsTotal, setSubmissionsTotal] = useState(0)
     const [submissionsOffset, setSubmissionsOffset] = useState(0)
     const submissionsLimit = 20
@@ -317,9 +341,9 @@ export default function ContestDetail() {
     const fetchClarifications = useCallback(() => {
         if (!id) return
         const lastSeen = localStorage.getItem(`contest_${id}_last_clarif`) || '0'
-        api.clarifications.list(id).then(res => {
+        api.clarifications.list(id).then((res: { data?: ClarificationItem[] }) => {
             const items = res.data || []
-            const newCount = items.filter((c: any) => new Date(c.created_at).getTime() > Number(lastSeen)).length
+            const newCount = items.filter(c => new Date(c.created_at).getTime() > Number(lastSeen)).length
             setUnreadClarifications(newCount)
             setClarifications(items)
         }).catch(() => { })
@@ -329,21 +353,15 @@ export default function ContestDetail() {
         if (activeTab === 'clarifications') {
             fetchClarifications()
             if (id) localStorage.setItem(`contest_${id}_last_clarif`, String(Date.now()))
-            setUnreadClarifications(0)
         }
         if (activeTab === 'announcements' && id) {
             localStorage.setItem(`contest_${id}_last_notice`, String(Date.now()))
-            setUnreadAnnouncements(0)
-        }
-        // Reset standings page when switching tabs
-        if (activeTab !== 'standings') {
-            setStandingsPage(1)
         }
     }, [activeTab, fetchClarifications, id])
 
     useEffect(() => {
         if (activeTab === 'standings' && id) {
-            api.contests.standings(id, standingsPage).then((res: any) => {
+            api.contests.standings(id, standingsPage).then((res: { entries?: StandingsEntry[]; problems?: ProblemRow[]; frozen?: boolean; pagination?: { page: number; total_pages: number; total: number } }) => {
                 setStandings(res.entries || [])
                 setStandingsProblems(res.problems || [])
                 setStandingsFrozen(res.frozen || false)
@@ -354,11 +372,11 @@ export default function ContestDetail() {
 
     useEffect(() => {
         if (activeTab === 'submissions' && id && getAccessToken()) {
-            const filters: any = { mine: submissionsMine }
+            const filters: { mine: boolean; problem_id?: string; language?: string; status?: string } = { mine: submissionsMine }
             if (subFilterProblem) filters.problem_id = subFilterProblem
             if (subFilterLang) filters.language = subFilterLang
             if (subFilterStatus) filters.status = subFilterStatus
-            api.contests.submissions(id, submissionsOffset, submissionsLimit, filters).then((res: any) => {
+            api.contests.submissions(id, submissionsOffset, submissionsLimit, filters).then((res: { data?: SubmissionRow[]; total?: number; is_judge?: boolean }) => {
                 setSubmissions(res.data || [])
                 setSubmissionsTotal(res.total || 0)
                 setIsJudge(res.is_judge || false)
@@ -369,14 +387,14 @@ export default function ContestDetail() {
     const filteredSubmissions = useMemo(() => {
         let result = submissions
         if (subFilterId) {
-            result = result.filter((s: any) => s.id?.toLowerCase().includes(subFilterId.toLowerCase()))
+            result = result.filter(s => s.id?.toLowerCase().includes(subFilterId.toLowerCase()))
         }
         if (contest?.freeze_time) {
             const freezeTime = new Date(contest.freeze_time).getTime()
-            const now = Date.now()
+            const now = Date.now() // eslint-disable-line react-hooks/purity -- freeze window intentionally compared against wall clock
             const endTime = new Date(contest.end_time).getTime()
             if (now >= freezeTime && now < endTime) {
-                result = result.filter((s: any) => new Date(s.created_at).getTime() < freezeTime)
+                result = result.filter(s => new Date(s.created_at).getTime() < freezeTime)
             }
         }
         return result
@@ -385,7 +403,7 @@ export default function ContestDetail() {
     useEffect(() => {
         if (!id) return
         const pollNotices = () => {
-            api.contests.announcements(id).then((res: any) => {
+            api.contests.announcements(id).then((res: AnnouncementItem[] | { data?: AnnouncementItem[] }) => {
                 const items = Array.isArray(res) ? res : res.data || []
                 // Show popup when new announcements arrive (after first load)
                 if (announcements.length > 0 && items.length > announcements.length) {
@@ -403,13 +421,13 @@ export default function ContestDetail() {
                 setAnnouncements(items)
                 // Calculate unread from localStorage
                 const lastSeen = localStorage.getItem(`contest_${id}_last_notice`) || '0'
-                setUnreadAnnouncements(items.filter((a: any) => new Date(a.created_at).getTime() > Number(lastSeen)).length)
+                setUnreadAnnouncements(items.filter(a => new Date(a.created_at).getTime() > Number(lastSeen)).length)
             }).catch(() => { })
         }
         pollNotices()
         const interval = setInterval(pollNotices, 15000)
         return () => clearInterval(interval)
-    }, [id])
+    }, [id]) // eslint-disable-line react-hooks/exhaustive-deps -- notification loop keeps its established stale-closure behavior
 
     const handleRegister = async () => {
         if (!id) return
@@ -417,7 +435,7 @@ export default function ContestDetail() {
             await api.contests.register(id)
             setRegistered(true)
             setRegistrationCount(c => c + 1)
-        } catch (e: any) { toast.error(e.message) }
+        } catch (e) { toast.error(e instanceof Error ? e.message : String(e)) }
     }
 
     const handleUnregister = async () => {
@@ -426,7 +444,7 @@ export default function ContestDetail() {
             await api.contests.unregister(id)
             setRegistered(false)
             setRegistrationCount(c => Math.max(0, c - 1))
-        } catch (e: any) { toast.error(e.message) }
+        } catch (e) { toast.error(e instanceof Error ? e.message : String(e)) }
     }
 
     const handleAsk = async () => {
@@ -436,7 +454,7 @@ export default function ContestDetail() {
             setQuestion('')
             setShowForm(false)
             fetchClarifications()
-        } catch (e: any) { toast.error(e.message) }
+        } catch (e) { toast.error(e instanceof Error ? e.message : String(e)) }
     }
 
     const handleAnnounce = async () => {
@@ -444,16 +462,16 @@ export default function ContestDetail() {
         try {
             await api.contests.postAnnouncement(id, announceText.trim())
             setAnnounceText('')
-            api.contests.announcements(id).then((res: any) => setAnnouncements(Array.isArray(res) ? res : res.data || [])).catch(() => { })
-        } catch (e: any) { toast.error(e.message) }
+            api.contests.announcements(id).then((res: AnnouncementItem[] | { data?: AnnouncementItem[] }) => setAnnouncements(Array.isArray(res) ? res : res.data || [])).catch(() => { })
+        } catch (e) { toast.error(e instanceof Error ? e.message : String(e)) }
     }
 
     const handleDeleteAnnouncement = async (announcementId: string) => {
         if (!id || !(await confirm({ message: 'Delete this announcement?', variant: 'danger' }))) return
         try {
             await api.contests.deleteAnnouncement(id, announcementId)
-            setAnnouncements(a => a.filter((x: any) => x.id !== announcementId))
-        } catch (e: any) { toast.error(e.message) }
+            setAnnouncements(a => a.filter(x => x.id !== announcementId))
+        } catch (e) { toast.error(e instanceof Error ? e.message : String(e)) }
     }
 
     if (loading) return <div className="text-center py-20 text-gray-500 dark:text-gray-400">Loading...</div>
@@ -507,7 +525,14 @@ export default function ContestDetail() {
                     ] as { key: Tab; label: string; icon: string; unread?: number }[]).map(tab => (
                         <button
                             key={tab.key}
-                            onClick={() => setActiveTab(tab.key)}
+                            onClick={() => {
+                                if (tab.key !== activeTab) {
+                                    setActiveTab(tab.key)
+                                    if (tab.key === 'clarifications') setUnreadClarifications(0)
+                                    if (tab.key === 'announcements') setUnreadAnnouncements(0)
+                                    if (tab.key !== 'standings') setStandingsPage(1)
+                                }
+                            }}
                             className={`pb-3 text-sm font-semibold transition-colors flex items-center gap-1.5 ${activeTab === tab.key
                                 ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600'
                                 : 'text-gray-500 hover:text-gray-700 border-b-2 border-transparent'
@@ -548,7 +573,7 @@ export default function ContestDetail() {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {problems.map((p: any, i: number) => (
+                                            {problems.map((p, i) => (
                                                 <tr key={p.problem_id} className="border-b border-gray-100 dark:border-gray-800 last:border-0 hover:bg-gray-50 transition-colors">
                                                     <td className="px-4 py-3 font-mono font-bold text-gray-500">{p.index || String.fromCharCode(65 + i)}</td>
                                                     <td className="px-4 py-3">
@@ -615,7 +640,7 @@ export default function ContestDetail() {
                                                     <span className="text-emerald-700 dark:text-emerald-400">=</span>
                                                 </th>
                                                 <th className="text-center px-3 py-3 font-bold text-xs uppercase tracking-wider w-20">Penalty</th>
-                                                {(standingsProblems.length > 0 ? standingsProblems : problems).map((p: any, i: number) => (
+                                                {(standingsProblems.length > 0 ? standingsProblems : problems).map((p, i) => (
                                                     <th key={i} className="text-center px-1 py-3 font-bold text-xs uppercase tracking-wider w-16">
                                                         <div className="flex flex-col items-center">
                                                             <span className="text-base">{String.fromCharCode(65 + i)}</span>
@@ -626,7 +651,7 @@ export default function ContestDetail() {
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                                            {(standingsProblems.length > 0 ? standingsProblems : problems).length > 0 && standings.map((row: any, idx: number) => {
+                                            {(standingsProblems.length > 0 ? standingsProblems : problems).length > 0 && standings.map((row, idx) => {
                                                 const probList = standingsProblems.length > 0 ? standingsProblems : problems
                                                 const isMe = row.user_id === userId
                                                 const rank = row.rank || idx + 1
@@ -656,7 +681,7 @@ export default function ContestDetail() {
                                                             <span className="text-lg font-black text-gray-900 dark:text-gray-100">{row.total_solved ?? 0}</span>
                                                         </td>
                                                         <td className="text-center px-3 py-2.5 font-mono text-gray-500 dark:text-gray-400 text-xs">{penaltyStr}</td>
-                                                        {probList.map((p: any, i: number) => {
+                                                        {probList.map((p, i) => {
                                                             const pidx = p.index || String.fromCharCode(65 + i)
                                                             const cell = row.problems?.[pidx] || {}
                                                             const solved = cell.solved
@@ -806,7 +831,7 @@ export default function ContestDetail() {
                                         className="text-sm border border-gray-200 dark:border-gray-700 rounded-md px-2.5 py-1.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     >
                                         <option value="">All Problems</option>
-                                        {problems.map((p: any) => (
+                                        {problems.map((p) => (
                                             <option key={p.problem_id} value={p.problem_id}>{p.index ? `${p.index} - ` : ''}{p.title}</option>
                                         ))}
                                     </select>
@@ -816,7 +841,7 @@ export default function ContestDetail() {
                                         className="text-sm border border-gray-200 dark:border-gray-700 rounded-md px-2.5 py-1.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                     >
                                         <option value="">All Languages</option>
-                                        {Array.from(new Set(submissions.map((s: any) => s.language).filter(Boolean))).sort().map((lang: any) => (
+                                        {Array.from(new Set(submissions.map(s => s.language).filter(Boolean))).sort().map(lang => (
                                             <option key={lang} value={lang}>{lang}</option>
                                         ))}
                                     </select>
@@ -880,7 +905,7 @@ export default function ContestDetail() {
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {filteredSubmissions.map((s: any, i: number) => {
+                                                {filteredSubmissions.map((s, i) => {
                                                     const verdictCls: Record<string, string> = {
                                                         ac: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-300 dark:border-green-700',
                                                         wa: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-300 dark:border-red-700',
@@ -898,7 +923,7 @@ export default function ContestDetail() {
                                                         mle: 'Memory Limit', re: 'Runtime Error', ce: 'Compile Error',
                                                         pending: 'Pending', judging: 'Judging', se: 'Internal Error', ie: 'Internal Error',
                                                     }
-                                                    const problem = problems.find((p: any) => p.problem_id === s.problem_id)
+                                                    const problem = problems.find(p => p.problem_id === s.problem_id)
                                                     const problemLabel = problem ? `${problem.index || ''} — ${problem.title}` : s.problem_id?.slice(0, 8)
                                                     const canClick = s.user_id === userId || isJudge
                                                     const rowCls = canClick ? 'cursor-pointer hover:bg-blue-50' : 'hover:bg-gray-50'
@@ -987,7 +1012,7 @@ export default function ContestDetail() {
                                 <EmptyState icon={<MessageSquare className="w-12 h-12 text-gray-700 dark:text-gray-300" />} text="No clarifications yet" description="Questions from participants and official responses will appear here." />
                             ) : (
                                 <div className="space-y-3">
-                                    {clarifications.map((c: any) => (
+                                    {clarifications.map(c => (
                                         <div key={c.id} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 shadow-sm">
                                             <div className="flex items-start justify-between mb-2">
                                                 <span className="text-xs font-medium text-gray-500">{c.username || 'Anonymous'}</span>
@@ -1044,7 +1069,7 @@ export default function ContestDetail() {
                                 <EmptyState icon={<Megaphone className="w-12 h-12 text-gray-700 dark:text-gray-300" />} text="No announcements yet" description="Announcements from judges will appear here" />
                             ) : (
                                 <div className="space-y-3">
-                                    {announcements.map((a: any, i: number) => (
+                                    {announcements.map((a, i) => (
                                         <div key={a.id} className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg p-4">
                                             <div className="flex items-start justify-between gap-3">
                                                 <div className="flex-1">

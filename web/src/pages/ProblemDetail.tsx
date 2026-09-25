@@ -22,7 +22,6 @@ function useIsDesktop(breakpoint = 768) {
     useEffect(() => {
         const mql = window.matchMedia(`(min-width: ${breakpoint}px)`)
         const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches)
-        setIsDesktop(mql.matches)
         mql.addEventListener('change', handler)
         return () => mql.removeEventListener('change', handler)
     }, [breakpoint])
@@ -184,16 +183,31 @@ const STATUS_LABELS: Record<string, string> = {
     se: 'System Error', SE: 'System Error',
 }
 
+interface ProblemTranslation { language: string; title?: string; description?: string }
+interface SampleCase { input: string; output: string; explanation?: string }
+interface ProblemData {
+    id: string; slug: string; title?: string; description?: string; hint?: string;
+    source?: string; difficulty?: string; problem_type?: string; scoring_mode?: string;
+    interactive?: boolean; time_limit: number; memory_limit: number;
+    input_format?: string; output_format?: string; pdf?: string;
+    tags?: string[]; sample_cases?: SampleCase[];
+}
+interface RunResult { status: string; stdout?: string; stderr?: string; compile_output?: string; expected?: string; passed?: boolean | null; time_used: number; memory_used: number }
+interface SampleRunResult { index: number; input: string; expected?: string; actual?: string; passed: boolean; status?: string; time: number; memory?: number; stderr?: string; compile_output?: string; error?: string }
+interface EditorialItem { id: string; title: string; is_official?: boolean; username?: string; time_complexity?: string; upvotes?: number }
+interface MySubmission { id: string; language?: string; status: string; time_used: number; memory_used: number }
+interface RemoteLangOption { enabled?: boolean; sort_order?: number; local_id: string; display_name: string }
+
 export default function ProblemDetail() {
     const toast = useToast()
     const { slug } = useParams<{ slug: string }>()
     const [searchParams] = useSearchParams()
     const isUpsolving = searchParams.get('upsolving') === 'true'
     const contestId = searchParams.get('contest')
-    const [problem, setProblem] = useState<any>(null)
+    const [problem, setProblem] = useState<ProblemData | null>(null)
     const { i18n } = useTranslation()
     // Translation for the active UI language, if the setter supplied one.
-    const [translation, setTranslation] = useState<any>(null)
+    const [translation, setTranslation] = useState<ProblemTranslation | null>(null)
 
     // The description to actually show: the translation when the setter supplied
     // one for the active language, otherwise the problem's default. Centralised
@@ -202,19 +216,19 @@ export default function ProblemDetail() {
     const [lang, setLang] = useState('cpp-gpp-64')
     const [languages, setLanguages] = useState(DEFAULT_LANGS)
     const [code, setCode] = useState('')
-    const [result, setResult] = useState<any>(null)
+    const [result, setResult] = useState<RunResult | null>(null)
     const [submitting, setSubmitting] = useState(false)
     const [customInput, setCustomInput] = useState('')
-    const [customOutput, setCustomOutput] = useState<any>(null)
+    const [customOutput, setCustomOutput] = useState<RunResult | null>(null)
     const [runningCustom, setRunningCustom] = useState(false)
-    const [sampleResults, setSampleResults] = useState<any[]>([])
+    const [sampleResults, setSampleResults] = useState<SampleRunResult[]>([])
     const [runningSamples, setRunningSamples] = useState(false)
     const [lastSubmitTime, setLastSubmitTime] = useState(0)
     const [lastTestTime, setLastTestTime] = useState(0)
     const [tab, setTab] = useState<'statement' | 'stats' | 'editorials' | 'submissions' | 'more'>('statement')
-    const [mySubs, setMySubs] = useState<any[]>([])
+    const [mySubs, setMySubs] = useState<MySubmission[]>([])
     const [loadingSubs, setLoadingSubs] = useState(false)
-    const [editorials, setEditorials] = useState<any[]>([])
+    const [editorials, setEditorials] = useState<EditorialItem[]>([])
     const [isAddModalOpen, setIsAddModalOpen] = useState(false)
     const isMountedRef = useRef(true)
     const isDesktop = useIsDesktop()
@@ -261,22 +275,26 @@ export default function ProblemDetail() {
     }, [])
 
     useEffect(() => {
-        if (slug) api.problems.get(slug).then(setProblem).catch(() => { })
+        if (slug) {
+            api.problems.get(slug).then(p => {
+                setProblem(p)
+                // local/default problems render the built-in language list; previously
+                // this reset was a synchronous setLanguages in the languages effect
+                if (!p?.source || p.source === 'local') setLanguages(DEFAULT_LANGS)
+            }).catch(() => { })
+        }
     }, [slug])
 
     // Fetch the translation for the active UI language and prefer it over the
     // problem's default title/description. Mirrors the backend's Coalesce
     // fallback: an absent translation simply leaves the defaults in place.
     useEffect(() => {
-        if (!problem?.id) {
-            setTranslation(null)
-            return
-        }
+        if (!problem?.id) return
         let cancelled = false
         api.problems.listI18n(problem.id)
-            .then((rows) => {
+            .then((rows: ProblemTranslation[] | null) => {
                 if (cancelled) return
-                const match = (rows || []).find((r: any) => r.language === i18n.language)
+                const match = (rows || []).find(r => r.language === i18n.language)
                 setTranslation(match || null)
             })
             .catch(() => { if (!cancelled) setTranslation(null) })
@@ -291,17 +309,15 @@ export default function ProblemDetail() {
             api.remoteLanguages.list(problem.source)
                 .then(d => {
                     const langs = (d.data || [])
-                        .filter((rl: any) => rl.enabled)
-                        .sort((a: any, b: any) => a.sort_order - b.sort_order)
-                        .map((rl: any) => ({ value: rl.local_id, label: rl.display_name }))
+                        .filter((rl: RemoteLangOption) => rl.enabled)
+                        .sort((a: RemoteLangOption, b: RemoteLangOption) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+                        .map((rl: RemoteLangOption) => ({ value: rl.local_id, label: rl.display_name }))
                     if (langs.length > 0) {
                         setLanguages(langs)
                         setLang(langs[0].value)
                     }
                 })
                 .catch(() => { })
-        } else {
-            setLanguages(DEFAULT_LANGS)
         }
     }, [problem?.source])
 
@@ -311,7 +327,9 @@ export default function ProblemDetail() {
 
     useEffect(() => {
         if (tab === 'submissions' && problem?.id) {
-            setLoadingSubs(true)
+            // deferred a microtask: spinner still lands pre-paint, but the setState is
+            // no longer synchronous (react-hooks/set-state-in-effect)
+            queueMicrotask(() => setLoadingSubs(true))
             api.submissions.list(0, 50, problem.id, contestId || undefined)
                 .then(d => {
                     if (isMountedRef.current) {
@@ -331,7 +349,8 @@ export default function ProblemDetail() {
         if (slug) {
             const key = `aioj_draft_${problem?.id || slug}_${lang}`
             const saved = localStorage.getItem(key)
-            setCode(saved || TEMPLATE_CODE[lang] || '')
+            // deferred a microtask: draft still lands pre-paint (react-hooks/set-state-in-effect)
+            queueMicrotask(() => setCode(saved || TEMPLATE_CODE[lang] || ''))
         }
     }, [slug, problem?.id, lang])
 
@@ -356,8 +375,8 @@ export default function ProblemDetail() {
             if (isMountedRef.current) {
                 setCustomOutput(res)
             }
-        } catch (e: any) {
-            toast.error('Custom run failed: ' + e.message)
+        } catch (e) {
+            toast.error('Custom run failed: ' + (e instanceof Error ? e.message : String(e)))
         } finally {
             if (isMountedRef.current) {
                 setRunningCustom(false)
@@ -374,7 +393,7 @@ export default function ProblemDetail() {
         setLastTestTime(now)
         setRunningSamples(true)
         setSampleResults([])
-        const results: any[] = []
+        const results: SampleRunResult[] = []
         for (let i = 0; i < problem.sample_cases.length; i++) {
             const sc = problem.sample_cases[i]
             try {
@@ -399,7 +418,7 @@ export default function ProblemDetail() {
                     stderr: res.stderr,
                     compile_output: res.compile_output,
                 })
-            } catch (e: any) {
+            } catch (e) {
                 results.push({
                     index: i + 1,
                     input: sc.input,
@@ -407,7 +426,8 @@ export default function ProblemDetail() {
                     actual: '',
                     passed: false,
                     status: 'error',
-                    error: e.message,
+                    time: 0,
+                    error: e instanceof Error ? e.message : String(e),
                 })
             }
             if (isMountedRef.current) {
@@ -422,6 +442,7 @@ export default function ProblemDetail() {
     const submit = async () => {
         if (!getAccessToken()) { toast.info('Please login first'); return }
         if (!code.trim()) { toast.info('Please write some code'); return }
+        if (!problem) return
         const now = Date.now()
         if (now - lastSubmitTime < 5000) { toast.info('Please wait 5 seconds between submissions'); return }
         setLastSubmitTime(now)
@@ -468,8 +489,8 @@ export default function ProblemDetail() {
                 }
             }
             poll()
-        } catch (e: any) {
-            toast.error('Submit failed: ' + e.message)
+        } catch (e) {
+            toast.error('Submit failed: ' + (e instanceof Error ? e.message : String(e)))
         } finally {
             if (isMountedRef.current) {
                 setSubmitting(false)
@@ -575,8 +596,8 @@ export default function ProblemDetail() {
                                         a.download = `${problem.slug}.zip`
                                         a.click()
                                         URL.revokeObjectURL(url)
-                                    } catch (e: any) {
-                                        toast.error('Export failed: ' + e.message)
+                                    } catch (e) {
+                                        toast.error('Export failed: ' + (e instanceof Error ? e.message : String(e)))
                                     }
                                 }}
                                 className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
@@ -677,7 +698,7 @@ export default function ProblemDetail() {
                                 </div>
                             </div>
                         )}
-                        {problem.sample_cases?.length > 0 && problem.sample_cases.map((sc: any, i: number) => (
+                        {problem.sample_cases && problem.sample_cases.length > 0 && problem.sample_cases.map((sc, i) => (
                             <div key={i}>
                                 <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Sample {i + 1}</h3>
                                 <div className="border border-gray-200 dark:border-gray-700 rounded-md overflow-hidden mb-4">
@@ -818,7 +839,7 @@ export default function ProblemDetail() {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                                        {mySubs.map((s: any) => (
+                                        {mySubs.map(s => (
                                             <tr key={s.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                                                 <td className="px-4 py-2 font-mono text-xs">
                                                     <Link to={`/submissions/${s.id}`} className="text-blue-600 dark:text-blue-400 hover:underline">
