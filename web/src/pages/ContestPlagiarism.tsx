@@ -3,30 +3,34 @@ import { useParams } from 'react-router-dom'
 import { api, getAccessToken } from '../lib/api'
 import { EmptyState } from '../components/EmptyState'
 import { useToast } from '../components/Toast'
+import { errorMessage } from '../lib/errors'
+
+interface PlagiarismReportInfo { status?: string; threshold?: number; total_pairs?: number }
+interface PlagiarismPairRow { id: string; matched_lines?: number; problem_title?: string; similarity?: number; status?: string; submission_a_lang?: string; submission_b_lang?: string; user_a_username?: string; user_b_username?: string }
 
 export default function ContestPlagiarism() {
 	const toast = useToast()
 	const { id } = useParams<{ id: string }>()
-	const [report, setReport] = useState<any>(null)
-	const [pairs, setPairs] = useState<any[]>([])
+	const [report, setReport] = useState<PlagiarismReportInfo | null>(null)
+	const [pairs, setPairs] = useState<PlagiarismPairRow[]>([])
 	const [loading, setLoading] = useState(true)
 	const [checking, setChecking] = useState(false)
-	const [isAdmin, setIsAdmin] = useState(false)
+	const [isAdmin] = useState(() => {
+		const token = getAccessToken()
+		if (!token) return false
+		try {
+			const payload = JSON.parse(atob(token.split('.')[1]))
+			return payload.role === 'admin' || payload.role === 'setter'
+		} catch { /* malformed JWT — keep default role */ return false }
+	})
 
 	useEffect(() => {
-		const token = getAccessToken()
-		if (token) {
-			try {
-				const payload = JSON.parse(atob(token.split('.')[1]))
-				setIsAdmin(payload.role === 'admin' || payload.role === 'setter')
-			} catch { }
-		}
 		fetchReport()
 		const interval = setInterval(fetchReport, 5000)
 		return () => clearInterval(interval)
-	}, [id])
+	}, [id]) // eslint-disable-line react-hooks/exhaustive-deps
 
-	const fetchReport = () => {
+	function fetchReport() {
 		if (!id) return
 		api.plagiarism.getReport(id).then(r => {
 			setReport(r || null)
@@ -45,7 +49,7 @@ export default function ContestPlagiarism() {
 		try {
 			await api.plagiarism.runCheck(id, 0.70)
 			fetchReport()
-		} catch (e: any) { toast.error(e.message) }
+		} catch (e) { toast.error(errorMessage(e)) }
 		finally { setChecking(false) }
 	}
 
@@ -89,9 +93,9 @@ export default function ContestPlagiarism() {
 				<div className="grid grid-cols-4 gap-4">
 					{[
 						{ label: 'Status', value: report.status?.toUpperCase(), cls: report.status === 'completed' ? 'text-green-700' : 'text-blue-700' },
-						{ label: 'Threshold', value: `${(report.threshold * 100).toFixed(0)}%` },
+						{ label: 'Threshold', value: `${((report.threshold ?? 0) * 100).toFixed(0)}%` },
 						{ label: 'Total Pairs', value: report.total_pairs },
-						{ label: 'Flagged Pairs', value: pairs.filter((p: any) => p.status === 'flagged').length },
+						{ label: 'Flagged Pairs', value: pairs.filter((p) => p.status === 'flagged').length },
 					].map(s => (
 						<div key={s.label} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-3 text-center">
 							<div className="text-xs text-gray-500 uppercase mb-1">{s.label}</div>
@@ -114,7 +118,7 @@ export default function ContestPlagiarism() {
 						</tr>
 					</thead>
 					<tbody className="divide-y divide-gray-100">
-						{pairs.map((p: any) => (
+						{pairs.map((p) => (
 							<tr key={p.id} className="hover:bg-gray-50">
 								<td className="px-4 py-3 font-mono text-xs">
 									<span className="font-semibold text-gray-900 dark:text-gray-100">{p.user_a_username}</span>
@@ -126,9 +130,9 @@ export default function ContestPlagiarism() {
 								<td className="px-4 py-3 text-center">
 									<div className="flex items-center gap-2 justify-center">
 										<div className="w-20 bg-gray-200 rounded-full h-2">
-											<div className={`h-2 rounded-full ${similarityColor(p.similarity)}`} style={{ width: `${p.similarity * 100}%` }}></div>
+											<div className={`h-2 rounded-full ${similarityColor(p.similarity ?? 0)}`} style={{ width: `${(p.similarity ?? 0) * 100}%` }}></div>
 										</div>
-										<span className="text-xs font-semibold">{(p.similarity * 100).toFixed(0)}%</span>
+										<span className="text-xs font-semibold">{((p.similarity ?? 0) * 100).toFixed(0)}%</span>
 									</div>
 								</td>
 								<td className="px-4 py-3 text-center text-gray-500 text-xs">{p.matched_lines}</td>

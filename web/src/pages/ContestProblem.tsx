@@ -10,6 +10,27 @@ import { api, getAccessToken } from '../lib/api'
 import CodeEditor from '../components/CodeEditor'
 import { Copy, Check, Lightbulb, ClipboardList, BarChart3, FileText, Download } from 'lucide-react'
 import { useToast } from '../components/Toast'
+import { errorMessage } from '../lib/errors'
+
+// Derived from the API so these track the real response shapes without
+// importing model types (shared type files are in flux).
+type LoadedProblem = Awaited<ReturnType<typeof api.contests.getProblemByIndex>>['problem'] & { problem_type?: string }
+type LoadedContest = Awaited<ReturnType<typeof api.contests.getProblemByIndex>>['contest']
+interface SampleCaseData { input: string; output?: string; explanation?: string }
+interface SubmissionView {
+    id?: string
+    error?: string
+    status?: string
+    verdict?: string
+    time_used?: number | string
+    memory_used?: number
+    score?: number | string
+    language?: string
+    compile_output?: string
+}
+interface SubRow { id: string; status?: string; created_at?: string; time_used?: number; memory_used?: number; language?: string }
+interface RunResult { stdout?: string; stderr?: string; expected?: string; passed?: boolean | null; status?: string; time_used?: number; memory_used?: number; compile_output?: string; error?: string }
+interface SampleRunResult { index: number; input: string; expected?: string; actual?: string; passed: boolean; status?: string; time?: number; memory?: number; stderr?: string; compile_output?: string; error?: string }
 
 function isPdfUrl(url: string | undefined | null): boolean {
     if (!url) return false
@@ -136,7 +157,7 @@ function CountdownTimer({ target, label }: { target: string; label: string }) {
 }
 
 function RunningTimer({ start, end }: { start: string; end: string }) {
-    const [now, setNow] = useState(Date.now())
+    const [now, setNow] = useState(() => Date.now())
 
     useEffect(() => {
         const iv = setInterval(() => setNow(Date.now()), 1000)
@@ -200,7 +221,7 @@ function CopyButton({ text }: { text: string }) {
     )
 }
 
-function SampleCase({ sample, index }: { sample: any; index: number }) {
+function SampleCase({ sample, index }: { sample: SampleCaseData; index: number }) {
     return (
         <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
             <div className="bg-gray-50 dark:bg-gray-900/20 px-4 py-2 border-b border-gray-200 dark:border-gray-700">
@@ -219,7 +240,7 @@ function SampleCase({ sample, index }: { sample: any; index: number }) {
                 <div className="p-4">
                     <div className="flex items-center justify-between mb-2">
                         <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Output</span>
-                        <CopyButton text={sample.output} />
+                        <CopyButton text={sample.output || ''} />
                     </div>
                     <pre className="bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700 text-sm p-3 rounded-md overflow-x-auto font-mono whitespace-pre-wrap">
                         {sample.output}
@@ -265,7 +286,7 @@ function HintSection({ hint }: { hint: string }) {
     )
 }
 
-function SubmissionResult({ result }: { result: any }) {
+function SubmissionResult({ result }: { result: SubmissionView }) {
     if (!result) return null
 
     if (result.error) {
@@ -281,8 +302,8 @@ function SubmissionResult({ result }: { result: any }) {
 
     const isPending = result.status === 'pending' || result.status === 'judging'
     const statusKey = (result.status || result.verdict || '').toLowerCase()
-    const label = STATUS_LABELS[result.status] || STATUS_LABELS[statusKey] || result.status || 'Submitted'
-    const colorClass = STATUS_COLORS[result.status] || STATUS_COLORS[statusKey] || 'bg-gray-100 dark:bg-gray-900/30 text-gray-800 dark:text-gray-300 border-gray-300 dark:border-gray-700'
+    const label = STATUS_LABELS[result.status || ''] || STATUS_LABELS[statusKey] || result.status || 'Submitted'
+    const colorClass = STATUS_COLORS[result.status || ''] || STATUS_COLORS[statusKey] || 'bg-gray-100 dark:bg-gray-900/30 text-gray-800 dark:text-gray-300 border-gray-300 dark:border-gray-700'
 
     return (
         <div className="p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg space-y-3">
@@ -353,7 +374,7 @@ function SubmissionResult({ result }: { result: any }) {
 }
 
 function MySubmissionsTab({ problemId, contestId }: { problemId: string; contestId?: string }) {
-    const [subs, setSubs] = useState<any[]>([])
+    const [subs, setSubs] = useState<SubRow[]>([])
     const [loading, setLoading] = useState(true)
     const isMounted = useRef(true)
 
@@ -364,7 +385,7 @@ function MySubmissionsTab({ problemId, contestId }: { problemId: string; contest
 
     useEffect(() => {
         if (!problemId) return
-        setLoading(true)
+        queueMicrotask(() => setLoading(true))
         api.submissions.list(0, 30, problemId, contestId)
             .then(d => {
                 if (isMounted.current) setSubs(d.data || [])
@@ -401,10 +422,10 @@ function MySubmissionsTab({ problemId, contestId }: { problemId: string; contest
                     </tr>
                 </thead>
                 <tbody>
-                    {subs.map((s: any) => {
+                    {subs.map((s) => {
                         const statusKey = (s.status || '').toLowerCase()
-                        const label = STATUS_LABELS[s.status] || s.status
-                        const colorClass = STATUS_COLORS[s.status] || STATUS_COLORS[statusKey] || 'bg-gray-100 dark:bg-gray-900/30 text-gray-800 dark:text-gray-300 border-gray-300 dark:border-gray-700'
+                        const label = STATUS_LABELS[s.status || ''] || s.status
+                        const colorClass = STATUS_COLORS[s.status || ''] || STATUS_COLORS[statusKey] || 'bg-gray-100 dark:bg-gray-900/30 text-gray-800 dark:text-gray-300 border-gray-300 dark:border-gray-700'
                         return (
                             <tr key={s.id} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 transition-colors">
                                 <td className="py-2.5 px-3 text-gray-500 whitespace-nowrap">
@@ -444,8 +465,8 @@ function MySubmissionsTab({ problemId, contestId }: { problemId: string; contest
 export default function ContestProblem() {
     const toast = useToast()
     const { contestId, index } = useParams<{ contestId: string; index: string }>()
-    const [problem, setProblem] = useState<any>(null)
-    const [contest, setContest] = useState<any>(null)
+    const [problem, setProblem] = useState<LoadedProblem | null>(null)
+    const [contest, setContest] = useState<LoadedContest | null>(null)
     const [canSubmit, setCanSubmit] = useState(true)
     const [upsolvingDisabled, setUpsolvingDisabled] = useState(false)
     const [statementHidden, setStatementHidden] = useState(false)
@@ -455,16 +476,16 @@ export default function ContestProblem() {
     const [tab, setTab] = useState<'statement' | 'submissions'>('statement')
 
     const [customInput, setCustomInput] = useState('')
-    const [customOutput, setCustomOutput] = useState<any>(null)
+    const [customOutput, setCustomOutput] = useState<RunResult | null>(null)
     const [runningCustom, setRunningCustom] = useState(false)
-    const [sampleResults, setSampleResults] = useState<any[]>([])
+    const [sampleResults, setSampleResults] = useState<SampleRunResult[]>([])
     const [runningSamples, setRunningSamples] = useState(false)
     const [lastTestTime, setLastTestTime] = useState(0)
 
     const [language, setLanguage] = useState('cpp-gpp-64')
     const [code, setCode] = useState('')
     const [submitting, setSubmitting] = useState(false)
-    const [result, setResult] = useState<any>(null)
+    const [result, setResult] = useState<SubmissionView | null>(null)
     const [lastSubmitTime, setLastSubmitTime] = useState(0)
     const isMounted = useRef(true)
 
@@ -502,7 +523,7 @@ export default function ContestProblem() {
     }, [dragging, splitPos])
 
     const isLoggedIn = !!getAccessToken()
-    const status = contest ? getStatus(contest.start_time, contest.end_time, contest.freeze_time) : 'ended'
+    const status = contest ? getStatus(contest.start_time, contest.end_time, contest.freeze_time ?? undefined) : 'ended'
     const isUpcoming = status === 'upcoming'
     const isRunning = status === 'running' || status === 'frozen'
     const showSubmit = isLoggedIn && canSubmit && !upsolvingDisabled
@@ -524,9 +545,9 @@ export default function ContestProblem() {
             setCanSubmit(data.can_submit ?? true)
             setUpsolvingDisabled(data.upsolving_disabled ?? false)
             setStatementHidden(data.statement_hidden ?? false)
-        } catch (err: any) {
+        } catch (err) {
             if (isMounted.current) {
-                setError(err.message || 'Failed to load problem')
+                setError(errorMessage(err) || 'Failed to load problem')
             }
         } finally {
             if (isMounted.current) {
@@ -536,7 +557,7 @@ export default function ContestProblem() {
     }, [contestId, index])
 
     useEffect(() => {
-        loadProblem()
+        queueMicrotask(loadProblem)
     }, [loadProblem])
 
     // Load saved draft or template on language change
@@ -544,7 +565,7 @@ export default function ContestProblem() {
         if (!problem?.id) return
         const key = `aioj_contest_draft_${problem.id}_${language}`
         const saved = localStorage.getItem(key)
-        setCode(saved || TEMPLATE_CODE[language] || '')
+        queueMicrotask(() => setCode(saved || TEMPLATE_CODE[language] || ''))
     }, [problem?.id, language])
 
     const handleCodeChange = (newCode: string) => {
@@ -568,8 +589,8 @@ export default function ContestProblem() {
             if (isMounted.current) {
                 setCustomOutput(res)
             }
-        } catch (e: any) {
-            toast.error('Custom run failed: ' + e.message)
+        } catch (e) {
+            toast.error('Custom run failed: ' + errorMessage(e))
         } finally {
             if (isMounted.current) {
                 setRunningCustom(false)
@@ -586,7 +607,7 @@ export default function ContestProblem() {
         setLastTestTime(now)
         setRunningSamples(true)
         setSampleResults([])
-        const results: any[] = []
+        const results: SampleRunResult[] = []
         for (let i = 0; i < problem.sample_cases.length; i++) {
             const sc = problem.sample_cases[i]
             try {
@@ -611,7 +632,7 @@ export default function ContestProblem() {
                     stderr: res.stderr,
                     compile_output: res.compile_output,
                 })
-            } catch (e: any) {
+            } catch (e) {
                 results.push({
                     index: i + 1,
                     input: sc.input,
@@ -619,7 +640,7 @@ export default function ContestProblem() {
                     actual: '',
                     passed: false,
                     status: 'error',
-                    error: e.message,
+                    error: errorMessage(e),
                 })
             }
             if (isMounted.current) {
@@ -634,6 +655,7 @@ export default function ContestProblem() {
     const handleSubmit = async () => {
         if (!getAccessToken()) { toast.info('Please login first'); return }
         if (!code.trim()) { toast.info('Please write some code'); return }
+        if (!problem) return
         const now = Date.now()
         if (now - lastSubmitTime < 5000) { toast.info('Please wait 5 seconds between submissions'); return }
         setLastSubmitTime(now)
@@ -674,9 +696,9 @@ export default function ContestProblem() {
                 }
             }
             poll()
-        } catch (e: any) {
+        } catch (e) {
             if (isMounted.current) {
-                setResult({ error: e.message })
+                setResult({ error: errorMessage(e) })
             }
         } finally {
             if (isMounted.current) {
@@ -728,12 +750,12 @@ export default function ContestProblem() {
         <div className="max-w-7xl mx-auto px-4 py-6">
             {isUpcoming && (
                 <div className="mb-6">
-                    <CountdownTimer target={contest.start_time} label="Contest starts in" />
+                    <CountdownTimer target={contest?.start_time ?? ''} label="Contest starts in" />
                 </div>
             )}
             {isRunning && (
                 <div className="mb-6">
-                    <RunningTimer start={contest.start_time} end={contest.end_time} />
+                    <RunningTimer start={contest?.start_time ?? ''} end={contest?.end_time ?? ''} />
                 </div>
             )}
 
@@ -909,7 +931,7 @@ export default function ContestProblem() {
                                 <div>
                                     <h3 className="font-semibold text-sm text-gray-700 dark:text-gray-300 uppercase tracking-wide mb-3">Sample Cases</h3>
                                     <div className="space-y-4">
-                                        {problem.sample_cases.map((sample: any, i: number) => (
+                                        {problem.sample_cases.map((sample: SampleCaseData, i: number) => (
                                             <SampleCase key={i} sample={sample} index={i} />
                                         ))}
                                     </div>
@@ -996,7 +1018,7 @@ export default function ContestProblem() {
                                                 <div className="flex items-center justify-between mb-2">
                                                     <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Sample {r.index}</span>
                                                     <div className="flex items-center gap-2">
-                                                        {r.time > 0 && (
+                                                        {(r.time ?? 0) > 0 && (
                                                             <span className="text-xs text-gray-500 dark:text-gray-400">{r.time}ms</span>
                                                         )}
                                                         <span className={`text-xs font-medium px-2 py-0.5 rounded ${r.passed ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
@@ -1071,9 +1093,9 @@ export default function ContestProblem() {
                                                                             customOutput.status
                                                     }
                                                 </span>
-                                                {customOutput.time_used > 0 && (
+                                                {(customOutput.time_used ?? 0) > 0 && (
                                                     <span className="text-gray-500 dark:text-gray-400 font-mono">
-                                                        {customOutput.time_used}ms / {Math.round(customOutput.memory_used / 1024)}MB
+                                                        {customOutput.time_used}ms / {Math.round((customOutput.memory_used ?? 0) / 1024)}MB
                                                     </span>
                                                 )}
                                             </div>

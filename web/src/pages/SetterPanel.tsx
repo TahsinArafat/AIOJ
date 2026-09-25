@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
+import { errorMessage } from '../lib/errors'
 import SetterApplication from '../components/SetterApplication'
 import { useToast } from '../components/Toast'
 import { EmptyState } from '../components/EmptyState'
@@ -16,10 +17,13 @@ function decodeRole(): string | null {
     }
 }
 
+interface SetterProblemRow { id: string; title?: string; source?: string; difficulty?: string; slug: string }
+interface SetterContestRow { id: string; title?: string; start_time: string; format?: string; visible?: boolean }
+
 export default function SetterPanel() {
     const toast = useToast()
-    const [problems, setProblems] = useState<any[]>([])
-    const [contests, setContests] = useState<any[]>([])
+    const [problems, setProblems] = useState<SetterProblemRow[]>([])
+    const [contests, setContests] = useState<SetterContestRow[]>([])
     const [activeTab, setActiveTab] = useState<'my-problems' | 'my-contests' | 'all-problems' | 'import'>('my-problems')
     const [contestId, setContestId] = useState('')
     const [problemIndex, setProblemIndex] = useState('')
@@ -41,7 +45,7 @@ export default function SetterPanel() {
         }
     }
 
-    useEffect(() => { loadData() }, [activeTab])
+    useEffect(() => { loadData() }, [activeTab]) // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleImport = async () => {
         if (!contestId || !problemIndex) toast.info('Contest ID and Problem Index are required'); return
@@ -58,8 +62,8 @@ export default function SetterPanel() {
                 try {
                     const result = await api.problems.importCodeforces(contestId.trim(), idx)
                     success.push(`Codeforces ${contestId.trim()}${idx} (${result.slug})`)
-                } catch (e: any) {
-                    failed.push(`Codeforces ${contestId.trim()}${idx}: ${e.message}`)
+                } catch (e) {
+                    failed.push(`Codeforces ${contestId.trim()}${idx}: ${errorMessage(e)}`)
                 }
             })
         )
@@ -85,8 +89,8 @@ export default function SetterPanel() {
                 try {
                     const result = await api.problems.importCSES(id)
                     success.push(`CSES ${id} (${result.slug})`)
-                } catch (e: any) {
-                    failed.push(`CSES ${id}: ${e.message}`)
+                } catch (e) {
+                    failed.push(`CSES ${id}: ${errorMessage(e)}`)
                 }
             })
         )
@@ -111,8 +115,8 @@ export default function SetterPanel() {
                 try {
                     const result = await api.problems.importAtCoder(atcoderContestId.trim(), id)
                     success.push(`AtCoder ${atcoderContestId.trim()}_${id} (${result.slug})`)
-                } catch (e: any) {
-                    failed.push(`AtCoder ${atcoderContestId.trim()}_${id}: ${e.message}`)
+                } catch (e) {
+                    failed.push(`AtCoder ${atcoderContestId.trim()}_${id}: ${errorMessage(e)}`)
                 }
             })
         )
@@ -138,8 +142,8 @@ export default function SetterPanel() {
                 try {
                     const result = await api.problems.importToph(id)
                     success.push(`Toph ${id} (${result.slug})`)
-                } catch (e: any) {
-                    failed.push(`Toph ${id}: ${e.message}`)
+                } catch (e) {
+                    failed.push(`Toph ${id}: ${errorMessage(e)}`)
                 }
             })
         )
@@ -164,8 +168,8 @@ export default function SetterPanel() {
                 try {
                     const result = await api.problems.importQOJ(id)
                     success.push(`QOJ ${id} (${result.slug})`)
-                } catch (e: any) {
-                    failed.push(`QOJ ${id}: ${e.message}`)
+                } catch (e) {
+                    failed.push(`QOJ ${id}: ${errorMessage(e)}`)
                 }
             })
         )
@@ -188,10 +192,10 @@ export default function SetterPanel() {
                 failed: []
             })
             loadData()
-        } catch (err: any) {
+        } catch (err) {
             setImportResults({
                 success: [],
-                failed: [`XML/ZIP import failed: ${err.message || err}`]
+                failed: [`XML/ZIP import failed: ${errorMessage(err)}`]
             })
         } finally {
             setImporting(false)

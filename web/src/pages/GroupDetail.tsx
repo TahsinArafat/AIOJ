@@ -4,6 +4,7 @@ import { EmptyState } from '../components/EmptyState'
 import { api, getAccessToken } from '../lib/api'
 import { useConfirm } from '../components/ConfirmDialog'
 import { useToast } from '../components/Toast'
+import { errorMessage } from '../lib/errors'
 
 function getUserId(): string | null {
     const token = getAccessToken()
@@ -23,19 +24,24 @@ function getRole(): string | null {
     } catch { return null }
 }
 
+interface GroupInfo { name: string; description?: string | null; is_public: boolean; join_policy?: string; invite_code?: string }
+interface GroupMemberRow { user_id: string; username?: string; role: string }
+interface GroupContestRow { id: string; title?: string; type?: string }
+interface GroupPendingRow { user_id?: string; username?: string; role?: string }
+
 export default function GroupDetail() {
     const confirm = useConfirm()
     const toast = useToast()
     const { id } = useParams<{ id: string }>()
     const navigate = useNavigate()
-    const [group, setGroup] = useState<any>(null)
-    const [members, setMembers] = useState<any[]>([])
+    const [group, setGroup] = useState<GroupInfo | null>(null)
+    const [members, setMembers] = useState<GroupMemberRow[]>([])
     const [isMember, setIsMember] = useState(false)
     const [currentUserRole, setCurrentUserRole] = useState<string | null>(null)
     const [loading, setLoading] = useState(true)
 
     const [activeTab, setActiveTab] = useState<'members' | 'contests' | 'pending'>('members')
-    const [contests, setContests] = useState<any[]>([])
+    const [contests, setContests] = useState<GroupContestRow[]>([])
 
     const [editing, setEditing] = useState(false)
     const [editName, setEditName] = useState('')
@@ -48,7 +54,7 @@ export default function GroupDetail() {
     const [inviting, setInviting] = useState(false)
 
     // Pending members
-    const [pendingMembers, setPendingMembers] = useState<any[]>([])
+    const [pendingMembers, setPendingMembers] = useState<GroupPendingRow[]>([])
     const [acting, setActing] = useState<string | null>(null)
 
     const [newContestId, setNewContestId] = useState('')
@@ -66,14 +72,14 @@ export default function GroupDetail() {
             const memberList = m.data || []
             setMembers(memberList)
             setContests(c.data || [])
-            const membership = memberList.find((mb: any) => mb.user_id === currentUserId)
+            const membership = memberList.find((mb: GroupMemberRow) => mb.user_id === currentUserId)
             setIsMember(!!membership)
             setCurrentUserRole(membership?.role || null)
         }).catch(console.error).finally(() => setLoading(false))
     }, [id])
 
     useEffect(() => {
-        fetchGroupData()
+        queueMicrotask(fetchGroupData)
     }, [fetchGroupData])
 
     const fetchPending = useCallback(() => {
@@ -88,7 +94,7 @@ export default function GroupDetail() {
         try {
             await api.groups.join(id)
             fetchGroupData()
-        } catch (e: any) { toast.error('Failed: ' + e.message) }
+        } catch (e) { toast.error('Failed: ' + errorMessage(e)) }
     }
 
     const handleLeave = async () => {
@@ -96,10 +102,11 @@ export default function GroupDetail() {
         try {
             await api.groups.leave(id)
             fetchGroupData()
-        } catch (e: any) { toast.error('Failed: ' + e.message) }
+        } catch (e) { toast.error('Failed: ' + errorMessage(e)) }
     }
 
     const handleStartEdit = () => {
+        if (!group) return
         setEditName(group.name)
         setEditDescription(group.description || '')
         setEditIsPublic(group.is_public)
@@ -118,7 +125,7 @@ export default function GroupDetail() {
             })
             setGroup(updated)
             setEditing(false)
-        } catch (e: any) { toast.error('Update failed: ' + e.message) }
+        } catch (e) { toast.error('Update failed: ' + errorMessage(e)) }
     }
 
     const handleDelete = async () => {
@@ -127,7 +134,7 @@ export default function GroupDetail() {
         try {
             await api.groups.delete(id)
             navigate('/groups')
-        } catch (e: any) { toast.error('Delete failed: ' + e.message) }
+        } catch (e) { toast.error('Delete failed: ' + errorMessage(e)) }
     }
 
     const handleAddContest = async () => {
@@ -137,7 +144,7 @@ export default function GroupDetail() {
             setNewContestId('')
             const c = await api.groups.getContests(id)
             setContests(c.data || [])
-        } catch (e: any) { toast.error('Failed to add contest: ' + e.message) }
+        } catch (e) { toast.error('Failed to add contest: ' + errorMessage(e)) }
     }
 
     const handleRemoveContest = async (contestId: string) => {
@@ -147,7 +154,7 @@ export default function GroupDetail() {
             await api.groups.removeContest(id, contestId)
             const c = await api.groups.getContests(id)
             setContests(c.data || [])
-        } catch (e: any) { toast.error('Failed to remove contest: ' + e.message) }
+        } catch (e) { toast.error('Failed to remove contest: ' + errorMessage(e)) }
     }
 
     const handleInvite = async () => {
@@ -157,7 +164,7 @@ export default function GroupDetail() {
             await api.groups.invite(id, { username: inviteUsername.trim() })
             setInviteUsername('')
             fetchPending()
-        } catch (e: any) { toast.error('Invite failed: ' + e.message) }
+        } catch (e) { toast.error('Invite failed: ' + errorMessage(e)) }
         finally { setInviting(false) }
     }
 
@@ -168,7 +175,7 @@ export default function GroupDetail() {
             await api.groups.respond(id, { user_id: userId, action })
             fetchPending()
             fetchGroupData()
-        } catch (e: any) { toast.error('Failed: ' + e.message) }
+        } catch (e) { toast.error('Failed: ' + errorMessage(e)) }
         finally { setActing(null) }
     }
 
@@ -394,7 +401,7 @@ export default function GroupDetail() {
                                         Requests &amp; Invitations ({pendingMembers.length})
                                     </h3>
                                     <div className="border rounded-lg divide-y bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
-                                        {pendingMembers.map((pm: any) => (
+                                        {pendingMembers.map((pm) => (
                                             <div key={pm.user_id} className="px-4 py-3 flex items-center justify-between text-sm">
                                                 <div className="flex items-center gap-2">
                                                     <span className="font-medium">{pm.username || pm.user_id}</span>
@@ -408,19 +415,19 @@ export default function GroupDetail() {
                                                 <div className="flex gap-1.5">
                                                     {pm.role === 'requested' ? (
                                                         <>
-                                                            <button onClick={() => handleRespond(pm.user_id, 'approve')}
+                                                            <button onClick={() => handleRespond(pm.user_id as string, 'approve')}
                                                                 disabled={acting === `${pm.user_id}-approve`}
                                                                 className="bg-green-600 text-white px-2.5 py-1 rounded text-xs hover:bg-green-700 disabled:opacity-50 cursor-pointer">
                                                                 Approve
                                                             </button>
-                                                            <button onClick={() => handleRespond(pm.user_id, 'reject')}
+                                                            <button onClick={() => handleRespond(pm.user_id as string, 'reject')}
                                                                 disabled={acting === `${pm.user_id}-reject`}
                                                                 className="bg-red-600 text-white px-2.5 py-1 rounded text-xs hover:bg-red-700 disabled:opacity-50 cursor-pointer">
                                                                 Reject
                                                             </button>
                                                         </>
                                                     ) : (
-                                                        <button onClick={() => handleRespond(pm.user_id, 'decline')}
+                                                        <button onClick={() => handleRespond(pm.user_id as string, 'decline')}
                                                             disabled={acting === `${pm.user_id}-decline`}
                                                             className="bg-gray-600 text-white px-2.5 py-1 rounded text-xs hover:bg-gray-700 disabled:opacity-50 cursor-pointer">
                                                             Revoke

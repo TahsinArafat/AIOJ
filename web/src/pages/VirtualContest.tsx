@@ -32,12 +32,16 @@ function progressBarColor(remainingSeconds: number): string {
     return 'bg-red-500'
 }
 
+interface VirtualStatusState { is_active?: boolean; ends_at: string; started_at: string; original_contest_id: string; virtual_id?: string }
+type ContestProblemRef = { problem_id: string; index?: string }
+interface ContestDataShape { contest?: { id: string; slug?: string; display_id?: number; title?: string; start_time: string; end_time: string }; problems?: ContestProblemRef[] }
+
 export default function VirtualContest() {
     const { theme } = useTheme()
-    const [virtualStatus, setVirtualStatus] = useState<any>(null)
-    const [contestData, setContestData] = useState<any>(null)
-    const { contest, problems } = contestData || {}
-    const [loading, setLoading] = useState(true)
+    const [virtualStatus, setVirtualStatus] = useState<VirtualStatusState | null>(null)
+    const [contestData, setContestData] = useState<ContestDataShape | null>(null)
+    const { contest, problems } = (contestData ?? {}) as ContestDataShape
+    const [loading, setLoading] = useState(() => !getAccessToken())
     const [completed, setCompleted] = useState(false)
     const [problemSlugs, setProblemSlugs] = useState<Map<string, string>>(new Map())
     const [problemTitles, setProblemTitles] = useState<Map<string, string>>(new Map())
@@ -57,10 +61,7 @@ export default function VirtualContest() {
     }, [])
 
     useEffect(() => {
-        if (!getAccessToken()) {
-            setLoading(false)
-            return
-        }
+        if (!getAccessToken()) return
         api.virtual.status()
             .then((status) => {
                 setVirtualStatus(status)
@@ -75,7 +76,7 @@ export default function VirtualContest() {
                     return api.contests.get(status.original_contest_id).then((d) => {
                         setContestData(d)
                         if (d.problems?.length) {
-                            Promise.all(d.problems.map(async (p: any) => {
+                            Promise.all(d.problems.map(async (p: ContestProblemRef) => {
                                 const [slug, title] = await Promise.all([
                                     resolveProblemSlug(p.problem_id),
                                     resolveProblemTitle(p.problem_id),
@@ -114,7 +115,7 @@ export default function VirtualContest() {
 
             if (remaining <= 0) {
                 clearInterval(interval)
-                handleComplete(virtualStatus.virtual_id)
+                handleComplete(virtualStatus.virtual_id ?? '')
             }
         }, 1000)
 
@@ -242,7 +243,7 @@ export default function VirtualContest() {
             {/* Problems */}
             <div>
                 <h2 className="text-lg font-semibold mb-3">Problems</h2>
-                {problems?.length > 0 ? (
+                {(problems?.length ?? 0) > 0 ? (
                     <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
                         <table className="w-full text-sm">
                             <thead className="bg-gray-50">
@@ -253,7 +254,7 @@ export default function VirtualContest() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100">
-                                {problems.map((p: any) => {
+                                {problems?.map((p) => {
                                     const slug = problemSlugs.get(p.problem_id)
                                     const title = problemTitles.get(p.problem_id)
                                     return (
@@ -287,7 +288,7 @@ export default function VirtualContest() {
                     Virtual contest in progress. Submissions will be judged in real-time.
                 </div>
                 <button
-                    onClick={() => handleComplete(virtualStatus.virtual_id)}
+                    onClick={() => handleComplete(virtualStatus!.virtual_id ?? '')}
                     className="text-sm text-red-600 bg-red-50 hover:bg-red-100 px-4 py-2 rounded font-medium transition-colors"
                 >
                     End Contest Early

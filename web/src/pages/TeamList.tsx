@@ -4,8 +4,10 @@ import { api, getAccessToken } from '../lib/api'
 import RatingBadge from '../components/RatingBadge'
 import { EmptyState } from '../components/EmptyState'
 
+interface TeamListRow { id: string; name?: string; member_count?: number; rating?: number }
+
 export default function TeamList() {
-    const [teams, setTeams] = useState<any[]>([])
+    const [teams, setTeams] = useState<TeamListRow[]>([])
     const [total, setTotal] = useState(0)
 
     useEffect(() => {

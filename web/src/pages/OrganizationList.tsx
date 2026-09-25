@@ -3,19 +3,21 @@ import { Link } from 'react-router-dom'
 import { api, getAccessToken } from '../lib/api'
 import { EmptyState } from '../components/EmptyState'
 
+interface OrgRow { id: string; name?: string; description?: string | null; member_count?: number; created_at: string }
+
 export default function OrganizationList() {
-	const [orgs, setOrgs] = useState<any[]>([])
+	const [orgs, setOrgs] = useState<OrgRow[]>([])
 	const [loading, setLoading] = useState(true)
-	const [isAdmin, setIsAdmin] = useState(false)
+	const [isAdmin] = useState(() => {
+		const token = getAccessToken()
+		if (!token) return false
+		try {
+			const payload = JSON.parse(atob(token.split('.')[1]))
+			return payload.role === 'admin' || payload.role === 'setter'
+		} catch { /* malformed JWT — keep default role */ return false }
+	})
 
 	useEffect(() => {
-		const token = getAccessToken()
-		if (token) {
-			try {
-				const payload = JSON.parse(atob(token.split('.')[1]))
-				setIsAdmin(payload.role === 'admin' || payload.role === 'setter')
-			} catch { }
-		}
 		api.organizations.list(0, 50)
 			.then(d => setOrgs(d.data || []))
 			.catch(() => { })

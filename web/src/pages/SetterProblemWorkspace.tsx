@@ -164,8 +164,8 @@ const [problem, setProblem] = useState<LoadedProblem | null>(null)
   }
 
   useEffect(() => {
-    loadProblem()
-  }, [slug])
+    queueMicrotask(loadProblem)
+  }, [slug]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSave = async (overrides?: Partial<ProblemFormState>) => {
     if (!problem) return

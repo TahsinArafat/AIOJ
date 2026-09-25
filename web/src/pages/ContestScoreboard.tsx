@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { api, getAccessToken } from '../lib/api';
+import { errorMessage } from '../lib/errors';
 import RatingBadge from '../components/RatingBadge';
 import { AlertTriangle, Eye, EyeOff, ChevronLeft, ChevronRight } from 'lucide-react';
 import { EmptyState } from '../components/EmptyState';
@@ -91,7 +92,7 @@ export default function ContestScoreboard() {
 
   // Reset to page 1 when view mode changes
   useEffect(() => {
-    setCurrentPage(1);
+    queueMicrotask(() => setCurrentPage(1));
   }, [viewMode]);
 
   const isAdmin = useMemo(() => {
@@ -127,8 +128,8 @@ export default function ContestScoreboard() {
         setCanSeeJudge(true);
       }
       setError('');
-    } catch (e: any) {
-      setError(e?.message || 'Failed to load scoreboard');
+    } catch (e) {
+      setError(errorMessage(e) || 'Failed to load scoreboard');
     } finally {
       setLoading(false);
     }
@@ -139,7 +140,7 @@ export default function ContestScoreboard() {
     try {
       const res = await api.ratings.getByContest(id);
       const map = new Map<string, RatingDelta>();
-      (res.data || []).forEach((r: any) => {
+      (res.data || []).forEach((r) => {
         map.set(r.user_id, { user_id: r.user_id, rating_change: r.rating_change, new_rating: r.new_rating });
       });
       setRatings(map);
@@ -149,8 +150,10 @@ export default function ContestScoreboard() {
   }, [id]);
 
   useEffect(() => {
-    fetchScoreboard(viewMode, currentPage);
-    fetchRatings();
+    queueMicrotask(() => {
+      fetchScoreboard(viewMode, currentPage);
+      fetchRatings();
+    });
   }, [fetchScoreboard, fetchRatings, viewMode, currentPage]);
 
   // Auto-refresh every 30s for running contests
@@ -160,7 +163,7 @@ export default function ContestScoreboard() {
       fetchScoreboard(viewMode, currentPage);
     }, 30_000);
     return () => clearInterval(interval);
-  }, [data?.contest?.status, fetchScoreboard, viewMode, currentPage]);
+  }, [data?.contest?.status, fetchScoreboard, viewMode, currentPage]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Determine first-solve problem indices
   const firstSolves = useMemo(() => {
@@ -202,8 +205,8 @@ export default function ContestScoreboard() {
       setRatingMsg('Rating calculation started!');
       // Refresh ratings after a delay
       setTimeout(() => fetchRatings(), 3000);
-    } catch (e: any) {
-      setRatingMsg(e?.message || 'Failed to trigger rating');
+    } catch (e) {
+      setRatingMsg(errorMessage(e) || 'Failed to trigger rating');
     } finally {
       setRatingLoading(false);
     }

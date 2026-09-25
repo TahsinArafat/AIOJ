@@ -36,14 +36,11 @@ function formatDate(dateStr: string) {
 export default function RatingHistory() {
   const user = decodeUser()
   const [history, setHistory] = useState<RatingEntry[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(() => !user?.uid)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!user?.uid) {
-      setLoading(false)
-      return
-    }
+    if (!user?.uid) return
 
     api.ratings
       .getByUser(user.uid)

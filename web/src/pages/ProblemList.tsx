@@ -44,8 +44,10 @@ const sortOptions = [
     { value: 'title_asc', label: 'Title A-Z' },
 ]
 
+interface ProblemRow { title?: string; slug?: string; difficulty?: string; source?: string; tags?: string[]; accepted_count?: number; submission_count?: number }
+
 export default function ProblemList() {
-    const [problems, setProblems] = useState<any[]>([])
+    const [problems, setProblems] = useState<ProblemRow[]>([])
     const [total, setTotal] = useState(0)
     const [offset, setOffset] = useState(0)
     const [difficulty, setDifficulty] = useState('')
@@ -63,7 +65,7 @@ export default function ProblemList() {
     }, [])
 
     const fetchProblems = useCallback(() => {
-        const filters: any = {}
+        const filters: { difficulty?: string; tags?: string[]; search?: string; source?: string; rating?: string; sort?: string } = {}
         if (difficulty) filters.difficulty = difficulty
         if (selectedTags.length > 0) filters.tags = selectedTags
         if (search) filters.search = search
@@ -78,13 +80,13 @@ export default function ProblemList() {
     }, [offset, difficulty, selectedTags, search, source, rating, sortBy])
 
     useEffect(() => {
-        setOffset(0)
+        queueMicrotask(() => setOffset(0))
         fetchProblems()
-    }, [difficulty, selectedTags, search, source, rating, sortBy])
+    }, [difficulty, selectedTags, search, source, rating, sortBy]) // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
         fetchProblems()
-    }, [offset])
+    }, [offset]) // eslint-disable-line react-hooks/exhaustive-deps
 
     const toggleTag = (tag: string) => {
         setSelectedTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag])
@@ -101,7 +103,7 @@ export default function ProblemList() {
 
     const hasActiveFilters = difficulty || selectedTags.length > 0 || search || source || rating || sortBy !== 'newest'
 
-    const FilterSidebar = () => (
+    const filterSidebar = () => (
         <div className="w-64 flex-shrink-0 space-y-6">
             {/* Search */}
             <div>
@@ -238,7 +240,7 @@ export default function ProblemList() {
             <div className="flex gap-6">
                 {/* Sidebar */}
                 <div className="hidden md:block">
-                    <FilterSidebar />
+                    {filterSidebar()}
                 </div>
 
                 {/* Mobile filter overlay */}
@@ -249,7 +251,7 @@ export default function ProblemList() {
                                 <h2 className="font-semibold">Filters</h2>
                                 <button onClick={() => setShowMobileFilters(false)} className="text-gray-500 dark:text-gray-400">✕</button>
                             </div>
-                            <FilterSidebar />
+                            {filterSidebar()}
                         </div>
                     </div>
                 )}
@@ -287,7 +289,7 @@ export default function ProblemList() {
                                             </span>
                                         </td>
                                         <td className="px-4 py-3">
-                                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${difficultyColor[p.difficulty] || ''}`}>
+                                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${difficultyColor[p.difficulty || ''] || ''}`}>
                                                 {p.difficulty}
                                             </span>
                                         </td>
@@ -325,7 +327,7 @@ export default function ProblemList() {
                                         }`}>
                                         {p.source === 'local' || !p.source ? 'AIOJ' : p.source?.charAt(0).toUpperCase() + p.source?.slice(1)}
                                     </span>
-                                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${difficultyColor[p.difficulty] || ''}`}>
+                                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${difficultyColor[p.difficulty || ''] || ''}`}>
                                         {p.difficulty}
                                     </span>
                                     <span className="text-xs text-gray-500 dark:text-gray-400 ml-auto">

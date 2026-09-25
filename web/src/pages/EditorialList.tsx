@@ -3,8 +3,10 @@ import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
 import { EmptyState } from '../components/EmptyState'
 
+interface EditorialItem { id: string; is_official?: boolean; title?: string; problem_title?: string; username?: string; upvotes?: number; created_at: string }
+
 export default function EditorialList() {
-    const [editorials, setEditorials] = useState<any[]>([])
+    const [editorials, setEditorials] = useState<EditorialItem[]>([])
     const [total, setTotal] = useState(0)
 
     useEffect(() => {

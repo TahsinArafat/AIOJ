@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, getAccessToken } from '../lib/api'
+import { errorMessage } from '../lib/errors'
 import { EmptyState } from '../components/EmptyState'
 
+interface GroupListRow { id: string; name?: string; description?: string | null; is_public?: boolean; member_count?: number }
+
 export default function GroupList() {
-    const [groups, setGroups] = useState<any[]>([])
+    const [groups, setGroups] = useState<GroupListRow[]>([])
     const [total, setTotal] = useState(0)
     const [activeTab, setActiveTab] = useState<'all' | 'my'>('all')
     const [joinCode, setJoinCode] = useState('')
@@ -39,8 +42,8 @@ export default function GroupList() {
                     setTotal(d.data?.length || 0)
                 }).catch(console.error)
             }
-        } catch (e: any) {
-            setJoinMessage('Failed: ' + e.message)
+        } catch (e) {
+            setJoinMessage('Failed: ' + errorMessage(e))
         } finally {
             setJoining(false)
         }

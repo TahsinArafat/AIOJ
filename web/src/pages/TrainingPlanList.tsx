@@ -3,21 +3,27 @@ import { Link } from 'react-router-dom'
 import { api, getAccessToken } from '../lib/api'
 import { EmptyState } from '../components/EmptyState'
 
+interface TrainingPlanRow { id: string; title?: string; description?: string | null; section_count?: number; problem_count?: number; enrolled_count?: number }
+interface OrgOption { id: string; name?: string }
+
 export default function TrainingPlanList() {
-	const [plans, setPlans] = useState<any[]>([])
+	const [plans, setPlans] = useState<TrainingPlanRow[]>([])
 	const [loading, setLoading] = useState(true)
 	const [activeTab, setActiveTab] = useState<'public' | 'org'>('public')
-	const [isAdmin, setIsAdmin] = useState(false)
-	const [myOrgs, setMyOrgs] = useState<any[]>([])
+	const [isAdmin] = useState(() => {
+		const token = getAccessToken()
+		if (!token) return false
+		try {
+			const payload = JSON.parse(atob(token.split('.')[1]))
+			return payload.role === 'admin' || payload.role === 'setter'
+		} catch { /* malformed JWT — keep default role */ return false }
+	})
+	const [myOrgs, setMyOrgs] = useState<OrgOption[]>([])
 	const [selectedOrg, setSelectedOrg] = useState<string>('')
 
 	useEffect(() => {
 		const token = getAccessToken()
 		if (token) {
-			try {
-				const payload = JSON.parse(atob(token.split('.')[1]))
-				setIsAdmin(payload.role === 'admin' || payload.role === 'setter')
-			} catch { }
 			api.organizations.my().then(d => {
 				setMyOrgs(d.data || [])
 				if (d.data?.length > 0) {
@@ -28,19 +34,17 @@ export default function TrainingPlanList() {
 	}, [])
 
 	useEffect(() => {
-		setLoading(true)
-		const opts: any = {}
+		const opts: { orgId?: string; public?: boolean } = {}
 		if (activeTab === 'org') {
 			if (!selectedOrg) {
-				setPlans([])
-				setLoading(false)
+				queueMicrotask(() => { setPlans([]); setLoading(false) })
 				return
 			}
 			opts.orgId = selectedOrg
 		} else {
 			opts.public = true
 		}
-
+		queueMicrotask(() => setLoading(true))
 		api.training.list(0, 50, opts)
 			.then(d => setPlans(d.data || []))
 			.catch(() => { })

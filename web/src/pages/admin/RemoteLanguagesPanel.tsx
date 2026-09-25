@@ -46,7 +46,7 @@ export default function RemoteLanguagesPanel() {
             .finally(() => setLoading(false))
     }
 
-    useEffect(() => { loadLangs() }, [platform])
+    useEffect(() => { queueMicrotask(loadLangs) }, [platform]) // eslint-disable-line react-hooks/exhaustive-deps
 
     const resetForm = () => {
         setForm({ local_id: '', remote_id: '', display_name: '', enabled: true, sort_order: 0, inline_comment_prefix: '//' })

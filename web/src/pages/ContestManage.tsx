@@ -2,6 +2,7 @@ import React from 'react'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { api } from '../lib/api'
+import { errorMessage } from '../lib/errors'
 import { useTheme } from '../context/ThemeContext'
 import {
     FileText, FileDown, MessageSquare, Users, FileCode, Printer,
@@ -41,11 +42,35 @@ const TABS = [
 
 type TabKey = typeof TABS[number]['key']
 
+// Local row shapes for tab data — kept page-local on purpose: this page only
+// needs the fields it renders, and shared API model types are in flux.
+interface ManagedContest { title?: string }
+interface ChallengeRow { problem_id: string; index?: string; score?: number; sort_order?: number; title?: string; slug?: string }
+interface ProblemHit { id: string; title?: string; difficulty?: string }
+interface ClarificationRow { id: string; created_at: string; problem_index?: string; username?: string; answered?: boolean; question?: string; answer?: string | null }
+interface RegistrationList { data?: ParticipantRow[]; count?: number }
+interface ParticipantRow { user_id?: string; username?: string; registered_at: string }
+interface SubmissionRow { id?: string; username?: string; user_id?: string; problem_index?: string; problem_id?: string; language?: string; status: string; time_ms?: number; created_at?: string }
+interface PrintRow { id: string; filename?: string; status: string; content?: string; username?: string; created_at?: string }
+interface ContestStats {
+    total_participants?: number
+    total_submissions?: number
+    accepted_submissions?: number
+    problems?: { problem_id?: string; index?: string; solve_rate: number; accepted?: number; total_submissions?: number }[]
+    languages?: Record<string, number>
+    verdicts?: Record<string, number>
+}
+interface BalloonRow { id: string; dispatched?: boolean; problem_index?: string; username?: string; color?: string; created_at: string }
+interface NoticeRow { id: string; content?: string; created_at: string }
+interface ModeratorRow { user_id: string; username?: string; access_level: string }
+interface OnsiteTeamRow { id: string; team_name?: string; institution?: string; username?: string; password?: string; is_used?: boolean }
+interface GroupOption { id: string; name?: string }
+
 export default function ContestManage() {
     const { id } = useParams()
     const nav = useNavigate()
-    const [contest, setContest] = useState<any>(null)
-    const [problems, setProblems] = useState<any[]>([])
+    const [contest, setContest] = useState<ManagedContest | null>(null)
+    const [problems, setProblems] = useState<ChallengeRow[]>([])
     const [tab, setTab] = useState<TabKey>(() => {
         const hash = window.location.hash.replace('#', '') as TabKey
         const validTabs: TabKey[] = [
@@ -81,10 +106,10 @@ export default function ContestManage() {
     useEffect(() => {
         if (!id) return
         api.contests.get(id).then(d => {
-            setContest(d.contest || d)
+            setContest(d.contest)
             setProblems(d.problems || [])
         }).catch(() => nav('/contests')).finally(() => setLoading(false))
-    }, [id])
+    }, [id]) // eslint-disable-line react-hooks/exhaustive-deps
 
     if (loading) return <div className="flex items-center justify-center h-screen"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>
     if (!contest) return null
@@ -156,8 +181,8 @@ export default function ContestManage() {
 export function ChallengesTab({ contestId }: { contestId: string }) {
     const confirm = useConfirm()
     const toast = useToast()
-    const [problems, setProblems] = useState<any[]>([])
-    const [allProblems, setAllProblems] = useState<any[]>([])
+    const [problems, setProblems] = useState<ChallengeRow[]>([])
+    const [allProblems, setAllProblems] = useState<ProblemHit[]>([])
     const [showAdd, setShowAdd] = useState(false)
     const [search, setSearch] = useState('')
     const [loading, setLoading] = useState(true)
@@ -226,8 +251,8 @@ export function ChallengesTab({ contestId }: { contestId: string }) {
                 sort_order: updates[i].sort_order,
             })))
             toast.success('Challenge order updated')
-        } catch (e: any) {
-            toast.error('Failed to update challenge order: ' + (e.message || 'Please try again'))
+        } catch (e) {
+            toast.error('Failed to update challenge order: ' + (errorMessage(e) || 'Please try again'))
             try {
                 await load()
             } catch {
@@ -254,7 +279,7 @@ export function ChallengesTab({ contestId }: { contestId: string }) {
                             placeholder="Search problems..." className="flex-1 border rounded-lg px-3 py-1.5 text-sm" />
                         <button onClick={searchProblems} className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg">Search</button>
                     </div>
-                    {allProblems.map((p: any) => (
+                    {allProblems.map((p) => (
                         <div key={p.id} className="flex items-center justify-between py-1.5 text-sm">
                             <span>{p.title} <span className="text-gray-400">({p.difficulty})</span></span>
                             <button onClick={() => addProblem(p.id)} className="text-blue-600 hover:underline text-xs font-semibold">Add</button>
@@ -267,7 +292,7 @@ export function ChallengesTab({ contestId }: { contestId: string }) {
                     <th className="py-2 pr-4 w-12">#</th><th className="py-2 pr-4">Problem</th><th className="py-2 pr-4 w-20">Score</th><th className="py-2 w-40 text-right">Actions</th>
                 </tr></thead>
                 <tbody className="divide-y divide-gray-100">
-                    {problems.map((p: any, idx: number) => (
+                    {problems.map((p, idx) => (
                         <tr key={p.problem_id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
                             <td className="py-2.5 pr-4 font-mono font-bold text-blue-600">{indexLabel(idx)}</td>
                             <td className="py-2.5 pr-4">
@@ -353,7 +378,7 @@ function BookletTab({ contestId }: { contestId: string }) {
 // CLARIFICATIONS TAB
 // ═══════════════════════════════════════════════
 function ClarificationsTab({ contestId }: { contestId: string }) {
-    const [items, setItems] = useState<any[]>([])
+    const [items, setItems] = useState<ClarificationRow[]>([])
     const [loading, setLoading] = useState(true)
     const [answer, setAnswer] = useState<Record<string, string>>({})
     const [publicAns, setPublicAns] = useState<Record<string, boolean>>({})
@@ -380,7 +405,7 @@ function ClarificationsTab({ contestId }: { contestId: string }) {
                 description="Participant questions and your replies will appear here."
             /> : (
                 <div className="space-y-3">
-                    {items.map((c: any) => (
+                    {items.map((c) => (
                         <div key={c.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
                             <div className="flex items-start justify-between mb-2">
                                 <div>
@@ -415,7 +440,7 @@ function ClarificationsTab({ contestId }: { contestId: string }) {
 // PARTICIPANTS TAB
 // ═══════════════════════════════════════════════
 function ParticipantsTab({ contestId }: { contestId: string }) {
-    const [data, setData] = useState<any>(null)
+    const [data, setData] = useState<RegistrationList | null>(null)
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
@@ -437,7 +462,7 @@ function ParticipantsTab({ contestId }: { contestId: string }) {
                         <th className="py-2 pr-4">#</th><th className="py-2 pr-4">Username</th><th className="py-2">Registered</th>
                     </tr></thead>
                     <tbody className="divide-y divide-gray-100">
-                        {participants.map((p: any, i: number) => (
+                        {participants.map((p, i) => (
                             <tr key={p.user_id} className="hover:bg-gray-50">
                                 <td className="py-2 pr-4 text-gray-400">{i + 1}</td>
                                 <td className="py-2 pr-4"><Link to={`/user/${p.username}`} className="text-blue-600 hover:underline">{p.username}</Link></td>
@@ -455,7 +480,7 @@ function ParticipantsTab({ contestId }: { contestId: string }) {
 // SUBMISSIONS TAB
 // ═══════════════════════════════════════════════
 function SubmissionsTab({ contestId }: { contestId: string }) {
-    const [items, setItems] = useState<any[]>([])
+    const [items, setItems] = useState<SubmissionRow[]>([])
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
@@ -484,7 +509,7 @@ function SubmissionsTab({ contestId }: { contestId: string }) {
                             <th className="py-2 pr-3">Lang</th><th className="py-2 pr-3">Verdict</th><th className="py-2 pr-3">Time</th><th className="py-2">When</th>
                         </tr></thead>
                         <tbody className="divide-y divide-gray-100">
-                            {items.slice(0, 100).map((s: any) => (
+                            {items.slice(0, 100).map((s) => (
                                 <tr key={s.id} className="hover:bg-gray-50">
                                     <td className="py-2 pr-3"><Link to={`/submissions/${s.id}`} className="text-blue-600 hover:underline font-mono text-xs">{s.id?.slice(0, 8)}</Link></td>
                                     <td className="py-2 pr-3">{s.username || s.user_id?.slice(0, 8)}</td>
@@ -507,11 +532,11 @@ function SubmissionsTab({ contestId }: { contestId: string }) {
 // PRINTS TAB
 // ═══════════════════════════════════════════════
 function PrintsTab({ contestId }: { contestId: string }) {
-    const [items, setItems] = useState<any[]>([])
+    const [items, setItems] = useState<PrintRow[]>([])
     const [loading, setLoading] = useState(true)
 
     const load = useCallback(() => {
-        api.onsite.listPrints(contestId).then(d => setItems(d.data || [])).finally(() => setLoading(false))
+        api.onsite.listPrints(contestId).then(d => setItems((d.data || []) as PrintRow[])).finally(() => setLoading(false))
     }, [contestId])
     useEffect(() => { load() }, [load])
 
@@ -536,7 +561,7 @@ function PrintsTab({ contestId }: { contestId: string }) {
                 description="Onsite print requests will appear here for review."
             /> : (
                 <div className="space-y-3">
-                    {items.map((p: any) => (
+                    {items.map((p) => (
                         <div key={p.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
                             <div className="flex items-center justify-between mb-2">
                                 <div className="flex items-center gap-2">
@@ -584,13 +609,13 @@ function StandingsTab({ contestId }: { contestId: string }) {
 // STATISTICS TAB
 // ═══════════════════════════════════════════════
 function StatisticsTab({ contestId }: { contestId: string }) {
-    const [stats, setStats] = useState<any>(null)
+    const [stats, setStats] = useState<ContestStats | null>(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
 
     useEffect(() => {
         api.contests.stats(contestId)
-            .then(setStats)
+            .then(r => setStats(r as ContestStats))
             .catch(e => setError(e.message))
             .finally(() => setLoading(false))
     }, [contestId])
@@ -616,7 +641,7 @@ function StatisticsTab({ contestId }: { contestId: string }) {
                 <div className="mb-6">
                     <h3 className="text-sm font-semibold text-gray-700 mb-3">Problem Solve Rates</h3>
                     <div className="space-y-2">
-                        {stats.problems.map((p: any) => (
+                        {stats.problems.map((p) => (
                             <div key={p.problem_id} className="flex items-center gap-3">
                                 <span className="font-mono font-bold text-blue-600 w-8">{p.index}</span>
                                 <div className="flex-1 bg-gray-100 rounded-full h-5 overflow-hidden">
@@ -637,7 +662,7 @@ function StatisticsTab({ contestId }: { contestId: string }) {
                 <div className="mb-6">
                     <h3 className="text-sm font-semibold text-gray-700 mb-3">Languages</h3>
                     <div className="flex gap-2 flex-wrap">
-                        {languagesArray.map((l: any) => (
+                        {languagesArray.map((l) => (
                             <span key={l.language} className="text-xs bg-gray-100 px-3 py-1.5 rounded-full">
                                 {l.language}: <strong>{l.count}</strong>
                             </span>
@@ -651,7 +676,7 @@ function StatisticsTab({ contestId }: { contestId: string }) {
                 <div>
                     <h3 className="text-sm font-semibold text-gray-700 mb-3">Verdicts</h3>
                     <div className="flex gap-2 flex-wrap">
-                        {verdictsArray.map((v: any) => {
+                        {verdictsArray.map((v) => {
                             const color = v.status === 'ACCEPTED' ? 'bg-green-100 text-green-800' :
                                 v.status?.includes('PENDING') ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
                             return <span key={v.status} className={`text-xs px-3 py-1.5 rounded-full ${color}`}>{v.status}: <strong>{v.count}</strong></span>
@@ -663,7 +688,7 @@ function StatisticsTab({ contestId }: { contestId: string }) {
     )
 }
 
-function StatCard({ label, value, icon }: { label: string; value: number | string; icon: React.ReactNode }) {
+function StatCard({ label, value, icon }: { label: string; value?: number | string; icon: React.ReactNode }) {
     return (
         <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 text-center">
             <div className="text-2xl mb-1">{icon}</div>
@@ -693,12 +718,12 @@ function PlagiarismsTab({ contestId }: { contestId: string }) {
 // ═══════════════════════════════════════════════
 function BalloonsTab({ contestId }: { contestId: string }) {
     const { theme } = useTheme()
-    const [items, setItems] = useState<any[]>([])
+    const [items, setItems] = useState<BalloonRow[]>([])
     const [loading, setLoading] = useState(true)
     const [filter, setFilter] = useState<'all' | 'pending' | 'dispatched'>('pending')
 
     const load = useCallback(() => {
-        api.onsite.listBalloons(contestId).then(d => setItems(d.data || [])).finally(() => setLoading(false))
+        api.onsite.listBalloons(contestId).then(d => setItems((d.data || []) as BalloonRow[])).finally(() => setLoading(false))
     }, [contestId])
     useEffect(() => { load() }, [load])
 
@@ -739,7 +764,7 @@ function BalloonsTab({ contestId }: { contestId: string }) {
                             : 'No balloon records are available for this contest.'}
             /> : (
                 <div className="space-y-2">
-                    {filtered.map((b: any) => (
+                    {filtered.map((b) => (
                         <div key={b.id} className={`flex items-center justify-between p-3 rounded-lg border ${b.dispatched ? 'bg-gray-50 border-gray-200 dark:border-gray-700' : 'bg-white dark:bg-gray-800 border-blue-200'}`}>
                             <div className="flex items-center gap-3">
                                 <CircleDot className="w-5 h-5 text-blue-500" />
@@ -771,7 +796,7 @@ function BalloonsTab({ contestId }: { contestId: string }) {
 // ANNOUNCEMENTS TAB
 // ═══════════════════════════════════════════════
 function AnnouncementsTab({ contestId }: { contestId: string }) {
-    const [items, setItems] = useState<any[]>([])
+    const [items, setItems] = useState<NoticeRow[]>([])
     const [loading, setLoading] = useState(true)
     const [content, setContent] = useState('')
 
@@ -807,7 +832,7 @@ function AnnouncementsTab({ contestId }: { contestId: string }) {
                 description="Post a contest update above to notify participants."
             /> : (
                 <div className="space-y-2">
-                    {items.map((n: any) => (
+                    {items.map((n) => (
                         <div key={n.id} className="flex items-start justify-between p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                             <div>
                                 <p className="text-sm text-gray-800">{n.content}</p>
@@ -826,7 +851,7 @@ function AnnouncementsTab({ contestId }: { contestId: string }) {
 // MODERATORS TAB
 // ═══════════════════════════════════════════════
 function ModeratorsTab({ contestId }: { contestId: string }) {
-    const [items, setItems] = useState<any[]>([])
+    const [items, setItems] = useState<ModeratorRow[]>([])
     const [loading, setLoading] = useState(true)
     const [userId, setUserId] = useState('')
     const [level, setLevel] = useState('judge')
@@ -873,7 +898,7 @@ function ModeratorsTab({ contestId }: { contestId: string }) {
                 description="Use the User ID and access-level controls above to add one."
             /> : (
                 <div className="space-y-2">
-                    {items.map((p: any) => (
+                    {items.map((p) => (
                         <div key={p.user_id} className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
                             <div className="flex items-center gap-3">
                                 <Link to={`/user/${p.username}`} className="font-medium text-sm text-gray-800 hover:text-blue-600">{p.username || p.user_id}</Link>
@@ -894,7 +919,7 @@ function ModeratorsTab({ contestId }: { contestId: string }) {
 function OnsiteTeamsTab({ contestId }: { contestId: string }) {
     const confirm = useConfirm()
     const toast = useToast()
-    const [teams, setTeams] = useState<any[]>([])
+    const [teams, setTeams] = useState<OnsiteTeamRow[]>([])
     const [loading, setLoading] = useState(true)
     const [generating, setGenerating] = useState(false)
     const [teamInput, setTeamInput] = useState('')
@@ -918,7 +943,7 @@ function OnsiteTeamsTab({ contestId }: { contestId: string }) {
             const created = res.users || []
             setTeams(prev => [...created, ...prev])
             setTeamInput('')
-        } catch (e: any) { toast.error(e.message) }
+        } catch (e) { toast.error(errorMessage(e)) }
         finally { setGenerating(false) }
     }
 
@@ -932,7 +957,7 @@ function OnsiteTeamsTab({ contestId }: { contestId: string }) {
         try {
             await api.onsite.deleteUser(contestId, userId)
             setTeams(prev => prev.filter(t => t.id !== userId))
-        } catch (e: any) { toast.error(e.message) }
+        } catch (e) { toast.error(errorMessage(e)) }
     }
 
     if (loading) return <TabLoading />
@@ -974,7 +999,7 @@ function OnsiteTeamsTab({ contestId }: { contestId: string }) {
                                 <th className="py-2 w-16"></th>
                             </tr></thead>
                             <tbody className="divide-y divide-gray-100">
-                                {teams.map((t: any) => (
+                                {teams.map((t) => (
                                     <tr key={t.id} className="hover:bg-gray-50">
                                         <td className="py-2 pr-3 font-medium">{t.team_name}</td>
                                         <td className="py-2 pr-3 text-gray-500">{t.institution || '—'}</td>
@@ -1020,7 +1045,7 @@ function SettingsTab({ contestId }: { contestId: string }) {
         visibility: 'public',
         group_id: '',
     })
-    const [groups, setGroups] = useState<any[]>([])
+    const [groups, setGroups] = useState<GroupOption[]>([])
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
     const [error, setError] = useState('')
@@ -1079,8 +1104,8 @@ function SettingsTab({ contestId }: { contestId: string }) {
                 upsolving_enabled: form.upsolving_enabled,
                 virtual_contest_enabled: form.virtual_contest_enabled,
             })
-        } catch (err: any) {
-            setError(err.message || 'Failed to save')
+        } catch (err) {
+            setError(errorMessage(err) || 'Failed to save')
         } finally {
             setSaving(false)
         }
@@ -1173,7 +1198,7 @@ function SettingsTab({ contestId }: { contestId: string }) {
                                 <input type="checkbox" checked={form[key] as boolean}
                                     onChange={e => setForm(p => ({ ...p, [key]: e.target.checked }))}
                                     className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500" />
-                                <span className="text-sm flex items-center gap-1.5">{typeof icon === "string" ? icon : React.createElement(icon as any, { className: "w-4 h-4" })} {label}</span>
+                                <span className="text-sm flex items-center gap-1.5">{typeof icon === "string" ? icon : React.createElement(icon as unknown as React.ComponentType<{ className?: string }>, { className: "w-4 h-4" })} {label}</span>
                             </label>
                         ))}
                     </div>

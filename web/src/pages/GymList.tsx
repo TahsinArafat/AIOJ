@@ -14,8 +14,10 @@ const CATEGORIES = [
     { value: 'open', label: 'Open' },
 ]
 
+interface GymRow { id: string; contest_title?: string; category?: string; country?: string; description?: string; difficulty_rating?: number | null; season?: string; solve_count?: number }
+
 export default function GymList() {
-    const [gyms, setGyms] = useState<any[]>([])
+    const [gyms, setGyms] = useState<GymRow[]>([])
     const [total, setTotal] = useState(0)
     const [category, setCategory] = useState('')
     const [search, setSearch] = useState('')
@@ -27,7 +29,7 @@ export default function GymList() {
         }).catch(console.error)
     }, [category, search])
 
-    const getDifficultyColor = (rating?: number) => {
+    const getDifficultyColor = (rating?: number | null) => {
         if (!rating) return 'text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800'
         if (rating < 1200) return 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20'
         if (rating < 1600) return 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20'

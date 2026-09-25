@@ -84,7 +84,7 @@ const [team, setTeam] = useState<TeamInfo | null>(null)
     }, [id])
 
     useEffect(() => {
-        fetchTeamData()
+        queueMicrotask(fetchTeamData)
     }, [fetchTeamData])
 
     const fetchPending = useCallback(() => {
