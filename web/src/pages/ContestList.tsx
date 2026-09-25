@@ -65,7 +65,16 @@ function formatElapsed(startIso: string): string {
 
 type ContestStatus = 'upcoming' | 'running' | 'ended'
 
-function getContestStatus(c: any): ContestStatus {
+interface ContestSummary {
+    id: string
+    title: string
+    division?: 0 | 1 | 2 | 3 | 4
+    type: string
+    start_time: string
+    end_time: string
+}
+
+function getContestStatus(c: { start_time: string; end_time: string }): ContestStatus {
     const now = Date.now()
     const start = new Date(c.start_time).getTime()
     const end = new Date(c.end_time).getTime()
@@ -142,7 +151,7 @@ const PAGE_SIZE = 30
 
 export default function ContestList() {
     const { theme } = useTheme()
-    const [contests, setContests] = useState<any[]>([])
+    const [contests, setContests] = useState<ContestSummary[]>([])
     const [total, setTotal] = useState(0)
     const [division, setDivision] = useState<Division | undefined>(undefined)
     const [search, setSearch] = useState('')
@@ -191,8 +200,8 @@ export default function ContestList() {
             if (!search) return true
             return c.title?.toLowerCase().includes(search.toLowerCase())
         })
-        const u: any[] = []
-        const p: any[] = []
+        const u: ContestSummary[] = []
+        const p: ContestSummary[] = []
         for (const c of filtered) {
             const s = getContestStatus(c)
             if (s === 'ended') p.push(c)

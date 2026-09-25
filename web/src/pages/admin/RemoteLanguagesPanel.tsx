@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { errorMessage } from '../../lib/errors'
 import { api } from '../../lib/api'
 import { Plus, Pencil, Trash2, X, Save, Search, Check, AlertTriangle } from 'lucide-react'
 import { useConfirm } from '../../components/ConfirmDialog'
@@ -76,8 +77,8 @@ export default function RemoteLanguagesPanel() {
             }
             resetForm()
             loadLangs()
-        } catch (err: any) {
-            toast.error(err.message)
+        } catch (err) {
+            toast.error(errorMessage(err))
         }
     }
 
@@ -86,8 +87,8 @@ export default function RemoteLanguagesPanel() {
         try {
             await api.admin.remoteLanguages.delete(id)
             loadLangs()
-        } catch (err: any) {
-            toast.error(err.message)
+        } catch (err) {
+            toast.error(errorMessage(err))
         }
     }
 
@@ -95,8 +96,8 @@ export default function RemoteLanguagesPanel() {
         try {
             await api.admin.remoteLanguages.update(lang.id, { enabled: !lang.enabled })
             loadLangs()
-        } catch (err: any) {
-            toast.error(err.message)
+        } catch (err) {
+            toast.error(errorMessage(err))
         }
     }
 
@@ -107,8 +108,8 @@ export default function RemoteLanguagesPanel() {
             setDetectResults({ matched: result.matched, unmatched: result.unmatched })
             setSelectedForSave(new Set(result.matched.map((_, i) => i)))
             setShowDetectModal(true)
-        } catch (err: any) {
-            toast.error(err.message)
+        } catch (err) {
+            toast.error(errorMessage(err))
         } finally {
             setDetecting(false)
         }
@@ -129,8 +130,8 @@ export default function RemoteLanguagesPanel() {
             loadLangs()
             setShowDetectModal(false)
             setDetectResults(null)
-        } catch (err: any) {
-            toast.error(err.message)
+        } catch (err) {
+            toast.error(errorMessage(err))
         }
     }
 
@@ -287,7 +288,11 @@ export default function RemoteLanguagesPanel() {
                                                         <input type="checkbox" checked={selectedForSave.has(i)}
                                                             onChange={() => {
                                                                 const next = new Set(selectedForSave)
-                                                                next.has(i) ? next.delete(i) : next.add(i)
+                                                                if (next.has(i)) {
+                                                                    next.delete(i)
+                                                                } else {
+                                                                    next.add(i)
+                                                                }
                                                                 setSelectedForSave(next)
                                                             }}
                                                             className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500" />
@@ -324,7 +329,11 @@ export default function RemoteLanguagesPanel() {
                                                             <input type="checkbox" checked={selectedForSave.has(idx)}
                                                                 onChange={() => {
                                                                     const next = new Set(selectedForSave)
-                                                                    next.has(idx) ? next.delete(idx) : next.add(idx)
+                                                                    if (next.has(idx)) {
+                                                                        next.delete(idx)
+                                                                    } else {
+                                                                        next.add(idx)
+                                                                    }
                                                                     setSelectedForSave(next)
                                                                 }}
                                                                 className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500" />

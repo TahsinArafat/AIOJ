@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { errorMessage } from '../lib/errors'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { api, getAccessToken } from '../lib/api'
 import { useConfirm } from '../components/ConfirmDialog'
@@ -26,7 +27,14 @@ export default function SetterProblemWorkspace() {
   const { slug } = useParams<{ slug: string }>()
   const navigate = useNavigate()
   const confirm = useConfirm()
-  const [problem, setProblem] = useState<any>(null)
+  interface LoadedProblem {
+    id: string
+    slug: string
+    title: string
+    description: string
+}
+
+const [problem, setProblem] = useState<LoadedProblem | null>(null)
   type WorkspaceTab = 'statement' | 'testcases' | 'checker' | 'permissions' | 'settings' | 'editorial' | 'translations'
 
   const [activeTab, setActiveTab] = useState<WorkspaceTab>(() => {
@@ -150,8 +158,8 @@ export default function SetterProblemWorkspace() {
 
       const permData = await api.problems.getPermissions(data.slug)
       setCollaborators(permData.data || [])
-    } catch (err: any) {
-      setError(err.message || 'Failed to load problem workspace')
+    } catch (err) {
+      setError(errorMessage(err) || 'Failed to load problem workspace')
     }
   }
 
@@ -169,8 +177,8 @@ export default function SetterProblemWorkspace() {
       await api.problems.update(problem.slug as string, payload)
       setSuccess('Problem saved successfully!')
       loadProblem()
-    } catch (err: any) {
-      setError(err.message || 'Failed to save problem')
+    } catch (err) {
+      setError(errorMessage(err) || 'Failed to save problem')
     } finally {
       setSaving(false)
     }
@@ -199,8 +207,8 @@ export default function SetterProblemWorkspace() {
     try {
       await api.problems.update(problem.slug as string, buildPayload({ testcases: updated }))
       setSuccess('Testcase scores updated successfully!')
-    } catch (err: any) {
-      setError(err.message || 'Failed to save testcase scores')
+    } catch (err) {
+      setError(errorMessage(err) || 'Failed to save testcase scores')
     }
   }
 
@@ -213,8 +221,8 @@ export default function SetterProblemWorkspace() {
     try {
       await api.problems.update(problem.slug as string, buildPayload({ testcases: updated }))
       setSuccess('Testcase score removed successfully!')
-    } catch (err: any) {
-      setError(err.message || 'Failed to save testcase scores')
+    } catch (err) {
+      setError(errorMessage(err) || 'Failed to save testcase scores')
     }
   }
 
@@ -232,8 +240,8 @@ export default function SetterProblemWorkspace() {
     try {
       await api.problems.update(problem.slug as string, buildPayload({ testcases: updated }))
       setSuccess(`All ${formState.testcases.length} testcase scores set to ${batchScore} points successfully!`)
-    } catch (err: any) {
-      setError(err.message || 'Failed to update testcase scores')
+    } catch (err) {
+      setError(errorMessage(err) || 'Failed to update testcase scores')
     } finally {
       setBatchApplying(false)
     }
@@ -248,8 +256,8 @@ export default function SetterProblemWorkspace() {
       await api.problems.uploadTestcases(problem.slug as string, file)
       setSuccess('Testcase package uploaded successfully!')
       loadProblem()
-    } catch (err: any) {
-      setError(err.message || 'Failed to upload testcase package')
+    } catch (err) {
+      setError(errorMessage(err) || 'Failed to upload testcase package')
     }
   }
 
@@ -280,8 +288,8 @@ export default function SetterProblemWorkspace() {
         description: prev.description ? `${prev.description}\n\n![Image](${imageUrl})` : `![Image](${imageUrl})`
       }))
       setSuccess('Image uploaded and inserted into description!')
-    } catch (err: any) {
-      setError(err.message || 'Failed to upload image')
+    } catch (err) {
+      setError(errorMessage(err) || 'Failed to upload image')
     } finally {
       setUploadingImage(false)
     }
@@ -296,8 +304,8 @@ export default function SetterProblemWorkspace() {
       setSuccess(`Collaborator ${newUsername} added successfully!`)
       setNewUsername('')
       loadProblem()
-    } catch (err: any) {
-      setError(err.message || 'Failed to add collaborator')
+    } catch (err) {
+      setError(errorMessage(err) || 'Failed to add collaborator')
     }
   }
 
@@ -309,8 +317,8 @@ export default function SetterProblemWorkspace() {
       await api.problems.removePermission(problem.slug as string, userId)
       setSuccess('Collaborator removed successfully!')
       loadProblem()
-    } catch (err: any) {
-      setError(err.message || 'Failed to remove collaborator')
+    } catch (err) {
+      setError(errorMessage(err) || 'Failed to remove collaborator')
     }
   }
 
@@ -325,8 +333,8 @@ export default function SetterProblemWorkspace() {
     try {
       await api.problems.delete(problem.slug as string)
       navigate('/setter')
-    } catch (err: any) {
-      setError(err.message || 'Failed to delete problem')
+    } catch (err) {
+      setError(errorMessage(err) || 'Failed to delete problem')
     }
   }
 

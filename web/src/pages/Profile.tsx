@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import type { TeamInvite, GroupInvite } from '../types/community'
+import { errorMessage } from '../lib/errors'
 import { Link, useNavigate } from 'react-router-dom'
 import { api, getAccessToken, clearTokens } from '../lib/api'
 import RatingBadge from '../components/RatingBadge'
@@ -17,7 +19,21 @@ const TABS = ['Edit Profile', 'Change Password', 'Pending Invites'] as const
 type Tab = (typeof TABS)[number]
 
 function EditProfileTab() {
-    const [profile, setProfile] = useState<any>(null)
+    interface ProfileData {
+    first_name: string
+    last_name: string
+    avatar_url: string | null
+    bio: string | null
+    city: string | null
+    country: string | null
+    organization: string | null
+    github_url: string | null
+    show_email: boolean
+    show_tags: boolean
+    [key: string]: unknown
+}
+
+const [profile, setProfile] = useState<ProfileData | null>(null)
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
     const [message, setMessage] = useState('')
@@ -29,11 +45,12 @@ function EditProfileTab() {
             .finally(() => setLoading(false))
     }, [])
 
-    const handleChange = (field: string, value: any) => {
-        setProfile((prev: any) => ({ ...prev, [field]: value }))
+    const handleChange = (field: string, value: string | boolean) => {
+        setProfile(prev => (prev ? { ...prev, [field]: value } : prev))
     }
 
     const handleSave = async () => {
+        if (!profile) return
         setSaving(true)
         setMessage('')
         try {
@@ -51,8 +68,8 @@ function EditProfileTab() {
             })
             setProfile(result)
             setMessage('Profile saved!')
-        } catch (e: any) {
-            setMessage('Error: ' + e.message)
+        } catch (e) {
+            setMessage('Error: ' + errorMessage(e))
         } finally {
             setSaving(false)
         }
@@ -69,7 +86,7 @@ function EditProfileTab() {
         { key: 'github_url', label: 'GitHub URL', type: 'url' },
         { key: 'bio', label: 'Bio', type: 'textarea' },
         { key: 'avatar_url', label: 'Avatar URL', type: 'url' },
-    ]
+    ] as const
 
     return (
         <div className="space-y-4">
@@ -135,8 +152,8 @@ function ChangePasswordTab() {
             setCurrentPassword('')
             setNewPassword('')
             setConfirmPassword('')
-        } catch (e: any) {
-            setMessage('Error: ' + e.message)
+        } catch (e) {
+            setMessage('Error: ' + errorMessage(e))
         } finally {
             setSaving(false)
         }
@@ -172,7 +189,7 @@ function ChangePasswordTab() {
 
 function PendingInvitesTab({ userId }: { userId: string }) {
     const toast = useToast()
-    const [invites, setInvites] = useState<{ teams: any[]; groups: any[] }>({ teams: [], groups: [] })
+    const [invites, setInvites] = useState<{ teams: TeamInvite[]; groups: GroupInvite[] }>({ teams: [], groups: [] })
     const [loading, setLoading] = useState(true)
     const [acting, setActing] = useState<string | null>(null)
 
@@ -195,8 +212,8 @@ function PendingInvitesTab({ userId }: { userId: string }) {
                 await api.groups.respond(id, { user_id: userId, action })
             }
             fetchInvites()
-        } catch (e: any) {
-            toast.error('Failed: ' + e.message)
+        } catch (e) {
+            toast.error('Failed: ' + errorMessage(e))
         } finally {
             setActing(null)
         }
@@ -388,8 +405,8 @@ export default function Profile() {
                                 a.download = 'aioj-data-export.json'
                                 a.click()
                                 URL.revokeObjectURL(url)
-                            } catch (e: any) {
-                                toast.error(e?.message || 'Export failed')
+                            } catch (e) {
+                                toast.error(errorMessage(e) || 'Export failed')
                             }
                         }}
                         className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
@@ -458,8 +475,8 @@ function DeleteAccountSection() {
             await api.users.deleteAccount({ password, confirm: true })
             clearTokens()
             navigate('/')
-        } catch (e: any) {
-            setError(e?.message || 'Delete failed')
+        } catch (e) {
+            setError(errorMessage(e) || 'Delete failed')
         } finally {
             setBusy(false)
         }

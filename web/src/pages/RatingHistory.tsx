@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, getAccessToken } from '../lib/api'
 import RatingBadge from '../components/RatingBadge'
+import { EmptyState } from '../components/EmptyState'
 
 interface RatingEntry {
   id: string
@@ -104,8 +105,8 @@ export default function RatingHistory() {
 
       {/* Rating History List */}
       {history.length === 0 ? (
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-8 text-center text-gray-400 dark:text-gray-500 shadow-sm">
-          No rated contests yet. Participate in contests to see your rating history!
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-8 shadow-sm">
+          <EmptyState text="No rated contests yet" description="Participate in rated contests to build your rating history." />
         </div>
       ) : (
         <div className="space-y-3">

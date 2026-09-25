@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { api, getAccessToken, contestSlug } from '../lib/api'
 import { resolveProblemSlug, resolveProblemTitle } from '../lib/problemSlugResolver'
 import { useTheme } from '../context/ThemeContext'
+import { EmptyState } from '../components/EmptyState'
 
 function formatTime(seconds: number): string {
     const h = Math.floor(seconds / 3600)
@@ -72,29 +73,29 @@ export default function VirtualContest() {
                     setRemainingSeconds(remaining)
                     setElapsedSeconds(elapsed)
                     return api.contests.get(status.original_contest_id).then((d) => {
-                    setContestData(d)
-                    if (d.problems?.length) {
-                        Promise.all(d.problems.map(async (p: any) => {
-                            const [slug, title] = await Promise.all([
-                                resolveProblemSlug(p.problem_id),
-                                resolveProblemTitle(p.problem_id),
-                            ])
-                            return { id: p.problem_id, slug, title }
-                        })).then(results => {
-                            const slugMap = new Map<string, string>()
-                            const titleMap = new Map<string, string>()
-                            for (const r of results) {
-                                if (r.slug) slugMap.set(r.id, r.slug)
-                                if (r.title) titleMap.set(r.id, r.title)
-                            }
-                            setProblemSlugs(slugMap)
-                            setProblemTitles(titleMap)
-                        })
-                    }
-                })
+                        setContestData(d)
+                        if (d.problems?.length) {
+                            Promise.all(d.problems.map(async (p: any) => {
+                                const [slug, title] = await Promise.all([
+                                    resolveProblemSlug(p.problem_id),
+                                    resolveProblemTitle(p.problem_id),
+                                ])
+                                return { id: p.problem_id, slug, title }
+                            })).then(results => {
+                                const slugMap = new Map<string, string>()
+                                const titleMap = new Map<string, string>()
+                                for (const r of results) {
+                                    if (r.slug) slugMap.set(r.id, r.slug)
+                                    if (r.title) titleMap.set(r.id, r.title)
+                                }
+                                setProblemSlugs(slugMap)
+                                setProblemTitles(titleMap)
+                            })
+                        }
+                    })
                 }
             })
-            .catch(() => {})
+            .catch(() => { })
             .finally(() => setLoading(false))
     }, [])
 
@@ -256,26 +257,26 @@ export default function VirtualContest() {
                                     const slug = problemSlugs.get(p.problem_id)
                                     const title = problemTitles.get(p.problem_id)
                                     return (
-                                    <tr key={p.problem_id} className="hover:bg-gray-50 transition-colors">
-                                        <td className="px-4 py-3 font-bold text-blue-600">{p.index}</td>
-                                        <td className="px-4 py-3 text-gray-800 font-medium">{title || p.problem_id}</td>
-                                        <td className="px-4 py-3 text-right">
-                                            <Link
-                                                to={slug ? `/problems/${slug}` : '#'}
-                                                className="inline-block text-xs text-white bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded font-medium transition-colors"
-                                            >
-                                                Submit
-                                            </Link>
-                                        </td>
-                                    </tr>
+                                        <tr key={p.problem_id} className="hover:bg-gray-50 transition-colors">
+                                            <td className="px-4 py-3 font-bold text-blue-600">{p.index}</td>
+                                            <td className="px-4 py-3 text-gray-800 font-medium">{title || p.problem_id}</td>
+                                            <td className="px-4 py-3 text-right">
+                                                <Link
+                                                    to={slug ? `/problems/${slug}` : '#'}
+                                                    className="inline-block text-xs text-white bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded font-medium transition-colors"
+                                                >
+                                                    Submit
+                                                </Link>
+                                            </td>
+                                        </tr>
                                     )
                                 })}
                             </tbody>
                         </table>
                     </div>
                 ) : (
-                    <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-6 text-gray-400 text-sm">
-                        No problems found for this contest.
+                    <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-6">
+                        <EmptyState text="No problems found for this contest" description="Add problems from the problem pool to populate this virtual contest." />
                     </div>
                 )}
             </div>

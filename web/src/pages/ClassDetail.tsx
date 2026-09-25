@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
+import type { ClassMember, ClassInfo } from '../types/community'
+import { errorMessage } from '../lib/errors'
 import { useParams, Link } from 'react-router-dom'
 import { api, getAccessToken } from '../lib/api'
 
 export default function ClassDetail() {
 	const { id } = useParams<{ id: string }>()
-	const [c, setC] = useState<any>(null)
-	const [members, setMembers] = useState<any[]>([])
+	const [c, setC] = useState<ClassInfo | null>(null)
+	const [members, setMembers] = useState<ClassMember[]>([])
 	const [loading, setLoading] = useState(true)
 	const [isTeacher, setIsTeacher] = useState(false)
 	const [joiningCode, setJoiningCode] = useState('')
@@ -25,11 +27,11 @@ export default function ClassDetail() {
 				try {
 					const payload = JSON.parse(atob(token.split('.')[1]))
 					const currentUserID = payload.user_id
-					const member = memberData.data?.find((m: any) => m.user_id === currentUserID)
+					const member = memberData.data?.find((m: ClassMember) => m.user_id === currentUserID)
 					setIsTeacher(member?.role === 'teacher' || payload.role === 'admin')
-				} catch {}
+				} catch { /* malformed JWT — keep default role */ }
 			}
-		}).catch(() => {}).finally(() => setLoading(false))
+		}).catch(() => { }).finally(() => setLoading(false))
 	}, [id])
 
 	const handleJoinByCode = async (e: React.FormEvent) => {
@@ -39,8 +41,8 @@ export default function ClassDetail() {
 		try {
 			const res = await api.classes.joinByCode(joiningCode)
 			window.location.href = `/classes/${res.class_id}`
-		} catch (err: any) {
-			setJoinError(err.message || 'Invalid invite code')
+		} catch (err) {
+			setJoinError(errorMessage(err) || 'Invalid invite code')
 		}
 	}
 
@@ -94,7 +96,7 @@ export default function ClassDetail() {
 								<tr key={m.user_id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
 									<td className="px-6 py-3 font-semibold text-gray-900 dark:text-gray-100">{m.username || m.user_id}</td>
 									<td className="px-6 py-3 uppercase">{m.role}</td>
-									<td className="px-6 py-3 text-gray-500 dark:text-gray-400">{new Date(m.joined_at).toLocaleDateString()}</td>
+									<td className="px-6 py-3 text-gray-500 dark:text-gray-400">{new Date(m.joined_at ?? '').toLocaleDateString()}</td>
 								</tr>
 							))}
 						</tbody>

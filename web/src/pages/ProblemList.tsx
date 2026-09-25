@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
+import { EmptyState } from '../components/EmptyState'
 
 const difficultyColor: Record<string, string> = {
     easy: 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20',
@@ -58,7 +59,7 @@ export default function ProblemList() {
     const limit = 20
 
     useEffect(() => {
-        api.problems.listTags().then(d => setAvailableTags(d.data || [])).catch(() => {})
+        api.problems.listTags().then(d => setAvailableTags(d.data || [])).catch(() => { })
     }, [])
 
     const fetchProblems = useCallback(() => {
@@ -69,11 +70,11 @@ export default function ProblemList() {
         if (source) filters.source = source
         if (rating) filters.rating = rating
         filters.sort = sortBy
-        
+
         api.problems.list(offset, limit, filters).then(d => {
             setProblems(d.data || [])
             setTotal(d.total || 0)
-        }).catch(() => {})
+        }).catch(() => { })
     }, [offset, difficulty, selectedTags, search, source, rating, sortBy])
 
     useEffect(() => {
@@ -275,14 +276,13 @@ export default function ProblemList() {
                                             </Link>
                                         </td>
                                         <td className="px-4 py-3">
-                                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                                                p.source === 'codeforces' ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300' :
+                                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${p.source === 'codeforces' ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300' :
                                                 p.source === 'atcoder' ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300' :
-                                                p.source === 'cses' ? 'bg-cyan-50 text-cyan-700' :
-                                                p.source === 'toph' ? 'bg-pink-50 dark:bg-pink-900/20 text-pink-700' :
-                                                p.source === 'qoj' ? 'bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300' :
-                                                'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
-                                            }`}>
+                                                    p.source === 'cses' ? 'bg-cyan-50 text-cyan-700' :
+                                                        p.source === 'toph' ? 'bg-pink-50 dark:bg-pink-900/20 text-pink-700' :
+                                                            p.source === 'qoj' ? 'bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300' :
+                                                                'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
+                                                }`}>
                                                 {p.source === 'local' || !p.source ? 'AIOJ' : p.source?.charAt(0).toUpperCase() + p.source?.slice(1)}
                                             </span>
                                         </td>
@@ -300,7 +300,7 @@ export default function ProblemList() {
                                     </tr>
                                 ))}
                                 {problems.length === 0 && (
-                                    <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400 dark:text-gray-500">No problems found.</td></tr>
+                                    <tr><td colSpan={5} className="px-4 py-4"><EmptyState text="No problems found" description="Try a different search or filter — problem sets sync in from judges." /></td></tr>
                                 )}
                             </tbody>
                         </table>
@@ -316,14 +316,13 @@ export default function ProblemList() {
                                     </h3>
                                 </Link>
                                 <div className="flex flex-wrap items-center gap-2 mb-2">
-                                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                                        p.source === 'codeforces' ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300' :
+                                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${p.source === 'codeforces' ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300' :
                                         p.source === 'atcoder' ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300' :
-                                        p.source === 'cses' ? 'bg-cyan-50 text-cyan-700' :
-                                        p.source === 'toph' ? 'bg-pink-50 dark:bg-pink-900/20 text-pink-700' :
-                                        p.source === 'qoj' ? 'bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300' :
-                                        'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
-                                    }`}>
+                                            p.source === 'cses' ? 'bg-cyan-50 text-cyan-700' :
+                                                p.source === 'toph' ? 'bg-pink-50 dark:bg-pink-900/20 text-pink-700' :
+                                                    p.source === 'qoj' ? 'bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300' :
+                                                        'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
+                                        }`}>
                                         {p.source === 'local' || !p.source ? 'AIOJ' : p.source?.charAt(0).toUpperCase() + p.source?.slice(1)}
                                     </span>
                                     <span className={`px-2 py-0.5 rounded text-xs font-medium ${difficultyColor[p.difficulty] || ''}`}>
@@ -350,7 +349,7 @@ export default function ProblemList() {
                             </div>
                         ))}
                         {problems.length === 0 && (
-                            <div className="px-4 py-8 text-center text-gray-400 dark:text-gray-500">No problems found.</div>
+                            <div className="px-4 py-4"><EmptyState text="No problems found" description="Try a different search or filter — problem sets sync in from judges." /></div>
                         )}
                     </div>
 

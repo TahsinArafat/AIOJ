@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
+import { EmptyState } from '../components/EmptyState'
 
 const CATEGORIES = [
     { value: '', label: 'All Categories' },
@@ -75,7 +76,10 @@ export default function GymList() {
                     </Link>
                 ))}
                 {gyms.length === 0 && (
-                    <div className="text-center py-16 text-gray-400 dark:text-gray-500">No gym contests found.</div>
+                    <EmptyState
+                        text="No gym contests found"
+                        description={category || search ? 'Try a different category or search term.' : 'Community-curated gym contests will appear here once available.'}
+                    />
                 )}
             </div>
             {total > 0 && <p className="text-sm text-gray-400 dark:text-gray-500 mt-4">{total} gym contests total</p>}

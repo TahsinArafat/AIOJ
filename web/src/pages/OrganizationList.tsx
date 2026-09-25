@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, getAccessToken } from '../lib/api'
+import { EmptyState } from '../components/EmptyState'
 
 export default function OrganizationList() {
 	const [orgs, setOrgs] = useState<any[]>([])
@@ -13,11 +14,11 @@ export default function OrganizationList() {
 			try {
 				const payload = JSON.parse(atob(token.split('.')[1]))
 				setIsAdmin(payload.role === 'admin' || payload.role === 'setter')
-			} catch {}
+			} catch { }
 		}
 		api.organizations.list(0, 50)
 			.then(d => setOrgs(d.data || []))
-			.catch(() => {})
+			.catch(() => { })
 			.finally(() => setLoading(false))
 	}, [])
 
@@ -53,7 +54,7 @@ export default function OrganizationList() {
 					</div>
 				))}
 				{orgs.length === 0 && (
-					<div className="col-span-2 text-center py-12 text-gray-400 dark:text-gray-500">No organizations found.</div>
+					<EmptyState text="No organizations found" description="Organizations you belong to will appear here." />
 				)}
 			</div>
 		</div>

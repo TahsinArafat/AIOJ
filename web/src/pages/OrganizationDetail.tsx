@@ -1,15 +1,23 @@
 import { useEffect, useState } from 'react'
+import type { ClassMember, ClassInfo } from '../types/community'
+import { errorMessage } from '../lib/errors'
 import { EmptyState } from '../components/EmptyState'
 import { useParams, Link } from 'react-router-dom'
 import { api, getAccessToken } from '../lib/api'
 import { useToast } from '../components/Toast'
 
 export default function OrganizationDetail() {
-    const toast = useToast()
+	const toast = useToast()
 	const { id } = useParams<{ id: string }>()
-	const [org, setOrg] = useState<any>(null)
-	const [classes, setClasses] = useState<any[]>([])
-	const [members, setMembers] = useState<any[]>([])
+	interface OrgInfo {
+    name: string
+    description?: string | null
+    created_at: string
+}
+
+const [org, setOrg] = useState<OrgInfo | null>(null)
+	const [classes, setClasses] = useState<ClassInfo[]>([])
+	const [members, setMembers] = useState<ClassMember[]>([])
 	const [loading, setLoading] = useState(true)
 	const [activeTab, setActiveTab] = useState<'classes' | 'members'>('classes')
 	const [isMember, setIsMember] = useState(false)
@@ -38,12 +46,12 @@ export default function OrganizationDetail() {
 				try {
 					const payload = JSON.parse(atob(token.split('.')[1]))
 					const currentUserID = payload.user_id
-					const member = memberData.data?.find((m: any) => m.user_id === currentUserID)
+					const member = memberData.data?.find((m: ClassMember) => m.user_id === currentUserID)
 					setIsMember(!!member)
 					setIsOwner(member?.role === 'owner' || member?.role === 'admin' || payload.role === 'admin')
-				} catch {}
+				} catch { /* malformed JWT — keep default role */ }
 			}
-		}).catch(() => {}).finally(() => setLoading(false))
+		}).catch(() => { }).finally(() => setLoading(false))
 	}, [id])
 
 	const handleJoinLeave = async () => {
@@ -59,7 +67,7 @@ export default function OrganizationDetail() {
 				setIsMember(true)
 				window.location.reload()
 			}
-		} catch (e: any) { toast.error(e.message) }
+		} catch (e) { toast.error(errorMessage(e)) }
 		finally { setJoining(false) }
 	}
 
@@ -73,8 +81,8 @@ export default function OrganizationDetail() {
 			setClassName('')
 			setClassDesc('')
 			setShowAddClass(false)
-		} catch (err: any) {
-			setClassError(err.message || 'Failed to create class')
+		} catch (err) {
+			setClassError(errorMessage(err) || 'Failed to create class')
 		}
 	}
 
@@ -93,11 +101,10 @@ export default function OrganizationDetail() {
 				</div>
 				{getAccessToken() && (
 					<button onClick={handleJoinLeave} disabled={joining}
-						className={`px-6 py-2 rounded font-semibold text-sm transition-colors ${
-							isMember 
+						className={`px-6 py-2 rounded font-semibold text-sm transition-colors ${isMember
 								? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-100 hover:bg-red-100'
 								: 'bg-blue-600 text-white hover:bg-blue-700'
-						}`}>
+							}`}>
 						{isMember ? 'Leave Organization' : 'Join Organization'}
 					</button>
 				)}
@@ -170,7 +177,7 @@ export default function OrganizationDetail() {
 								<tr key={m.user_id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
 									<td className="px-6 py-3 font-semibold text-gray-900 dark:text-gray-100">{m.username || m.user_id}</td>
 									<td className="px-6 py-3 uppercase">{m.role}</td>
-									<td className="px-6 py-3 text-gray-500 dark:text-gray-400">{new Date(m.joined_at).toLocaleDateString()}</td>
+									<td className="px-6 py-3 text-gray-500 dark:text-gray-400">{new Date(m.joined_at ?? '').toLocaleDateString()}</td>
 								</tr>
 							))}
 						</tbody>

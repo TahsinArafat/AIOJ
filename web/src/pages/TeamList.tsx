@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, getAccessToken } from '../lib/api'
 import RatingBadge from '../components/RatingBadge'
+import { EmptyState } from '../components/EmptyState'
 
 export default function TeamList() {
     const [teams, setTeams] = useState<any[]>([])
@@ -41,7 +42,7 @@ export default function TeamList() {
                     </Link>
                 ))}
                 {teams.length === 0 && (
-                    <div className="text-center py-16 text-gray-400 dark:text-gray-500">No teams found.</div>
+                    <EmptyState text="No teams found" description="Teams you create or join will show up here." />
                 )}
             </div>
             {total > 0 && <p className="text-sm text-gray-400 dark:text-gray-500 mt-4">{total} teams total</p>}

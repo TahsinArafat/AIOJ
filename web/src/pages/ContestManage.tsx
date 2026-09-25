@@ -597,7 +597,7 @@ function StatisticsTab({ contestId }: { contestId: string }) {
 
     if (loading) return <TabLoading />
     if (error) return <TabShell title="Statistics"><div className="text-red-500 text-sm p-4">{error}</div></TabShell>
-    if (!stats) return null
+    if (!stats) return <TabShell title="Statistics"><EmptyState text="No statistics yet" description="Statistics appear once participants register and submit solutions." /></TabShell>
 
     const languagesArray = stats.languages ? Object.entries(stats.languages).map(([language, count]) => ({ language, count: count as number })) : []
     const verdictsArray = stats.verdicts ? Object.entries(stats.verdicts).map(([status, count]) => ({ status, count: count as number })) : []

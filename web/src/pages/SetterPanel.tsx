@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
 import SetterApplication from '../components/SetterApplication'
 import { useToast } from '../components/Toast'
+import { EmptyState } from '../components/EmptyState'
 
 function decodeRole(): string | null {
     const token = localStorage.getItem('access_token')
@@ -430,7 +431,7 @@ export default function SetterPanel() {
                                     </tr>
                                 ))}
                                 {contests.length === 0 && (
-                                    <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400 dark:text-gray-500">No contests managed by you yet.</td></tr>
+                                    <tr><td colSpan={5} className="px-4 py-4"><EmptyState text="No contests managed by you yet" description="Create a contest to start managing rounds and participants." /></td></tr>
                                 )}
                             </tbody>
                         </table>
@@ -468,7 +469,7 @@ export default function SetterPanel() {
                                     </tr>
                                 ))}
                                 {problems.length === 0 && (
-                                    <tr><td colSpan={4} className="px-4 py-8 text-center text-gray-400 dark:text-gray-500">No problems found.</td></tr>
+                                    <tr><td colSpan={4} className="px-4 py-4"><EmptyState text="No problems found" description="Problems you author or are assigned will appear here." /></td></tr>
                                 )}
                             </tbody>
                         </table>

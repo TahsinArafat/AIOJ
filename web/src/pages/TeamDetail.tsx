@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
+import { errorMessage } from '../lib/errors'
 import { useParams, useNavigate } from 'react-router-dom'
 import { api, getAccessToken } from '../lib/api'
 import { EmptyState } from '../components/EmptyState'
@@ -29,8 +30,23 @@ export default function TeamDetail() {
     const toast = useToast()
     const { id } = useParams<{ id: string }>()
     const navigate = useNavigate()
-    const [team, setTeam] = useState<any>(null)
-    const [members, setMembers] = useState<any[]>([])
+    interface TeamMember {
+    user_id: string
+    username?: string
+    role: string
+}
+
+interface TeamInfo {
+    name: string
+    description?: string | null
+    is_public: boolean
+    rating?: number
+    max_rating?: number
+    contest_count?: number
+}
+
+const [team, setTeam] = useState<TeamInfo | null>(null)
+    const [members, setMembers] = useState<TeamMember[]>([])
     const [isMember, setIsMember] = useState(false)
     const [currentUserRole, setCurrentUserRole] = useState<string | null>(null)
     const [loading, setLoading] = useState(true)
@@ -46,7 +62,7 @@ export default function TeamDetail() {
     const [inviting, setInviting] = useState(false)
 
     // Pending members state
-    const [pendingMembers, setPendingMembers] = useState<any[]>([])
+    const [pendingMembers, setPendingMembers] = useState<TeamMember[]>([])
     const [showPending, setShowPending] = useState(false)
     const [acting, setActing] = useState<string | null>(null)
 
@@ -61,7 +77,7 @@ export default function TeamDetail() {
             setTeam(t)
             const memberList = m.data || []
             setMembers(memberList)
-            const membership = memberList.find((member: any) => member.user_id === currentUserId)
+            const membership = memberList.find((member: TeamMember) => member.user_id === currentUserId)
             setIsMember(!!membership)
             setCurrentUserRole(membership?.role || null)
         }).catch(console.error).finally(() => setLoading(false))
@@ -83,7 +99,7 @@ export default function TeamDetail() {
         try {
             await api.teams.join(id)
             fetchTeamData()
-        } catch (e: any) { toast.error('Failed: ' + e.message) }
+        } catch (e) { toast.error('Failed: ' + errorMessage(e)) }
     }
 
     const handleRequestJoin = async () => {
@@ -91,7 +107,7 @@ export default function TeamDetail() {
         try {
             await api.teams.requestJoin(id)
             fetchTeamData()
-        } catch (e: any) { toast.error('Failed: ' + e.message) }
+        } catch (e) { toast.error('Failed: ' + errorMessage(e)) }
     }
 
     const handleLeave = async () => {
@@ -99,10 +115,11 @@ export default function TeamDetail() {
         try {
             await api.teams.leave(id)
             fetchTeamData()
-        } catch (e: any) { toast.error('Failed: ' + e.message) }
+        } catch (e) { toast.error('Failed: ' + errorMessage(e)) }
     }
 
     const handleStartEdit = () => {
+        if (!team) return
         setEditName(team.name)
         setEditDescription(team.description || '')
         setEditIsPublic(team.is_public)
@@ -119,7 +136,7 @@ export default function TeamDetail() {
             })
             setTeam(updated)
             setEditing(false)
-        } catch (e: any) { toast.error('Update failed: ' + e.message) }
+        } catch (e) { toast.error('Update failed: ' + errorMessage(e)) }
     }
 
     const handleDelete = async () => {
@@ -128,7 +145,7 @@ export default function TeamDetail() {
         try {
             await api.teams.delete(id)
             navigate('/teams')
-        } catch (e: any) { toast.error('Delete failed: ' + e.message) }
+        } catch (e) { toast.error('Delete failed: ' + errorMessage(e)) }
     }
 
     const handleInvite = async () => {
@@ -138,7 +155,7 @@ export default function TeamDetail() {
             await api.teams.invite(id, { username: inviteUsername.trim() })
             setInviteUsername('')
             fetchPending()
-        } catch (e: any) { toast.error('Invite failed: ' + e.message) }
+        } catch (e) { toast.error('Invite failed: ' + errorMessage(e)) }
         finally { setInviting(false) }
     }
 
@@ -149,7 +166,7 @@ export default function TeamDetail() {
             await api.teams.respond(id, { user_id: userId, action })
             fetchPending()
             fetchTeamData()
-        } catch (e: any) { toast.error('Failed: ' + e.message) }
+        } catch (e) { toast.error('Failed: ' + errorMessage(e)) }
         finally { setActing(null) }
     }
 
@@ -289,7 +306,7 @@ export default function TeamDetail() {
                                     <div className="border-t border-gray-200 dark:border-gray-700 pt-3">
                                         <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2">Join Requests &amp; Invitations</h4>
                                         <div className="space-y-2">
-                                            {pendingMembers.map((pm: any) => (
+                                            {pendingMembers.map((pm: TeamMember) => (
                                                 <div key={pm.user_id} className="flex items-center justify-between bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded px-3 py-2">
                                                     <div className="flex items-center gap-2">
                                                         <span className="text-sm font-medium">{pm.username || pm.user_id}</span>

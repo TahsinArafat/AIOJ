@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { api, getAccessToken } from '../lib/api'
+import { EmptyState } from '../components/EmptyState'
 import { useToast } from '../components/Toast'
 
 export default function ContestPlagiarism() {
-    const toast = useToast()
+	const toast = useToast()
 	const { id } = useParams<{ id: string }>()
 	const [report, setReport] = useState<any>(null)
 	const [pairs, setPairs] = useState<any[]>([])
@@ -18,7 +19,7 @@ export default function ContestPlagiarism() {
 			try {
 				const payload = JSON.parse(atob(token.split('.')[1]))
 				setIsAdmin(payload.role === 'admin' || payload.role === 'setter')
-			} catch {}
+			} catch { }
 		}
 		fetchReport()
 		const interval = setInterval(fetchReport, 5000)
@@ -132,10 +133,9 @@ export default function ContestPlagiarism() {
 								</td>
 								<td className="px-4 py-3 text-center text-gray-500 text-xs">{p.matched_lines}</td>
 								<td className="px-4 py-3 text-center">
-									<span className={`px-2 py-0.5 rounded text-xs font-medium ${
-										p.status === 'flagged' ? 'bg-red-100 text-red-700' : 
+									<span className={`px-2 py-0.5 rounded text-xs font-medium ${p.status === 'flagged' ? 'bg-red-100 text-red-700' :
 										p.status === 'ignored' ? 'bg-gray-100 text-gray-500' : 'bg-yellow-100 text-yellow-700'
-									}`}>
+										}`}>
 										{p.status}
 									</span>
 								</td>
@@ -155,7 +155,9 @@ export default function ContestPlagiarism() {
 						))}
 						{pairs.length === 0 && (
 							<tr>
-								<td colSpan={6} className="px-6 py-16 text-center text-gray-400">No suspicious pairs found.</td>
+								<td colSpan={6} className="px-6 py-6">
+									<EmptyState text="No suspicious pairs found" description="Run a plagiarism check — flagged submission pairs will appear here." />
+								</td>
 							</tr>
 						)}
 					</tbody>

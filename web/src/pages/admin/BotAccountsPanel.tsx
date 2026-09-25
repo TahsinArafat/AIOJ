@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
+import { errorMessage } from '../../lib/errors'
 import { api } from '../../lib/api'
 import { Plus, Pencil, Trash2, X } from 'lucide-react'
 import { useConfirm } from '../../components/ConfirmDialog'
@@ -50,7 +51,7 @@ const updateCookieValue = (sessionDataStr: string, key: string, val: string): st
     let current: Record<string, string> = {}
     try {
         current = JSON.parse(sessionDataStr || '{}')
-    } catch {}
+    } catch { /* invalid stored JSON — start fresh */ }
     if (val) {
         current[key] = val
     } else {
@@ -76,7 +77,7 @@ export default function BotAccountsPanel() {
     const [editingId, setEditingId] = useState<string | null>(null)
     const [form, setForm] = useState<BotForm>(emptyForm)
     const [saving, setSaving] = useState(false)
-    const [users, setUsers] = useState<{id: string, username: string}[]>([])
+    const [users, setUsers] = useState<{ id: string, username: string }[]>([])
     const [userSearch, setUserSearch] = useState('')
     const [showUserDropdown, setShowUserDropdown] = useState(false)
     const userDropdownRef = useRef<HTMLDivElement>(null)
@@ -86,9 +87,9 @@ export default function BotAccountsPanel() {
         api.admin.botAccounts.list().then(d => setBots(d.data || [])).catch(console.error).finally(() => setLoading(false))
     }
 
-    useEffect(() => { 
+    useEffect(() => {
         loadBots()
-        api.admin.listUsers(0, 100).then(d => setUsers(d.data || [])).catch(() => {})
+        api.admin.listUsers(0, 100).then(d => setUsers(d.data || [])).catch(() => { })
     }, [])
 
     useEffect(() => {
@@ -129,7 +130,7 @@ export default function BotAccountsPanel() {
         setSaving(true)
         try {
             if (editingId) {
-                const update: any = {}
+                const update: Record<string, unknown> = {}
                 if (form.platform_user) update.platform_user = form.platform_user
                 if (form.platform_pass) update.platform_pass = form.platform_pass
                 if (form.api_key) update.api_key = form.api_key
@@ -140,11 +141,23 @@ export default function BotAccountsPanel() {
                 if (form.session_data) {
                     try {
                         update.session_data = JSON.parse(form.session_data)
-                    } catch {}
+                    } catch { /* invalid JSON — field left unchanged */ }
                 }
                 await api.admin.botAccounts.update(editingId, update)
             } else {
-                const payload: any = {
+                interface BotAccountInput {
+                    user_id?: string
+                    platform: string
+                    platform_user: string
+                    platform_pass: string
+                    api_key?: string
+                    api_secret?: string
+                    rate_limit_rps?: number
+                    session_data?: Record<string, string>
+                    proxy_url?: string
+                    proxy_enabled?: boolean
+                }
+                const payload: BotAccountInput = {
                     user_id: form.user_id || 'system',
                     platform: form.platform,
                     platform_user: form.platform_user,
@@ -158,14 +171,14 @@ export default function BotAccountsPanel() {
                 if (form.session_data) {
                     try {
                         payload.session_data = JSON.parse(form.session_data)
-                    } catch {}
+                    } catch { /* invalid JSON — field left unchanged */ }
                 }
                 await api.admin.botAccounts.create(payload)
             }
             resetForm()
             loadBots()
-        } catch (err: any) {
-            toast.error(err.message)
+        } catch (err) {
+            toast.error(errorMessage(err))
         } finally {
             setSaving(false)
         }
@@ -176,8 +189,8 @@ export default function BotAccountsPanel() {
         try {
             await api.admin.botAccounts.delete(id)
             loadBots()
-        } catch (err: any) {
-            toast.error(err.message)
+        } catch (err) {
+            toast.error(errorMessage(err))
         }
     }
 
@@ -186,17 +199,17 @@ export default function BotAccountsPanel() {
         try {
             await api.admin.botAccounts.update(bot.id, { status: newStatus })
             loadBots()
-        } catch (err: any) {
-            toast.error(err.message)
+        } catch (err) {
+            toast.error(errorMessage(err))
         }
     }
 
     const statusColor = (s: string) =>
         s === 'active' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' :
-        s === 'expired' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300' :
-        s === 'error' ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300' :
-        s === 'banned' ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300' :
-        'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200'
+            s === 'expired' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300' :
+                s === 'error' ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300' :
+                    s === 'banned' ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300' :
+                        'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200'
 
     const platformHint = PLATFORMS.find(p => p.value === form.platform)?.hint || ''
 
@@ -335,7 +348,7 @@ export default function BotAccountsPanel() {
                                             className="w-full border rounded px-3 py-2 text-sm font-mono" />
                                     </div>
                                     <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                                        Get cookies from browser: DevTools (F12) → Application → Cookies → codeforces.com. 
+                                        Get cookies from browser: DevTools (F12) → Application → Cookies → codeforces.com.
                                         The bypass proxy auto-generates cf_clearance for the server IP.
                                     </p>
                                 </div>
@@ -422,7 +435,7 @@ export default function BotAccountsPanel() {
                                 try {
                                     let sessionData: Record<string, string> | undefined
                                     if (form.session_data) {
-                                        try { sessionData = JSON.parse(form.session_data) } catch {}
+                                        try { sessionData = JSON.parse(form.session_data) } catch { /* invalid JSON — treated as absent */ }
                                     }
                                     const result = await api.admin.botAccounts.testLogin({
                                         platform: form.platform,
@@ -431,8 +444,8 @@ export default function BotAccountsPanel() {
                                         session_data: sessionData,
                                     })
                                     toast.error(result.message)
-                                } catch (err: any) {
-                                    toast.error('Test failed: ' + err.message)
+                                } catch (err) {
+                                    toast.error('Test failed: ' + errorMessage(err))
                                 }
                             }}
                                 className="px-4 py-2 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 border border-blue-300 dark:border-blue-700 rounded transition-colors">

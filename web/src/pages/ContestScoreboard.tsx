@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { api, getAccessToken } from '../lib/api';
 import RatingBadge from '../components/RatingBadge';
 import { AlertTriangle, Eye, EyeOff, ChevronLeft, ChevronRight } from 'lucide-react';
+import { EmptyState } from '../components/EmptyState';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -41,6 +42,7 @@ interface ContestInfo {
   end_time?: string;
   is_rated?: boolean;
   rating_calculated?: boolean;
+  is_team_contest?: boolean;
 }
 
 interface RatingDelta {
@@ -317,7 +319,7 @@ export default function ContestScoreboard() {
           <thead>
             <tr className="bg-gray-900 text-white">
               <th className="px-3 py-2.5 text-center font-bold w-10">#</th>
-              <th className="px-4 py-2.5 text-left font-bold min-w-[140px]">Team</th>
+              <th className="px-4 py-2.5 text-left font-bold min-w-[140px]">{data?.contest.is_team_contest ? 'Team' : 'Participant'}</th>
               <th className="px-3 py-2.5 text-center font-bold w-12">Solved</th>
               <th className="px-3 py-2.5 text-center font-bold w-20">Penalty</th>
               {ratings.size > 0 && (
@@ -341,9 +343,9 @@ export default function ContestScoreboard() {
               <tr>
                 <td
                   colSpan={4 + problemIndices.length + (ratings.size > 0 ? 1 : 0)}
-                  className="px-4 py-8 text-center text-gray-400 italic"
+                  className="px-4 py-4"
                 >
-                  No participants yet.
+                  <EmptyState text="No participants yet" description="Registered participants will appear on the board once the contest starts." />
                 </td>
               </tr>
             ) : (

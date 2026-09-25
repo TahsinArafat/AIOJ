@@ -165,7 +165,7 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
     if (!text) return null as unknown as T
     try {
         return JSON.parse(text)
-    } catch (e) {
+    } catch {
         return text as unknown as T
     }
 }

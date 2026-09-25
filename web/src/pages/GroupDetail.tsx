@@ -80,7 +80,7 @@ export default function GroupDetail() {
         if (!id) return
         api.groups.pending(id).then(d => {
             setPendingMembers(d.data || [])
-        }).catch(() => {})
+        }).catch(() => { })
     }, [id])
 
     const handleJoin = async () => {
@@ -248,18 +248,16 @@ export default function GroupDetail() {
                         <div>
                             <div className="flex items-center gap-3 flex-wrap">
                                 <h1 className="text-2xl font-bold">{group.name}</h1>
-                                <span className={`text-xs px-2 py-0.5 rounded font-semibold ${
-                                    group.is_public
-                                        ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300'
-                                        : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300'
-                                }`}>
+                                <span className={`text-xs px-2 py-0.5 rounded font-semibold ${group.is_public
+                                    ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300'
+                                    : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300'
+                                    }`}>
                                     {group.is_public ? 'Public' : 'Private'}
                                 </span>
-                                <span className={`text-xs px-2 py-0.5 rounded font-semibold ${
-                                    group.join_policy === 'auto_approve'
-                                        ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
-                                        : 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300'
-                                }`}>
+                                <span className={`text-xs px-2 py-0.5 rounded font-semibold ${group.join_policy === 'auto_approve'
+                                    ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
+                                    : 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300'
+                                    }`}>
                                     {group.join_policy === 'auto_approve' ? 'Auto-Join via Link' : 'Approval Required'}
                                 </span>
                             </div>
@@ -278,9 +276,8 @@ export default function GroupDetail() {
                             )}
                             {getAccessToken() && (
                                 <button onClick={isMember ? handleLeave : handleJoin}
-                                    className={`px-4 py-2 rounded text-sm font-medium transition-colors cursor-pointer ${
-                                        isMember ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100' : 'bg-blue-600 text-white hover:bg-blue-700'
-                                    }`}>
+                                    className={`px-4 py-2 rounded text-sm font-medium transition-colors cursor-pointer ${isMember ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100' : 'bg-blue-600 text-white hover:bg-blue-700'
+                                        }`}>
                                     {isMember ? 'Leave Group' : 'Join Group'}
                                 </button>
                             )}
@@ -294,11 +291,10 @@ export default function GroupDetail() {
                                 setActiveTab(tab.key)
                                 if (tab.key === 'pending') fetchPending()
                             }}
-                                className={`pb-2 text-sm font-medium border-b-2 cursor-pointer ${
-                                    activeTab === tab.key
-                                        ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700'
-                                }`}>
+                                className={`pb-2 text-sm font-medium border-b-2 cursor-pointer ${activeTab === tab.key
+                                    ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+                                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                                    }`}>
                                 {tab.label}
                             </button>
                         ))}
@@ -350,7 +346,7 @@ export default function GroupDetail() {
                                     </div>
                                 ))}
                                 {contests.length === 0 && (
-                                    <p className="p-4 text-sm text-gray-400 dark:text-gray-500 text-center">No contests in this group yet.</p>
+                                    <EmptyState text="No contests in this group yet" description="Contests hosted for this group will appear here." />
                                 )}
                             </div>
                         </div>
@@ -402,11 +398,10 @@ export default function GroupDetail() {
                                             <div key={pm.user_id} className="px-4 py-3 flex items-center justify-between text-sm">
                                                 <div className="flex items-center gap-2">
                                                     <span className="font-medium">{pm.username || pm.user_id}</span>
-                                                    <span className={`text-xs px-1.5 py-0.5 rounded ${
-                                                        pm.role === 'requested'
-                                                            ? 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300'
-                                                            : 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
-                                                    }`}>
+                                                    <span className={`text-xs px-1.5 py-0.5 rounded ${pm.role === 'requested'
+                                                        ? 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300'
+                                                        : 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
+                                                        }`}>
                                                         {pm.role === 'requested' ? 'Join Request' : 'Invited'}
                                                     </span>
                                                 </div>
@@ -439,7 +434,7 @@ export default function GroupDetail() {
                             )}
 
                             {pendingMembers.length === 0 && (
-                                <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-8">No pending requests or invitations.</p>
+                                <EmptyState text="No pending requests or invitations" description="Join requests and pending invites will show up here." />
                             )}
                         </div>
                     )}

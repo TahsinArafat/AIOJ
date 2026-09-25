@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, getAccessToken } from '../lib/api'
+import { EmptyState } from '../components/EmptyState'
 
 export default function TrainingPlanList() {
 	const [plans, setPlans] = useState<any[]>([])
@@ -16,13 +17,13 @@ export default function TrainingPlanList() {
 			try {
 				const payload = JSON.parse(atob(token.split('.')[1]))
 				setIsAdmin(payload.role === 'admin' || payload.role === 'setter')
-			} catch {}
+			} catch { }
 			api.organizations.my().then(d => {
 				setMyOrgs(d.data || [])
 				if (d.data?.length > 0) {
 					setSelectedOrg(d.data[0].id)
 				}
-			}).catch(() => {})
+			}).catch(() => { })
 		}
 	}, [])
 
@@ -42,7 +43,7 @@ export default function TrainingPlanList() {
 
 		api.training.list(0, 50, opts)
 			.then(d => setPlans(d.data || []))
-			.catch(() => {})
+			.catch(() => { })
 			.finally(() => setLoading(false))
 	}, [activeTab, selectedOrg])
 
@@ -106,7 +107,7 @@ export default function TrainingPlanList() {
 					</div>
 				))}
 				{plans.length === 0 && (
-					<p className="text-gray-400 dark:text-gray-500 text-center py-10 w-full col-span-2">No training plans found.</p>
+					<div className="w-full col-span-2"><EmptyState text="No training plans found" description="Training plans you create or follow will appear here." /></div>
 				)}
 			</div>
 		</div>

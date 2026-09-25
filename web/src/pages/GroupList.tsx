@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, getAccessToken } from '../lib/api'
+import { EmptyState } from '../components/EmptyState'
 
 export default function GroupList() {
     const [groups, setGroups] = useState<any[]>([])
@@ -110,7 +111,7 @@ export default function GroupList() {
                     </Link>
                 ))}
                 {groups.length === 0 && (
-                    <div className="text-center py-16 text-gray-400 dark:text-gray-500">No groups found.</div>
+                    <EmptyState text="No groups found" description="Create a group or discover one to collaborate with other solvers." />
                 )}
             </div>
             {total > 0 && <p className="text-sm text-gray-400 dark:text-gray-500 mt-4">{total} groups total</p>}

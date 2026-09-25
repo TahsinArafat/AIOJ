@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
+import { EmptyState } from '../components/EmptyState'
 
 export default function EditorialList() {
     const [editorials, setEditorials] = useState<any[]>([])
@@ -40,7 +41,7 @@ export default function EditorialList() {
                     </Link>
                 ))}
                 {editorials.length === 0 && (
-                    <div className="text-center py-16 text-gray-400 dark:text-gray-500">No editorials found.</div>
+                    <EmptyState text="No editorials found" description="Editorials written by the community will appear here." />
                 )}
             </div>
             {total > 0 && <p className="text-sm text-gray-400 dark:text-gray-500 mt-4">{total} editorials</p>}

@@ -1,13 +1,44 @@
 import { useEffect, useState } from 'react'
+import { errorMessage } from '../lib/errors'
 import { EmptyState } from '../components/EmptyState'
 import { useParams, Link } from 'react-router-dom'
 import { api, getAccessToken } from '../lib/api'
 import { useToast } from '../components/Toast'
 
 export default function TrainingPlanDetail() {
-    const toast = useToast()
+	const toast = useToast()
 	const { id } = useParams<{ id: string }>()
-	const [data, setData] = useState<any>(null)
+	interface PlanProblem {
+		id: string
+		problem_id: string
+		points?: number
+	}
+
+	interface PlanSection {
+		id: string
+		title: string
+		description?: string | null
+		problems?: PlanProblem[]
+	}
+
+	interface PlanProgress {
+		total_problems: number
+		completed_problems: number
+		percentage: number
+	}
+
+	interface TrainingPlan {
+		title: string
+		description?: string | null
+		enrolled?: boolean
+		enrolled_count?: number
+		problem_count: number
+		section_count?: number
+		sections?: PlanSection[]
+		progress?: PlanProgress | null
+	}
+
+	const [data, setData] = useState<TrainingPlan | null>(null)
 	const [loading, setLoading] = useState(true)
 	const [enrolling, setEnrolling] = useState(false)
 
@@ -18,8 +49,8 @@ export default function TrainingPlanDetail() {
 				setData(d)
 				// Resolve problem slugs and titles
 				const allProblems: string[] = []
-				d.sections?.forEach((s: any) => {
-					s.problems?.forEach((p: any) => {
+				d.sections?.forEach((s: PlanSection) => {
+					s.problems?.forEach((p: PlanProblem) => {
 						if (p.problem_id) allProblems.push(p.problem_id)
 					})
 				})
@@ -29,7 +60,7 @@ export default function TrainingPlanDetail() {
 					// but since slug/title resolver exists, we can use it!
 					// Fallback to simple matching if needed
 				}
-			}).catch(() => {}).finally(() => setLoading(false))
+			}).catch(() => { }).finally(() => setLoading(false))
 		}
 
 		fetchDetail()
@@ -41,13 +72,13 @@ export default function TrainingPlanDetail() {
 		try {
 			if (data.enrolled) {
 				await api.training.unenroll(id)
-				setData((p: any) => ({ ...p, enrolled: false, progress: null }))
+				setData(p => (p ? { ...p, enrolled: false, progress: null } : p))
 			} else {
 				await api.training.enroll(id)
-				setData((p: any) => ({ ...p, enrolled: true, progress: { total_problems: p.problem_count, completed_problems: 0, percentage: 0 } }))
+				setData(p => (p ? { ...p, enrolled: true, progress: { total_problems: p.problem_count, completed_problems: 0, percentage: 0 } } : p))
 				window.location.reload()
 			}
-		} catch (e: any) { toast.error(e.message) }
+		} catch (e) { toast.error(errorMessage(e)) }
 		finally { setEnrolling(false) }
 	}
 
@@ -73,11 +104,10 @@ export default function TrainingPlanDetail() {
 				</div>
 				{getAccessToken() && (
 					<button onClick={handleEnrollToggle} disabled={enrolling}
-						className={`px-6 py-2 rounded font-semibold text-sm transition-colors ${
-							data.enrolled 
-								? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-100 hover:bg-red-100'
-								: 'bg-blue-600 text-white hover:bg-blue-700'
-						}`}>
+						className={`px-6 py-2 rounded font-semibold text-sm transition-colors ${data.enrolled
+							? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-100 hover:bg-red-100'
+							: 'bg-blue-600 text-white hover:bg-blue-700'
+							}`}>
 						{data.enrolled ? 'Leave Plan' : 'Enroll in Plan'}
 					</button>
 				)}
@@ -98,7 +128,7 @@ export default function TrainingPlanDetail() {
 
 			<div className="space-y-4">
 				<h2 className="text-lg font-bold text-gray-800 dark:text-gray-200">Curriculum</h2>
-				{data.sections?.map((s: any) => (
+				{data.sections?.map(s => (
 					<div key={s.id} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-5 space-y-3">
 						<div>
 							<h3 className="font-bold text-base text-gray-900 dark:text-gray-100">{s.title}</h3>
@@ -106,7 +136,7 @@ export default function TrainingPlanDetail() {
 						</div>
 
 						<div className="divide-y divide-gray-100 dark:divide-gray-700 border-t border-gray-100 dark:border-gray-700 pt-2">
-							{s.problems?.map((p: any) => (
+							{s.problems?.map(p => (
 								<div key={p.id} className="py-2.5 flex items-center justify-between text-sm">
 									<div className="flex items-center gap-2">
 										<Link to={`/problems/${p.problem_id}`} className="font-semibold text-blue-600 dark:text-blue-400 hover:underline">
