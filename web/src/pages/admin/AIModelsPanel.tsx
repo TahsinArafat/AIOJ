@@ -49,7 +49,9 @@ export default function AIModelsPanel() {
             .finally(() => setLoading(false))
     }
 
-    useEffect(() => { loadModels() }, [])
+    // deferred one microtask: loadModels opens with a synchronous setLoading(true),
+    // which react-hooks/set-state-in-effect rejects in an effect body
+    useEffect(() => { queueMicrotask(loadModels) }, [])
 
     const openCreate = () => {
         setEditingId(null)
@@ -97,8 +99,8 @@ export default function AIModelsPanel() {
             }
             handleCancel()
             loadModels()
-        } catch (err: any) {
-            toast.error('Save failed: ' + (err.message || err))
+        } catch (err) {
+            toast.error('Save failed: ' + (err instanceof Error ? err.message : String(err)))
         } finally {
             setSaving(false)
         }
@@ -108,8 +110,8 @@ export default function AIModelsPanel() {
         try {
             await api.admin.aiModels.toggle(m.id)
             loadModels()
-        } catch (err: any) {
-            toast.error('Toggle failed: ' + (err.message || err))
+        } catch (err) {
+            toast.error('Toggle failed: ' + (err instanceof Error ? err.message : String(err)))
         }
     }
 
@@ -118,8 +120,8 @@ export default function AIModelsPanel() {
         try {
             await api.admin.aiModels.delete(m.id)
             loadModels()
-        } catch (err: any) {
-            toast.error('Delete failed: ' + (err.message || err))
+        } catch (err) {
+            toast.error('Delete failed: ' + (err instanceof Error ? err.message : String(err)))
         }
     }
 
@@ -142,9 +144,9 @@ export default function AIModelsPanel() {
                 setTestState('fail')
                 setTestError(res.error || 'Unknown error')
             }
-        } catch (err: any) {
+        } catch (err) {
             setTestState('fail')
-            setTestError(err.message || 'Request failed')
+            setTestError((err instanceof Error ? err.message : String(err)) || 'Request failed')
         }
     }
 

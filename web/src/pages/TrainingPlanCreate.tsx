@@ -2,13 +2,17 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, getAccessToken } from '../lib/api'
 
+interface PlanProblemInput { problem_id: string; points: number }
+interface PlanSectionInput { title: string; description: string; problems: PlanProblemInput[] }
+interface OrgOption { id: string; name: string }
+
 export default function TrainingPlanCreate() {
 	const nav = useNavigate()
 	const [title, setTitle] = useState('')
 	const [desc, setDesc] = useState('')
 	const [orgId, setOrgId] = useState('')
-	const [myOrgs, setMyOrgs] = useState<any[]>([])
-	const [sections, setSections] = useState<any[]>([
+	const [myOrgs, setMyOrgs] = useState<OrgOption[]>([])
+	const [sections, setSections] = useState<PlanSectionInput[]>([
 		{ title: 'Section 1', description: '', problems: [{ problem_id: '', points: 100 }] }
 	])
 	const [error, setError] = useState('')
@@ -35,18 +39,18 @@ export default function TrainingPlanCreate() {
 		})
 	}
 
-	const handleSectionChange = (sIdx: number, field: string, val: string) => {
+	const handleSectionChange = (sIdx: number, field: 'title' | 'description', val: string) => {
 		setSections(p => {
 			const next = [...p]
-			next[sIdx][field] = val
+			if (field === 'title') { next[sIdx].title = val } else { next[sIdx].description = val }
 			return next
 		})
 	}
 
-	const handleProblemChange = (sIdx: number, pIdx: number, field: string, val: string) => {
+	const handleProblemChange = (sIdx: number, pIdx: number, field: 'problem_id' | 'points', val: string) => {
 		setSections(p => {
 			const next = [...p]
-			next[sIdx].problems[pIdx][field] = field === 'points' ? Number(val) : val
+			if (field === 'points') { next[sIdx].problems[pIdx].points = Number(val) } else { next[sIdx].problems[pIdx].problem_id = val }
 			return next
 		})
 	}
@@ -64,12 +68,12 @@ export default function TrainingPlanCreate() {
 				sections: sections.map(s => ({
 					title: s.title,
 					description: s.description,
-					problems: s.problems.filter((x: any) => x.problem_id.trim())
+					problems: s.problems.filter(x => x.problem_id.trim())
 				}))
 			})
 			nav('/training')
-		} catch (err: any) {
-			setError(err.message || 'Failed to create training plan')
+		} catch (err) {
+			setError((err instanceof Error ? err.message : String(err)) || 'Failed to create training plan')
 		} finally {
 			setSubmitting(false)
 		}
@@ -130,7 +134,7 @@ export default function TrainingPlanCreate() {
 								className="w-full border border-gray-200 dark:border-gray-700 rounded-md px-3 py-1.5 text-xs bg-white dark:bg-gray-800 focus:outline-none" />
 
 							<div className="space-y-2">
-								{s.problems.map((p: any, pIdx: number) => (
+								{s.problems.map((p, pIdx) => (
 									<div key={pIdx} className="flex gap-3 items-center">
 										<input required value={p.problem_id} onChange={e => handleProblemChange(sIdx, pIdx, 'problem_id', e.target.value)}
 											placeholder="Problem ID (e.g. p1)"

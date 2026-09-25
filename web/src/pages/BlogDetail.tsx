@@ -32,12 +32,14 @@ function getRole(): string | null {
     }
 }
 
+interface BlogPost { id: string; title: string; content: string; created_at: string; tags?: string[]; upvotes?: number; downvotes?: number; user_id?: string; username?: string }
+
 export default function BlogDetail() {
     const confirm = useConfirm()
     const toast = useToast()
     const { id } = useParams<{ id: string }>()
     const navigate = useNavigate()
-    const [post, setPost] = useState<any>(null)
+    const [post, setPost] = useState<BlogPost | null>(null)
     const [loading, setLoading] = useState(true)
     const [vote, setVote] = useState(0)
 
@@ -61,10 +63,11 @@ export default function BlogDetail() {
             setVote(value)
             const updated = await api.blog.get(id)
             setPost(updated)
-        } catch (e: any) { toast.error('Vote failed: ' + e.message) }
+        } catch (e) { toast.error('Vote failed: ' + (e instanceof Error ? e.message : String(e))) }
     }
 
     const handleStartEdit = () => {
+        if (!post) return
         setEditTitle(post.title)
         setEditContent(post.content)
         setEditTags(post.tags?.join(', ') || '')
@@ -79,7 +82,7 @@ export default function BlogDetail() {
             const updated = await api.blog.update(id, { title: editTitle, content: editContent, tags: parsedTags })
             setPost(updated)
             setEditing(false)
-        } catch (e: any) { toast.error('Update failed: ' + e.message) }
+        } catch (e) { toast.error('Update failed: ' + (e instanceof Error ? e.message : String(e))) }
     }
 
     const handleDelete = async () => {
@@ -88,7 +91,7 @@ export default function BlogDetail() {
         try {
             await api.blog.delete(id)
             navigate('/blog')
-        } catch (e: any) { toast.error('Delete failed: ' + e.message) }
+        } catch (e) { toast.error('Delete failed: ' + (e instanceof Error ? e.message : String(e))) }
     }
 
     if (loading) return <div className="text-center py-20 text-gray-400 dark:text-gray-500">Loading...</div>
@@ -149,7 +152,7 @@ export default function BlogDetail() {
                     <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400 mb-6">
                         <span className="font-semibold text-gray-700 dark:text-gray-300">{post.username}</span>
                         <span>{new Date(post.created_at).toLocaleDateString()}</span>
-                        {post.tags?.length > 0 && (
+                        {post.tags && post.tags.length > 0 && (
                             <div className="flex gap-2 ml-2">
                                 {post.tags.map((tag: string) => (
                                     <span key={tag} className="text-xs bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded font-medium">{tag}</span>

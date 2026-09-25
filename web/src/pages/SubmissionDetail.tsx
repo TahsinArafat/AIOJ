@@ -34,10 +34,19 @@ function groupBySubtask(results: TestCaseResult[]): Map<number, TestCaseResult[]
     return groups
 }
 
+interface JudgeCase { status: string; case_name?: string; subtask_id?: number; time?: number; memory?: number; score?: number; detail?: string }
+interface SubmissionRecord {
+    id: string; problem_id: string; language: string; status: string;
+    score?: number; time_used: number; memory_used: number; code_size?: number;
+    created_at: string; source_code?: string; compile_output?: string;
+    is_remote?: boolean; remote_id?: string; remote_url?: string;
+    judge_result?: JudgeCase[];
+}
+
 export default function SubmissionDetail() {
     const toast = useToast()
     const { id } = useParams<{ id: string }>()
-    const [sub, setSub] = useState<any>(null)
+    const [sub, setSub] = useState<SubmissionRecord | null>(null)
     const [loading, setLoading] = useState(true)
     const [problemSlug, setProblemSlug] = useState<string | null>(null)
     const [problemTitle, setProblemTitle] = useState<string | null>(null)
@@ -79,8 +88,8 @@ export default function SubmissionDetail() {
         try {
             await api.submissions.retryRemote(id)
             setPollTrigger(prev => prev + 1)
-        } catch (err: any) {
-            toast.error('Failed to retry: ' + err.message)
+        } catch (err) {
+            toast.error('Failed to retry: ' + (err instanceof Error ? err.message : String(err)))
         } finally {
             setActionLoading(false)
         }
@@ -92,8 +101,8 @@ export default function SubmissionDetail() {
         try {
             await api.submissions.recheckRemote(id)
             setPollTrigger(prev => prev + 1)
-        } catch (err: any) {
-            toast.error('Failed to recheck: ' + err.message)
+        } catch (err) {
+            toast.error('Failed to recheck: ' + (err instanceof Error ? err.message : String(err)))
         } finally {
             setActionLoading(false)
         }
@@ -104,7 +113,7 @@ export default function SubmissionDetail() {
 
     const judgeResult = sub.judge_result || []
     const totalCases = judgeResult.length
-    const passedCases = judgeResult.filter((r: any) => r.status === 'ac').length
+    const passedCases = judgeResult.filter(r => r.status === 'ac').length
 
     return (
         <div className="max-w-4xl mx-auto space-y-6">
@@ -170,8 +179,8 @@ export default function SubmissionDetail() {
             )}
 
             <div className="flex border-b border-gray-200 dark:border-gray-700">
-                {['overview', 'code', 'tests'].map(tab => (
-                    <button key={tab} onClick={() => setActiveTab(tab as any)}
+                {(['overview', 'code', 'tests'] as const).map(tab => (
+                    <button key={tab} onClick={() => setActiveTab(tab)}
                         className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px capitalize ${activeTab === tab ? 'border-blue-600 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}>
                         {tab} {tab === 'tests' && totalCases > 0 && `(${passedCases}/${totalCases})`}
                     </button>
@@ -224,7 +233,7 @@ export default function SubmissionDetail() {
                     )
                 }
 
-                const hasSubtasks = judgeResult.some((r: any) => (r.subtask_id ?? 0) > 0)
+                const hasSubtasks = judgeResult.some(r => (r.subtask_id ?? 0) > 0)
 
                 if (hasSubtasks) {
                     const subtaskMap = groupBySubtask(judgeResult)
@@ -278,7 +287,7 @@ export default function SubmissionDetail() {
                 // Fallback: non-subtask rendering
                 return (
                     <div className="space-y-3">
-                        {judgeResult.map((r: any, i: number) => (
+                        {judgeResult.map((r, i) => (
                             <div key={i} className={`border rounded-lg p-4 ${r.status === 'ac' ? 'bg-green-50 dark:bg-green-900/20/30 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20/30 border-red-200 dark:border-red-800'}`}>
                                 <div className="flex items-center justify-between mb-2">
                                     <span className="font-semibold text-sm">Test Case {i + 1}: {r.case_name || `#${i + 1}`}</span>

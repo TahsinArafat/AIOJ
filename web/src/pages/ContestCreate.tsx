@@ -54,6 +54,8 @@ function generateCFScores(count: number): number[] {
     return scores
 }
 
+interface ProblemSearchHit { id: string; title: string; slug: string; difficulty?: string }
+
 export default function ContestCreate() {
     const nav = useNavigate()
 
@@ -61,6 +63,8 @@ export default function ContestCreate() {
     const [title, setTitle] = useState('')
     const [slug, setSlug] = useState('')
     const [slugEdited, setSlugEdited] = useState(false)
+    // derived instead of an effect: mirrors slugify(title) until edited by hand
+    const effectiveSlug = slugEdited ? slug : slugify(title)
     const [description, setDescription] = useState('')
 
     // Schedule
@@ -99,11 +103,6 @@ export default function ContestCreate() {
     const [submitting, setSubmitting] = useState(false)
 
     // Auto-generate slug from title
-    useEffect(() => {
-        if (!slugEdited) {
-            setSlug(slugify(title))
-        }
-    }, [title, slugEdited])
 
     // Auth guard
     useEffect(() => {
@@ -143,7 +142,7 @@ export default function ContestCreate() {
             setSearchLoading(true)
             try {
                 const res = await api.problems.list(0, 10, { search: value.trim() })
-                const items = (res.data || []).map((p: any) => ({
+                const items = (res.data || []).map((p: ProblemSearchHit) => ({
                     id: p.id,
                     title: p.title,
                     slug: p.slug,
@@ -203,7 +202,7 @@ export default function ContestCreate() {
         setSubmitting(true)
 
         try {
-            let formatConfig: any = {}
+            let formatConfig: Record<string, unknown> = {}
             if (format === 'acm') {
                 formatConfig = { penalty_per_wrong: Number(penaltyPerWrong), time_penalty: true }
             } else if (format === 'oi') {
@@ -223,7 +222,7 @@ export default function ContestCreate() {
 
             const contest = await api.contests.create({
                 title: title.trim(),
-                slug: slug || undefined,
+                slug: effectiveSlug || undefined,
                 type,
                 format,
                 format_config: formatConfig,
@@ -238,8 +237,8 @@ export default function ContestCreate() {
                 statement_hidden: statementHidden,
             })
             nav(`/contests/${contestSlug(contest)}`)
-        } catch (err: any) {
-            setError(err.message || 'Failed to create contest.')
+        } catch (err) {
+            setError((err instanceof Error ? err.message : String(err)) || 'Failed to create contest.')
         } finally {
             setSubmitting(false)
         }
@@ -304,7 +303,7 @@ export default function ContestCreate() {
                                     /contests/
                                 </span>
                                 <input
-                                    value={slug}
+                                    value={effectiveSlug}
                                     onChange={e => { setSlug(e.target.value); setSlugEdited(true) }}
                                     placeholder="auto-generated-from-title"
                                     pattern="[a-z0-9\-]*"

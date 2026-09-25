@@ -6,8 +6,10 @@ interface ProblemStatsProps {
     problemId: string
 }
 
+interface ProblemStatsData { total_submissions: number; accepted_submissions: number; acceptance_rate: number; average_attempts: number; language_distribution: Record<string, number> }
+
 export default function ProblemStats({ problemId }: ProblemStatsProps) {
-    const [stats, setStats] = useState<any>(null)
+    const [stats, setStats] = useState<ProblemStatsData | null>(null)
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
@@ -27,7 +29,7 @@ export default function ProblemStats({ problemId }: ProblemStatsProps) {
         )
     }
 
-    const total = Object.values(stats.language_distribution || {}).reduce((a: any, b: any) => a + b, 0) as number
+    const total = Object.values(stats.language_distribution || {}).reduce((a, b) => a + b, 0) as number
 
     return (
         <div className="space-y-6">
@@ -60,7 +62,7 @@ export default function ProblemStats({ problemId }: ProblemStatsProps) {
                     <EmptyState text="No language data yet" description="The language breakdown fills in as people submit solutions." />
                 ) : (
                     <div className="space-y-2">
-                        {Object.entries(stats.language_distribution || {}).map(([lang, count]: any) => (
+                        {Object.entries(stats.language_distribution || {}).map(([lang, count]) => (
                             <div key={lang} className="flex items-center text-sm">
                                 <span className="w-24 text-gray-600 dark:text-gray-400 font-medium truncate">{lang}</span>
                                 <div className="flex-1 bg-gray-100 dark:bg-gray-700 h-4 rounded-full overflow-hidden mx-3">

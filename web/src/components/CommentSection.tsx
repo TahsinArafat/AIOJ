@@ -7,9 +7,11 @@ interface Props {
     parentId: string
 }
 
+interface CommentItem { id: string; username?: string; created_at: string; content?: string; upvotes?: number }
+
 export default function CommentSection({ parentType, parentId }: Props) {
     const toast = useToast()
-    const [comments, setComments] = useState<any[]>([])
+    const [comments, setComments] = useState<CommentItem[]>([])
     const [newComment, setNewComment] = useState('')
     const [loading, setLoading] = useState(true)
 
@@ -22,7 +24,7 @@ export default function CommentSection({ parentType, parentId }: Props) {
 
     useEffect(() => {
         fetchComments()
-    }, [parentType, parentId])
+    }, [parentType, parentId]) // eslint-disable-line react-hooks/exhaustive-deps -- refetch only when the comment target changes
 
     const handlePost = async () => {
         if (!newComment.trim()) return
@@ -34,14 +36,14 @@ export default function CommentSection({ parentType, parentId }: Props) {
             })
             setComments(prev => [...prev, c])
             setNewComment('')
-        } catch (e: any) { toast.error('Failed: ' + e.message) }
+        } catch (e) { toast.error('Failed: ' + (e instanceof Error ? e.message : String(e))) }
     }
 
     const handleCommentVote = async (commentId: string, value: number) => {
         try {
             await api.blog.vote({ target_type: 'comment', target_id: commentId, value })
             fetchComments()
-        } catch (e: any) { toast.error('Vote failed: ' + e.message) }
+        } catch (e) { toast.error('Vote failed: ' + (e instanceof Error ? e.message : String(e))) }
     }
 
     return (

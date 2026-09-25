@@ -5,7 +5,7 @@ import { useToast } from '../../components/Toast'
 
 interface Setting {
     key: string
-    value: any
+    value: string | number | boolean
     description: string
     updated_at: string
     updated_by: string | null
@@ -47,7 +47,7 @@ export default function SystemSettingsPanel() {
     const [settings, setSettings] = useState<Setting[]>([])
     const [loading, setLoading] = useState(true)
     const [savingKey, setSavingKey] = useState<string | null>(null)
-    const [localValues, setLocalValues] = useState<Record<string, any>>({})
+    const [localValues, setLocalValues] = useState<Record<string, string | number | boolean>>({})
 
     const loadSettings = () => {
         setLoading(true)
@@ -55,7 +55,7 @@ export default function SystemSettingsPanel() {
             .then(d => {
                 const items = d.data || []
                 setSettings(items)
-                const vals: Record<string, any> = {}
+                const vals: Record<string, string | number | boolean> = {}
                 items.forEach((s: Setting) => { vals[s.key] = s.value })
                 setLocalValues(vals)
             })
@@ -63,9 +63,11 @@ export default function SystemSettingsPanel() {
             .finally(() => setLoading(false))
     }
 
-    useEffect(() => { loadSettings() }, [])
+    // deferred one microtask: loadSettings opens with a synchronous setLoading(true),
+    // which react-hooks/set-state-in-effect rejects in an effect body
+    useEffect(() => { queueMicrotask(loadSettings) }, [])
 
-    const updateLocal = (key: string, value: any) => {
+    const updateLocal = (key: string, value: string | number | boolean) => {
         setLocalValues(prev => ({ ...prev, [key]: value }))
     }
 
@@ -75,8 +77,8 @@ export default function SystemSettingsPanel() {
             const value = localValues[key]
             await api.admin.settings.update(key, value)
             loadSettings()
-        } catch (err: any) {
-            toast.error(err.message)
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : String(err))
         } finally {
             setSavingKey(null)
         }

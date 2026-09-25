@@ -33,7 +33,9 @@ export default function BackupsPanel() {
             .finally(() => setLoading(false))
     }
 
-    useEffect(() => { loadBackups() }, [])
+    // deferred one microtask: loadBackups opens with a synchronous setLoading(true),
+    // which react-hooks/set-state-in-effect rejects in an effect body
+    useEffect(() => { queueMicrotask(loadBackups) }, [])
 
     const formatSize = (bytes: number) => {
         if (bytes === 0) return '0 B'
@@ -83,8 +85,8 @@ export default function BackupsPanel() {
         try {
             await api.admin.backups.create(createType)
             loadBackups()
-        } catch (err: any) {
-            setError(err.message)
+        } catch (err) {
+            setError(err instanceof Error ? err.message : String(err))
         } finally {
             setCreating(false)
         }
@@ -99,8 +101,8 @@ export default function BackupsPanel() {
         try {
             await api.admin.backups.upload(file)
             loadBackups()
-        } catch (err: any) {
-            setError(err.message)
+        } catch (err) {
+            setError(err instanceof Error ? err.message : String(err))
         } finally {
             setUploading(false)
             if (fileInputRef.current) fileInputRef.current.value = ''
@@ -113,8 +115,8 @@ export default function BackupsPanel() {
         try {
             await api.admin.backups.delete(filename)
             loadBackups()
-        } catch (err: any) {
-            setError(err.message)
+        } catch (err) {
+            setError(err instanceof Error ? err.message : String(err))
         }
     }
 
@@ -138,8 +140,8 @@ export default function BackupsPanel() {
             setRestoreModal(null)
             setPassword('')
             toast.success('Restore completed successfully')
-        } catch (err: any) {
-            setError(err.message)
+        } catch (err) {
+            setError(err instanceof Error ? err.message : String(err))
         } finally {
             setRestoring(false)
         }

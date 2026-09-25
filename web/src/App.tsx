@@ -74,10 +74,10 @@ import './global.css'
 
 function Home() {
     const { t } = useTranslation()
-    const [contests, setContests] = useState<any[]>([])
-    const [posts, setPosts] = useState<any[]>([])
+    const [contests, setContests] = useState<ContestLite[]>([])
+    const [posts, setPosts] = useState<FeedPost[]>([])
     const [stats, setStats] = useState({ problems: 0, users: 0, submissions: 0 })
-    const [rankings, setRankings] = useState<any[]>([])
+    const [rankings, setRankings] = useState<RankingRow[]>([])
     const [loading, setLoading] = useState(true)
     const token = localStorage.getItem('access_token')
     const username = token ? JSON.parse(atob(token.split('.')[1])).uname : null
@@ -96,8 +96,8 @@ function Home() {
         }).catch(() => { }).finally(() => setLoading(false))
     }, [])
 
-    const contestStatus = (c: any) => {
-        const now = Date.now()
+    const contestStatus = (c: ContestLite) => {
+        const now = Date.now() // eslint-disable-line react-hooks/purity -- status intentionally compared against wall clock at render
         const start = new Date(c.start_time).getTime()
         const end = new Date(c.end_time).getTime()
         if (now < start) return { text: 'Upcoming', cls: 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20' }
@@ -382,6 +382,10 @@ function AppShell() {
         </div>
     )
 }
+
+interface ContestLite { id: string; title: string; start_time: string; end_time: string }
+interface FeedPost { id: string; title: string; username?: string; created_at: string; upvotes?: number }
+interface RankingRow { user_id: string; username: string; rating?: number }
 
 export default function App() {
     return (

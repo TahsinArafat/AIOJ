@@ -4,15 +4,20 @@ import { api } from '../lib/api'
 import { useConfirm } from '../components/ConfirmDialog'
 import { useToast } from '../components/Toast'
 
+interface ApiKeyItem { id: string; name: string; key_preview?: string }
+interface OpenApiParameter { name?: string; required?: boolean; schema?: { type?: string } }
+interface OpenApiOperation { summary?: string; security?: object[]; parameters?: OpenApiParameter[] }
+interface OpenApiDoc { info?: { title?: string; description?: string }; paths?: Record<string, Record<string, OpenApiOperation>> }
+
 export default function APISettings() {
     const confirm = useConfirm()
     const toast = useToast()
-    const [keys, setKeys] = useState<any[]>([])
+    const [keys, setKeys] = useState<ApiKeyItem[]>([])
     const [name, setName] = useState('')
     const [newSecret, setNewSecret] = useState('')
     const [loading, setLoading] = useState(true)
     const [activeTab, setActiveTab] = useState<'keys' | 'reference'>('keys')
-    const [openapi, setOpenapi] = useState<any>(null)
+    const [openapi, setOpenapi] = useState<OpenApiDoc | null>(null)
 
     useEffect(() => {
         api.apiKeys.list().then(d => setKeys(d.data || [])).catch(console.error).finally(() => setLoading(false))
@@ -34,7 +39,7 @@ export default function APISettings() {
             setNewSecret(result.secret)
             setName('')
             api.apiKeys.list().then(d => setKeys(d.data || []))
-        } catch (e: any) { toast.error('Failed: ' + e.message) }
+        } catch (e) { toast.error('Failed: ' + (e instanceof Error ? e.message : String(e))) }
     }
 
     const handleDelete = async (id: string) => {
@@ -42,7 +47,7 @@ export default function APISettings() {
         try {
             await api.apiKeys.delete(id)
             setKeys(prev => prev.filter(k => k.id !== id))
-        } catch (e: any) { toast.error('Failed: ' + e.message) }
+        } catch (e) { toast.error('Failed: ' + (e instanceof Error ? e.message : String(e))) }
     }
 
     if (loading) return <div className="text-center py-20 text-gray-400 dark:text-gray-500">Loading...</div>
@@ -118,9 +123,9 @@ export default function APISettings() {
                             </div>
 
                             <div className="space-y-4">
-                                {Object.entries(openapi.paths || {}).map(([path, methods]: [string, any]) => (
+                                {Object.entries(openapi.paths || {}).map(([path, methods]: [string, Record<string, OpenApiOperation>]) => (
                                     <div key={path} className="border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden bg-white dark:bg-gray-900 shadow-sm">
-                                        {Object.entries(methods).map(([method, details]: [string, any]) => {
+                                        {Object.entries(methods).map(([method, details]: [string, OpenApiOperation]) => {
                                             const colorClass = 
                                                 method === 'get' ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300' :
                                                 method === 'post' ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-300' :
@@ -142,7 +147,7 @@ export default function APISettings() {
                                                         <div className="space-y-1">
                                                             <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Query Parameters:</p>
                                                             <ul className="text-xs font-mono space-y-1 pl-4 list-disc text-gray-600 dark:text-gray-400">
-                                                                {details.parameters.map((param: any) => (
+                                                                {details.parameters.map(param => (
                                                                     <li key={param.name}>
                                                                         <span className="font-semibold">{param.name}</span> ({param.schema?.type || 'string'}) {param.required ? '<required>' : ''}
                                                                     </li>
