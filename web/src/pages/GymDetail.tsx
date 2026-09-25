@@ -5,10 +5,16 @@ import { useToast } from '../components/Toast'
 import { EmptyState } from '../components/EmptyState'
 import { AlertTriangle } from 'lucide-react'
 
+interface GymData {
+    contest_title: string; description?: string; category?: string;
+    difficulty_rating?: number; solve_count: number; country?: string;
+    contest_slug?: string; contest_display_id?: number; contest_id: string;
+}
+
 export default function GymDetail() {
     const toast = useToast()
     const { id } = useParams<{ id: string }>()
-    const [gym, setGym] = useState<any>(null)
+    const [gym, setGym] = useState<GymData | null>(null)
     const [loading, setLoading] = useState(true)
     const [solved, setSolved] = useState(false)
 
@@ -26,7 +32,7 @@ export default function GymDetail() {
             await api.gym.markSolved(id)
             setSolved(true)
             if (gym) setGym({ ...gym, solve_count: gym.solve_count + 1 })
-        } catch (e: any) { toast.error('Failed: ' + e.message) }
+        } catch (e) { toast.error('Failed: ' + (e instanceof Error ? e.message : String(e))) }
     }
 
     if (loading) return <div className="text-center py-20 text-gray-400 dark:text-gray-500">Loading...</div>

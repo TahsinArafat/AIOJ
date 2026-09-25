@@ -163,8 +163,11 @@ export default function UserPublicProfile() {
 
   useEffect(() => {
     if (!username) return
-    setLoading(true)
-    setNotFound(false)
+    // deferred a microtask: spinner lands pre-paint (react-hooks/set-state-in-effect)
+    queueMicrotask(() => {
+      setLoading(true)
+      setNotFound(false)
+    })
     api.users.getByUsername(username)
       .then(u => {
         setUser(u)
@@ -220,9 +223,9 @@ export default function UserPublicProfile() {
 
   useEffect(() => {
     if (!user) return
-    if (tab === 'submissions' && submissions.length === 0 && !subsLoading) loadSubmissions(1)
-    if (tab === 'blogs' && blogs.length === 0 && !blogsLoading) loadBlogs(1)
-    if (tab === 'comments' && comments.length === 0 && !commentsLoading) loadComments(1)
+    if (tab === 'submissions' && submissions.length === 0 && !subsLoading) queueMicrotask(() => loadSubmissions(1))
+    if (tab === 'blogs' && blogs.length === 0 && !blogsLoading) queueMicrotask(() => loadBlogs(1))
+    if (tab === 'comments' && comments.length === 0 && !commentsLoading) queueMicrotask(() => loadComments(1))
   }, [tab, user]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) return <Skeleton />

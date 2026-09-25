@@ -5,6 +5,7 @@ import { useTheme } from '../context/ThemeContext'
 import NotificationBell from './NotificationBell'
 import LanguageSwitcher from './LanguageSwitcher'
 import GlobalSearch from './GlobalSearch'
+import type { LucideIcon } from 'lucide-react'
 import {
     Code2, Trophy, Dumbbell, BookOpen, Users, UserCheck,
     MessageSquare, BarChart3, Settings, LogOut, User, FileCode,
@@ -22,7 +23,7 @@ function decodeRole(): string | null {
     }
 }
 
-function NavDropdown({ label, icon: Icon, align = 'left', ariaLabel, children }: { label: string; icon: any; align?: 'left' | 'right'; ariaLabel?: string; children: React.ReactNode }) {
+function NavDropdown({ label, icon: Icon, align = 'left', ariaLabel, children }: { label: string; icon: LucideIcon; align?: 'left' | 'right'; ariaLabel?: string; children: React.ReactNode }) {
     const [open, setOpen] = useState(false)
     const ref = useRef<HTMLDivElement>(null)
 
@@ -56,7 +57,7 @@ function NavDropdown({ label, icon: Icon, align = 'left', ariaLabel, children }:
     )
 }
 
-function NavLink({ to, icon: Icon, children, onClick }: { to?: string; icon?: any; children: React.ReactNode; onClick?: () => void }) {
+function NavLink({ to, icon: Icon, children, onClick }: { to?: string; icon?: LucideIcon; children: React.ReactNode; onClick?: () => void }) {
     const inner = (
         <span className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
             {Icon && <Icon className="w-4 h-4" />}

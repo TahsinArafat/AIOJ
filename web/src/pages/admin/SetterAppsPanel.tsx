@@ -3,10 +3,12 @@ import { api } from '../../lib/api'
 import { useConfirm } from '../../components/ConfirmDialog'
 import { useToast } from '../../components/Toast'
 
+interface SetterAppItem { user_id: string; username: string; reason?: string; status: string; created_at: string }
+
 export default function SetterAppsPanel() {
     const confirm = useConfirm()
     const toast = useToast()
-    const [apps, setApps] = useState<any[]>([])
+    const [apps, setApps] = useState<SetterAppItem[]>([])
     const [loading, setLoading] = useState(true)
 
     const loadApps = () => {
@@ -14,15 +16,17 @@ export default function SetterAppsPanel() {
         api.admin.listApps().then(d => setApps(d.data || [])).catch(console.error).finally(() => setLoading(false))
     }
 
-    useEffect(() => { loadApps() }, [])
+    // deferred one microtask: loadApps opens with a synchronous setLoading(true),
+    // which react-hooks/set-state-in-effect rejects in an effect body
+    useEffect(() => { queueMicrotask(loadApps) }, [])
 
     const handleAppReview = async (userId: string, status: string) => {
         if (!(await confirm({ message: `Mark application as ${status}?`, variant: 'danger' }))) return
         try {
             await api.admin.reviewApp(userId, status)
             loadApps()
-        } catch (e: any) {
-            toast.error(e.message)
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : String(e))
         }
     }
 

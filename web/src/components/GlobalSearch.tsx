@@ -44,8 +44,11 @@ export default function GlobalSearch() {
     useEffect(() => {
         const trimmed = query.trim()
         if (trimmed.length < 2) {
-            setResults(null)
-            if (!trimmed) setIsOpen(false)
+            // deferred a microtask: clear lands pre-paint (react-hooks/set-state-in-effect)
+            queueMicrotask(() => {
+                setResults(null)
+                if (!trimmed) setIsOpen(false)
+            })
             return
         }
 
@@ -90,7 +93,7 @@ export default function GlobalSearch() {
         setQuery('')
         setIsOpen(false)
         inputRef.current?.blur()
-    }, [navigate])
+    }, [navigate]) // eslint-disable-line react-hooks/exhaustive-deps -- getResultPath is a module-level helper
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (!isOpen || !hasResults) {

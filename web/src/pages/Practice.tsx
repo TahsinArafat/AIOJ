@@ -2,17 +2,17 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, getAccessToken } from '../lib/api'
 
+interface PracticeProblem { id: string; slug: string; title: string; difficulty?: string; tags?: string[]; submission_count: number; accepted_count: number }
+interface Recommendations { hybrid?: PracticeProblem[]; progression?: PracticeProblem[]; weak_tags?: { tags?: string[]; problems?: PracticeProblem[] } }
+
 export default function Practice() {
-    const [rec, setRec] = useState<any>(null)
-    const [loading, setLoading] = useState(true)
+    const [rec, setRec] = useState<Recommendations | null>(null)
+    const [loading, setLoading] = useState(() => !getAccessToken())
     const [error, setError] = useState('')
     const [activeTab, setActiveTab] = useState<'hybrid' | 'progression' | 'weak'>('hybrid')
 
     useEffect(() => {
-        if (!getAccessToken()) {
-            setLoading(false)
-            return
-        }
+        if (!getAccessToken()) return
         api.recommendations.get()
             .then(data => {
                 setRec(data)
@@ -82,7 +82,7 @@ export default function Practice() {
             {/* Recommendations Content */}
             <div className="space-y-4">
                 {problems && problems.length > 0 ? (
-                    problems.map((p: any) => (
+                    problems.map(p => (
                         <div key={p.id} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-5 hover:border-blue-300 transition-colors shadow-sm flex items-center justify-between">
                             <div className="space-y-1">
                                 <Link to={`/problems/${p.slug}`} className="text-lg font-bold text-gray-900 dark:text-gray-100 hover:text-blue-600 transition-colors">
@@ -116,7 +116,7 @@ export default function Practice() {
                     </div>
                 )}
 
-                {activeTab === 'weak' && rec?.weak_tags?.tags?.length > 0 && (
+                {activeTab === 'weak' && rec?.weak_tags?.tags && rec.weak_tags.tags.length > 0 && (
                     <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg p-4 text-sm text-amber-800 dark:text-amber-300 mt-6">
                         🎯 Recommending problems on your weakest tags: <span className="font-bold">{rec.weak_tags.tags.join(', ')}</span>
                     </div>

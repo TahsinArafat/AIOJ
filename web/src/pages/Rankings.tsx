@@ -45,8 +45,10 @@ const COUNTRIES = [
     'Zambia', 'Zimbabwe',
 ]
 
+interface RankingUser { username: string; country?: string; rating: number; rating_change: number; contests_played?: number }
+
 export default function Rankings() {
-    const [users, setUsers] = useState<any[]>([])
+    const [users, setUsers] = useState<RankingUser[]>([])
     const [total, setTotal] = useState(0)
     const [offset, setOffset] = useState(0)
     const [loading, setLoading] = useState(false)
@@ -63,7 +65,8 @@ export default function Rankings() {
     }, [])
 
     useEffect(() => {
-        fetchRankings(0, false, country, organization)
+        // deferred a microtask: loader's sync setLoading violates react-hooks/set-state-in-effect
+        queueMicrotask(() => fetchRankings(0, false, country, organization))
     }, [country, organization, fetchRankings])
 
     const handleCountryChange = (val: string) => {

@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { CheckCircle2, XCircle, Info, X } from 'lucide-react'
 
@@ -23,7 +23,7 @@ interface ToastApi {
 const ToastContext = createContext<ToastApi | null>(null)
 
 /** Shows transient status messages. Errors surface via `role="alert"`. */
-export function useToast(): ToastApi {
+export function useToast(): ToastApi { // eslint-disable-line react-refresh/only-export-components -- hook stays co-located; moving it would churn imports across session-owned files
     const ctx = useContext(ToastContext)
     if (!ctx) throw new Error('useToast must be used within a ToastProvider')
     return ctx
@@ -62,16 +62,11 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         }
     }, [])
 
-    const api = useRef<ToastApi>({
+    const api = useMemo<ToastApi>(() => ({
         success: (m: string) => push('success', m),
         error: (m: string) => push('error', m),
         info: (m: string) => push('info', m),
-    })
-    api.current = {
-        success: (m: string) => push('success', m),
-        error: (m: string) => push('error', m),
-        info: (m: string) => push('info', m),
-    }
+    }), [push])
 
     const icons = {
         success: CheckCircle2,
@@ -85,7 +80,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     }
 
     return (
-        <ToastContext.Provider value={api.current}>
+        <ToastContext.Provider value={api}>
             {children}
             {toasts.length > 0 &&
                 createPortal(

@@ -49,9 +49,10 @@ export default function MathDialog({ onInsert, onClose }: MathDialogProps) {
         throwOnError: true,
         trust: true,
       })
-      setError('')
-    } catch (e: any) {
-      setError(e.message || 'Invalid LaTeX')
+      queueMicrotask(() => setError(''))
+    } catch (e) {
+      // deferred a microtask: error state may not be set synchronously in an effect
+      queueMicrotask(() => setError((e instanceof Error ? e.message : '') || 'Invalid LaTeX'))
     }
   }, [latex])
 

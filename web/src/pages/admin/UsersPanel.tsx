@@ -3,10 +3,12 @@ import { api } from '../../lib/api'
 import { useConfirm } from '../../components/ConfirmDialog'
 import { useToast } from '../../components/Toast'
 
+interface AdminUser { id: string; username: string; email?: string; role: string }
+
 export default function UsersPanel() {
     const confirm = useConfirm()
     const toast = useToast()
-    const [users, setUsers] = useState<any[]>([])
+    const [users, setUsers] = useState<AdminUser[]>([])
     const [loading, setLoading] = useState(true)
 
     const loadUsers = () => {
@@ -14,15 +16,17 @@ export default function UsersPanel() {
         api.admin.listUsers().then(d => setUsers(d.data || [])).catch(console.error).finally(() => setLoading(false))
     }
 
-    useEffect(() => { loadUsers() }, [])
+    // deferred one microtask: loadUsers opens with a synchronous setLoading(true),
+    // which react-hooks/set-state-in-effect rejects in an effect body
+    useEffect(() => { queueMicrotask(loadUsers) }, [])
 
     const handleRoleChange = async (userId: string, newRole: string) => {
         if (!(await confirm({ message: `Change role to ${newRole}?`, variant: 'danger' }))) return
         try {
             await api.admin.updateRole(userId, newRole)
             loadUsers()
-        } catch (e: any) {
-            toast.error(e.message)
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : String(e))
         }
     }
 

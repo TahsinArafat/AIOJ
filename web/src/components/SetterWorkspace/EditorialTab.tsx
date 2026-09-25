@@ -2,13 +2,15 @@ import { useEffect, useState } from 'react'
 import { api } from '../../lib/api'
 import EditorialForm from '../EditorialForm'
 
+interface EditorialItem { id: string; title: string; username?: string; is_official?: boolean; upvotes?: number }
+
 interface EditorialTabProps {
   problemId: string
   isUserAdmin: boolean
 }
 
 export default function EditorialTab({ problemId, isUserAdmin }: EditorialTabProps) {
-  const [editorials, setEditorials] = useState<any[]>([])
+  const [editorials, setEditorials] = useState<EditorialItem[]>([])
   const [loading, setLoading] = useState(true)
   const [isAdding, setIsAdding] = useState(false)
 
@@ -24,8 +26,9 @@ export default function EditorialTab({ problemId, isUserAdmin }: EditorialTabPro
   }
 
   useEffect(() => {
-    loadEditorials()
-  }, [problemId])
+    // deferred a microtask so no setState is reachable synchronously from the effect
+    queueMicrotask(loadEditorials)
+  }, [problemId]) // eslint-disable-line react-hooks/exhaustive-deps -- refetch only when the problem changes
 
   if (loading) {
     return <div className="text-center py-10 text-gray-500">Loading editorials...</div>

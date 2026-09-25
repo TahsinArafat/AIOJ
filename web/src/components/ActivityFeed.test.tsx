@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import ActivityFeed from './ActivityFeed'
@@ -46,7 +46,7 @@ function renderFeed() {
 
 describe('ActivityFeed', () => {
   it('renders activity items from API', async () => {
-    ;(api.feed.activity as any).mockResolvedValue(sample)
+    ;(api.feed.activity as Mock).mockResolvedValue(sample)
     renderFeed()
     expect(await screen.findByText('alice')).toBeInTheDocument()
     expect(screen.getByText('bob')).toBeInTheDocument()
@@ -54,7 +54,7 @@ describe('ActivityFeed', () => {
   })
 
   it('renders empty state on API failure', async () => {
-    ;(api.feed.activity as any).mockRejectedValue(new Error('down'))
+    ;(api.feed.activity as Mock).mockRejectedValue(new Error('down'))
     renderFeed()
     await waitFor(() => {
       expect(screen.getByText(/No activity yet/)).toBeInTheDocument()

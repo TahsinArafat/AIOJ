@@ -19,8 +19,8 @@ export default function TwoFactorSetup() {
             const r = await api.twoFactor.begin()
             setSecret(r.secret)
             setUri(r.uri)
-        } catch (e: any) {
-            setError(e?.message || 'Failed to start 2FA setup')
+        } catch (e) {
+            setError((e instanceof Error ? e.message : '') || 'Failed to start 2FA setup')
         } finally {
             setBusy(false)
         }
@@ -32,8 +32,8 @@ export default function TwoFactorSetup() {
         try {
             const r = await api.twoFactor.enable(code)
             setBackupCodes(r.backup_codes)
-        } catch (e: any) {
-            setError(e?.message || 'Invalid code')
+        } catch (e) {
+            setError((e instanceof Error ? e.message : '') || 'Invalid code')
         } finally {
             setBusy(false)
         }

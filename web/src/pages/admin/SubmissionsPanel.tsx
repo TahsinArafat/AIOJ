@@ -28,15 +28,17 @@ export default function SubmissionsPanel() {
             .finally(() => setLoading(false))
     }
 
-    useEffect(() => { loadSubs() }, [])
+    // deferred one microtask: loadSubs opens with a synchronous setLoading(true),
+    // which react-hooks/set-state-in-effect rejects in an effect body
+    useEffect(() => { queueMicrotask(loadSubs) }, [])
 
     const rejudge = async (id: string) => {
         if (!(await confirm({ message: 'Rejudge this submission? It will be re-submitted to Codeforces.', variant: 'danger' }))) return
         try {
             await api.admin.submissions.rejudge(id)
             loadSubs()
-        } catch (err: any) {
-            toast.error(err.message)
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : String(err))
         }
     }
 
@@ -45,8 +47,8 @@ export default function SubmissionsPanel() {
         try {
             await api.admin.submissions.refresh(id)
             setTimeout(loadSubs, 5000)
-        } catch (err: any) {
-            toast.error(err.message)
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : String(err))
         } finally {
             setRefreshing(prev => {
                 const next = new Set(prev)

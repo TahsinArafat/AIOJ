@@ -3,15 +3,18 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { api } from '../lib/api'
 import { useToast } from '../components/Toast'
 
+interface HackSubmission { id: string; language: string; user_id: string }
+interface HackResult { success?: boolean; status?: string; actual_output?: string; expected_output?: string }
+
 export default function HackPanel() {
     const toast = useToast()
     const { contestId, problemId } = useParams<{ contestId: string; problemId: string }>()
     const navigate = useNavigate()
-    const [submissions, setSubmissions] = useState<any[]>([])
+    const [submissions, setSubmissions] = useState<HackSubmission[]>([])
     const [selectedSub, setSelectedSub] = useState('')
     const [testInput, setTestInput] = useState('')
     const [loading, setLoading] = useState(true)
-    const [result, setResult] = useState<any>(null)
+    const [result, setResult] = useState<HackResult | null>(null)
     const [submitting, setSubmitting] = useState(false)
 
     useEffect(() => {
@@ -33,8 +36,8 @@ export default function HackPanel() {
                 test_input: testInput,
             })
             setResult(res)
-        } catch (e: any) {
-            toast.error('Hack failed: ' + e.message)
+        } catch (e) {
+            toast.error('Hack failed: ' + (e instanceof Error ? e.message : String(e)))
         } finally {
             setSubmitting(false)
         }

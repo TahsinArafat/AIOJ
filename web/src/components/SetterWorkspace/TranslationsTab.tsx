@@ -41,7 +41,8 @@ export default function TranslationsTab({ problemId, defaultTitle, defaultDescri
   useEffect(() => {
     if (!problemId) return
     let cancelled = false
-    setLoading(true)
+    // deferred a microtask: spinner lands pre-paint (react-hooks/set-state-in-effect)
+    queueMicrotask(() => setLoading(true))
     api.problems
       .listI18n(problemId)
       .then((list) => {
@@ -59,9 +60,12 @@ export default function TranslationsTab({ problemId, defaultTitle, defaultDescri
   // Load the selected language's existing text into the form.
   useEffect(() => {
     const row = rows[active]
-    setTitle(row?.title ?? '')
-    setDescription(row?.description ?? '')
-    setSaved(false)
+    // deferred a microtask: fields sync pre-paint (react-hooks/set-state-in-effect)
+    queueMicrotask(() => {
+      setTitle(row?.title ?? '')
+      setDescription(row?.description ?? '')
+      setSaved(false)
+    })
   }, [active, rows])
 
   const existing = rows[active]

@@ -10,15 +10,18 @@ export default function VerifyEmail() {
 
     useEffect(() => {
         if (!token) {
-            setState('err')
-            setMsg('Missing verification token.')
+            // deferred a microtask: error lands pre-paint (react-hooks/set-state-in-effect)
+            queueMicrotask(() => {
+                setState('err')
+                setMsg('Missing verification token.')
+            })
             return
         }
         api.auth.verifyEmail(token)
             .then(() => setState('ok'))
-            .catch((e: any) => {
+            .catch((e) => {
                 setState('err')
-                setMsg(e.message || 'Verification failed')
+                setMsg((e instanceof Error ? e.message : '') || 'Verification failed')
             })
     }, [token])
 

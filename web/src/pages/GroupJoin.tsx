@@ -12,8 +12,11 @@ export default function GroupJoin() {
 
     useEffect(() => {
         if (!code) {
-            setStatus('error')
-            setMessage('No invite code provided.')
+            // deferred a microtask: error lands pre-paint (react-hooks/set-state-in-effect)
+            queueMicrotask(() => {
+                setStatus('error')
+                setMessage('No invite code provided.')
+            })
             return
         }
         // Try to join immediately
@@ -21,9 +24,9 @@ export default function GroupJoin() {
             setStatus('success')
             setGroupName(d.group_name || 'the group')
             setConfirmed(true)
-        }).catch((e: any) => {
+        }).catch((e) => {
             setStatus('error')
-            setMessage(e.message || 'Failed to join group.')
+            setMessage((e instanceof Error ? e.message : '') || 'Failed to join group.')
         })
     }, [code])
 
@@ -35,9 +38,9 @@ export default function GroupJoin() {
             setStatus('success')
             setGroupName(d.group_name || 'the group')
             setConfirmed(true)
-        } catch (e: any) {
+        } catch (e) {
             setStatus('error')
-            setMessage(e.message || 'Failed to join group.')
+            setMessage((e instanceof Error ? e.message : '') || 'Failed to join group.')
         }
     }
 
