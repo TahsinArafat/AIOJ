@@ -60,8 +60,8 @@ export default function NotificationPreferences() {
             await api.notifications.updatePreferences(prefs)
             setSaved(true)
             setTimeout(() => setSaved(false), 3000)
-        } catch (e: any) {
-            toast.error('Failed to save: ' + e.message)
+        } catch (e) {
+            toast.error('Failed to save: ' + (e instanceof Error ? e.message : String(e)))
         } finally {
             setSaving(false)
         }

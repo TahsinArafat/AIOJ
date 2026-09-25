@@ -107,7 +107,8 @@ export default function IDE() {
 
     useEffect(() => {
         const saved = localStorage.getItem(`aioj_ide_code_${language}`)
-        setCode(saved || TEMPLATE_CODE[language] || '')
+        // deferred a microtask: draft lands pre-paint (react-hooks/set-state-in-effect)
+        queueMicrotask(() => setCode(saved || TEMPLATE_CODE[language] || ''))
     }, [language])
 
     const handleCodeChange = (newCode: string) => {

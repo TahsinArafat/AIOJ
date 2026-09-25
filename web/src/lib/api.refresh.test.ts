@@ -46,7 +46,7 @@ describe('api token refresh', () => {
             if (url.includes('/auth/refresh')) {
                 return jsonResponse({ access_token: 'fresh-access', refresh_token: 'fresh-refresh' })
             }
-            const auth = (fetchMock.mock.calls.find(c => String(c[0]).includes('/contests'))?.[1] as any)?.headers?.Authorization
+            const auth = (fetchMock.mock.calls.find(c => String(c[0]).includes('/contests'))?.[1] as { headers?: Record<string, string> })?.headers?.Authorization
             if (!auth || auth === `Bearer ${ORIGINAL_TOKEN}`) {
                 return jsonResponse({ error: 'expired' }, 401)
             }

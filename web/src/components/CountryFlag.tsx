@@ -29,7 +29,7 @@ function isoFrom(country: string): string | null {
 }
 
 /** Flag emoji for a country name/code, or null when unknown. */
-export function flagEmoji(country: string): string | null {
+export function flagEmoji(country: string): string | null { // eslint-disable-line react-refresh/only-export-components -- pure helper stays co-located with its component
   const iso = isoFrom(country)
   if (!iso || iso.length !== 2) return null
   const A = 0x1f1e6

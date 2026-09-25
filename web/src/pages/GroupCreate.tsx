@@ -19,8 +19,8 @@ export default function GroupCreate() {
         try {
             const group = await api.groups.create({ name, description, is_public: isPublic, join_policy: joinPolicy })
             navigate(`/groups/${group.id}`)
-        } catch (e: any) {
-            toast.error('Failed to create group: ' + e.message)
+        } catch (e) {
+            toast.error('Failed to create group: ' + (e instanceof Error ? e.message : String(e)))
         } finally {
             setSubmitting(false)
         }

@@ -20,8 +20,8 @@ export default function OrganizationCreate() {
 		try {
 			const res = await api.organizations.create({ name, description: desc })
 			nav(`/organizations/${res.id}`)
-		} catch (err: any) {
-			setError(err.message || 'Failed to create organization')
+		} catch (err) {
+			setError((err instanceof Error ? err.message : '') || 'Failed to create organization')
 		} finally {
 			setSubmitting(false)
 		}

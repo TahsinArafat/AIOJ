@@ -3,9 +3,11 @@ import { useParams } from 'react-router-dom'
 import { api } from '../lib/api'
 import CommentSection from '../components/CommentSection'
 
+interface EditorialDetailData { title: string; username?: string; created_at: string; is_official?: boolean; approach?: string; content?: string; solution_code?: string; solution_language?: string; time_complexity?: string; space_complexity?: string }
+
 export default function EditorialDetail() {
     const { id } = useParams<{ id: string }>()
-    const [editorial, setEditorial] = useState<any>(null)
+    const [editorial, setEditorial] = useState<EditorialDetailData | null>(null)
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {

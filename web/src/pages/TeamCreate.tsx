@@ -18,8 +18,8 @@ export default function TeamCreate() {
         try {
             const team = await api.teams.create({ name, description, is_public: isPublic })
             navigate(`/teams/${team.id}`)
-        } catch (e: any) {
-            toast.error('Failed to create team: ' + e.message)
+        } catch (e) {
+            toast.error('Failed to create team: ' + (e instanceof Error ? e.message : String(e)))
         } finally {
             setSubmitting(false)
         }

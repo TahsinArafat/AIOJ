@@ -25,8 +25,8 @@ export default function TwoFactorVerify() {
             const d = await api.twoFactor.verify({ challenge_id: challengeId, code })
             setTokens(d.access_token, d.refresh_token)
             navigate('/')
-        } catch (e: any) {
-            setError(e?.message || 'Invalid code')
+        } catch (e) {
+            setError((e instanceof Error ? e.message : '') || 'Invalid code')
         } finally {
             setBusy(false)
         }

@@ -18,8 +18,8 @@ export default function ForgotPassword() {
             const d = await api.auth.forgotPassword({ email })
             setMsg(d.message)
             setSent(true)
-        } catch (e: any) {
-            setErr(e.message || 'Something went wrong')
+        } catch (e) {
+            setErr((e instanceof Error ? e.message : '') || 'Something went wrong')
         } finally {
             setLoading(false)
         }

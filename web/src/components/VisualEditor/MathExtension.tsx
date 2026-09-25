@@ -1,10 +1,10 @@
 import { Node, mergeAttributes } from '@tiptap/core'
-import { ReactNodeViewRenderer } from '@tiptap/react'
+import { ReactNodeViewRenderer, type ReactNodeViewProps } from '@tiptap/react'
 import { NodeViewWrapper } from '@tiptap/react'
 import katex from 'katex'
 import { useEffect, useRef } from 'react'
 
-const MathComponent = ({ node }: any) => {
+const MathComponent = ({ node }: ReactNodeViewProps) => {
   const ref = useRef<HTMLSpanElement>(null)
 
   useEffect(() => {

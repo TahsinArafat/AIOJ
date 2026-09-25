@@ -38,8 +38,8 @@ export default function ProblemCreate() {
                 input_format: form.input_format, output_format: form.output_format,
             })
             nav('/setter')
-        } catch (err: any) {
-            setError(err.message || 'Failed to create problem')
+        } catch (err) {
+            setError((err instanceof Error ? err.message : '') || 'Failed to create problem')
         } finally {
             setSubmitting(false)
         }

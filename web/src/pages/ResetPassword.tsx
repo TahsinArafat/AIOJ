@@ -27,8 +27,8 @@ export default function ResetPassword() {
         try {
             await api.auth.resetPassword({ token, new_password: password })
             setDone(true)
-        } catch (e: any) {
-            setErr(e.message || 'Reset failed')
+        } catch (e) {
+            setErr((e instanceof Error ? e.message : '') || 'Reset failed')
         } finally {
             setLoading(false)
         }

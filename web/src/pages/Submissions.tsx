@@ -15,8 +15,10 @@ const STATUS_LABEL: Record<string, string> = {
     pending: 'Pending', judging: 'Judging...', se: 'System Error',
 }
 
+interface SubRow { id: string; language?: string; status: string; time_used?: number; memory_used: number }
+
 export default function Submissions() {
-    const [subs, setSubs] = useState<any[]>([])
+    const [subs, setSubs] = useState<SubRow[]>([])
     const [total, setTotal] = useState(0)
     const [offset, setOffset] = useState(0)
     const limit = 20

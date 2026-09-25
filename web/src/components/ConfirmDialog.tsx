@@ -24,7 +24,7 @@ type ConfirmFn = (options: ConfirmOptions) => Promise<boolean>
 const ConfirmContext = createContext<ConfirmFn | null>(null)
 
 /** Returns a promise-based confirm. Resolves `true` on confirm, `false` on cancel. */
-export function useConfirm(): ConfirmFn {
+export function useConfirm(): ConfirmFn { // eslint-disable-line react-refresh/only-export-components -- hook stays co-located; moving it would churn imports across session-owned files
     const ctx = useContext(ConfirmContext)
     if (!ctx) throw new Error('useConfirm must be used within a ConfirmProvider')
     return ctx

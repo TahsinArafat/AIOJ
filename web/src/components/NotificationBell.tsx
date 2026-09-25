@@ -1,9 +1,11 @@
 import { useEffect, useState, useRef } from 'react'
 import { api, getAccessToken } from '../lib/api'
 
+interface NotificationItem { id: string; title?: string; content?: string; read?: boolean; created_at: string }
+
 export default function NotificationBell() {
     const [count, setCount] = useState(0)
-    const [notifications, setNotifications] = useState<any[]>([])
+    const [notifications, setNotifications] = useState<NotificationItem[]>([])
     const [isOpen, setIsOpen] = useState(false)
     const containerRef = useRef<HTMLDivElement>(null)
 

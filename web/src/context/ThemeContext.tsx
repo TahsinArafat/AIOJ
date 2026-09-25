@@ -42,6 +42,6 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     );
 }
 
-export function useTheme() {
+export function useTheme() { // eslint-disable-line react-refresh/only-export-components -- hook stays with its provider; moving it would churn imports across session-owned files
     return useContext(ThemeContext);
 }

@@ -227,8 +227,8 @@ export default function GenerateProblem() {
                 additional_prompt: additionalPrompt || undefined,
             })
             setResult(res)
-        } catch (err: any) {
-            setError(err.message || 'Generation failed.')
+        } catch (err) {
+            setError((err instanceof Error ? err.message : '') || 'Generation failed.')
         } finally {
             setGenerating(false)
         }

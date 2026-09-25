@@ -18,8 +18,8 @@ export default function SetterApplication() {
             await api.setter.apply(reason)
             setSubmitted(true)
             setStatus('pending')
-        } catch (e: any) {
-            toast.error('Failed: ' + e.message)
+        } catch (e) {
+            toast.error('Failed: ' + (e instanceof Error ? e.message : String(e)))
         }
     }
 

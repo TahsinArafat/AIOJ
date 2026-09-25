@@ -22,8 +22,8 @@ export default function BlogCreate() {
                 tags: tags.split(',').map(t => t.trim()).filter(Boolean)
             })
             navigate(`/blog/${post.id}`)
-        } catch (e: any) {
-            toast.error('Failed: ' + e.message)
+        } catch (e) {
+            toast.error('Failed: ' + (e instanceof Error ? e.message : String(e)))
         } finally {
             setSubmitting(false)
         }

@@ -41,8 +41,8 @@ export default function EditorialForm({ problemId, isUserAdmin, onSuccess, onCan
         is_official: isUserAdmin ? isOfficial : false,
       })
       onSuccess()
-    } catch (err: any) {
-      setError(err.message || 'Failed to submit editorial.')
+    } catch (err) {
+      setError((err instanceof Error ? err.message : '') || 'Failed to submit editorial.')
     } finally {
       setSubmitting(false)
     }

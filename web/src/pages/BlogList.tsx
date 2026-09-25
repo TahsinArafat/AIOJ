@@ -3,8 +3,10 @@ import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
 import { EmptyState } from '../components/EmptyState'
 
+interface BlogCard { id: string; title: string; username?: string; created_at: string; upvotes?: number; comment_count?: number; tags?: string[] }
+
 export default function BlogList() {
-    const [posts, setPosts] = useState<any[]>([])
+    const [posts, setPosts] = useState<BlogCard[]>([])
     const [total, setTotal] = useState(0)
     const [tag, setTag] = useState('')
     const [offset, setOffset] = useState(0)
@@ -54,7 +56,7 @@ export default function BlogList() {
                                 <span>{p.comment_count} comments</span>
                                 <span>{new Date(p.created_at).toLocaleDateString()}</span>
                             </div>
-                            {p.tags?.length > 0 && (
+                            {p.tags && p.tags.length > 0 && (
                                 <div className="flex gap-2 mt-3">
                                     {p.tags.map((tag: string) => (
                                         <span key={tag} className="text-xs bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded font-medium">{tag}</span>

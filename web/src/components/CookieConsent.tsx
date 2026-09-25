@@ -1,16 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { X } from 'lucide-react'
 
 const KEY = 'cookie-consent'
 
 export default function CookieConsent() {
-    const [show, setShow] = useState(false)
-
-    useEffect(() => {
-        if (typeof window !== 'undefined' && !localStorage.getItem(KEY)) {
-            setShow(true)
-        }
-    }, [])
+    const [show, setShow] = useState(() => typeof window !== 'undefined' && !localStorage.getItem(KEY))
 
     if (!show) return null
 
