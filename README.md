@@ -1,900 +1,506 @@
-# AIOJ - Lightweight Online Judge
+<div align="center">
 
-A fully functional, scalable, and lightweight Online Judge for competitive programming.
+# AIOJ
 
-## Features
-- **Monolith Go Backend**: High performance, easy to deploy (Chi Router, PostgreSQL).
-- **Dockerized Sandbox Execution**: Uses `criyle/go-judge` for secure, cgroups-isolated code execution.
-- **Language Support**: 12+ pre-configured languages (C, C++, Python, Java, Rust, Node.js, etc.) via simple YAML configurations.
-- **VJudge Bot Support**: Submit problems seamlessly to remote platforms (like Codeforces) via integrated background bots.
-- **Advanced Contest Management**: Scoreboards, freeze times, and ACM/OI scoring rules.
-- **Collaboration Permissions**: Codeforces-style permission system (Owner, Co-author, Tester) for problems and contests.
-- **Modern React SPA**: Vite + React 19 + TypeScript + Tailwind CSS with a CodeMirror 6 code editor.
+**A full-featured, self-hostable competitive programming platform.**
 
-## Getting Started
+Monolith Go backend · React SPA · PostgreSQL · Docker-isolated code execution
+
+[![Backend tests](https://github.com/TahsinArafat/AIOJ/actions/workflows/backend-test.yml/badge.svg)](https://github.com/TahsinArafat/AIOJ/actions/workflows/backend-test.yml)
+[![Frontend build](https://github.com/TahsinArafat/AIOJ/actions/workflows/frontend-build.yml/badge.svg)](https://github.com/TahsinArafat/AIOJ/actions/workflows/frontend-build.yml)
+[![Lint](https://github.com/TahsinArafat/AIOJ/actions/workflows/lint.yml/badge.svg)](https://github.com/TahsinArafat/AIOJ/actions/workflows/lint.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](#license)
+
+</div>
+
+---
+
+## Table of Contents
+
+- [What is AIOJ?](#what-is-aioj)
+- [Feature Highlights](#feature-highlights)
+- [Architecture](#architecture)
+- [Tech Stack](#tech-stack)
+- [Quick Start (Docker)](#quick-start-docker)
+- [Local Development](#local-development)
+- [Configuration](#configuration)
+- [Project Layout](#project-layout)
+- [How Judging Works](#how-judging-works)
+- [Virtual Judge (Remote Platforms)](#virtual-judge-remote-platforms)
+- [API & Integrations](#api--integrations)
+- [Testing & CI](#testing--ci)
+- [Common Tasks](#common-tasks)
+- [Production Deployment](#production-deployment)
+- [Troubleshooting](#troubleshooting)
+- [Documentation](#documentation)
+- [License](#license)
+
+---
+
+## What is AIOJ?
+
+AIOJ is a complete online judge you can run yourself — a Codeforces-style platform for hosting problems, running contests, judging submissions, and building a community. It is designed to be **lightweight to operate** (a single Go binary plus Postgres and a sandbox) while still covering the depth expected of a modern OJ: virtual contests, hacking, editorial workflows, organizations and classes, plagiarism detection, and remote-platform (virtual judge) submissions.
+
+**Who it's for:** university courses, clubs, and anyone who wants a private competitive-programming judge without the operational weight of a distributed system.
+
+---
+
+## Feature Highlights
+
+**Judging**
+- Secure, cgroup-isolated execution via [`criyle/go-judge`](https://github.com/criyle/go-judge).
+- 12 pre-configured languages (C/C++/Clang/GCC 32/64, Python, PyPy, Java, Rust, Node.js, JavaScript, C#) declared in `lang/*.yaml`.
+- Rich judging engine: subtasks, interactive problems, submit-answer problems, per-language limits, and 8 output checkers (byte-identical, sorted, unordered, float absolute/relative, and more).
+- Fully asynchronous queue backed by Redis (falls back to an in-memory queue when Redis is unset).
+
+**Contests**
+- Pluggable scoring-format registry: **ACM / OI / IOI / AtCoder / Codeforces**.
+- Scoreboards with freeze times, virtual contests, gym/training contests, and upsolving.
+- Hacking phase with counter-test cases and hack scoring.
+- Divisions (Div 1–4) with eligibility checks.
+
+**Problems & Content**
+- Problem setter workspace with a visual statement editor (TipTap), test-case upload, and ZIP import.
+- FPS (Free Polygon Standard) import/export.
+- Blog/discussions, editorials (official + community), clarification & contest notices.
+- Problem i18n (English + Bengali via `react-i18next`), KaTeX math, tags, difficulty, and recommendations.
+
+**Community & Platform**
+- Organizations, classes, and training plans with automatic progress tracking.
+- Groups and teams, friendships, achievements, and an activity feed.
+- Notifications (real-time over WebSocket), public profiles, rating history with Elo and color badges.
+- Public REST API with API-key management, webhooks with secret signing, rate limiting.
+- OAuth sign-in (GitHub & Google), 2FA (TOTP + backup codes), email verification, and password reset.
+- Observability: Prometheus `/metrics`, Grafana dashboards, alert rules, and Sentry error tracking.
+- SEO/PWA: dynamic `sitemap.xml`, Atom feeds, manifest, and service worker.
+
+**Virtual Judge**
+- Submit to remote platforms through integrated bots: **Codeforces, AtCoder, CSES, Toph, QOJ**.
+- Cloudflare-bypass submit services for Codeforces and AtCoder.
+
+---
+
+## Architecture
+
+AIOJ is a monolith with a clear separation between the API server and dedicated judge workers, so judging scales independently from request handling.
+
+```
+                         ┌─────────────────────────────────────────┐
+   Browser ──▶ nginx:80  │  React SPA (Vite + TS + Tailwind)        │
+                         └─────────────────────────────────────────┘
+                                        │ /api/* proxy
+                                        ▼
+                         ┌─────────────────────────────────────────┐
+                         │  Go API server (:8080)  — Chi router     │
+                         │  handlers · middleware · stores          │
+                         └───────┬───────────────┬─────────────────┘
+                                 │               │
+                    ┌────────────▼───┐     ┌─────▼───────────────┐
+                    │ PostgreSQL:5432│     │ Redis :6379 (queue) │
+                    └────────────────┘     └─────┬───────────────┘
+                                                 │ claim
+                                       ┌─────────▼────────────┐
+                                       │ judge-worker process │
+                                       │ (compile + verify)   │
+                                       └─────────┬────────────┘
+                                                 │ HTTP
+                                       ┌─────────▼────────────┐
+                                       │ go-judge sandbox:5050│
+                                       │ (cgroup isolated)    │
+                                       └──────────────────────┘
+```
+
+**Key design decisions**
+
+| Decision | Why |
+|----------|-----|
+| **Monolith + separate worker mode** | One binary, `--mode=server\|judge-worker`. Only workers consume the judge queue, so the API never silently becomes a second decider. |
+| **Compilers in the backend image** | `go-judge` is distroless and only executes; compilation (g++, python3, java, rustc, node) happens in the backend/judge-worker image. |
+| **Redis-backed queue** | Enables multiple `judge-worker` replicas. Includes claim-token fencing and a reclaimer for stale claims. |
+| **Pluggable contest formats** | `internal/contest/format/` registry — adding a scoring rule means adding one package, not editing the core. |
+| **Store interfaces** | `internal/store/interfaces.go` defines contracts; `internal/store/postgres/` implements them, keeping handlers testable. |
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Backend | Go 1.26, [Chi](https://github.com/go-chi/chi) router, `log/slog`, `golang-migrate` |
+| Database | PostgreSQL 18 |
+| Queue / cache | Redis 7 (`go-redis`), in-memory fallback |
+| Sandbox | `criyle/go-judge` (privileged, host cgroup namespace) |
+| Frontend | React 19, TypeScript 6, Vite 8, Tailwind CSS 4, React Router 7 |
+| Editor | Monaco Editor; TipTap for rich-text statements |
+| Testing | Go `testing`, Vitest + Testing Library (unit), Playwright (E2E) |
+| Observability | Prometheus, Grafana, Sentry |
+| Auth | JWT (access + refresh), TOTP 2FA, OAuth (GitHub/Google) |
+
+---
+
+## Quick Start (Docker)
 
 ### Prerequisites
-- Docker and Docker Compose
+- Docker and Docker Compose.
 
-### 1. Setup Environment
-```bash
-cp .env.example .env
-```
-
-### 2. Start the System
-```bash
-docker compose up -d
-```
-
-Wait a few seconds for the database and judge executor containers to initialize.
-
-### 3. Run Database Migrations
-Run the migrations to create the tables and seed the default admin account:
-```bash
-make migrate-up
-```
-
-### 4. Access the Application
-- Open your browser and navigate to: [http://localhost](http://localhost)
-
-### Default Admin Credentials
-You can immediately log in and access the Admin Dashboard and Problem Setter workspace using:
-- **Username:** `admin`
-- **Password:** `admin_secret`
-
----
-
-## Architecture Overview
-- **Backend:** `:8080` (Go)
-- **Frontend:** `:80` (Nginx + React SPA)
-- **Database:** `:5432` (PostgreSQL 18)
-- **Sandbox:** `:5050` (go-judge)
-
----
-
-## Deploying to Production (VPS + Domain + HTTPS)
-
-This guide walks you through deploying AIOJ on a real server with your own domain name and HTTPS (the green lock in the browser). Even if you've never deployed anything before — just follow each step.
-
----
-
-### What You Will Need
-
-| Item | Why | Estimated Cost |
-|------|-----|---------------|
-| **A VPS (Virtual Private Server)** | Runs AIOJ 24/7 on the internet | $5–20/month |
-| **A domain name** | `your-cool-site.com` instead of an IP address | $5–15/year |
-| **30 minutes** | Time to set everything up | Free |
-
-**Recommended VPS providers for beginners:** Hetzner, DigitalOcean, Vultr, Linode.  
-**Recommended domain registrars:** Namecheap, Cloudflare Registrar, Porkbun.
-
----
-
-### Step 1: Get a VPS Server
-
-1. Sign up at any VPS provider (we'll use **DigitalOcean** as an example, but the steps are similar everywhere).
-2. Create a new **Droplet** (server):
-   - **OS:** Ubuntu 24.04 LTS
-   - **Plan:** Basic, $6/month (1 vCPU, 1 GB RAM) — enough for a small OJ
-   - **Region:** Pick one closest to your users
-3. Choose **SSH key** authentication (more secure than password).
-4. Click **Create Droplet**. You'll get an **IP address** like `167.99.123.45`. **Save this IP** — you'll need it everywhere.
-
----
-
-### Step 2: Get a Domain Name
-
-1. Go to any domain registrar and search for an available domain.
-2. Buy it. Example: `myoj.com`
-
----
-
-### Step 3: Point Your Domain to Your Server (DNS)
-
-This tells the internet: "When someone types `myoj.com`, send them to my server at `167.99.123.45`."
-
-1. Log into your domain registrar's dashboard.
-2. Find **DNS Settings** or **DNS Management** or **Manage DNS**.
-3. Add an **A Record**:
-   - **Name/Host:** `@` (means the root domain — `myoj.com`)
-   - **Type:** `A`
-   - **Value/Target:** Your VPS IP address (e.g., `167.99.123.45`)
-   - **TTL:** `3600` (or leave default)
-4. *(Optional)* Add a second A record for `www`:
-   - **Name/Host:** `www`
-   - **Type:** `A`
-   - **Value/Target:** Same IP
-5. Save. DNS changes can take **a few minutes to 48 hours** to propagate, but usually it's quick (5–30 minutes).
-
-> **Verify:** Run `nslookup myoj.com` (replace with your domain). It should return your server IP. If not, wait and try again.
-
----
-
-### Step 4: Set Up Your Server
-
-SSH into your VPS:
-
-```bash
-ssh root@YOUR_SERVER_IP
-```
-
-#### 4a. Update the system
-
-```bash
-apt update && apt upgrade -y
-```
-
-#### 4b. Install Docker & Docker Compose
-
-```bash
-# Install Docker
-curl -fsSL https://get.docker.com | sh
-
-# Add your user to the docker group (so you don't need sudo)
-usermod -aG docker $USER
-
-# Log out and back in for the group change to take effect
-exit
-ssh root@YOUR_SERVER_IP
-```
-
-#### 4c. Configure Firewall (CRITICAL)
-
-The firewall controls which ports are open to the internet. You need ports **22** (SSH), **80** (HTTP), and **443** (HTTPS). Everything else should be blocked.
-
-```bash
-# Install ufw (Uncomplicated Firewall)
-apt install ufw -y
-
-# Allow SSH (port 22) — IMPORTANT: do this first or you'll lock yourself out!
-ufw allow 22/tcp
-
-# Allow HTTP (port 80) — needed for Let's Encrypt verification and redirects
-ufw allow 80/tcp
-
-# Allow HTTPS (port 443) — your secure site traffic
-ufw allow 443/tcp
-
-# Enable the firewall
-ufw enable
-
-# Verify
-ufw status
-```
-
-You should see:
-```
-Status: active
-
-To                         Action      From
---                         ------      ----
-22/tcp                     ALLOW       Anywhere
-80/tcp                     ALLOW       Anywhere
-443/tcp                    ALLOW       Anywhere
-```
-
-**DO NOT expose ports 5432, 6379, 5050, 8080, 9090, 3000 to the internet.** These are internal services. Only Caddy (or Nginx) on ports 80/443 should be public.
-
-If you are using the Codeforces VJudge bot, also allow Docker containers to reach the host's cf-submit service:
-
-```bash
-# Allow Docker bridge networks to reach cf-submit on port 8003
-sudo ufw allow from 172.16.0.0/12 to any port 8003 proto tcp
-```
-
-#### 4d. Clone AIOJ
-
-```bash
-git clone https://github.com/TahsinArafat/AIOJ.git /opt/aioj
-cd /opt/aioj
-```
-
----
-
-### Step 5: Configure AIOJ for Production
-
-#### 5a. Secure your environment variables
+### 1. Configure environment
 
 ```bash
 cp .env.example .env
-nano .env
 ```
 
-Change the values to **strong, random secrets**:
+Edit `.env` and set strong secrets:
 
 ```env
-DB_PASSWORD=use-a-very-long-random-password-here-64-chars
-JWT_SECRET=another-very-long-random-string-different-from-above
-JUDGE_CONCURRENCY=4
+DB_PASSWORD=<long-random-password>
+JWT_SECRET=<long-random-string>
 ```
 
-> **How to generate random secrets:**
-> ```bash
-> openssl rand -hex 32   # Generates a 64-character random hex string
-> ```
+Generate a secret with `openssl rand -hex 32`.
 
-#### 5b. Update config.yaml
-
-Edit `config.yaml` and change the JWT secret:
-
-```yaml
-auth:
-  jwt_secret: "paste-the-same-JWT_SECRET-from-.env-here"
-```
-
----
-
-### Step 6: Enable HTTPS with Caddy (RECOMMENDED)
-
-Caddy is a web server that **automatically** gets and renews SSL certificates from Let's Encrypt. You write 5 lines of config, and it handles everything — no cron jobs, no certbot commands, no manual renewal.
-
-#### 6a. Edit the Caddyfile
-
-```bash
-nano deploy/Caddyfile
-```
-
-Replace `yourdomain.com` with your actual domain:
-
-```caddyfile
-myoj.com {
-    reverse_proxy frontend:80
-    encode gzip zstd
-}
-```
-
-That's it. Caddy will automatically:
-- Get a free SSL certificate from Let's Encrypt
-- Redirect HTTP → HTTPS for all visitors
-- Renew the certificate 30 days before it expires (forever)
-
-#### 6b. Fix port conflict (important!)
-
-By default, the `frontend` service in `docker-compose.yml` binds to port 80. Caddy also needs port 80 and 443. Remove the frontend's port binding:
-
-```bash
-nano docker-compose.yml
-```
-
-Find the `frontend` service and **comment out** the ports line:
-
-```yaml
-  frontend:
-    build:
-      context: ./web
-      dockerfile: Dockerfile
-    # ports:                    # <-- COMMENT OUT or REMOVE this line
-    #   - "80:80"              # <-- COMMENT OUT or REMOVE this line
-    depends_on:
-      - backend
-    restart: unless-stopped
-```
-
-The frontend container still runs on port 80 **inside** Docker's internal network — Caddy can reach it there. You're just removing the public exposure so Caddy takes over.
-
-#### 6c. Start everything
-
-```bash
-# First, start ONLY the core services (without Caddy) to initialize the database
-docker compose up -d postgres judge redis backend judge-worker frontend
-
-# Wait ~10 seconds for everything to be ready
-
-# Run database migrations
-make migrate-up
-
-# Now start Caddy (which needs everything else running)
-docker compose --profile production up -d
-```
-
-> `--profile production` tells Docker to also start the Caddy service. Without this flag, Caddy stays off — so your local development setup remains unchanged.
-
-#### 6d. Verify HTTPS
-
-Open your browser and go to `https://myoj.com`. You should see:
-- The AIOJ login page
-- A **padlock icon** (🔒) in the address bar — means HTTPS is working
-
-**If you see a "Secure Connection Failed" error or `ERR_SSL_PROTOCOL_ERROR`:**
-
-- Wait 1–2 minutes, then refresh. Let's Encrypt takes a moment to issue the certificate on first run.
-- Check Caddy's logs for the exact error: `docker compose logs caddy --tail 20`
-- **Let's Encrypt rate limit?** If you see `too many certificates (50) already issued for "example.tld"`, the domain suffix has hit its weekly limit. Common with cheap/free subdomain providers. Either wait (up to 7 days) or use a different domain. To switch domains: edit `deploy/Caddyfile` → run `docker compose stop caddy && docker compose rm -f caddy` → `docker volume rm aioj_caddy_data aioj_caddy_config` → restart.
-- If you just want to run on plain HTTP temporarily, skip Caddy entirely: `docker compose stop caddy && docker compose rm -f caddy`, then uncomment `80:80` under the `frontend` service and run `docker compose up -d frontend`.
-
----
-
-### Alternative: Nginx + Certbot (More Control)
-
-If you prefer Nginx over Caddy, a ready-to-use config is at `deploy/nginx/aioj.conf`.
-
-#### Install Nginx and Certbot
-
-```bash
-apt install nginx certbot python3-certbot-nginx -y
-```
-
-#### Configure Nginx
-
-```bash
-# Copy the config
-cp deploy/nginx/aioj.conf /etc/nginx/sites-available/aioj
-
-# Edit it — replace "yourdomain.com" with your actual domain
-nano /etc/nginx/sites-available/aioj
-```
-
-Change these lines in the file:
-```
-server_name yourdomain.com www.yourdomain.com;
-ssl_certificate     /etc/letsencrypt/live/yourdomain.com/fullchain.pem;
-ssl_certificate_key /etc/letsencrypt/live/yourdomain.com/privkey.pem;
-```
-
-Replace `yourdomain.com` with your actual domain everywhere.
-
-#### Change the frontend port
-
-In `docker-compose.yml`, change the frontend port from `80` to `8080`:
-
-```yaml
-  frontend:
-    # ...
-    ports:
-      - "8080:80"    # <-- Change from "80:80" to "8080:80"
-```
-
-Then start Docker:
+### 2. Start the stack
 
 ```bash
 docker compose up -d
-make migrate-up
 ```
 
-#### Enable the site and get SSL
+Wait a few seconds for PostgreSQL and the judge sandbox to initialize. The backend applies database migrations automatically on startup.
+
+### 3. Open the app
+
+- Application: [http://localhost](http://localhost)
+
+### Default admin credentials
+
+| Username | Password |
+|----------|----------|
+| `admin`  | `admin_secret` |
+
+> **Change the admin password immediately** after first login (Profile → Change Password).
+
+### Service ports (local)
+
+| Service | Port | Purpose |
+|---------|------|---------|
+| Frontend (nginx) | 80 | React SPA |
+| Backend (Go) | 8080 | REST API + WebSocket |
+| PostgreSQL | 5432 | Database |
+| Redis | 6379 | Judge queue |
+| go-judge | 5050 | Sandbox executor |
+| Prometheus | 9090 | Metrics |
+| Grafana | 3000 | Dashboards |
+
+---
+
+## Local Development
+
+### Backend
 
 ```bash
-# Enable the Nginx site
-ln -s /etc/nginx/sites-available/aioj /etc/nginx/sites-enabled/
-rm /etc/nginx/sites-enabled/default   # Remove default site
+# Start only the dependencies
+docker compose up -d postgres judge redis
 
-# Test Nginx config
-nginx -t
+# Run the API server with hot reload via go run
+make run
 
-# Reload Nginx
-systemctl reload nginx
+# ...or run a judge worker in a second terminal
+go run ./cmd/aioj --mode=judge-worker
+```
 
-# Get SSL certificate (Let's Encrypt)
-certbot --nginx -d myoj.com -d www.myoj.com
+The server reads `config.yaml` (`make run` uses the repo default). Point it at the Dockerized Postgres/Redis with the values in `config.yaml.example`.
 
-# Follow the prompts — choose redirect (option 2) to force HTTPS
+### Frontend
 
-# Test auto-renewal (Certbot adds a systemd timer automatically)
-certbot renew --dry-run
+```bash
+cd web
+npm install
+npm run dev        # Vite dev server on :5173
+```
+
+The dev server proxies `/api` to the backend. Build a production bundle with `npm run build`.
+
+### Database migrations
+
+```bash
+make migrate-up         # apply all pending migrations
+make migrate-down       # roll back one
+make migrate-status     # show current state
+make migrate-version    # print current version
+make migrate-force V=71 # force version (recover from a dirty state)
+```
+
+Migrations live in `internal/store/migrations/` as numbered `.up.sql` / `.down.sql` pairs. The API server also auto-applies them on boot (`cmd/aioj/main.go`).
+
+---
+
+## Configuration
+
+Configuration is layered: **`config.yaml`** provides defaults, and environment variables override sensitive values (the intended pattern for containers).
+
+| Env var | Purpose | Default |
+|---------|---------|---------|
+| `DB_HOST` / `DB_PORT` / `DB_NAME` / `DB_USER` / `DB_PASSWORD` | PostgreSQL connection | `localhost:5432 / aioj` |
+| `JWT_SECRET` | Signs access/refresh tokens | `change-me-in-production` |
+| `CSRF_SECRET` | CSRF token signing | falls back to JWT secret |
+| `JUDGE_ENDPOINT` | go-judge base URL | `http://localhost:5050` |
+| `JUDGE_CONCURRENCY` | Parallel judge workers | `4` |
+| `REDIS_URL` | Redis address; empty → in-memory queue | → queue |
+| `LANG_DIR` | Directory of `lang/*.yaml` | `./lang` |
+| `MAIL_DRIVER` | `smtp` \| `catcher` \| `noop` | `catcher` |
+| `MAIL_PUBLIC_URL` / `PUBLIC_ORIGIN` | Public base URL for links, sitemap, feeds | `http://localhost:8081` |
+| `GITHUB_CLIENT_ID` / `GOOGLE_CLIENT_ID` (+ secrets) | Enable OAuth providers | disabled |
+| `CF_SUBMIT_URL` | Codeforces submit service | `http://host.docker.internal:8003` |
+| `ATCODER_SUBMIT_URL` | AtCoder submit service | `http://host.docker.internal:8004` |
+| `SENTRY_DSN` | Error tracking (optional) | disabled |
+
+See `config.yaml.example` for the full annotated structure.
+
+---
+
+## Project Layout
+
+```
+cmd/
+  aioj/          Main binary — API server + judge worker (--mode)
+  migrate/       Standalone migration tool
+  seed/          Database seeder (demo data / admin)
+  aioj-cli/      Admin CLI
+  vjudge-test/   Manual vjudge bot harness
+
+internal/
+  api/
+    router.go        All HTTP routes (Chi)
+    deps.go          Handler dependency wiring
+    handler/         HTTP handlers (problems, contests, submissions, …)
+    middleware/      Auth, role, CSRF, rate limit, logging, Sentry recover
+  auth/              JWT, password hashing, TOTP
+  config/            config.yaml + env loading
+  contest/format/    ACM / OI / IOI / AtCoder / Codeforces scoring registry
+  judge/
+    worker.go        Compilation + test-case orchestration
+    executor/        HTTP client to go-judge
+    checker/         Output checkers
+    compiler/        Language → compile command resolution
+    runner/          Batch + interactive runners, scorer
+  store/
+    interfaces.go    Store contracts
+    postgres/        PostgreSQL implementations
+    migrations/      Numbered .up.sql / .down.sql
+  model/             Shared domain types
+  rating/            Elo calculation
+  virtual/           Virtual contest logic
+  hack/              Hack validation + scoring
+  plagiarism/        LCS engine + MOSS integration
+  vjudge/            Remote-platform bots & parsers
+  mail/              SMTP / MailCatcher senders + templates
+  oauth/             GitHub & Google providers
+  queue/             Redis + in-memory judge queues
+  fps/               Free Polygon Standard import/export
+  generate/          AI-assisted problem generation
+  observability/     Sentry initialization
+
+web/                 React SPA (Vite)
+  src/
+    pages/           Route components
+    components/      Reusable UI (Navbar, Editor, RatingGraph, …)
+    lib/             API client, utilities
+    i18n/            EN + BN locales
+    test/            Vitest setup & fixtures
+  e2e/               Playwright specs
+
+lang/*.yaml          Language compiler/run configurations
+deploy/              Caddyfile, nginx, prometheus, grafana, status page
+docs/                OpenAPI spec, legal, runbooks, plans
 ```
 
 ---
 
-### Visual Management Panels (Easiest GUI Option — No Config Files)
+## How Judging Works
 
-If you prefer clicking buttons over editing config files, use this combo:
-
-| Panel | What You Do With It | Access At |
-|-------|-------------------|-----------|
-| **Nginx Proxy Manager** | Add domains, get SSL certs, manage redirects — all from a web UI | `http://your-ip:81` |
-| **Dockge** | Start/stop containers, view logs, edit docker-compose, update images — all visually | `http://your-ip:5001` |
-
-Both are free, open-source, and run as Docker containers. **You never touch a config file for domains or SSL again.**
-
-#### Step-by-Step Setup
-
-**1. Prepare docker-compose.yml**
-
-Before starting, open `docker-compose.yml` and **comment out** these lines (NPM will handle ports 80/443 instead):
-
-```yaml
-  frontend:
-    # ports:           # ← COMMENT THIS OUT
-    #   - "80:80"      # ← COMMENT THIS OUT
+```
+POST /api/submissions
+        │
+        ▼
+  status = pending  ──▶  JudgeQueue (Redis list, or in-memory)
+                                │
+                                ▼
+                     judge-worker claims the job
+                     (claim token + fencing, stale-claim reclaimer)
+                                │
+                                ▼
+             compile in backend image ──▶ run each test case
+                                          in go-judge sandbox
+                                │
+                                ▼
+             checker verdicts (AC / WA / TLE / MLE / RE / CE / SE)
+                                │
+                                ▼
+             persist verdict ──▶ WebSocket push to the browser
 ```
 
-If you previously added Caddy, you can leave it or remove it — NPM replaces both Caddy and the frontend's public port. Just don't use `--profile production`.
+1. The submission is stored with `status = pending` and pushed onto the judge queue.
+2. A **judge worker** claims it with a fencing token. Only `--mode=judge-worker` processes consume the queue.
+3. The worker **compiles** the source in the backend image (compilers are *not* in the distroless judge container).
+4. Each test case is executed in the **go-judge sandbox** with input piped and limits enforced by cgroup.
+5. Output is verified by the configured **checker** (exact, lines, float, sorted, unordered, …).
+6. The verdict is persisted and pushed to the client over **WebSocket** in real time.
 
-**2. Start AIOJ + the management panels**
-
-```bash
-# Start core services first
-docker compose up -d postgres judge redis backend judge-worker frontend
-
-# Wait 10 seconds, then run migrations
-make migrate-up
-
-# Now add NPM + Dockge using the override file
-docker compose -f docker-compose.yml -f deploy/docker-compose.npm.yml up -d
-```
-
-**3. Open firewall for the admin UIs (temporary)**
-
-The admin panels run on ports 81 and 5001. Open them temporarily while you configure things:
-
-```bash
-ufw allow 81/tcp
-ufw allow 5001/tcp
-```
-
-> **After setup is complete, close these ports:** `ufw delete allow 81/tcp && ufw delete allow 5001/tcp`. Your admin panels should NOT be publicly accessible long-term.
-
-**4. Configure Nginx Proxy Manager**
-
-Open your browser and go to `http://YOUR_SERVER_IP:81`
-
-- **Default login:** `admin@example.com` / `changeme`
-- It will immediately ask you to change email and password — **do this first.**
-
-Now add your domain with SSL:
-
-1. Click **Hosts** → **Proxy Hosts** → **Add Proxy Host**
-2. Fill in:
-   - **Domain Names:** `myoj.com` (and optionally `www.myoj.com`)
-   - **Scheme:** `http`
-   - **Forward Hostname / IP:** `frontend` (the Docker service name)
-   - **Forward Port:** `80`
-   - **Block Common Exploits:** ✅ Check this
-3. Click the **SSL** tab:
-   - **SSL Certificate:** Select "Request a new SSL Certificate"
-   - **Force SSL:** ✅ Check this
-   - **HTTP/2 Support:** ✅ Check this
-   - **Email Address:** Enter your email (Let's Encrypt needs this)
-   - **Agree to Terms:** ✅ Check this
-4. Click **Save**
-
-NPM will obtain a free Let's Encrypt certificate within ~30 seconds. Visit `https://myoj.com` — you'll see the green lock.
-
-**Renewals are automatic.** NPM renews certificates 30 days before expiry. Zero maintenance.
-
-**5. (Optional) Explore Dockge**
-
-Go to `http://YOUR_SERVER_IP:5001`. Dockge shows:
-
-- **All your containers** with status, CPU, memory usage
-- **One-click start/stop/restart** for any service
-- **Live log viewer** — see what's happening in real time
-- **docker-compose editor** — modify your compose file from the browser
-- **Image update checker** — see when new versions are available
-
-To view AIOJ in Dockge, click the "Scan" button at the bottom of the sidebar — it auto-discovers your existing compose file.
-
-**6. Lock down admin panels**
-
-Once everything is working, close the admin ports:
-
-```bash
-ufw delete allow 81/tcp
-ufw delete allow 5001/tcp
-```
-
-To access the panels later, use an **SSH tunnel** (secure — no open ports needed):
-
-```bash
-# Run this on YOUR local machine (not the VPS):
-ssh -L 81:localhost:81 -L 5001:localhost:5001 root@YOUR_SERVER_IP
-
-# Then open in your browser:
-# http://localhost:81      → Nginx Proxy Manager
-# http://localhost:5001    → Dockge
-```
-
-This tunnels traffic through SSH — the admin panels are only accessible from your computer, not the internet.
+**Languages** are declared as data in `lang/*.yaml`, so adding a language rarely requires Go changes.
 
 ---
 
-### Step 7: Log In and Secure Admin
+## Virtual Judge (Remote Platforms)
 
-1. Go to `https://myoj.com`
-2. Log in with the default admin credentials:
-   - **Username:** `admin`
-   - **Password:** `admin_secret`
-3. **IMMEDIATELY change the admin password:** Go to your profile → Settings → Change Password.
+AIOJ can submit code to remote judges on behalf of bot accounts. Bots live in `internal/vjudge/` and are registered at startup for the platforms **Codeforces, AtCoder, CSES, Toph, and QOJ**.
 
----
+- **Codeforces** and **AtCoder** use dedicated submit microservices (`deploy/cf-submit/`, `deploy/atcoder-submit/`) that drive a real browser to clear Cloudflare.
+- Bot credentials are managed under **Admin Panel → Bot Accounts**, with automatic disable after consecutive failures.
 
-### Port Reference (Production)
-
-When deployed behind Caddy, Nginx, or NPM, only these ports should be open to the internet:
-
-| Port | Service | Public? | Purpose |
-|------|---------|---------|---------|
-| 22 | SSH | ✅ Yes | Server management |
-| 80 | Caddy/Nginx/NPM | ✅ Yes | HTTP → HTTPS redirect |
-| 443 | Caddy/Nginx/NPM | ✅ Yes | HTTPS (your site) |
-| 81 | NPM Admin (optional) | ⚠️ Setup only | Nginx Proxy Manager UI — close after setup, use SSH tunnel instead |
-| 5001 | Dockge (optional) | ⚠️ Setup only | Docker management UI — close after setup, use SSH tunnel instead |
-| 8080 | Backend (Go) | ❌ No | Internal API |
-| 8003 | cf-submit (host) | ❌ No | CloakBrowser Codeforces automation — only accessible from Docker containers |
-| 5432 | PostgreSQL | ❌ No | Database |
-| 6379 | Redis | ❌ No | Job queue |
-| 5050 | go-judge | ❌ No | Code sandbox |
+> **Cloudflare note:** Codeforces blocks datacenter IPs. On a VPS you **must** route through a residential proxy (`CF_PROXY`) or the login form will never render. See the [cf-submit troubleshooting](#troubleshooting) below.
 
 ---
 
-### Troubleshooting
+## API & Integrations
 
-| Problem | Likely Cause | Fix |
-|---------|-------------|-----|
-| "Site can't be reached" | DNS hasn't propagated yet | Wait 5–30 min. Run `nslookup yourdomain.com` to check. |
-| "Connection refused" | Firewall blocking port 80/443 | Run `ufw status`. Make sure 80/tcp and 443/tcp are ALLOW. |
-| "Secure Connection Failed" on first Caddy run | SSL cert still being issued | Wait 1–2 min, refresh. Check `docker compose logs caddy`. |
-| Caddy fails to start | Port 80 already in use by frontend | Did you comment out `80:80` in docker-compose.yml? (Step 6b) |
-| NPM shows "502 Bad Gateway" | NPM can't reach the frontend container | In NPM, set Forward Hostname to `frontend` (Docker service name), not `localhost`. |
-| NPM SSL fails ("Internal error") | Port 80 or 443 blocked by another service | Make sure you commented out `80:80` in frontend AND are not running Caddy alongside NPM. |
-| NPM admin UI not loading | Firewall blocking port 81 | `ufw allow 81/tcp`. Remember to close it after setup. |
-| "SSL certificate error" after domain change | Old cert cached | Delete the cert in NPM (SSL Certificates tab), request new one. Or for Caddy: `docker compose stop caddy && docker compose rm caddy`. |
-| Migrations fail | Database not ready | Wait longer after `docker compose up`. Check: `docker compose logs postgres`. |
-| 502 Bad Gateway | Backend container not running | `docker compose ps` — all services should be "Up". |
-| Codeforces submission shows SE (System Error) | cf-submit not reachable, bot locked, or Cloudflare blocked | See [Codeforces VJudge Bot Debugging](#debugging-cf-submit) section below. Common causes: missing proxy, wrong CF_SUBMIT_URL, bot account password empty, firewall blocking Docker→host traffic. |
-| `dial tcp 172.x.x.x:8003: i/o timeout` | UFW blocking Docker→host traffic | `sudo ufw allow from 172.16.0.0/12 to any port 8003 proto tcp && sudo ufw reload` |
-| `lookup host.docker.internal: no such host` | `extra_hosts` not configured | Ensure `extra_hosts: ["host.docker.internal:host-gateway"]` is present in `docker-compose.yml` under `backend` and `judge-worker`. |
-| `login form not found. CF blocked: False` | Proxy not working or JS rendering failed | Verify proxy: `curl -s localhost:8003/health` should show `"proxy":true`. Clear stale browser profile: `rm -rf /tmp/cb-profile`. Check screenshots in `/tmp/cf-screenshots/`. |
-| `login form not found. CF blocked: True` | Cloudflare challenge page returned | Your proxy is not working. Codeforces sees your real (datacenter) IP. Get a residential proxy. |
-| `cf-submit error: crash: ... ImportError: geoip2 is required` | `cloakbrowser[geoip]` not installed | Reinstall: `pip install "cloakbrowser[geoip]" --break-system-packages` |
+- **REST API** — served under `/api/*`. An OpenAPI spec lives at `docs/openapi/openapi.yaml`; regenerate TypeScript types with `make openapi`.
+- **API keys** — users create keys in Settings → API; requests authenticate with the key header.
+- **Webhooks** — event delivery with HMAC secret signing, configurable per user/org.
+- **WebSocket** — `/api/ws` pushes submission verdicts and notifications.
+- **Atom feeds** — `/feed/problems.atom`, `/feed/contests.atom`, `/feed/comments.atom`, `/feed/blog.atom`.
+- **Sitemap** — `/sitemap.xml`, built from the same visibility rules the public APIs enforce.
+- **Metrics** — `/metrics` (Prometheus).
+- **Status page** — `/status`, a static page polling `/api/health`.
 
 ---
 
-## Codeforces VJudge Bot (cf-submit)
+## Testing & CI
 
-AIOJ can submit solutions to Codeforces on behalf of bot accounts. The `cf-submit` service runs a headful Chromium browser via CloakBrowser (Playwright-based) to bypass Cloudflare's bot detection and interact with Codeforces' login and submission pages.
+### Run tests locally
 
-**Cloudflare blocks datacenter IPs.** On a VPS (AWS, DigitalOcean, Hetzner, etc.) you MUST route through a residential proxy. Without a proxy, Codeforces will return a "Just a moment..." Cloudflare challenge page instead of the login form.
+```bash
+# Backend (uses AIOJ_TEST_DSN, defaults to local Postgres)
+make test
 
-### How It Works
+# Frontend unit tests (Vitest)
+make test-frontend
 
-```
-User submits to CF problem
-       │
-       ▼
-AIOJ Backend → POST /submit → cf-submit service
-       │
-       ▼
-CloakBrowser (headful Chromium) → Codeforces.com
-       │
-       ▼
-Returns submission ID → Backend polls CF API for verdict
+# Lint (gofmt check + go vet + golangci-lint + eslint) — mirrors CI
+make lint
+
+# End-to-end (Playwright) — requires the sim stack
+make sim-up
+make e2e
 ```
 
-### Architecture Options
+### CI workflows (`.github/workflows/`)
 
-You can run `cf-submit` either:
-
-| Option | Setup | Default Port | Use When |
-|--------|-------|------|----------|
-| **systemd service** on host | `systemctl` | `8003` | Best for simplicity — runs Python directly on the host, no Docker overhead |
-| **Docker container** | `docker compose` | `8002/8003` | Runs inside Docker network, no systemd needed |
-
-**Recommended: systemd service on host (port 8003)**. It avoids Docker networking complexity and page-rendering issues inside containers.
+| Workflow | What it checks |
+|----------|---------------|
+| `backend-test.yml` | `go test ./...` + build against a live Postgres |
+| `frontend-build.yml` | TypeScript typecheck + Vite build + Vitest |
+| `lint.yml` | `gofmt -l`, `go vet`, `golangci-lint`, `eslint` |
+| `docker-image.yml` | Builds and publishes container images |
+| `deploy-staging.yml` | Staging deployment |
 
 ---
 
-### Environment Variables
+## Common Tasks
 
-| Variable | Used By | Purpose |
-|----------|---------|---------|
-| `CF_PROXY` | cf-submit (Python) | Residential proxy URL (`http://user:pass@host:port` or `socks5://user:pass@host:port`). **Required on VPS.** |
-| `CF_SUBMIT_URL` | Backend (Go) | Override the cf-submit base URL. Default: `http://host.docker.internal:8003` |
-| `PORT` | cf-submit (Python) | Listen port for the FastAPI server. Default: `8002` |
+### Add a new API endpoint
+1. Add handler methods in `internal/api/handler/<name>.go`.
+2. Add a field to `Deps` in `internal/api/deps.go` and wire routes in `internal/api/router.go`.
+3. Construct the handler in `cmd/aioj/main.go`.
 
----
+### Add a new database table
+1. Create `NNNNNN_<name>.up.sql` / `.down.sql` in `internal/store/migrations/`.
+2. Add the model in `internal/model/<name>.go`.
+3. Add the store interface in `internal/store/interfaces.go`.
+4. Implement it in `internal/store/postgres/<name>.go`.
 
-### Option A: systemd Service on Host (Recommended)
+### Add a new frontend page
+1. Create `web/src/pages/<PageName>.tsx`.
+2. Register the route in `web/src/App.tsx`.
+3. Add API calls in `web/src/lib/api.ts` and a nav link in the Navbar.
 
-The cf-submit service runs as a systemd unit directly on the VPS host, listening on port 8003. The Docker backend container reaches it via `host.docker.internal:8003`.
+### Add a language
+1. Drop a new YAML into `lang/` (copy an existing file as a template).
+2. Ensure the compiler/runtime is present in the `Dockerfile`.
+3. Restart the backend — languages are auto-discovered from the directory.
 
-#### 1. Install Dependencies
-
-```bash
-# Install Python packages (use --break-system-packages on Ubuntu 24.04+)
-pip install "cloakbrowser[geoip]" fastapi uvicorn requests --break-system-packages
-
-# Install Chromium runtime deps and fonts
-# Ubuntu 24.04 (t64 suffix):
-sudo apt-get install -y xvfb \
-    libglib2.0-0t64 libgobject-2.0-0 libnspr4 libnss3 \
-    libatk1.0-0t64 libatk-bridge2.0-0t64 libcups2t64 libxkbcommon0 \
-    libatspi2.0-0t64 libxcomposite1 libxdamage1 libxfixes3 \
-    libcairo2 libpango-1.0-0 libasound2t64 \
-    fonts-noto-color-emoji fonts-freefont-ttf fonts-unifont
-
-# Ubuntu 22.04:
-# sudo apt-get install -y xvfb \
-#     libglib2.0-0 libgobject-2.0-0 libnspr4 libnss3 \
-#     libatk1.0-0 libatk-bridge2.0-0 libcups2 libxkbcommon0 \
-#     libatspi2.0-0 libxcomposite1 libxdamage1 libxfixes3 \
-#     libcairo2 libpango-1.0-0 libasound2 \
-#     fonts-noto-color-emoji fonts-freefont-ttf fonts-unifont
-
-# Install Chromium browser binary
-python3 -m cloakbrowser install
-```
-
-#### 2. Configure the Proxy
-
-Edit the systemd service file before creating it if using a proxy:
-```bash
-# Edit the Environment line in the service file below to include:
-# Environment=CF_PROXY=http://user:pass@residential-proxy-host:port
-```
-
-#### 3. Create the systemd Service
+### Rebuild after code changes
 
 ```bash
-sudo nano /etc/systemd/system/cf-submit.service
-```
-
-```ini
-[Unit]
-Description=AIOJ cf-submit service
-After=network.target
-
-[Service]
-Type=simple
-User=root
-WorkingDirectory=/opt/aioj/deploy/cf-submit
-ExecStartPre=/bin/bash -c 'rm -f /tmp/.X99-lock && Xvfb :99 -screen 0 1920x1080x24 -ac &'
-ExecStart=/usr/bin/python3 server.py
-Environment=PORT=8003
-Environment=DISPLAY=:99
-Environment=CF_PROXY=http://user:pass@residential-proxy-host:port
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Start it:
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now cf-submit
-sudo systemctl status cf-submit
-```
-
-#### 4. Configure UFW (Firewall)
-
-Docker containers use a private bridge network. The backend container must reach the host's port 8003. Allow Docker-originated traffic:
-
-```bash
-sudo ufw allow from 172.16.0.0/12 to any port 8003 proto tcp
-sudo ufw reload
-```
-
-> `172.16.0.0/12` covers all Docker bridge subnets (`172.17.x.x` through `172.31.x.x`).
-
-#### 5. Configure Docker to Reach the Host
-
-The backend container uses `host.docker.internal` to reach the host. Docker Compose needs `extra_hosts` for this to resolve on Linux. The default `docker-compose.yml` already includes this:
-
-```yaml
-backend:
-  extra_hosts:
-    - "host.docker.internal:host-gateway"
-```
-
-#### 6. Verify
-
-```bash
-# Health check (confirms service is up and proxy is loaded)
-curl -s http://localhost:8003/health
-# → {"status":"ok","proxy":true}
-
-# Test login directly (replace with your credentials)
-curl -s -X POST http://localhost:8003/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"YOUR_BOT_HANDLE","password":"YOUR_BOT_PASSWORD"}'
-# → {"status":"ok","message":"login successful"}
-
-# Test reachability from inside the Docker backend container
-docker compose exec backend sh -c "wget -qO- http://host.docker.internal:8003/health 2>&1"
+docker compose build backend      # or: frontend / judge-worker
+docker compose up -d
 ```
 
 ---
 
-### Option B: Docker Container
+## Production Deployment
 
-The `cf-submit` Docker container runs with `network_mode: host` to avoid Docker bridge networking issues. It binds directly to the host's port 8003.
+The full, beginner-friendly VPS guide (VPS + domain + HTTPS with Caddy or Nginx, firewalls, visual management panels, and bot setup) is maintained in **[`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)**. The short version:
 
-#### 1. Configure `.env`
+1. **Provision** an Ubuntu VPS and a domain; point an `A` record at the server IP.
+2. **Harden** — allow only ports 22/80/443; never expose 5432/6379/5050/8080.
+3. **Clone** the repo, copy `.env.example` → `.env`, and set strong secrets.
+4. **Bring up core services**, run migrations, then enable a reverse proxy:
 
-```bash
-# In /opt/aioj/.env
-CF_PROXY=http://user:pass@residential-proxy-host:port
-CF_SUBMIT_URL=http://host.docker.internal:8003   # or omit (default)
-```
+   ```bash
+   docker compose up -d postgres judge redis backend judge-worker frontend
+   make migrate-up
+   docker compose --profile production up -d   # starts Caddy (edit deploy/Caddyfile first)
+   ```
 
-#### 2. Start the Container
+   Caddy obtains and renews Let's Encrypt certificates automatically. To use Nginx instead, see `deploy/nginx/aioj.conf`.
 
-```bash
-docker compose up -d --build cf-submit
-docker compose logs cf-submit --tail 20
-```
+5. **Log in and immediately change the admin password.**
 
-#### 3. Stop the systemd Service (If Running)
-
-```bash
-sudo systemctl stop cf-submit
-sudo systemctl disable cf-submit
-```
+> **Scale-out:** run multiple `judge-worker` replicas with `REDIS_URL` set — the queue enforces claim fencing so workers never double-judge a submission.
 
 ---
 
-### Setting Up a Bot Account
+## Troubleshooting
 
-1. Log into AIOJ as admin.
-2. Go to **Admin Panel → Bot Accounts**.
-3. Add a new Codeforces bot account:
-   - **Platform:** `codeforces`
-   - **Handle:** The Codeforces username (e.g., `JUST_Analytics`)
-   - **Password:** The Codeforces account password
-   - **Status:** `active`
-4. The backend will use the first active bot account for submissions.
+| Symptom | Likely cause | Fix |
+|---------|--------------|-----|
+| `Site can't be reached` after deploy | DNS not propagated | Wait 5–30 min; verify with `nslookup yourdomain.com`. |
+| `502 Bad Gateway` | Backend container down | `docker compose ps` — all services should be `Up`. |
+| Migrations fail on boot | DB not ready | Wait longer; check `docker compose logs postgres`. |
+| Migration stuck **dirty** | A failed migration left partial state | `docker compose exec postgres psql -U aioj -d aioj -c "UPDATE schema_migrations SET version=<n>, dirty=false"`. |
+| Judge always `CE` | Compiler missing in backend image | Compilers live in the **backend** image, not distroless go-judge. Rebuild `backend`. |
+| Submissions stuck `pending` | No judge worker consuming the queue | Ensure a `judge-worker` (or `--mode=judge-worker`) process is running and shares `REDIS_URL`. |
+| CF submission → `SE` / `System Error` | cf-submit unreachable, bot locked, or Cloudflare blocked | Check `curl localhost:8003/health` → `"proxy":true`. Reset a locked bot: `UPDATE bot_accounts SET consecutive_failures=0, status='active'`. |
+| `dial tcp ...:8003: i/o timeout` | UFW blocking Docker→host traffic | `sudo ufw allow from 172.16.0.0/12 to any port 8003 proto tcp && sudo ufw reload`. |
+| `login form not found. CF blocked: True` | Proxy not working | Codeforces sees your datacenter IP — configure a residential `CF_PROXY`. |
+| `lookup host.docker.internal: no such host` | Missing `extra_hosts` | Ensure `extra_hosts: ["host.docker.internal:host-gateway"]` is set (already in `docker-compose.yml`). |
+| `cgroup path is empty` (judge restarts) | Docker private cgroup namespace | The judge service requires `cgroup: host` + `privileged: true` (already configured). |
 
-Alternatively, insert directly into PostgreSQL:
-```bash
-docker compose exec postgres psql -U aioj -d aioj -c "
-  INSERT INTO bot_accounts (id, platform, platform_user, platform_pass, status, consecutive_failures)
-  VALUES (gen_random_uuid(), 'codeforces', 'YOUR_HANDLE', 'YOUR_PASSWORD', 'active', 0);
-"
-```
-
-#### Resetting a Locked Bot Account
-
-After 3 consecutive failures, the bot is skipped. Reset it:
-```bash
-docker compose exec postgres psql -U aioj -d aioj -c "
-  UPDATE bot_accounts SET consecutive_failures = 0, status = 'active';
-"
-```
+For cf-submit deep debugging (screenshots, manual browser tests, systemd setup), see `deploy/cf-submit/`.
 
 ---
 
-### Debugging cf-submit
+## Documentation
 
-#### Check Service Health
+| Document | Contents |
+|----------|----------|
+| [`AI_CONTEXT.md`](AI_CONTEXT.md) | Architecture, common tasks, and gotchas for contributors/AI agents |
+| [`USER_GUIDE.md`](USER_GUIDE.md) | End-user guide (solving, contests, profile) |
+| [`COMPETITIVE_OJ_FEATURES.md`](COMPETITIVE_OJ_FEATURES.md) | Feature parity notes vs. other judges |
+| [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) | Full VPS + domain + HTTPS deployment guide and bot setup |
+| [`docs/openapi/openapi.yaml`](docs/openapi/openapi.yaml) | REST API specification |
+| [`docs/runbooks/`](docs/runbooks/) | Operational runbooks (disaster recovery, domain policy, multi-region) |
+| [`docs/superpowers/plans/`](docs/superpowers/plans/) | Historical implementation plans |
 
-```bash
-curl -s http://localhost:8003/health
-# {"status":"ok","proxy":false}  → proxy NOT configured!
-# {"status":"ok","proxy":true}   → proxy is active
-```
+---
 
-#### Check Backend Logs for Submission Issues
+## License
 
-```bash
-docker compose logs backend --tail 50 -f
-```
+Released under the [MIT License](LICENSE).
 
-Key log messages and what they mean:
+---
 
-| Log Message | Meaning |
-|-------------|---------|
-| `async submit: submitting to remote OJ` | Backend picked up the submission, routing to vjudge |
-| `cf-submit failed, falling back to direct POST` | cf-submit service errored; falling back to direct HTTP (will fail on VPS) |
-| `dial tcp ... i/o timeout` | Network issue — backend container can't reach cf-submit (check UFW) |
-| `lookup host.docker.internal: no such host` | `extra_hosts` not configured in docker-compose.yml |
-| `login form not found. CF blocked: False` | Browser rendered page but inputs didn't appear (proxy or rendering issue) |
-| `CF blocked: True` | Cloudflare challenge page returned (proxy not working or missing) |
-| `vjudge submitted via bot` | **Success!** Submission sent to Codeforces |
-| `all bots failed` | All bot accounts exhausted or locked |
+<div align="center">
 
-#### Check cf-submit Logs
+Built for the competitive programming community.
 
-```bash
-# systemd service
-sudo journalctl -u cf-submit -n 50 --no-pager -f
-
-# Docker container
-docker compose logs cf-submit --tail 50 -f
-```
-
-#### View Browser Screenshots
-
-CloakBrowser captures screenshots at each step. They're saved to `/tmp/cf-screenshots/`:
-
-```bash
-ls -la /tmp/cf-screenshots/
-```
-
-| Screenshot | Captured When |
-|------------|---------------|
-| `01_enter.png` | After navigating to login page |
-| `02_after_login.png` | After submitting login credentials |
-| `03_submit.png` | After navigating to submit page |
-| `04_before_submit.png` | Before clicking submit |
-| `05_after_submit.png` | After clicking submit |
-| `99_no_form.png` | Login form not found (Cloudflare or render issue) |
-| `99_login_failed.png` | Login credentials rejected |
-| `99_no_submit_form.png` | Submit form not found |
-
-Download them to inspect visually:
-```bash
-# From your LOCAL machine:
-scp -r root@YOUR_VPS_IP:/tmp/cf-screenshots/ /tmp/
-```
-
-#### Run a Manual Browser Test
-
-To test if CloakBrowser can log into Codeforces directly (bypassing the Go backend):
-
-```bash
-DISPLAY=:99 python3 -c "
-import time
-from cloakbrowser import launch_persistent_context
-kw = dict(headless=False, humanize=True, args=['--no-sandbox','--disable-dev-shm-usage'])
-ctx = launch_persistent_context('/tmp/cb-profile', **kw)
-page = ctx.pages[0]
-page.goto('https://codeforces.com/enter', timeout=60000)
-time.sleep(5)
-print('Page title:', page.title())
-print('Login form found:', page.locator('#handleOrEmail').count() > 0)
-ctx.close()
-"
-```
-
-### Proxy Format
-
-`CF_PROXY` accepts HTTP and SOCKS5 proxies:
-
-```
-CF_PROXY=http://user:pass@host:port
-CF_PROXY=socks5://user:pass@host:port
-```
-
-When `CF_PROXY` is set, `geoip=True` is automatically enabled — CloakBrowser will match the browser's timezone and locale to the proxy's exit IP, making the session look more natural. This requires `cloakbrowser[geoip]` to be installed.
-
-### macOS (Local Development)
-
-Run the service directly on your Mac so CloakBrowser uses your residential IP:
-
-```bash
-pip install "cloakbrowser[geoip]" fastapi uvicorn requests
-
-# Start on port 8003 (Docker backend reaches it via host.docker.internal:8003)
-PORT=8003 python3 deploy/cf-submit/server.py
-```
-
-To start automatically on login, create a LaunchAgent:
-
-```bash
-mkdir -p ~/Library/LaunchAgents
-cat > ~/Library/LaunchAgents/com.aioj.cf-submit.plist << 'EOF'
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>com.aioj.cf-submit</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>/usr/bin/python3</string>
-        <string>/opt/aioj/deploy/cf-submit/server.py</string>
-    </array>
-    <key>EnvironmentVariables</key>
-    <dict>
-        <key>PORT</key>
-        <string>8003</string>
-    </dict>
-    <key>RunAtLoad</key>
-    <true/>
-    <key>KeepAlive</key>
-    <true/>
-    <key>StandardOutPath</key>
-    <string>/tmp/cf-submit.log</string>
-    <key>StandardErrorPath</key>
-    <string>/tmp/cf-submit.log</string>
-</dict>
-</plist>
-EOF
-
-launchctl load ~/Library/LaunchAgents/com.aioj.cf-submit.plist
-```
-
-Make sure `CF_SUBMIT_URL` is set to `http://host.docker.internal:8003` (the default).
+</div>
