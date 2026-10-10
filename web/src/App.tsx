@@ -238,7 +238,7 @@ function Home() {
                     ) : (
                         <div className="space-y-2">
                             {rankings.map((user, i) => (
-                                <div key={user.user_id} className="flex justify-between items-center text-xs">
+                                <div key={user.id} className="flex justify-between items-center text-xs">
                                     <div className="flex gap-2 items-center">
                                         <span className="font-mono text-gray-400 w-4">{i + 1}</span>
                                         <Link to={`/user/${user.username}`} className="font-semibold text-blue-600 dark:text-blue-400 hover:underline">
@@ -385,7 +385,7 @@ function AppShell() {
 
 interface ContestLite { id: string; title: string; start_time: string; end_time: string }
 interface FeedPost { id: string; title: string; username?: string; created_at: string; upvotes?: number }
-interface RankingRow { user_id: string; username: string; rating?: number }
+interface RankingRow { id: string; username: string; rating?: number }
 
 export default function App() {
     return (

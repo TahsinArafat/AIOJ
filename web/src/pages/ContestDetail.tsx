@@ -236,11 +236,11 @@ interface ContestInfo {
     title: string
     type: string
     format: string
-    division?: Division
+    division?: number
     start_time: string
     end_time: string
-    freeze_time?: string
-    max_participants?: number
+    freeze_time?: string | null
+    max_participants?: number | null
     pdf_enabled?: boolean
     registration_required?: boolean
     statement_hidden?: boolean
@@ -248,7 +248,7 @@ interface ContestInfo {
     virtual_contest_enabled?: boolean
 }
 interface ProblemRow { problem_id?: string; index?: string; title?: string; score?: number }
-interface ClarificationItem { id?: string; created_at: string; question?: string; answer?: string; username?: string; is_public?: boolean }
+interface ClarificationItem { id?: string; created_at: string; question?: string; answer?: string | null; username?: string; is_public?: boolean }
 interface AnnouncementItem { id: string; created_at: string; content?: string; username?: string }
 interface SubmissionRow { id?: string; created_at: string; status: string; language?: string; problem_id?: string; user_id?: string; username?: string; time_used?: number; memory_used?: number; score?: number }
 interface StandingsCell { solved?: boolean; attempts?: number; time?: number; pending?: number }
@@ -331,10 +331,11 @@ export default function ContestDetail() {
     useEffect(() => {
         if (!id) return
         api.contests.get(id).then(res => {
-            setContest(res.contest || res)
+            const c = res.contest
+            setContest(c)
             setProblems(res.problems || [])
-            setRegistered((res.contest || res).is_registered ?? false)
-            setRegistrationCount((res.contest || res).registration_count ?? 0)
+            setRegistered(c.is_registered ?? false)
+            setRegistrationCount(c.registration_count ?? 0)
         }).finally(() => setLoading(false))
     }, [id])
 
@@ -477,7 +478,7 @@ export default function ContestDetail() {
     if (loading) return <div className="text-center py-20 text-gray-500 dark:text-gray-400">Loading...</div>
     if (!contest) return <div className="text-center py-20 text-gray-500 dark:text-gray-400">Contest not found</div>
 
-    const status = getStatus(contest.start_time, contest.end_time, contest.freeze_time)
+    const status = getStatus(contest.start_time, contest.end_time, contest.freeze_time ?? undefined)
     const isUpcoming = status === 'upcoming'
     const isRunning = status === 'running' || status === 'frozen'
     const isEnded = status === 'ended'
@@ -494,7 +495,7 @@ export default function ContestDetail() {
                     <StatusBadge status={status} />
                     {contest.format && <FormatBadge format={contest.format} />}
                     {contest.type && <TypeBadge type={contest.type} />}
-                    {contest.division !== undefined && <DivisionBadge division={contest.division} />}
+                    {contest.division !== undefined && <DivisionBadge division={contest.division as Division} />}
                 </div>
             </div>
 

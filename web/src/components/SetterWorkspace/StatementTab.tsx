@@ -272,7 +272,7 @@ export default function StatementTab({
               <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Explanation (optional)</label>
               <input
                 type="text"
-                value={sc.explanation}
+                value={sc.explanation ?? ''}
                 onChange={e => {
                   const updated = [...formState.sampleCases]
                   updated[i] = { ...updated[i], explanation: e.target.value }

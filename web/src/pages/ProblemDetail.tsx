@@ -183,7 +183,7 @@ const STATUS_LABELS: Record<string, string> = {
     se: 'System Error', SE: 'System Error',
 }
 
-interface ProblemTranslation { language: string; title?: string; description?: string }
+interface ProblemTranslation { language: string; title?: string | null; description?: string | null }
 interface SampleCase { input: string; output: string; explanation?: string }
 interface ProblemData {
     id: string; slug: string; title?: string; description?: string; hint?: string;

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { api, type TestCaseResult } from '../lib/api'
+import { api } from '../lib/api'
 import { resolveProblemSlug, resolveProblemTitle } from '../lib/problemSlugResolver'
 import { useToast } from '../components/Toast'
 
@@ -24,8 +24,8 @@ const CASE_COLOR: Record<string, string> = {
     mle: 'text-orange-600 dark:text-orange-400', re: 'text-red-600 dark:text-red-400', se: 'text-gray-600 dark:text-gray-400',
 }
 
-function groupBySubtask(results: TestCaseResult[]): Map<number, TestCaseResult[]> {
-    const groups = new Map<number, TestCaseResult[]>()
+function groupBySubtask(results: JudgeCase[]): Map<number, JudgeCase[]> {
+    const groups = new Map<number, JudgeCase[]>()
     for (const r of results) {
         const id = r.subtask_id ?? 0
         if (!groups.has(id)) groups.set(id, [])

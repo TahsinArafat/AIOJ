@@ -1,13 +1,3 @@
-export interface TestCaseResult {
-    case_name?: string
-    status: string
-    time?: number
-    memory?: number
-    score?: number
-    subtask_id?: number
-    detail?: string
-}
-
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 /** Returns true if the string looks like a UUID — auto-generated slugs that aren't "real". */
@@ -170,26 +160,22 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
     }
 }
 
+import type { AIModel, APIKey, ActivityItem, AuthResponse, AuthSessionResponse, BackupFile, BlogListItem, BlogPost, BotAccount, Clarification, Class, ClassListItem, ClassMember, Comment, Contest, ContestDetailResponse, ContestNotice, ContestPermission, ContestProblem, ContestRegistration, ContestSubmissionsResponse, DetectedTool, Editorial, Group, GroupListItem, GroupMember, GroupPendingInvite, GymContest, GymData, Hack, HackResult, HackSubmission, LanguageConfig, Notification, NotificationPreferences, OnsiteBatchUser, Organization, OrganizationListItem, OrganizationMember, PendingInvite, PendingRemoteSubmission, PlagiarismPair, PlagiarismReport, Problem, ProblemI18n, ProblemListItem, ProblemPermission, ProblemStats, PublicProfile, RankingEntry, RatingHistoryEntry, RemoteLanguage, ScoreboardData, SetterApplication, Submission, Team, TeamListItem, TeamMember, TestResult, TrainingPlan, TrainingPlanDetail, TrainingPlanEnrollment, TrainingPlanProblem, TrainingPlanProgress, TrainingPlanSection, User, UserAchievement, UserProblemStats, UserProfile, VirtualContest, VirtualStatusResponse, WeakTagsRecommendations, Webhook } from '../types/api'
+
 export const api = {
     auth: {
         register: (d: { username: string; email: string; password: string }) =>
-            request<{ access_token: string; refresh_token: string; user: any }>('/auth/register', {
+            request<AuthSessionResponse>('/auth/register', {
                 method: 'POST',
                 body: JSON.stringify(d),
             }),
         login: (d: { username: string; password: string }) =>
-            request<{
-                access_token?: string
-                refresh_token?: string
-                user?: any
-                requires_2fa?: boolean
-                challenge_id?: string
-            }>('/auth/login', {
+            request<AuthResponse>('/auth/login', {
                 method: 'POST',
                 body: JSON.stringify(d),
             }),
         verify2FA: (challenge_id: string, code: string) =>
-            request<{ access_token: string; refresh_token: string; user: any }>(
+            request<AuthSessionResponse>(
                 '/auth/2fa/verify',
                 { method: 'POST', body: JSON.stringify({ challenge_id, code }) },
             ),
@@ -222,7 +208,7 @@ export const api = {
                 body: JSON.stringify({ password }),
             }),
         verify: (body: { challenge_id: string; code: string }) =>
-            request<{ access_token: string; refresh_token: string; user: any }>('/auth/2fa/verify', {
+            request<AuthSessionResponse>('/auth/2fa/verify', {
                 method: 'POST',
                 body: JSON.stringify(body),
             }),
@@ -234,30 +220,30 @@ export const api = {
             if (filters?.tags?.length) url += `&tags=${filters.tags.join(',')}`;
             if (filters?.search) url += `&search=${encodeURIComponent(filters.search)}`;
             if (filters?.source) url += `&source=${encodeURIComponent(filters.source)}`;
-            return request<{ data: any[]; total: number }>(url);
+            return request<{ data: ProblemListItem[]; total: number }>(url);
         },
-        listMy: (offset = 0, limit = 20) => request<{ data: any[]; total: number }>(`/problems/my?offset=${offset}&limit=${limit}`),
+        listMy: (offset = 0, limit = 20) => request<{ data: ProblemListItem[]; total: number }>(`/problems/my?offset=${offset}&limit=${limit}`),
         listTags: () => request<{ data: string[] }>('/problems/tags'),
-        get: (slug: string) => request<any>(`/problems/${slug}`),
+        get: (slug: string) => request<Problem>(`/problems/${slug}`),
         // Per-problem statement translations. `listI18n` is public; the write
         // methods are used by the setter panel.
-        listI18n: (id: string) => request<any[]>(`/problems/${id}/i18n/`),
+        listI18n: (id: string) => request<ProblemI18n[]>(`/problems/${id}/i18n/`),
         upsertI18n: (id: string, lang: string, d: { title?: string; description?: string }) =>
-            request<any>(`/problems/${id}/i18n/${lang}`, { method: 'PUT', body: JSON.stringify(d) }),
+            request<ProblemI18n>(`/problems/${id}/i18n/${lang}`, { method: 'PUT', body: JSON.stringify(d) }),
         deleteI18n: (id: string, lang: string) =>
-            request<any>(`/problems/${id}/i18n/${lang}`, { method: 'DELETE' }),
-        create: (d: any) => request<any>('/problems', { method: 'POST', body: JSON.stringify(d) }),
-        update: (slug: string, d: any) => request<any>(`/problems/${slug}`, { method: 'PUT', body: JSON.stringify(d) }),
-        delete: (slug: string) => request<any>(`/problems/${slug}`, { method: 'DELETE' }),
-        getPermissions: (slug: string) => request<{ data: any[] }>(`/problems/${slug}/permissions`),
+            request<{ status: string }>(`/problems/${id}/i18n/${lang}`, { method: 'DELETE' }),
+        create: (d: unknown) => request<Problem>('/problems', { method: 'POST', body: JSON.stringify(d) }),
+        update: (slug: string, d: unknown) => request<Problem>(`/problems/${slug}`, { method: 'PUT', body: JSON.stringify(d) }),
+        delete: (slug: string) => request<{ status: string }>(`/problems/${slug}`, { method: 'DELETE' }),
+        getPermissions: (slug: string) => request<{ data: ProblemPermission[] }>(`/problems/${slug}/permissions`),
         addPermission: (slug: string, username: string, accessLevel: string) =>
-            request<any>(`/problems/${slug}/permissions`, {
+            request<{ status: string }>(`/problems/${slug}/permissions`, {
                 method: 'POST',
                 body: JSON.stringify({ username, access_level: accessLevel })
             }),
         removePermission: (slug: string, userId: string) =>
-            request<any>(`/problems/${slug}/permissions/${userId}`, { method: 'DELETE' }),
-        uploadTestcases: async (slug: string, file: File) => {
+            request<{ status: string }>(`/problems/${slug}/permissions/${userId}`, { method: 'DELETE' }),
+        uploadTestcases: async (slug: string, file: File): Promise<unknown> => {
             const formData = new FormData()
             formData.append('file', file)
             const headers: Record<string, string> = {}
@@ -274,11 +260,11 @@ export const api = {
             }
             if (res.status === 204 || res.status === 200) {
                 const text = await res.text()
-                if (!text) return null as any
+                if (!text) return null
                 try {
                     return JSON.parse(text)
                 } catch {
-                    return text as any
+                    return text
                 }
             }
             return res.json()
@@ -378,8 +364,8 @@ export const api = {
         },
     },
     submissions: {
-        create: (d: any) => request<any>('/submissions', { method: 'POST', body: JSON.stringify(d) }),
-        createUpsolving: (d: any) => request<any>('/submissions/upsolving', { method: 'POST', body: JSON.stringify(d) }),
+        create: (d: unknown) => request<Submission>('/submissions', { method: 'POST', body: JSON.stringify(d) }),
+        createUpsolving: (d: unknown) => request<Submission>('/submissions/upsolving', { method: 'POST', body: JSON.stringify(d) }),
         run: (d: { source_code: string; language: string; input: string; expected?: string; time_limit_ms?: number; memory_limit_kb?: number }) =>
             request<{
                 status: string;
@@ -391,31 +377,31 @@ export const api = {
                 passed: boolean | null;
                 expected: string;
             }>('/submissions/run', { method: 'POST', body: JSON.stringify(d) }),
-        get: (id: string) => request<any>(`/submissions/${id}`),
-        retryRemote: (id: string) => request<any>(`/submissions/${id}/retry-remote`, { method: 'POST' }),
-        recheckRemote: (id: string) => request<any>(`/submissions/${id}/recheck-remote`, { method: 'POST' }),
+        get: (id: string) => request<Submission>(`/submissions/${id}`),
+        retryRemote: (id: string) => request<{ status: string }>(`/submissions/${id}/retry-remote`, { method: 'POST' }),
+        recheckRemote: (id: string) => request<{ status: string }>(`/submissions/${id}/recheck-remote`, { method: 'POST' }),
         list: (offset = 0, limit = 20, problemId?: string, contestId?: string) => {
             let url = `/submissions?offset=${offset}&limit=${limit}`;
             if (problemId) url += `&problem_id=${problemId}`;
             if (contestId) url += `&contest_id=${contestId}`;
-            return request<{ data: any[]; total: number }>(url);
+            return request<{ data: Submission[]; total: number }>(url);
         },
     },
     admin: {
         listUsers: (offset = 0, limit = 20) =>
-            request<{ data: any[]; total: number }>(`/admin/users?offset=${offset}&limit=${limit}`),
+            request<{ data: User[]; total: number }>(`/admin/users?offset=${offset}&limit=${limit}`),
         updateRole: (userId: string, role: string) =>
             request(`/admin/users/${userId}/role`, { method: 'PUT', body: JSON.stringify({ role }) }),
-        listApps: () => request<{ data: any[] }>('/admin/setter-applications'),
+        listApps: () => request<{ data: SetterApplication[] }>('/admin/setter-applications'),
         reviewApp: (userId: string, status: string) =>
             request(`/admin/setter-applications/${userId}/review`, { method: 'POST', body: JSON.stringify({ status }) }),
         botAccounts: {
             list: (offset = 0, limit = 20) =>
-                request<{ data: any[]; total: number }>(`/admin/bot-accounts?offset=${offset}&limit=${limit}`),
+                request<{ data: BotAccount[]; total: number }>(`/admin/bot-accounts?offset=${offset}&limit=${limit}`),
             create: (d: { user_id?: string; platform: string; platform_user: string; platform_pass: string; api_key?: string; api_secret?: string; rate_limit_rps?: number; session_data?: Record<string, string>; proxy_url?: string; proxy_enabled?: boolean }) =>
-                request<any>('/admin/bot-accounts', { method: 'POST', body: JSON.stringify(d) }),
+                request<BotAccount>('/admin/bot-accounts', { method: 'POST', body: JSON.stringify(d) }),
             update: (id: string, d: { platform_user?: string; platform_pass?: string; api_key?: string; api_secret?: string; status?: string; rate_limit_rps?: number; session_data?: Record<string, string>; proxy_url?: string; proxy_enabled?: boolean }) =>
-                request<any>(`/admin/bot-accounts/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
+                request<BotAccount>(`/admin/bot-accounts/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
             delete: (id: string) =>
                 request(`/admin/bot-accounts/${id}`, { method: 'DELETE' }),
             testLogin: (d: { platform: string; platform_user?: string; platform_pass?: string; session_data?: Record<string, string> }) =>
@@ -423,21 +409,21 @@ export const api = {
         },
         remoteLanguages: {
             list: (platform: string) =>
-                request<{ data: any[] }>(`/admin/remote-languages/${platform}`),
+                request<{ data: RemoteLanguage[] }>(`/admin/remote-languages/${platform}`),
             create: (d: { platform: string; local_id: string; remote_id: string; display_name: string; enabled?: boolean; sort_order?: number }) =>
-                request<any>('/admin/remote-languages', { method: 'POST', body: JSON.stringify(d) }),
+                request<RemoteLanguage>('/admin/remote-languages', { method: 'POST', body: JSON.stringify(d) }),
             update: (id: string, d: { local_id?: string; remote_id?: string; display_name?: string; enabled?: boolean; sort_order?: number }) =>
-                request<any>(`/admin/remote-languages/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
+                request<RemoteLanguage>(`/admin/remote-languages/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
             delete: (id: string) =>
                 request(`/admin/remote-languages/${id}`, { method: 'DELETE' }),
             detect: (platform: string) =>
-                request<{ matched: any[]; unmatched: any[]; existing: any[] }>(`/admin/remote-languages/detect/${platform}`, { method: 'POST' }),
+                request<{ matched: { remote_id: string; display_name: string; local_id: string }[]; unmatched: { remote_id: string; display_name: string }[]; existing: RemoteLanguage[] }>(`/admin/remote-languages/detect/${platform}`, { method: 'POST' }),
             bulkUpsert: (items: { platform: string; local_id: string; remote_id: string; display_name: string; enabled: boolean; sort_order: number }[]) =>
-                request<any>('/admin/remote-languages/bulk', { method: 'POST', body: JSON.stringify(items) }),
+                request<unknown>('/admin/remote-languages/bulk', { method: 'POST', body: JSON.stringify(items) }),
         },
         submissions: {
             pendingRemote: () =>
-                request<{ data: any[]; total: number }>('/admin/submissions/pending-remote'),
+                request<{ data: PendingRemoteSubmission[]; total: number }>('/admin/submissions/pending-remote'),
             rejudge: (id: string) =>
                 request<{ status: string }>(`/admin/submissions/${id}/rejudge`, { method: 'POST' }),
             refresh: (id: string) =>
@@ -445,45 +431,45 @@ export const api = {
         },
         settings: {
             list: () =>
-                request<{ data: { key: string; value: any; description: string; updated_at: string; updated_by: string | null }[] }>('/admin/settings'),
-            update: (key: string, value: any) =>
+                request<{ data: { key: string; value: string | number | boolean; description: string; updated_at: string; updated_by?: string | null }[] }>('/admin/settings'),
+            update: (key: string, value: unknown) =>
                 request(`/admin/settings/${encodeURIComponent(key)}`, { method: 'PUT', body: JSON.stringify({ value }) }),
         },
         languages: {
             list: () =>
-                request<{ data: any[] }>('/admin/languages'),
+                request<{ data: LanguageConfig[] }>('/admin/languages'),
             get: (key: string) =>
-                request<any>(`/admin/languages/${key}`),
+                request<LanguageConfig>(`/admin/languages/${key}`),
             getRaw: (key: string) =>
                 request<string>(`/admin/languages/${key}/raw`),
-            create: (d: any) =>
-                request<any>('/admin/languages', { method: 'POST', body: JSON.stringify(d) }),
-            update: (key: string, d: any) =>
-                request<any>(`/admin/languages/${key}`, { method: 'PUT', body: JSON.stringify(d) }),
+            create: (d: unknown) =>
+                request<LanguageConfig>('/admin/languages', { method: 'POST', body: JSON.stringify(d) }),
+            update: (key: string, d: unknown) =>
+                request<LanguageConfig>(`/admin/languages/${key}`, { method: 'PUT', body: JSON.stringify(d) }),
             updateRaw: (key: string, content: string) =>
-                request<any>(`/admin/languages/${key}/raw`, { method: 'PUT', body: JSON.stringify({ content }) }),
+                request<unknown>(`/admin/languages/${key}/raw`, { method: 'PUT', body: JSON.stringify({ content }) }),
             delete: (key: string) =>
                 request(`/admin/languages/${key}`, { method: 'DELETE' }),
             test: (key: string) =>
-                request<any>(`/admin/languages/${key}/test`, { method: 'POST' }),
+                request<TestResult>(`/admin/languages/${key}/test`, { method: 'POST' }),
             detect: () =>
-                request<{ compilers: any[]; interpreters: any[] }>('/admin/languages/detect'),
+                request<{ compilers: DetectedTool[]; interpreters: DetectedTool[] }>('/admin/languages/detect'),
             templates: () =>
-                request<{ data: any[] }>('/admin/languages/templates'),
+                request<{ data: LanguageConfig[] }>('/admin/languages/templates'),
         },
         backups: {
             list: () =>
-                request<{ data: any[] }>('/admin/backups'),
+                request<{ data: BackupFile[] }>('/admin/backups'),
             create: (type: string) =>
-                request<any>('/admin/backups', { method: 'POST', body: JSON.stringify({ type }) }),
+                request<unknown>('/admin/backups', { method: 'POST', body: JSON.stringify({ type }) }),
             delete: (filename: string) =>
-                request<any>(`/admin/backups/${encodeURIComponent(filename)}`, { method: 'DELETE' }),
+                request<unknown>(`/admin/backups/${encodeURIComponent(filename)}`, { method: 'DELETE' }),
             restore: (filename: string, password: string, type: string) =>
-                request<any>(`/admin/backups/${encodeURIComponent(filename)}/restore`, { method: 'POST', body: JSON.stringify({ password, type }) }),
+                request<unknown>(`/admin/backups/${encodeURIComponent(filename)}/restore`, { method: 'POST', body: JSON.stringify({ password, type }) }),
             upload: (file: File) => {
                 const formData = new FormData()
                 formData.append('file', file)
-                return request<any>('/admin/backups/upload', {
+                return request<unknown>('/admin/backups/upload', {
                     method: 'POST',
                     body: formData,
                 })
@@ -491,13 +477,13 @@ export const api = {
         },
         aiModels: {
             list: () =>
-                request<{ data: any[] }>('/admin/ai-models'),
+                request<{ data: AIModel[] }>('/admin/ai-models'),
             getById: (id: string) =>
-                request<any>(`/admin/ai-models/${id}`),
+                request<AIModel>(`/admin/ai-models/${id}`),
             create: (d: { name: string; endpoint: string; api_key: string; model_name: string; enabled: boolean; priority: number; description: string }) =>
-                request<any>('/admin/ai-models', { method: 'POST', body: JSON.stringify(d) }),
+                request<AIModel>('/admin/ai-models', { method: 'POST', body: JSON.stringify(d) }),
             update: (id: string, d: { name: string; endpoint: string; api_key: string; model_name: string; enabled: boolean; priority: number; description: string }) =>
-                request<any>(`/admin/ai-models/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
+                request<AIModel>(`/admin/ai-models/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
             toggle: (id: string) =>
                 request<{ id: string; enabled: boolean }>(`/admin/ai-models/${id}/toggle`, { method: 'PUT' }),
             delete: (id: string) =>
@@ -508,50 +494,50 @@ export const api = {
     },
     setter: {
         apply: (reason: string) => request('/auth/setter-apply', { method: 'POST', body: JSON.stringify({ reason }) }),
-        status: () => request<any>('/auth/setter-status'),
+        status: () => request<SetterApplication>('/auth/setter-status'),
     },
     contests: {
         list: (offset = 0, limit = 20, division?: number) => {
             let url = `/contests?offset=${offset}&limit=${limit}`;
             if (division !== undefined) url += `&division=${division}`;
-            return request<{ data: any[]; total: number }>(url);
+            return request<{ data: Contest[]; total: number }>(url);
         },
-        listMy: (offset = 0, limit = 20) => request<{ data: any[]; total: number }>(`/contests/my?offset=${offset}&limit=${limit}`),
-        get: (id: string) => request<any>(`/contests/${id}`),
-        create: (d: any) => request<any>('/contests', { method: 'POST', body: JSON.stringify(d) }),
+        listMy: (offset = 0, limit = 20) => request<{ data: Contest[]; total: number }>(`/contests/my?offset=${offset}&limit=${limit}`),
+        get: (id: string) => request<ContestDetailResponse>(`/contests/${id}`),
+        create: (d: unknown) => request<Contest>('/contests', { method: 'POST', body: JSON.stringify(d) }),
         getFormats: () => request<{ formats: string[] }>('/contests/formats'),
         scoreboard: (id: string, view?: string, page?: number) => {
             const params = new URLSearchParams();
             if (view) params.set('view', view);
             if (page && page > 1) params.set('page', String(page));
             const qs = params.toString();
-            return request<any>(`/contests/${id}/scoreboard${qs ? '?' + qs : ''}`);
+            return request<ScoreboardData>(`/contests/${id}/scoreboard${qs ? '?' + qs : ''}`);
         },
         register: (id: string) => request(`/contests/${id}/register`, { method: 'POST' }),
         unregister: (id: string) => request(`/contests/${id}/register`, { method: 'DELETE' }),
         checkRegistration: (id: string) => request<{ registered: boolean }>(`/contests/${id}/register`),
-        listRegistrations: (id: string) => request<{ data: any[]; count: number }>(`/contests/${id}/registrations`),
+        listRegistrations: (id: string) => request<{ data: ContestRegistration[]; count: number }>(`/contests/${id}/registrations`),
         getProblemByIndex: (contestId: string, index: string) =>
-            request<{ problem: any; contest: any; can_submit?: boolean; upsolving_disabled?: boolean; statement_hidden?: boolean; is_judge?: boolean }>(`/contests/${contestId}/problems/${index}`),
+            request<{ problem: Problem; contest: Contest; can_submit?: boolean; upsolving_disabled?: boolean; statement_hidden?: boolean; is_judge?: boolean }>(`/contests/${contestId}/problems/${index}`),
         addProblem: (contestId: string, d: { problem_id: string; index: string; score?: number }) =>
-            request<any>(`/contests/${contestId}/problems`, { method: 'POST', body: JSON.stringify(d) }),
+            request<{ status: string }>(`/contests/${contestId}/problems`, { method: 'POST', body: JSON.stringify(d) }),
         updateProblem: (contestId: string, problemId: string, d: { index: string; score: number; sort_order: number }) =>
-            request<any>(`/contests/${contestId}/problems/${problemId}`, { method: 'PUT', body: JSON.stringify(d) }),
+            request<{ status: string }>(`/contests/${contestId}/problems/${problemId}`, { method: 'PUT', body: JSON.stringify(d) }),
         removeProblem: (contestId: string, problemId: string) =>
             request(`/contests/${contestId}/problems/${problemId}`, { method: 'DELETE' }),
-        update: (id: string, d: any) =>
-            request<any>(`/contests/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
-        stats: (id: string) => request<any>(`/contests/${id}/stats`),
+        update: (id: string, d: unknown) =>
+            request<Contest>(`/contests/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
+        stats: (id: string) => request<unknown>(`/contests/${id}/stats`),
         standings: (id: string, page?: number) => {
             const params = new URLSearchParams();
             if (page && page > 1) params.set('page', String(page));
             const qs = params.toString();
-            return request<any>(`/contests/${id}/scoreboard${qs ? '?' + qs : ''}`);
+            return request<ScoreboardData>(`/contests/${id}/scoreboard${qs ? '?' + qs : ''}`);
         },
-        problems: (id: string) => request<any[]>(`/contests/${id}/problems`),
-        announcements: (id: string) => request<any[]>(`/contests/${id}/notices`),
+        problems: (id: string) => request<ContestProblem[]>(`/contests/${id}/problems`),
+        announcements: (id: string) => request<ContestNotice[]>(`/contests/${id}/notices`),
         postAnnouncement: (id: string, message: string) =>
-            request<any>(`/contests/${id}/notices`, { method: 'POST', body: JSON.stringify({ content: message }) }),
+            request<ContestNotice>(`/contests/${id}/notices`, { method: 'POST', body: JSON.stringify({ content: message }) }),
         deleteAnnouncement: (id: string, announcementId: string) =>
             request(`/contests/${id}/notices/${announcementId}`, { method: 'DELETE' }),
         submissions: (id: string, offset?: number, limit?: number, filters?: { mine?: boolean; problem_id?: string; language?: string; status?: string }) => {
@@ -562,56 +548,56 @@ export const api = {
             if (filters?.problem_id) params.set('problem_id', filters.problem_id);
             if (filters?.language) params.set('language', filters.language);
             if (filters?.status) params.set('status', filters.status);
-            return request<any>(`/contests/${id}/submissions${params.toString() ? '?' + params : ''}`);
+            return request<ContestSubmissionsResponse>(`/contests/${id}/submissions${params.toString() ? '?' + params : ''}`);
         },
     },
     clarifications: {
         list: (contestId: string) =>
-            request<{ data: any[] }>(`/contests/${contestId}/clarifications`),
+            request<{ data: Clarification[] }>(`/contests/${contestId}/clarifications`),
         create: (contestId: string, d: { problem_id?: string; question: string }) =>
-            request<any>(`/contests/${contestId}/clarifications`, { method: 'POST', body: JSON.stringify(d) }),
+            request<Clarification>(`/contests/${contestId}/clarifications`, { method: 'POST', body: JSON.stringify(d) }),
         answer: (contestId: string, id: string, d: { answer: string; is_public: boolean }) =>
-            request<any>(`/contests/${contestId}/clarifications/${id}/answer`, { method: 'POST', body: JSON.stringify(d) }),
+            request<Clarification>(`/contests/${contestId}/clarifications/${id}/answer`, { method: 'POST', body: JSON.stringify(d) }),
     },
     notices: {
         list: (contestId: string) =>
-            request<{ data: any[] }>(`/contests/${contestId}/notices`),
+            request<{ data: ContestNotice[] }>(`/contests/${contestId}/notices`),
         create: (contestId: string, d: { content: string }) =>
-            request<any>(`/contests/${contestId}/notices`, { method: 'POST', body: JSON.stringify(d) }),
+            request<ContestNotice>(`/contests/${contestId}/notices`, { method: 'POST', body: JSON.stringify(d) }),
         delete: (contestId: string, id: string) =>
             request(`/contests/${contestId}/notices/${id}`, { method: 'DELETE' }),
     },
     virtual: {
         start: (contestId: string, durationMinutes?: number) =>
-            request<any>('/virtual/start', { method: 'POST', body: JSON.stringify({ contest_id: contestId, duration_minutes: durationMinutes }) }),
-        status: () => request<any>('/virtual/status'),
+            request<VirtualContest>('/virtual/start', { method: 'POST', body: JSON.stringify({ contest_id: contestId, duration_minutes: durationMinutes }) }),
+        status: () => request<VirtualStatusResponse>('/virtual/status'),
         complete: (id: string) => request(`/virtual/${id}/complete`, { method: 'POST' }),
     },
     onsite: {
         listBalloons: (contestId: string) =>
-            request<{ data: any[] }>(`/contests/${contestId}/onsite/balloons`),
+            request<{ data: unknown[] }>(`/contests/${contestId}/onsite/balloons`),
         dispatchBalloon: (contestId: string, balloonId: string) =>
             request(`/contests/${contestId}/onsite/balloons/${balloonId}/dispatch`, { method: 'POST' }),
         requestPrint: (contestId: string, d: { filename: string; content: string }) =>
             request(`/contests/${contestId}/onsite/print`, { method: 'POST', body: JSON.stringify(d) }),
         listPrints: (contestId: string) =>
-            request<{ data: any[] }>(`/contests/${contestId}/onsite/prints`),
+            request<{ data: unknown[] }>(`/contests/${contestId}/onsite/prints`),
         updatePrintStatus: (contestId: string, printId: string, status: string) =>
             request(`/contests/${contestId}/onsite/prints/${printId}/status`, { method: 'POST', body: JSON.stringify({ status }) }),
-        loginAsTeam: (contestId: string, d: any) =>
-            request<any>(`/contests/${contestId}/onsite/login`, { method: 'POST', body: JSON.stringify(d) }),
-        generateBatch: (contestId: string, d: any) =>
-            request<any>(`/contests/${contestId}/onsite/generate`, { method: 'POST', body: JSON.stringify(d) }),
+        loginAsTeam: (contestId: string, d: unknown) =>
+            request<unknown>(`/contests/${contestId}/onsite/login`, { method: 'POST', body: JSON.stringify(d) }),
+        generateBatch: (contestId: string, d: unknown) =>
+            request<{ users: OnsiteBatchUser[] }>(`/contests/${contestId}/onsite/generate`, { method: 'POST', body: JSON.stringify(d) }),
         listBatch: (contestId: string) =>
-            request<any>(`/contests/${contestId}/onsite/users`),
+            request<{ data: OnsiteBatchUser[] }>(`/contests/${contestId}/onsite/users`),
         deleteUser: (contestId: string, userId: string) =>
             request(`/contests/${contestId}/onsite/users/${userId}`, { method: 'DELETE' }),
     },
     permissions: {
         list: (contestId: string) =>
-            request<{ data: any[] }>(`/contests/${contestId}/permissions`),
+            request<{ data: ContestPermission[] }>(`/contests/${contestId}/permissions`),
         add: (contestId: string, d: { user_id: string; access_level: string }) =>
-            request<any>(`/contests/${contestId}/permissions`, { method: 'POST', body: JSON.stringify(d) }),
+            request<{ status: string }>(`/contests/${contestId}/permissions`, { method: 'POST', body: JSON.stringify(d) }),
         remove: (contestId: string, userId: string) =>
             request(`/contests/${contestId}/permissions/${userId}`, { method: 'DELETE' }),
     },
@@ -620,194 +606,194 @@ export const api = {
             let url = `/gym?offset=${offset}&limit=${limit}`;
             if (filters?.category) url += `&category=${filters.category}`;
             if (filters?.search) url += `&search=${encodeURIComponent(filters.search)}`;
-            return request<{ data: any[]; total: number }>(url);
+            return request<{ data: GymContest[]; total: number }>(url);
         },
-        get: (id: string) => request<any>(`/gym/${id}`),
-        create: (d: any) => request<any>('/gym', { method: 'POST', body: JSON.stringify(d) }),
+        get: (id: string) => request<GymData>(`/gym/${id}`),
+        create: (d: unknown) => request<unknown>('/gym', { method: 'POST', body: JSON.stringify(d) }),
         markSolved: (id: string) => request(`/gym/${id}/solve`, { method: 'POST' }),
         isSolved: (id: string) => request<{ solved: boolean }>(`/gym/${id}/solved`),
     },
     hacks: {
         submit: (d: { contest_id: string; problem_id: string; submission_id: string; test_input: string }) =>
-            request<any>('/hacks', { method: 'POST', body: JSON.stringify(d) }),
-        get: (id: string) => request<any>(`/hacks/${id}`),
-        listByContest: (contestId: string) => request<any>(`/hacks/contest/${contestId}`),
-        listHackable: (contestId: string, problemId: string) => request<any>(`/hacks/hackable/${contestId}/${problemId}`),
+            request<HackResult>('/hacks', { method: 'POST', body: JSON.stringify(d) }),
+        get: (id: string) => request<Hack>(`/hacks/${id}`),
+        listByContest: (contestId: string) => request<unknown>(`/hacks/contest/${contestId}`),
+        listHackable: (contestId: string, problemId: string) => request<{ data: HackSubmission[] }>(`/hacks/hackable/${contestId}/${problemId}`),
     },
     stats: {
         getPlatform: () => request<{ problems: number; users: number; submissions: number }>('/stats/platform'),
-        getProblemStats: (problemId: string) => request<any>(`/stats/problems/${problemId}`),
-        getMyStats: () => request<any>('/stats/me'),
-        getUserStats: (userId: string) => request<any>(`/stats/user/${userId}`),
+        getProblemStats: (problemId: string) => request<ProblemStats>(`/stats/problems/${problemId}`),
+        getMyStats: () => request<UserProblemStats>('/stats/me'),
+        getUserStats: (userId: string) => request<UserProblemStats>(`/stats/user/${userId}`),
     },
     notifications: {
         list: (unreadOnly = false, limit = 50) =>
-            request<{ data: any[] }>(`/notifications?unread=${unreadOnly}&limit=${limit}`),
+            request<{ data: Notification[] }>(`/notifications?unread=${unreadOnly}&limit=${limit}`),
         unreadCount: () => request<{ count: number }>('/notifications/unread-count'),
         markAsRead: (id: string) => request(`/notifications/${id}/read`, { method: 'POST' }),
         markAllAsRead: () => request('/notifications/read-all', { method: 'POST' }),
-        getPreferences: () => request<any>('/notifications/preferences'),
-        updatePreferences: (prefs: any) => request('/notifications/preferences', { method: 'PUT', body: JSON.stringify(prefs) }),
+        getPreferences: () => request<NotificationPreferences>('/notifications/preferences'),
+        updatePreferences: (prefs: unknown) => request('/notifications/preferences', { method: 'PUT', body: JSON.stringify(prefs) }),
     },
     groups: {
         list: (offset = 0, limit = 20) =>
-            request<{ data: any[]; total: number }>(`/groups?offset=${offset}&limit=${limit}`),
-        my: () => request<{ data: any[] }>('/groups/my'),
-        get: (id: string) => request<any>(`/groups/${id}`),
-        create: (d: any) => request<any>('/groups', { method: 'POST', body: JSON.stringify(d) }),
-        update: (id: string, d: any) => request<any>(`/groups/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
-        delete: (id: string) => request<any>(`/groups/${id}`, { method: 'DELETE' }),
+            request<{ data: GroupListItem[]; total: number }>(`/groups?offset=${offset}&limit=${limit}`),
+        my: () => request<{ data: Group[] }>('/groups/my'),
+        get: (id: string) => request<Group>(`/groups/${id}`),
+        create: (d: unknown) => request<Group>('/groups', { method: 'POST', body: JSON.stringify(d) }),
+        update: (id: string, d: unknown) => request<Group>(`/groups/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
+        delete: (id: string) => request<unknown>(`/groups/${id}`, { method: 'DELETE' }),
         join: (id: string) => request(`/groups/${id}/join`, { method: 'POST' }),
         leave: (id: string) => request(`/groups/${id}/leave`, { method: 'POST' }),
-        members: (id: string) => request<any>(`/groups/${id}/members`),
-        getContests: (id: string) => request<{ data: any[] }>(`/groups/${id}/contests`),
+        members: (id: string) => request<{ data: GroupMember[] }>(`/groups/${id}/members`),
+        getContests: (id: string) => request<{ data: Contest[] }>(`/groups/${id}/contests`),
         addContest: (id: string, contestId: string) =>
             request(`/groups/${id}/contests`, { method: 'POST', body: JSON.stringify({ contest_id: contestId }) }),
         removeContest: (id: string, contestId: string) =>
             request(`/groups/${id}/contests/${contestId}`, { method: 'DELETE' }),
         invite: (id: string, d: { username: string }) =>
-            request<any>(`/groups/${id}/invite`, { method: 'POST', body: JSON.stringify(d) }),
+            request<unknown>(`/groups/${id}/invite`, { method: 'POST', body: JSON.stringify(d) }),
         respond: (id: string, d: { user_id: string; action: string }) =>
-            request<any>(`/groups/${id}/respond`, { method: 'POST', body: JSON.stringify(d) }),
+            request<unknown>(`/groups/${id}/respond`, { method: 'POST', body: JSON.stringify(d) }),
         pending: (id: string) =>
-            request<{ data: any[] }>(`/groups/${id}/pending`),
+            request<{ data: GroupPendingInvite[] }>(`/groups/${id}/pending`),
         joinByCode: (code: string) =>
-            request<any>('/groups/join-code', { method: 'POST', body: JSON.stringify({ invite_code: code }) }),
+            request<{ group_name?: string }>('/groups/join-code', { method: 'POST', body: JSON.stringify({ invite_code: code }) }),
     },
     teams: {
         list: (offset = 0, limit = 20) =>
-            request<{ data: any[]; total: number }>(`/teams?offset=${offset}&limit=${limit}`),
-        get: (id: string) => request<any>(`/teams/${id}`),
-        create: (d: any) => request<any>('/teams', { method: 'POST', body: JSON.stringify(d) }),
+            request<{ data: TeamListItem[]; total: number }>(`/teams?offset=${offset}&limit=${limit}`),
+        get: (id: string) => request<Team>(`/teams/${id}`),
+        create: (d: unknown) => request<Team>('/teams', { method: 'POST', body: JSON.stringify(d) }),
         join: (id: string) => request(`/teams/${id}/join`, { method: 'POST' }),
         leave: (id: string) => request(`/teams/${id}/leave`, { method: 'POST' }),
-        members: (id: string) => request<any>(`/teams/${id}/members`),
-        update: (id: string, d: any) => request<any>(`/teams/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
-        delete: (id: string) => request<any>(`/teams/${id}`, { method: 'DELETE' }),
+        members: (id: string) => request<{ data: TeamMember[] }>(`/teams/${id}/members`),
+        update: (id: string, d: unknown) => request<Team>(`/teams/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
+        delete: (id: string) => request<unknown>(`/teams/${id}`, { method: 'DELETE' }),
         invite: (id: string, d: { username: string }) =>
-            request<any>(`/teams/${id}/invite`, { method: 'POST', body: JSON.stringify(d) }),
+            request<unknown>(`/teams/${id}/invite`, { method: 'POST', body: JSON.stringify(d) }),
         requestJoin: (id: string) =>
-            request<any>(`/teams/${id}/request`, { method: 'POST' }),
+            request<unknown>(`/teams/${id}/request`, { method: 'POST' }),
         respond: (id: string, d: { user_id: string; action: string }) =>
-            request<any>(`/teams/${id}/respond`, { method: 'POST', body: JSON.stringify(d) }),
+            request<unknown>(`/teams/${id}/respond`, { method: 'POST', body: JSON.stringify(d) }),
         pending: (id: string) =>
-            request<{ data: any[] }>(`/teams/${id}/pending`),
+            request<{ data: TeamMember[] }>(`/teams/${id}/pending`),
     },
     blog: {
         list: (offset = 0, limit = 20, tag?: string) => {
             let url = `/blog?offset=${offset}&limit=${limit}`;
             if (tag) url += `&tag=${encodeURIComponent(tag)}`;
-            return request<{ data: any[]; total: number }>(url);
+            return request<{ data: BlogListItem[]; total: number }>(url);
         },
-        get: (id: string) => request<any>(`/blog/${id}`),
-        create: (d: any) => request<any>('/blog', { method: 'POST', body: JSON.stringify(d) }),
-        update: (id: string, d: any) => request<any>(`/blog/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
-        delete: (id: string) => request<any>(`/blog/${id}`, { method: 'DELETE' }),
-        getComments: (type: string, id: string) => request<{ data: any[] }>(`/blog/${type}/${id}/comments`),
-        createComment: (d: any) => request<any>('/blog/comments', { method: 'POST', body: JSON.stringify(d) }),
+        get: (id: string) => request<BlogPost>(`/blog/${id}`),
+        create: (d: unknown) => request<BlogPost>('/blog', { method: 'POST', body: JSON.stringify(d) }),
+        update: (id: string, d: unknown) => request<BlogPost>(`/blog/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
+        delete: (id: string) => request<unknown>(`/blog/${id}`, { method: 'DELETE' }),
+        getComments: (type: string, id: string) => request<{ data: Comment[] }>(`/blog/${type}/${id}/comments`),
+        createComment: (d: unknown) => request<Comment>('/blog/comments', { method: 'POST', body: JSON.stringify(d) }),
         vote: (d: { target_type: string; target_id: string; value: number }) =>
             request('/blog/vote', { method: 'POST', body: JSON.stringify(d) }),
         getVote: (id: string, type = 'blog') => request<{ value: number }>(`/blog/${id}/vote?type=${type}`),
     },
     editorials: {
         list: (offset = 0, limit = 20) =>
-            request<{ data: any[]; total: number }>(`/editorials?offset=${offset}&limit=${limit}`),
-        get: (id: string) => request<any>(`/editorials/${id}`),
-        getByProblem: (problemId: string) => request<{ data: any[] }>(`/editorials/problem/${problemId}`),
-        create: (d: any) => request<any>('/editorials', { method: 'POST', body: JSON.stringify(d) }),
+            request<{ data: Editorial[]; total: number }>(`/editorials?offset=${offset}&limit=${limit}`),
+        get: (id: string) => request<Editorial>(`/editorials/${id}`),
+        getByProblem: (problemId: string) => request<{ data: Editorial[] }>(`/editorials/problem/${problemId}`),
+        create: (d: unknown) => request<Editorial>('/editorials', { method: 'POST', body: JSON.stringify(d) }),
     },
     apiKeys: {
-        list: () => request<{ data: any[] }>('/keys'),
+        list: () => request<{ data: APIKey[] }>('/keys'),
         create: (d: { name: string; description?: string }) =>
-            request<{ api_key: any; secret: string }>('/keys', { method: 'POST', body: JSON.stringify(d) }),
+            request<{ api_key: string; secret: string }>('/keys', { method: 'POST', body: JSON.stringify(d) }),
         delete: (id: string) => request(`/keys/${id}`, { method: 'DELETE' }),
     },
     webhooks: {
-        list: () => request<{ data: any[] }>('/webhooks'),
+        list: () => request<{ data: Webhook[] }>('/webhooks'),
         create: (d: { url: string; secret?: string; events: string[] }) =>
-            request<any>('/webhooks', { method: 'POST', body: JSON.stringify(d) }),
+            request<Webhook>('/webhooks', { method: 'POST', body: JSON.stringify(d) }),
         delete: (id: string) => request(`/webhooks/${id}`, { method: 'DELETE' }),
     },
     recommendations: {
         get: (rating?: number) =>
             request<{
-                progression: any[];
-                weak_tags: { tags: string[]; problems: any[] };
-                hybrid: any[];
+                progression: ProblemListItem[];
+                weak_tags: WeakTagsRecommendations;
+                hybrid: ProblemListItem[];
             }>(rating !== undefined ? `/recommendations?rating=${rating}` : '/recommendations'),
     },
     organizations: {
         list: (offset = 0, limit = 20) =>
-            request<{ data: any[]; total: number }>(`/organizations?offset=${offset}&limit=${limit}`),
-        get: (id: string) => request<any>(`/organizations/${id}`),
+            request<{ data: OrganizationListItem[]; total: number }>(`/organizations?offset=${offset}&limit=${limit}`),
+        get: (id: string) => request<Organization>(`/organizations/${id}`),
         create: (d: { name: string; description: string }) =>
-            request<any>('/organizations', { method: 'POST', body: JSON.stringify(d) }),
+            request<Organization>('/organizations', { method: 'POST', body: JSON.stringify(d) }),
         update: (id: string, d: { name: string; description: string }) =>
-            request<any>(`/organizations/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
+            request<Organization>(`/organizations/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
         delete: (id: string) => request(`/organizations/${id}`, { method: 'DELETE' }),
         join: (id: string) => request(`/organizations/${id}/join`, { method: 'POST' }),
         leave: (id: string) => request(`/organizations/${id}/leave`, { method: 'POST' }),
-        members: (id: string) => request<{ data: any[] }>(`/organizations/${id}/members`),
+        members: (id: string) => request<{ data: OrganizationMember[] }>(`/organizations/${id}/members`),
         addMember: (id: string, userId: string, role: string) =>
             request(`/organizations/${id}/members`, { method: 'POST', body: JSON.stringify({ user_id: userId, role }) }),
         removeMember: (id: string, userId: string) =>
             request(`/organizations/${id}/members/${userId}`, { method: 'DELETE' }),
-        my: () => request<{ data: any[] }>('/organizations/my'),
+        my: () => request<{ data: OrganizationListItem[] }>('/organizations/my'),
     },
     classes: {
         list: (orgId: string, offset = 0, limit = 20) =>
-            request<{ data: any[]; total: number }>(`/organizations/${orgId}/classes?offset=${offset}&limit=${limit}`),
-        get: (id: string) => request<any>(`/classes/${id}`),
+            request<{ data: ClassListItem[]; total: number }>(`/organizations/${orgId}/classes?offset=${offset}&limit=${limit}`),
+        get: (id: string) => request<Class>(`/classes/${id}`),
         create: (orgId: string, d: { name: string; description: string }) =>
-            request<any>(`/organizations/${orgId}/classes`, { method: 'POST', body: JSON.stringify(d) }),
+            request<Class>(`/organizations/${orgId}/classes`, { method: 'POST', body: JSON.stringify(d) }),
         update: (id: string, d: { name: string; description: string }) =>
-            request<any>(`/classes/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
+            request<Class>(`/classes/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
         delete: (id: string) => request(`/classes/${id}`, { method: 'DELETE' }),
         joinByCode: (inviteCode: string) =>
-            request<any>('/classes/join', { method: 'POST', body: JSON.stringify({ invite_code: inviteCode }) }),
+            request<{ status: string; class_id: string }>('/classes/join', { method: 'POST', body: JSON.stringify({ invite_code: inviteCode }) }),
         leave: (id: string) => request(`/classes/${id}/leave`, { method: 'POST' }),
-        members: (id: string) => request<{ data: any[] }>(`/classes/${id}/members`),
+        members: (id: string) => request<{ data: ClassMember[] }>(`/classes/${id}/members`),
     },
     training: {
         list: (offset = 0, limit = 20, opts?: { orgId?: string; public?: boolean }) => {
             let url = `/training?offset=${offset}&limit=${limit}`;
             if (opts?.orgId) url += `&org_id=${opts.orgId}`;
             if (opts?.public) url += `&public=true`;
-            return request<{ data: any[]; total: number }>(url);
+            return request<{ data: TrainingPlan[]; total: number }>(url);
         },
-        get: (id: string) => request<any>(`/training/${id}`),
-        create: (d: any) => request<any>('/training', { method: 'POST', body: JSON.stringify(d) }),
-        update: (id: string, d: any) => request<any>(`/training/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
+        get: (id: string) => request<TrainingPlanDetail>(`/training/${id}`),
+        create: (d: unknown) => request<TrainingPlan>('/training', { method: 'POST', body: JSON.stringify(d) }),
+        update: (id: string, d: unknown) => request<TrainingPlan>(`/training/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
         delete: (id: string) => request(`/training/${id}`, { method: 'DELETE' }),
         enroll: (id: string) => request(`/training/${id}/enroll`, { method: 'POST' }),
         unenroll: (id: string) => request(`/training/${id}/enroll`, { method: 'DELETE' }),
-        enrollments: (id: string) => request<{ data: any[] }>(`/training/${id}/enrollments`),
-        progress: (id: string) => request<any>(`/training/${id}/progress`),
+        enrollments: (id: string) => request<{ data: TrainingPlanEnrollment[] }>(`/training/${id}/enrollments`),
+        progress: (id: string) => request<TrainingPlanProgress>(`/training/${id}/progress`),
         addSection: (planId: string, d: { title: string; description: string }) =>
-            request<any>(`/training/${planId}/sections`, { method: 'POST', body: JSON.stringify(d) }),
+            request<TrainingPlanSection>(`/training/${planId}/sections`, { method: 'POST', body: JSON.stringify(d) }),
         deleteSection: (sectionId: string) =>
             request(`/training/sections/${sectionId}`, { method: 'DELETE' }),
         addProblem: (sectionId: string, d: { problem_id: string; points: number }) =>
-            request<any>(`/training/sections/${sectionId}/problems`, { method: 'POST', body: JSON.stringify(d) }),
+            request<TrainingPlanProblem>(`/training/sections/${sectionId}/problems`, { method: 'POST', body: JSON.stringify(d) }),
         removeProblem: (problemId: string) =>
             request(`/training/problems/${problemId}`, { method: 'DELETE' }),
     },
     ratings: {
         getByUser: (userId: string, limit = 50) =>
-            request<{ data: any[] }>(`/rating/user/${userId}?limit=${limit}`),
+            request<{ data: RatingHistoryEntry[] }>(`/rating/user/${userId}?limit=${limit}`),
         getByContest: (contestId: string) =>
-            request<{ data: any[] }>(`/rating/contest/${contestId}`),
+            request<{ data: RatingHistoryEntry[] }>(`/rating/contest/${contestId}`),
     },
     plagiarism: {
         runCheck: (contestId: string, threshold?: number) =>
-            request<any>(`/contests/${contestId}/plagiarism/check`, {
+            request<unknown>(`/contests/${contestId}/plagiarism/check`, {
                 method: 'POST',
                 body: JSON.stringify({ contest_id: contestId, threshold }),
             }),
         getReport: (contestId: string) =>
-            request<any>(`/contests/${contestId}/plagiarism/report`),
+            request<PlagiarismReport>(`/contests/${contestId}/plagiarism/report`),
         listPairs: (contestId: string, reportId: string, offset = 0, limit = 50) =>
-            request<{ data: any[]; total: number }>(
+            request<{ data: PlagiarismPair[]; total: number }>(
                 `/contests/${contestId}/plagiarism/report/${reportId}/pairs?offset=${offset}&limit=${limit}`
             ),
         updatePair: (contestId: string, pairId: string, status: string) =>
@@ -821,28 +807,28 @@ export const api = {
             let url = `/rankings?offset=${offset}&limit=${limit}`;
             if (country) url += `&country=${encodeURIComponent(country)}`;
             if (organization) url += `&organization=${encodeURIComponent(organization)}`;
-            return request<{ data: any[]; total: number }>(url);
+            return request<{ data: RankingEntry[]; total: number }>(url);
         },
     },
     feed: {
-        activity: (limit = 30) => request<{ data: any[] }>(`/activity?limit=${limit}`),
+        activity: (limit = 30) => request<{ data: ActivityItem[] }>(`/activity?limit=${limit}`),
     },
     users: {
         exportMyData: () => request<Record<string, unknown>>('/users/me/export'),
         deleteAccount: (d: { password: string; confirm: boolean }) =>
             request<{ status: string }>('/users/me', { method: 'DELETE', body: JSON.stringify(d) }),
         getByUsername: (username: string) =>
-            request<any>(`/users/${encodeURIComponent(username)}`),
+            request<PublicProfile>(`/users/${encodeURIComponent(username)}`),
         getSubmissions: (username: string, offset = 0, limit = 20) =>
-            request<{ data: any[]; total: number }>(`/users/${encodeURIComponent(username)}/submissions?offset=${offset}&limit=${limit}`),
+            request<{ data: Submission[]; total: number }>(`/users/${encodeURIComponent(username)}/submissions?offset=${offset}&limit=${limit}`),
         getBlogs: (username: string, offset = 0, limit = 20) =>
-            request<{ data: any[]; total: number }>(`/users/${encodeURIComponent(username)}/blogs?offset=${offset}&limit=${limit}`),
+            request<{ data: BlogListItem[]; total: number }>(`/users/${encodeURIComponent(username)}/blogs?offset=${offset}&limit=${limit}`),
         getComments: (username: string, offset = 0, limit = 20) =>
-            request<{ data: any[]; total: number }>(`/users/${encodeURIComponent(username)}/comments?offset=${offset}&limit=${limit}`),
+            request<{ data: Comment[]; total: number }>(`/users/${encodeURIComponent(username)}/comments?offset=${offset}&limit=${limit}`),
         getProfile: () =>
-            request<any>('/users/profile/edit'),
+            request<UserProfile>('/users/profile/edit'),
         updateProfile: (d: { first_name?: string; last_name?: string; country?: string; city?: string; organization?: string; github_url?: string; bio?: string; avatar_url?: string; show_email?: boolean; show_tags?: boolean }) =>
-            request<any>('/users/profile/edit', { method: 'PUT', body: JSON.stringify(d) }),
+            request<UserProfile>('/users/profile/edit', { method: 'PUT', body: JSON.stringify(d) }),
         updatePassword: (d: { current_password: string; new_password: string }) =>
             request<{ message: string }>('/users/profile/password', { method: 'PUT', body: JSON.stringify(d) }),
         follow: (username: string) =>
@@ -854,21 +840,21 @@ export const api = {
                 `/users/${encodeURIComponent(username)}/follow/status`,
             ),
         followers: (username: string) =>
-            request<{ data: any[] }>(`/users/${encodeURIComponent(username)}/followers`),
+            request<{ data: unknown[] }>(`/users/${encodeURIComponent(username)}/followers`),
         following: (username: string) =>
-            request<{ data: any[] }>(`/users/${encodeURIComponent(username)}/following`),
+            request<{ data: unknown[] }>(`/users/${encodeURIComponent(username)}/following`),
         achievements: (userId: string) =>
-            request<{ data: any[] }>(`/users/${encodeURIComponent(userId)}/achievements`),
+            request<{ data: UserAchievement[] }>(`/users/${encodeURIComponent(userId)}/achievements`),
         getPendingInvites: () =>
-            request<{ teams: any[]; groups: any[] }>('/users/profile/invites'),
+            request<{ teams: PendingInvite[]; groups: GroupPendingInvite[] }>('/users/profile/invites'),
     },
     search: {
         global: (q: string, limit = 10) =>
-            request<{ problems: any[]; users: any[]; contests: any[] }>(`/search?q=${encodeURIComponent(q)}&limit=${limit}`),
+            request<{ problems: ProblemListItem[]; users: User[]; contests: Contest[] }>(`/search?q=${encodeURIComponent(q)}&limit=${limit}`),
     },
     remoteLanguages: {
         list: (platform: string) =>
-            request<{ data: any[] }>(`/remote-languages/${platform}`),
+            request<{ data: RemoteLanguage[] }>(`/remote-languages/${platform}`),
     },
     generate: {
         problem: (d: {

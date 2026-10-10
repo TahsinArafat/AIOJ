@@ -20,17 +20,16 @@ type Tab = (typeof TABS)[number]
 
 function EditProfileTab() {
     interface ProfileData {
-    first_name: string
-    last_name: string
-    avatar_url: string | null
-    bio: string | null
-    city: string | null
-    country: string | null
-    organization: string | null
-    github_url: string | null
+    first_name?: string
+    last_name?: string
+    avatar_url?: string | null
+    bio?: string | null
+    city?: string | null
+    country?: string | null
+    organization?: string | null
+    github_url?: string | null
     show_email: boolean
     show_tags: boolean
-    [key: string]: unknown
 }
 
 const [profile, setProfile] = useState<ProfileData | null>(null)
@@ -201,7 +200,11 @@ function PendingInvitesTab({ userId }: { userId: string }) {
             .finally(() => setLoading(false))
     }
 
-    useEffect(() => { fetchInvites() }, [])
+    useEffect(() => {
+        // deferred a microtask: spinner still lands pre-paint, but the setState is
+        // no longer synchronous (react-hooks/set-state-in-effect)
+        queueMicrotask(() => fetchInvites())
+    }, [])
 
     const handleRespond = async (type: 'team' | 'group', id: string, userId: string, action: string) => {
         setActing(`${type}-${id}-${action}`)

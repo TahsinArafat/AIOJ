@@ -7,7 +7,7 @@ export interface TestCase {
 export interface Collaborator {
   problem_id: string
   user_id: string
-  username: string
+  username?: string
   access_level: string
 }
 
@@ -22,7 +22,7 @@ export interface ProblemFormState {
   memoryLimit: number
   difficulty: string
   tags: string
-  sampleCases: { input: string; output: string; explanation: string }[]
+  sampleCases: { input: string; output: string; explanation?: string | null }[]
 
   // Test Cases
   testcases: TestCase[]

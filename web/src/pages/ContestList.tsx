@@ -68,7 +68,7 @@ type ContestStatus = 'upcoming' | 'running' | 'ended'
 interface ContestSummary {
     id: string
     title: string
-    division?: 0 | 1 | 2 | 3 | 4
+    division?: number
     type: string
     start_time: string
     end_time: string
@@ -168,12 +168,6 @@ export default function ContestList() {
         searchTimer.current = setTimeout(() => setSearch(v), 300)
     }, [])
 
-    // fetch on division / search change (reset)
-    useEffect(() => {
-        setOffset(0)
-        loadContests(0, true)
-    }, [division, search])
-
     const loadContests = useCallback(async (off: number, replace: boolean) => {
         setLoading(true)
         try {
@@ -189,6 +183,14 @@ export default function ContestList() {
             setLoading(false)
         }
     }, [division])
+
+    // fetch on division / search change (reset)
+    useEffect(() => {
+        queueMicrotask(() => {
+            setOffset(0)
+            loadContests(0, true)
+        })
+    }, [division, search, loadContests])
 
     const loadMore = useCallback(() => {
         if (!loading && hasMore) loadContests(offset, false)
@@ -241,7 +243,7 @@ export default function ContestList() {
                     >
                         All
                     </button>
-                    {(Object.entries(DIVISIONS) as [string, any][]).map(([key, info]) => {
+                    {Object.entries(DIVISIONS).map(([key, info]) => {
                         const div = Number(key) as Division
                         const active = division === div
                         const activeBg = theme === 'dark' && info.darkBg ? info.darkBg.replace(/30$|40$/, '60') : info.color
@@ -318,7 +320,7 @@ export default function ContestList() {
                                                     <Link to={`/contests/${contestSlug(c)}`} className="font-semibold text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400 hover:underline">
                                                         {c.title}
                                                     </Link>
-                                                    <DivisionBadge division={c.division ?? 0} size="sm" />
+                                                    <DivisionBadge division={(c.division ?? 0) as Division} size="sm" />
                                                     <FormatBadge type={c.type} />
                                                 </div>
                                             </td>
@@ -380,7 +382,7 @@ export default function ContestList() {
                                                 <Link to={`/contests/${contestSlug(c)}`} className="font-semibold text-gray-900 dark:text-gray-100 hover:text-blue-600 hover:underline">
                                                     {c.title}
                                                 </Link>
-                                                <DivisionBadge division={c.division ?? 0} size="sm" />
+                                                <DivisionBadge division={(c.division ?? 0) as Division} size="sm" />
                                                 <FormatBadge type={c.type} />
                                             </div>
                                         </td>

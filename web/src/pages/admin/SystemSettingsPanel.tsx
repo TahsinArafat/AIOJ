@@ -8,7 +8,7 @@ interface Setting {
     value: string | number | boolean
     description: string
     updated_at: string
-    updated_by: string | null
+    updated_by?: string | null
 }
 
 const settingGroups: Record<string, { label: string; icon: string }> = {

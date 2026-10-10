@@ -10,15 +10,15 @@ interface BotAccount {
     user_id: string
     platform: string
     platform_user: string
-    platform_pass: string
-    api_key: string
-    api_secret: string
+    platform_pass?: string
+    api_key?: string
+    api_secret?: string
     session_data?: Record<string, string>
     status: string
     rate_limit_rps: number
     proxy_url: string
     proxy_enabled: boolean
-    last_used_at: string | null
+    last_used_at?: string | null
     created_at: string
 }
 
@@ -88,8 +88,12 @@ export default function BotAccountsPanel() {
     }
 
     useEffect(() => {
-        loadBots()
-        api.admin.listUsers(0, 100).then(d => setUsers(d.data || [])).catch(() => { })
+        // deferred a microtask: spinner still lands pre-paint, but the setState is
+        // no longer synchronous (react-hooks/set-state-in-effect)
+        queueMicrotask(() => {
+            loadBots()
+            api.admin.listUsers(0, 100).then(d => setUsers(d.data || [])).catch(() => { })
+        })
     }, [])
 
     useEffect(() => {

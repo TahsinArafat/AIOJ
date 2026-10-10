@@ -4,7 +4,7 @@ import { api, contestSlug } from '../lib/api'
 
 interface SearchResult {
     id: string
-    title: string
+    title?: string
     slug?: string
     display_id?: number
     subtitle?: string
@@ -56,7 +56,11 @@ export default function GlobalSearch() {
             setIsLoading(true)
             try {
                 const data = await api.search.global(trimmed)
-                setResults(data)
+                setResults({
+                    problems: data.problems.map(p => ({ id: p.id, title: p.title, slug: p.slug })),
+                    users: data.users.map(u => ({ id: u.id, username: u.username })),
+                    contests: data.contests.map(c => ({ id: c.id, title: c.title, slug: c.slug, display_id: c.display_id })),
+                })
                 setIsOpen(true)
                 setSelectedIndex(-1)
             } catch {
