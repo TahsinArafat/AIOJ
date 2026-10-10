@@ -195,6 +195,20 @@ export default function GenerateProblem() {
     const [testCaseCount, setTestCaseCount] = useState(10)
     const [hasSubtasks, setHasSubtasks] = useState(false)
     const [additionalPrompt, setAdditionalPrompt] = useState('')
+    const [secondaryTopics, setSecondaryTopics] = useState<string[]>([])
+    const [requiredTechniques, setRequiredTechniques] = useState<string[]>([])
+    const [forbiddenTechniques, setForbiddenTechniques] = useState<string[]>([])
+    const [ratingMin, setRatingMin] = useState(1300)
+    const [ratingMax, setRatingMax] = useState(1500)
+    const [solverMode, setSolverMode] = useState<'solo' | 'team'>('solo')
+    const [teamSize, setTeamSize] = useState(3)
+    const [eventContext, setEventContext] = useState<'practice' | 'online' | 'onsite'>('practice')
+    const [formatProfile, setFormatProfile] = useState<'general' | 'codeforces' | 'icpc' | 'oi'>('general')
+    const [expectedSolveMinutes, setExpectedSolveMinutes] = useState(60)
+    const [audienceLevel, setAudienceLevel] = useState('intermediate')
+    const [insightEmphasis, setInsightEmphasis] = useState<'insight' | 'implementation' | 'balanced'>('balanced')
+    const [storyTone, setStoryTone] = useState('neutral')
+    const [constraintGuidance, setConstraintGuidance] = useState('')
 
     // Generation state
     const [generating, setGenerating] = useState(false)
@@ -225,6 +239,21 @@ export default function GenerateProblem() {
                 testcase_count: testCaseCount,
                 has_subtasks: hasSubtasks,
                 additional_prompt: additionalPrompt || undefined,
+                primary_topics: tags,
+                secondary_topics: secondaryTopics,
+                required_techniques: requiredTechniques,
+                forbidden_techniques: forbiddenTechniques,
+                rating_min: ratingMin,
+                rating_max: ratingMax,
+                solver_mode: solverMode,
+                team_size: solverMode === 'team' ? teamSize : undefined,
+                event_context: eventContext,
+                format_profile: formatProfile,
+                expected_solve_minutes: expectedSolveMinutes,
+                audience_level: audienceLevel,
+                insight_emphasis: insightEmphasis,
+                story_tone: storyTone,
+                constraint_guidance: constraintGuidance || undefined,
             })
             setResult(res)
         } catch (err) {
@@ -307,6 +336,45 @@ export default function GenerateProblem() {
                         Codeforces-style rating. This calibrates the algorithmic depth and expected solution complexity.
                     </p>
                     <RatingSlider value={rating} onChange={setRating} />
+                </fieldset>
+
+                <fieldset className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-5 shadow-sm space-y-4">
+                    <legend className="px-2 text-sm font-semibold text-gray-700 dark:text-gray-300">Authoring Profile</legend>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <label className="text-sm text-gray-600 dark:text-gray-300">Format profile
+                            <select value={formatProfile} onChange={e => setFormatProfile(e.target.value as typeof formatProfile)} className="mt-1 w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800">
+                                <option value="general">General practice</option><option value="codeforces">Codeforces round</option><option value="icpc">ICPC onsite</option><option value="oi">OI / IOI style</option>
+                            </select>
+                        </label>
+                        <label className="text-sm text-gray-600 dark:text-gray-300">Event context
+                            <select value={eventContext} onChange={e => setEventContext(e.target.value as typeof eventContext)} className="mt-1 w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800">
+                                <option value="practice">Practice</option><option value="online">Online contest</option><option value="onsite">Onsite contest</option>
+                            </select>
+                        </label>
+                        <label className="text-sm text-gray-600 dark:text-gray-300">Solver mode
+                            <select value={solverMode} onChange={e => setSolverMode(e.target.value as typeof solverMode)} className="mt-1 w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800">
+                                <option value="solo">Solo</option><option value="team">Team</option>
+                            </select>
+                        </label>
+                        {solverMode === 'team' && <label className="text-sm text-gray-600 dark:text-gray-300">Team size<input type="number" min={1} max={8} value={teamSize} onChange={e => setTeamSize(Number(e.target.value))} className="mt-1 w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800" /></label>}
+                        <label className="text-sm text-gray-600 dark:text-gray-300">Expected solve minutes<input type="number" min={1} max={360} value={expectedSolveMinutes} onChange={e => setExpectedSolveMinutes(Number(e.target.value))} className="mt-1 w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800" /></label>
+                        <label className="text-sm text-gray-600 dark:text-gray-300">Audience level<select value={audienceLevel} onChange={e => setAudienceLevel(e.target.value)} className="mt-1 w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800"><option>beginner</option><option>intermediate</option><option>advanced</option></select></label>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <label className="text-sm text-gray-600 dark:text-gray-300">Minimum acceptable rating<input type="number" min={800} max={3500} step={100} value={ratingMin} onChange={e => setRatingMin(Number(e.target.value))} className="mt-1 w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800" /></label>
+                        <label className="text-sm text-gray-600 dark:text-gray-300">Maximum acceptable rating<input type="number" min={800} max={3500} step={100} value={ratingMax} onChange={e => setRatingMax(Number(e.target.value))} className="mt-1 w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800" /></label>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <label className="text-sm text-gray-600 dark:text-gray-300">Insight / implementation emphasis<select value={insightEmphasis} onChange={e => setInsightEmphasis(e.target.value as typeof insightEmphasis)} className="mt-1 w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800"><option value="balanced">Balanced</option><option value="insight">Insight-heavy</option><option value="implementation">Implementation-heavy</option></select></label>
+                        <label className="text-sm text-gray-600 dark:text-gray-300">Story tone<input value={storyTone} onChange={e => setStoryTone(e.target.value)} className="mt-1 w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800" /></label>
+                    </div>
+                    <label className="block text-sm text-gray-600 dark:text-gray-300">Constraint guidance<textarea value={constraintGuidance} onChange={e => setConstraintGuidance(e.target.value)} rows={2} placeholder="e.g. N up to 2e5; avoid constraints that make brute force pass" className="mt-1 w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800" /></label>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <label className="text-sm text-gray-600 dark:text-gray-300">Secondary topics<input value={secondaryTopics.join(', ')} onChange={e => setSecondaryTopics(e.target.value.split(',').map(v => v.trim()).filter(Boolean))} placeholder="e.g. arrays, math" className="mt-1 w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800" /></label>
+                        <label className="text-sm text-gray-600 dark:text-gray-300">Required techniques<input value={requiredTechniques.join(', ')} onChange={e => setRequiredTechniques(e.target.value.split(',').map(v => v.trim()).filter(Boolean))} placeholder="e.g. binary search" className="mt-1 w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800" /></label>
+                        <label className="text-sm text-gray-600 dark:text-gray-300">Forbidden techniques<input value={forbiddenTechniques.join(', ')} onChange={e => setForbiddenTechniques(e.target.value.split(',').map(v => v.trim()).filter(Boolean))} placeholder="e.g. brute force" className="mt-1 w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800" /></label>
+                    </div>
+                    <p className="text-xs text-gray-500">Target {rating} with acceptable range {ratingMin}–{ratingMax}; {solverMode === 'team' ? `team of ${teamSize}` : 'solo'} / {eventContext} / {formatProfile}.</p>
                 </fieldset>
 
                 {/* Problem type + test case count */}

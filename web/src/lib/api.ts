@@ -480,9 +480,9 @@ export const api = {
                 request<{ data: AIModel[] }>('/admin/ai-models'),
             getById: (id: string) =>
                 request<AIModel>(`/admin/ai-models/${id}`),
-            create: (d: { name: string; endpoint: string; api_key: string; model_name: string; enabled: boolean; priority: number; description: string }) =>
+            create: (d: { name: string; endpoint: string; api_key?: string; model_name: string; enabled: boolean; priority: number; description: string }) =>
                 request<AIModel>('/admin/ai-models', { method: 'POST', body: JSON.stringify(d) }),
-            update: (id: string, d: { name: string; endpoint: string; api_key: string; model_name: string; enabled: boolean; priority: number; description: string }) =>
+            update: (id: string, d: { name: string; endpoint: string; api_key?: string; model_name: string; enabled: boolean; priority: number; description: string }) =>
                 request<AIModel>(`/admin/ai-models/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
             toggle: (id: string) =>
                 request<{ id: string; enabled: boolean }>(`/admin/ai-models/${id}/toggle`, { method: 'PUT' }),
@@ -864,6 +864,21 @@ export const api = {
             testcase_count: number
             has_subtasks: boolean
             additional_prompt?: string
+            primary_topics?: string[]
+            secondary_topics?: string[]
+            required_techniques?: string[]
+            forbidden_techniques?: string[]
+            rating_min?: number
+            rating_max?: number
+            solver_mode?: 'solo' | 'team'
+            team_size?: number
+            event_context?: 'practice' | 'online' | 'onsite'
+            format_profile?: 'general' | 'codeforces' | 'icpc' | 'oi'
+            expected_solve_minutes?: number
+            audience_level?: string
+            insight_emphasis?: 'insight' | 'implementation' | 'balanced'
+            story_tone?: string
+            constraint_guidance?: string
         }) =>
             request<{ problem_id: string; problem_slug: string; editorial_id: string }>(
                 '/generate/problem',

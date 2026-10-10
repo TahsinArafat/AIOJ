@@ -35,7 +35,7 @@ func (h *AdminAIModelHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetByID handles GET /api/admin/ai-models/{id}.
-// Returns the full record including the api_key.
+// Returns a safe record; credentials are never sent back to the browser.
 func (h *AdminAIModelHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	m, err := h.store.GetByID(r.Context(), id)
@@ -47,6 +47,8 @@ func (h *AdminAIModelHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "AI model not found", http.StatusNotFound)
 		return
 	}
+	m.APIKey = ""
+	m.HasAPIKey = true
 	respondJSON(w, http.StatusOK, m)
 }
 

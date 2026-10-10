@@ -35,21 +35,13 @@ func (h *GenerateHandler) Problem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate required fields.
-	if len(req.Tags) == 0 {
-		http.Error(w, "at least one tag is required", http.StatusBadRequest)
+	// Normalize applies defaults and enforces the cross-field brief rules
+	// (rating range, ICPC/subtask conflict, team size). One implementation
+	// shared with any future jobs API so the rules cannot drift.
+	req, err := req.Normalize()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
-	}
-	if req.Rating < 800 || req.Rating > 3500 {
-		http.Error(w, "rating must be between 800 and 3500", http.StatusBadRequest)
-		return
-	}
-	if req.TestCaseCount < 1 || req.TestCaseCount > 100 {
-		http.Error(w, "testcase_count must be between 1 and 100", http.StatusBadRequest)
-		return
-	}
-	if req.ProblemType == "" {
-		req.ProblemType = "standard"
 	}
 
 	result, err := h.svc.Generate(r.Context(), claims.UserID, req)

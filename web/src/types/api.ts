@@ -8,6 +8,7 @@ export interface AIModel {
     name: string
     endpoint: string
     api_key?: string
+    has_api_key?: boolean
     model_name: string
     enabled: boolean
     priority: number

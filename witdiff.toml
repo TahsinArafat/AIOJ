@@ -1,18 +1,17 @@
 [project]
-language = "typescript"
+language = "go"
 
 [verification]
 test_command = [
-    "npm",
+    "go",
     "test",
-    "--prefix",
-    "web",
+    "./internal/generate/...",
+    "./internal/api/handler/...",
+    "-count=1",
 ]
 test_globs = [
-    "*.test.ts",
-    "*.test.tsx",
-    "**/*.test.ts",
-    "**/*.test.tsx",
+    "*_test.go",
+    "**/*_test.go",
 ]
 extra_test_paths = []
 block_on_integrity_findings = true
@@ -20,14 +19,14 @@ max_output_bytes = 16384
 targeted_test_selection = false
 timeout_secs = 900
 flake_repeats = 1
-base_dependency_dirs = ["web/node_modules"]
-sandbox_env = []
+base_dependency_dirs = []
+sandbox_env = ["AIOJ_TEST_DSN=postgres://aioj:aioj_dev@localhost:5432/aioj_test?sslmode=disable"]
 sandbox_network = true
 mutation = false
 coverage = false
 max_mutants = 25
 max_mutants_per_function = 5
-framework = "vitest"
+framework = "go"
 signing_failure_exit_code = 1
 
 [gate]

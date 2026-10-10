@@ -44,6 +44,9 @@ func (s *AIModelStore) List(ctx context.Context) ([]model.AIModel, error) {
 		}
 		out = append(out, m)
 	}
+	for i := range out {
+		out[i].HasAPIKey = true
+	}
 	return out, rows.Err()
 }
 

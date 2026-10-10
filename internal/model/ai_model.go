@@ -10,6 +10,7 @@ type AIModel struct {
 	Name        string    `json:"name"                  db:"name"`
 	Endpoint    string    `json:"endpoint"              db:"endpoint"`
 	APIKey      string    `json:"api_key,omitempty"     db:"api_key"` // omitted from list; included in GetByID
+	HasAPIKey   bool      `json:"has_api_key" db:"-"`
 	ModelName   string    `json:"model_name"            db:"model_name"`
 	Enabled     bool      `json:"enabled"               db:"enabled"`
 	Priority    int       `json:"priority"              db:"priority"`

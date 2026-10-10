@@ -65,6 +65,45 @@ func buildUserPrompt(req Request) string {
 	fmt.Fprintf(&b, "- Difficulty rating: %d (Codeforces scale)\n", req.Rating)
 	fmt.Fprintf(&b, "- Problem type: %s\n", req.ProblemType)
 	fmt.Fprintf(&b, "- Number of test cases to describe in the statement: %d\n", req.TestCaseCount)
+	if len(req.PrimaryTopics) > 0 {
+		fmt.Fprintf(&b, "- Primary topics: %s\n", strings.Join(req.PrimaryTopics, ", "))
+	}
+	if len(req.SecondaryTopics) > 0 {
+		fmt.Fprintf(&b, "- Secondary topics: %s\n", strings.Join(req.SecondaryTopics, ", "))
+	}
+	if len(req.RequiredTechniques) > 0 {
+		fmt.Fprintf(&b, "- Required techniques: %s\n", strings.Join(req.RequiredTechniques, ", "))
+	}
+	if len(req.ForbiddenTechniques) > 0 {
+		fmt.Fprintf(&b, "- Forbidden techniques: %s\n", strings.Join(req.ForbiddenTechniques, ", "))
+	}
+	if req.RatingMin > 0 || req.RatingMax > 0 {
+		fmt.Fprintf(&b, "- Acceptable rating range: %d–%d\n", req.RatingMin, req.RatingMax)
+	}
+	if req.SolverMode != "" {
+		fmt.Fprintf(&b, "- Solver mode: %s (team size %d)\n", req.SolverMode, req.TeamSize)
+	}
+	if req.EventContext != "" {
+		fmt.Fprintf(&b, "- Event context: %s\n", req.EventContext)
+	}
+	if req.FormatProfile != "" {
+		fmt.Fprintf(&b, "- Format profile: %s\n", req.FormatProfile)
+	}
+	if req.ExpectedSolveMinutes > 0 {
+		fmt.Fprintf(&b, "- Expected solve time: %d minutes\n", req.ExpectedSolveMinutes)
+	}
+	if req.AudienceLevel != "" {
+		fmt.Fprintf(&b, "- Audience level: %s\n", req.AudienceLevel)
+	}
+	if req.InsightEmphasis != "" {
+		fmt.Fprintf(&b, "- Insight/implementation emphasis: %s\n", req.InsightEmphasis)
+	}
+	if req.StoryTone != "" {
+		fmt.Fprintf(&b, "- Story tone: %s\n", req.StoryTone)
+	}
+	if req.ConstraintGuidance != "" {
+		fmt.Fprintf(&b, "- Constraint guidance: %s\n", req.ConstraintGuidance)
+	}
 
 	if req.HasSubtasks {
 		b.WriteString("- Use subtask scoring with 2–4 subtasks (partial credit).\n")
