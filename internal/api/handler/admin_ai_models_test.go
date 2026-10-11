@@ -53,15 +53,15 @@ func TestAdminAIModelGetByIDRedactsAPIKey(t *testing.T) {
 		t.Fatalf("response leaked the API key: %s", body)
 	}
 
-	var got model.AIModel
+	var got map[string]any
 	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if got.APIKey != "" {
-		t.Errorf("APIKey = %q, want empty", got.APIKey)
+	if value, exists := got["api_key"]; exists && value != "" {
+		t.Errorf("api_key = %q, want omitted or empty", value)
 	}
-	if !got.HasAPIKey {
-		t.Error("HasAPIKey = false, want true so the UI can show a stored-credential indicator")
+	if got["has_api_key"] != true {
+		t.Error("has_api_key must be true so the UI can show a stored-credential indicator")
 	}
 }
 
