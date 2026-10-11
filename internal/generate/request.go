@@ -77,6 +77,9 @@ func (r Request) Normalize() (Request, error) {
 	if r.ProblemType == "" {
 		r.ProblemType = "standard"
 	}
+	if r.ProblemType != "standard" {
+		return r, fmt.Errorf("v1 supports standard batch problems only")
+	}
 
 	if r.RatingMin == 0 {
 		r.RatingMin = r.Rating - 100
@@ -113,6 +116,17 @@ func (r Request) Normalize() (Request, error) {
 	if r.FormatProfile == ProfileICPC && r.HasSubtasks {
 		return r, fmt.Errorf("ICPC profile does not support subtasks")
 	}
+	if r.FormatProfile == ProfileICPC {
+		r.SolverMode = SolverTeam
+		r.TeamSize = 3
+		r.EventContext = EventOnsite
+	}
+	if r.FormatProfile == ProfileCodeforces {
+		r.SolverMode = SolverSolo
+	}
+	if r.FormatProfile == ProfileOI {
+		r.SolverMode = SolverSolo
+	}
 
 	if r.SolverMode == SolverTeam && r.TeamSize == 0 {
 		r.TeamSize = 3
@@ -123,6 +137,13 @@ func (r Request) Normalize() (Request, error) {
 
 	if r.ExpectedSolveMinutes < 0 || r.ExpectedSolveMinutes > 360 {
 		return r, fmt.Errorf("expected_solve_minutes must be between 1 and 360")
+	}
+	if r.ExpectedSolveMinutes == 0 {
+		if r.FormatProfile == ProfileICPC {
+			r.ExpectedSolveMinutes = 60
+		} else {
+			r.ExpectedSolveMinutes = 45
+		}
 	}
 
 	return r, nil

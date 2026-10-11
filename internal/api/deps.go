@@ -76,6 +76,7 @@ type Deps struct {
 	Activity      *handler.ActivityHandler
 	Generate      *handler.GenerateHandler
 	AIModel       *handler.AdminAIModelHandler
+	AIGeneration  *handler.AIGenerationHandler
 	DevMail       *handler.DevMailHandler
 	VerifyEmail   *handler.EmailVerificationHandler
 	TwoFA         *handler.TwoFactorHandler
@@ -86,4 +87,5 @@ type Deps struct {
 	UsersExport   *handler.UsersExportHandler
 	UsersDeletion *handler.UsersDeletionHandler
 	CSRFSecret    string
+	AIEnabled     bool
 }

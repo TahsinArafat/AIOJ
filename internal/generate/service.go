@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/tahsinarafat/aioj/internal/ai"
@@ -60,7 +61,7 @@ func (s *Service) Generate(ctx context.Context, userID string, req Request) (*Ge
 	}
 
 	// 2. Build a one-shot client for this model.
-	client := ai.New(aiModel.Endpoint, aiModel.APIKey, aiModel.ModelName)
+	client := ai.NewWithOptions(aiModel.Endpoint, aiModel.APIKey, aiModel.ModelName, ai.ClientOptions{Mode: aiModel.StructuredOutputMode, Timeout: time.Duration(aiModel.RequestTimeoutSeconds) * time.Second, MaxOutputTokens: aiModel.MaxOutputTokens, AllowPrivateNetwork: aiModel.AllowPrivateNetwork})
 
 	// 3. Build prompts.
 	userMsg := buildUserPrompt(req)
@@ -74,7 +75,7 @@ func (s *Service) Generate(ctx context.Context, userID string, req Request) (*Ge
 	// 5. Parse the model's JSON response.
 	var content generatedContent
 	if err := json.Unmarshal([]byte(raw), &content); err != nil {
-		return nil, fmt.Errorf("generate: failed to parse model output as JSON: %w (raw: %s)", err, truncate(raw, 300))
+		return nil, fmt.Errorf("generate: model returned invalid JSON")
 	}
 
 	// 6. Apply sensible defaults for fields the model may omit.

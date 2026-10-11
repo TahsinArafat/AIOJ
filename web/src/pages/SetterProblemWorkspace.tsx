@@ -11,6 +11,7 @@ import PermissionsTab from '../components/SetterWorkspace/PermissionsTab'
 import SettingsTab from '../components/SetterWorkspace/SettingsTab'
 import EditorialTab from '../components/SetterWorkspace/EditorialTab'
 import TranslationsTab from '../components/SetterWorkspace/TranslationsTab'
+import AIStudioTab from '../components/SetterWorkspace/AIStudioTab'
 
 function decodeRole(): string | null {
   const token = localStorage.getItem('access_token')
@@ -35,13 +36,14 @@ export default function SetterProblemWorkspace() {
 }
 
 const [problem, setProblem] = useState<LoadedProblem | null>(null)
-  type WorkspaceTab = 'statement' | 'testcases' | 'checker' | 'permissions' | 'settings' | 'editorial' | 'translations'
+  type WorkspaceTab = 'statement' | 'testcases' | 'checker' | 'permissions' | 'settings' | 'editorial' | 'translations' | 'ai'
 
   const [activeTab, setActiveTab] = useState<WorkspaceTab>(() => {
     const hash = window.location.hash.replace('#', '') as WorkspaceTab
-    const validTabs: WorkspaceTab[] = ['statement', 'testcases', 'checker', 'permissions', 'settings', 'editorial', 'translations']
+    const validTabs: WorkspaceTab[] = ['statement', 'testcases', 'checker', 'permissions', 'settings', 'editorial', 'translations', 'ai']
     return validTabs.includes(hash) ? hash : 'statement'
   })
+  const role = decodeRole()
 
   // Two-way hash sync — the initializer only reads the hash once, so a deep
   // link or a Back/Forward step that changes the hash alone left the workspace
@@ -52,7 +54,7 @@ const [problem, setProblem] = useState<LoadedProblem | null>(null)
     }
     const onHashChange = () => {
       const next = window.location.hash.replace('#', '') as WorkspaceTab
-      const valid: WorkspaceTab[] = ['statement', 'testcases', 'checker', 'permissions', 'settings', 'editorial', 'translations']
+      const valid: WorkspaceTab[] = ['statement', 'testcases', 'checker', 'permissions', 'settings', 'editorial', 'translations', 'ai']
       if (valid.includes(next)) setActiveTab(next)
     }
     window.addEventListener('hashchange', onHashChange)
@@ -445,6 +447,13 @@ const [problem, setProblem] = useState<LoadedProblem | null>(null)
           >
             Translations
           </button>
+          {(role === 'admin' || role === 'setter') && <button
+            type="button"
+            onClick={() => setActiveTab('ai')}
+            className={`px-4 py-3 text-left shrink-0 whitespace-nowrap font-medium ${activeTab === 'ai' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-l-4 border-l-blue-600' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-black dark:hover:text-white'}`}
+          >
+            AI Studio
+          </button>}
         </div>
 
         {/* Tab Content Panels */}
@@ -517,6 +526,12 @@ const [problem, setProblem] = useState<LoadedProblem | null>(null)
               problemId={problem.id}
               defaultTitle={problem.title as string}
               defaultDescription={problem.description as string}
+            />
+          )}
+          {activeTab === 'ai' && (
+            <AIStudioTab
+              problemId={problem.id}
+              onApplied={() => loadProblem()}
             />
           )}
         </div>

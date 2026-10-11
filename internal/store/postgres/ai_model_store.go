@@ -3,26 +3,73 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 
+	"github.com/tahsinarafat/aioj/internal/ai"
 	"github.com/tahsinarafat/aioj/internal/model"
 )
 
 // AIModelStore is the PostgreSQL implementation of store.AIModelStore.
 type AIModelStore struct {
-	db *sql.DB
+	db          *sql.DB
+	credentials *ai.CredentialBox
 }
 
 // NewAIModelStore creates an AIModelStore backed by db.
-func NewAIModelStore(db *sql.DB) *AIModelStore {
-	return &AIModelStore{db: db}
+func NewAIModelStore(db *sql.DB, boxes ...*ai.CredentialBox) *AIModelStore {
+	var box *ai.CredentialBox
+	if len(boxes) > 0 {
+		box = boxes[0]
+	}
+	return &AIModelStore{db: db, credentials: box}
+}
+
+func (s *AIModelStore) EncryptLegacyCredentials(ctx context.Context) error {
+	rows, err := s.db.QueryContext(ctx, `SELECT id,api_key FROM ai_models WHERE api_key<>'' AND api_key NOT LIKE 'enc:v1:%'`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	type legacy struct{ id, key string }
+	var items []legacy
+	for rows.Next() {
+		var v legacy
+		if err := rows.Scan(&v.id, &v.key); err != nil {
+			return err
+		}
+		items = append(items, v)
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if len(items) > 0 && s.credentials == nil {
+		return errors.New("legacy AI credentials exist but AI_CREDENTIAL_MASTER_KEY is not configured")
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	for _, v := range items {
+		encrypted, err := s.credentials.Encrypt(v.key)
+		if err != nil {
+			return err
+		}
+		if _, err = tx.ExecContext(ctx, `UPDATE ai_models SET api_key=$2,updated_at=NOW() WHERE id=$1`, v.id, encrypted); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 // List returns all AI models ordered by priority descending.
 // api_key is deliberately excluded to avoid leaking secrets in list responses.
 func (s *AIModelStore) List(ctx context.Context) ([]model.AIModel, error) {
 	const q = `
-		SELECT id, name, endpoint, model_name, enabled, priority, description, created_at, updated_at
+		SELECT id, name, endpoint, model_name, enabled, priority, description,
+		       allow_private_network, structured_output_mode, request_timeout_seconds, max_output_tokens,
+		       capabilities, last_test_status, last_tested_at, api_key <> '', created_at, updated_at
 		FROM ai_models
 		ORDER BY priority DESC, created_at ASC`
 
@@ -35,17 +82,17 @@ func (s *AIModelStore) List(ctx context.Context) ([]model.AIModel, error) {
 	var out []model.AIModel
 	for rows.Next() {
 		var m model.AIModel
+		var capabilities []byte
 		if err := rows.Scan(
 			&m.ID, &m.Name, &m.Endpoint, &m.ModelName,
 			&m.Enabled, &m.Priority, &m.Description,
-			&m.CreatedAt, &m.UpdatedAt,
+			&m.AllowPrivateNetwork, &m.StructuredOutputMode, &m.RequestTimeoutSeconds, &m.MaxOutputTokens,
+			&capabilities, &m.LastTestStatus, &m.LastTestedAt, &m.HasAPIKey, &m.CreatedAt, &m.UpdatedAt,
 		); err != nil {
 			return nil, err
 		}
+		_ = json.Unmarshal(capabilities, &m.Capabilities)
 		out = append(out, m)
-	}
-	for i := range out {
-		out[i].HasAPIKey = true
 	}
 	return out, rows.Err()
 }
@@ -53,20 +100,33 @@ func (s *AIModelStore) List(ctx context.Context) ([]model.AIModel, error) {
 // GetByID returns a single model including its api_key.
 func (s *AIModelStore) GetByID(ctx context.Context, id string) (*model.AIModel, error) {
 	const q = `
-		SELECT id, name, endpoint, api_key, model_name, enabled, priority, description, created_at, updated_at
+		SELECT id, name, endpoint, api_key, model_name, enabled, priority, description,
+		       allow_private_network, structured_output_mode, request_timeout_seconds, max_output_tokens,
+		       capabilities, last_test_status, last_tested_at, created_at, updated_at
 		FROM ai_models WHERE id = $1`
 
 	var m model.AIModel
+	var capabilities []byte
 	err := s.db.QueryRowContext(ctx, q, id).Scan(
 		&m.ID, &m.Name, &m.Endpoint, &m.APIKey, &m.ModelName,
 		&m.Enabled, &m.Priority, &m.Description,
-		&m.CreatedAt, &m.UpdatedAt,
+		&m.AllowPrivateNetwork, &m.StructuredOutputMode, &m.RequestTimeoutSeconds, &m.MaxOutputTokens,
+		&capabilities, &m.LastTestStatus, &m.LastTestedAt, &m.CreatedAt, &m.UpdatedAt,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
+	}
+	_ = json.Unmarshal(capabilities, &m.Capabilities)
+	m.HasAPIKey = m.APIKey != ""
+	if m.APIKey != "" {
+		plain, err := s.credentials.Decrypt(m.APIKey)
+		if err != nil {
+			return nil, err
+		}
+		m.APIKey = plain
 	}
 	return &m, nil
 }
@@ -74,17 +134,21 @@ func (s *AIModelStore) GetByID(ctx context.Context, id string) (*model.AIModel, 
 // GetDefault returns the highest-priority enabled model, or (nil, nil) if none is enabled.
 func (s *AIModelStore) GetDefault(ctx context.Context) (*model.AIModel, error) {
 	const q = `
-		SELECT id, name, endpoint, api_key, model_name, enabled, priority, description, created_at, updated_at
+		SELECT id, name, endpoint, api_key, model_name, enabled, priority, description,
+		       allow_private_network, structured_output_mode, request_timeout_seconds, max_output_tokens,
+		       capabilities, last_test_status, last_tested_at, created_at, updated_at
 		FROM ai_models
 		WHERE enabled = true
 		ORDER BY priority DESC, created_at ASC
 		LIMIT 1`
 
 	var m model.AIModel
+	var capabilities []byte
 	err := s.db.QueryRowContext(ctx, q).Scan(
 		&m.ID, &m.Name, &m.Endpoint, &m.APIKey, &m.ModelName,
 		&m.Enabled, &m.Priority, &m.Description,
-		&m.CreatedAt, &m.UpdatedAt,
+		&m.AllowPrivateNetwork, &m.StructuredOutputMode, &m.RequestTimeoutSeconds, &m.MaxOutputTokens,
+		&capabilities, &m.LastTestStatus, &m.LastTestedAt, &m.CreatedAt, &m.UpdatedAt,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
@@ -92,25 +156,47 @@ func (s *AIModelStore) GetDefault(ctx context.Context) (*model.AIModel, error) {
 	if err != nil {
 		return nil, err
 	}
+	_ = json.Unmarshal(capabilities, &m.Capabilities)
+	if m.APIKey != "" {
+		plain, err := s.credentials.Decrypt(m.APIKey)
+		if err != nil {
+			return nil, err
+		}
+		m.APIKey = plain
+		m.HasAPIKey = true
+	}
 	return &m, nil
 }
 
 // Create inserts a new AIModel and populates its ID, CreatedAt, UpdatedAt.
 func (s *AIModelStore) Create(ctx context.Context, am *model.AIModel) error {
+	key, err := s.credentials.Encrypt(am.APIKey)
+	if err != nil && am.APIKey != "" {
+		return err
+	}
 	const q = `
-		INSERT INTO ai_models (name, endpoint, api_key, model_name, enabled, priority, description)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO ai_models (name, endpoint, api_key, model_name, enabled, priority, description,
+		 allow_private_network, structured_output_mode, request_timeout_seconds, max_output_tokens)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 		RETURNING id, created_at, updated_at`
 
 	return s.db.QueryRowContext(ctx, q,
-		am.Name, am.Endpoint, am.APIKey, am.ModelName,
-		am.Enabled, am.Priority, am.Description,
+		am.Name, am.Endpoint, key, am.ModelName,
+		am.Enabled, am.Priority, am.Description, am.AllowPrivateNetwork, am.StructuredOutputMode, am.RequestTimeoutSeconds, am.MaxOutputTokens,
 	).Scan(&am.ID, &am.CreatedAt, &am.UpdatedAt)
 }
 
 // Update replaces all mutable fields on the model identified by id.
 // If api_key is empty the existing value is preserved.
 func (s *AIModelStore) Update(ctx context.Context, id string, am *model.AIModel) error {
+	key := ""
+	var err error
+	if am.APIKey != "" {
+		key, err = s.credentials.Encrypt(am.APIKey)
+		if err != nil {
+			return err
+		}
+	}
 	const q = `
 		UPDATE ai_models
 		SET name        = $2,
@@ -120,14 +206,18 @@ func (s *AIModelStore) Update(ctx context.Context, id string, am *model.AIModel)
 		    enabled     = $6,
 		    priority    = $7,
 		    description = $8,
+		    allow_private_network = $9,
+		    structured_output_mode = $10,
+		    request_timeout_seconds = $11,
+		    max_output_tokens = $12,
 		    updated_at  = NOW()
 		WHERE id = $1
 		RETURNING updated_at`
 
 	return s.db.QueryRowContext(ctx, q,
 		id,
-		am.Name, am.Endpoint, am.APIKey, am.ModelName,
-		am.Enabled, am.Priority, am.Description,
+		am.Name, am.Endpoint, key, am.ModelName,
+		am.Enabled, am.Priority, am.Description, am.AllowPrivateNetwork, am.StructuredOutputMode, am.RequestTimeoutSeconds, am.MaxOutputTokens,
 	).Scan(&am.UpdatedAt)
 }
 

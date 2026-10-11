@@ -26,6 +26,20 @@ func (s *EditorialStore) Create(ctx context.Context, e *model.Editorial) error {
 	).Scan(&e.ID, &e.CreatedAt, &e.UpdatedAt)
 }
 
+func (s *EditorialStore) UpsertOfficial(ctx context.Context, e *model.Editorial) error {
+	var id string
+	err := s.db.QueryRowContext(ctx, `SELECT id FROM editorials WHERE problem_id=$1 AND is_official=true ORDER BY created_at LIMIT 1`, e.ProblemID).Scan(&id)
+	if err == sql.ErrNoRows {
+		return s.Create(ctx, e)
+	}
+	if err != nil {
+		return err
+	}
+	_, err = s.db.ExecContext(ctx, `UPDATE editorials SET user_id=$2,title=$3,content=$4,solution_code=$5,solution_language=$6,approach=$7,time_complexity=$8,space_complexity=$9,updated_at=NOW() WHERE id=$1`, id, e.UserID, e.Title, e.Content, e.SolutionCode, e.SolutionLanguage, e.Approach, e.TimeComplexity, e.SpaceComplexity)
+	e.ID = id
+	return err
+}
+
 func (s *EditorialStore) GetByID(ctx context.Context, id string) (*model.Editorial, error) {
 	if _, err := uuid.Parse(id); err != nil {
 		return nil, nil

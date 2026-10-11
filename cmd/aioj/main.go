@@ -15,6 +15,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/tahsinarafat/aioj/internal/ai"
 	"github.com/tahsinarafat/aioj/internal/api"
 	"github.com/tahsinarafat/aioj/internal/api/handler"
 	"github.com/tahsinarafat/aioj/internal/auth"
@@ -40,7 +41,7 @@ import (
 
 func main() {
 	cfgPath := flag.String("config", "config.yaml", "path to config file")
-	mode := flag.String("mode", "server", "run mode: server|judge-worker")
+	mode := flag.String("mode", "server", "run mode: server|judge-worker|ai-worker")
 	flag.Parse()
 
 	cfg, err := config.Load(*cfgPath)
@@ -271,8 +272,51 @@ func main() {
 	adminSubH := handler.NewAdminSubmissionHandler(submissionStore, problemStore, vjService)
 	backupH := handler.NewAdminBackupHandler(userStore, cfg.Database, "./backups")
 
-	aiModelStore := postgres.NewAIModelStore(db)
+	credentialKey, err := ai.ParseCredentialKey(cfg.AI.CredentialMasterKey)
+	if err != nil {
+		log.Fatalf("AI credential key: %v", err)
+	}
+	var credentialBox *ai.CredentialBox
+	if len(credentialKey) > 0 {
+		credentialBox, err = ai.NewCredentialBox(credentialKey)
+		if err != nil {
+			log.Fatalf("AI credential encryption: %v", err)
+		}
+	}
+	aiModelStore := postgres.NewAIModelStore(db, credentialBox)
+	if cfg.AI.Enabled && len(credentialKey) == 0 {
+		log.Fatal("AI is enabled but AI_CREDENTIAL_MASTER_KEY is not configured")
+	}
+	if err := aiModelStore.EncryptLegacyCredentials(ctx); err != nil {
+		log.Fatalf("AI credential migration: %v", err)
+	}
 	aiModelH := handler.NewAdminAIModelHandler(aiModelStore)
+	aiGenerationStore := postgres.NewAIGenerationStore(db)
+	aiJobService := &generate.JobService{Jobs: aiGenerationStore, Models: aiModelStore, Problems: problemStore}
+	generationAssetStore := postgres.NewGenerationAssetStore(db)
+	aiWorker := &generate.JobWorker{Jobs: aiGenerationStore, Models: aiModelStore, Timeout: time.Duration(cfg.AI.JobTimeoutSeconds) * time.Second, Sandbox: &generate.SandboxValidator{Exec: execClient, LangDir: cfg.LangDir, StagingRoot: cfg.AI.StagedTestdataRoot}}
+	startAIWorkers := func() {
+		for i := 0; i < cfg.AI.WorkerConcurrency; i++ {
+			go aiWorker.Run(ctx)
+		}
+	}
+	if *mode == "ai-worker" {
+		if !cfg.AI.Enabled {
+			log.Fatal("ai-worker mode requires AI_ENABLED=true")
+		}
+		startAIWorkers()
+		slog.Info("running in ai-worker mode, waiting for generation jobs")
+		quit := make(chan os.Signal, 1)
+		signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+		<-quit
+		cancel()
+		return
+	}
+	// Development/default deployment: process jobs in the API process. A
+	// dedicated --mode=ai-worker can be used to isolate workloads.
+	if cfg.AI.Enabled {
+		startAIWorkers()
+	}
 	genSvc := generate.NewService(aiModelStore, problemStore, editorialStore)
 	generateH := handler.NewGenerateHandler(genSvc)
 
@@ -329,6 +373,8 @@ func main() {
 	}
 
 	auditStore := postgres.NewAuditStore(db)
+	aiApplyService := &generate.ApplyService{Jobs: aiGenerationStore, Problems: problemStore, Editorials: editorialStore, Assets: generationAssetStore, Audit: auditStore, TestdataRoot: "./testdata", StagingRoot: cfg.AI.StagedTestdataRoot}
+	aiGenerationH := handler.NewAIGenerationHandler(aiJobService, aiApplyService, aiGenerationStore, aiModelStore, problemStore)
 	healthH := &handler.HealthChecker{
 		DB:      db,
 		Started: time.Now(),
@@ -536,6 +582,8 @@ func main() {
 		Activity:       handler.NewActivityHandler(submissionStore, ratingStore, feedStore),
 		Generate:       generateH,
 		AIModel:        aiModelH,
+		AIGeneration:   aiGenerationH,
+		AIEnabled:      cfg.AI.Enabled,
 	}, jwtManager)
 
 	srv := &http.Server{

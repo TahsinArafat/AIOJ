@@ -47,6 +47,15 @@ Respond with ONLY a valid JSON object matching exactly this schema (no markdown 
   "editorial_approach": "string — one-sentence summary of the algorithm used",
   "time_complexity": "string — e.g. O(N log N)",
   "space_complexity": "string — e.g. O(N)"
+  ,"generator_code": "string — deterministic C++17 generator; accepts one integer seed argument and writes one testcase to stdout"
+  ,"generator_language": "cpp-gpp-64"
+  ,"seeds": [1, 2, 3]
+  ,"curated_cases": [{"name":"edge-01","input":"string","intent":"what this case verifies","score":10}]
+  ,"difficulty_rationale": {
+    "core_insight":"string", "prerequisites":["string"],
+    "implementation_burden":"string", "likely_wrong_approaches":["string"],
+    "constraint_fit":"string"
+  }
 }
 
 Rules:
@@ -54,6 +63,9 @@ Rules:
 - sample_cases must contain at least 1 and at most 3 examples.
 - solution_code must be compilable C++17 and produce the correct answer for the sample cases.
 - editorial_content must explain the core insight, NOT just describe the solution code.
+- generator_code must be deterministic for a given seed and must not access the network, clock, filesystem, or environment.
+- curated case names must be unique safe basenames; do not include extensions or path separators.
+- difficulty_rationale must justify why the insight, implementation burden, and constraints fit the requested rating range.
 - Do NOT copy existing Codeforces problems verbatim; create a novel scenario.`
 
 // buildUserPrompt constructs the user message from a generation Request.
@@ -65,6 +77,7 @@ func buildUserPrompt(req Request) string {
 	fmt.Fprintf(&b, "- Difficulty rating: %d (Codeforces scale)\n", req.Rating)
 	fmt.Fprintf(&b, "- Problem type: %s\n", req.ProblemType)
 	fmt.Fprintf(&b, "- Number of test cases to describe in the statement: %d\n", req.TestCaseCount)
+	fmt.Fprintf(&b, "- Enforced profile rules: %s\n", profileInstructions(req))
 	if len(req.PrimaryTopics) > 0 {
 		fmt.Fprintf(&b, "- Primary topics: %s\n", strings.Join(req.PrimaryTopics, ", "))
 	}

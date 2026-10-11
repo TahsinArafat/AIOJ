@@ -13,9 +13,43 @@ export interface AIModel {
     enabled: boolean
     priority: number
     description: string
+    allow_private_network?: boolean
+    structured_output_mode?: string
+    request_timeout_seconds?: number
+    max_output_tokens?: number
+    capabilities?: Record<string, unknown>
+    last_test_status?: string
+    last_tested_at?: string | null
     created_at: string
     updated_at: string
 }
+
+export interface AIBrief {
+    tags: string[]; rating: number; problem_type: string; testcase_count: number; has_subtasks: boolean
+    additional_prompt?: string; primary_topics?: string[]; secondary_topics?: string[]; required_techniques?: string[]
+    forbidden_techniques?: string[]; rating_min?: number; rating_max?: number; solver_mode?: 'solo' | 'team'
+    team_size?: number; event_context?: 'practice' | 'online' | 'onsite'; format_profile?: 'general' | 'codeforces' | 'icpc' | 'oi'
+    expected_solve_minutes?: number; audience_level?: string; insight_emphasis?: 'insight' | 'implementation' | 'balanced'
+    story_tone?: string; constraint_guidance?: string
+}
+export interface AIValidationCheck { name: string; passed: boolean; message: string }
+export interface AIValidationReport { valid: boolean; checks: AIValidationCheck[] }
+export interface AIProposal {
+    title?: string; description?: string; input_format?: string; output_format?: string; hint?: string
+    sample_cases?: Array<{ input: string; output: string; explanation?: string }>; time_limit_ms?: number; memory_limit_kb?: number
+    tags?: string[]; difficulty?: string; solution_code?: string; solution_language?: string; editorial_title?: string
+    editorial_content?: string; editorial_approach?: string; time_complexity?: string; space_complexity?: string
+    generator_code?: string; generator_language?: string; seeds?: number[]
+    curated_cases?: Array<{ name: string; input: string; intent: string; score: number }>; difficulty_rationale?: Record<string, unknown>
+}
+export interface AIGenerationJob {
+    id: string; actor_id: string; problem_id?: string; ai_model_id?: string; artifact_type: string
+    status: 'queued'|'running'|'ready'|'validation_failed'|'failed'|'cancelled'|'applied'|'discarded'
+    stage: string; progress: number; submitted_brief: AIBrief; normalized_brief: AIBrief
+    proposal?: AIProposal; validation_report?: AIValidationReport; error_code?: string; error_message?: string
+    prompt_tokens: number; completion_tokens: number; latency_ms: number; created_at: string
+}
+export interface AIBriefPreset { id: string; name: string; description: string; values: Partial<AIBrief> }
 
 export interface APIKey {
     id: string

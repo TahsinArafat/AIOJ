@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/tahsinarafat/aioj/internal/model"
@@ -261,6 +262,7 @@ type EditorialStore interface {
 	GetByID(ctx context.Context, id string) (*model.Editorial, error)
 	GetByProblem(ctx context.Context, problemID string) ([]model.Editorial, error)
 	List(ctx context.Context, offset, limit int) ([]model.Editorial, int, error)
+	UpsertOfficial(ctx context.Context, e *model.Editorial) error
 }
 
 type APIKeyStore interface {
@@ -432,4 +434,21 @@ type AIModelStore interface {
 	Update(ctx context.Context, id string, am *model.AIModel) error
 	Delete(ctx context.Context, id string) error
 	SetEnabled(ctx context.Context, id string, enabled bool) error
+}
+
+type AIGenerationStore interface {
+	Create(ctx context.Context, job *model.AIGenerationJob) error
+	GetByID(ctx context.Context, id string) (*model.AIGenerationJob, error)
+	ListByProblem(ctx context.Context, problemID string, offset, limit int) ([]model.AIGenerationJob, error)
+	CountActiveByActor(ctx context.Context, actorID string) (running, queued int, err error)
+	ClaimNext(ctx context.Context, claimToken string) (*model.AIGenerationJob, error)
+	Heartbeat(ctx context.Context, id, claimToken, stage string, progress int) error
+	Complete(ctx context.Context, id, claimToken string, proposal, validation json.RawMessage, promptTokens, completionTokens, latencyMS int) error
+	Fail(ctx context.Context, id, claimToken, code, message string, validation json.RawMessage) error
+	RequestCancel(ctx context.Context, id, actorID string) (bool, error)
+	MarkCancelled(ctx context.Context, id, claimToken string) error
+	IsCancellationRequested(ctx context.Context, id string) (bool, error)
+	MarkDiscarded(ctx context.Context, id, actorID string) (bool, error)
+	MarkApplied(ctx context.Context, id string) error
+	RequeueStale(ctx context.Context, olderThan time.Duration) ([]string, error)
 }

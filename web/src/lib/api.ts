@@ -160,7 +160,7 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
     }
 }
 
-import type { AIModel, APIKey, ActivityItem, AuthResponse, AuthSessionResponse, BackupFile, BlogListItem, BlogPost, BotAccount, Clarification, Class, ClassListItem, ClassMember, Comment, Contest, ContestDetailResponse, ContestNotice, ContestPermission, ContestProblem, ContestRegistration, ContestSubmissionsResponse, DetectedTool, Editorial, Group, GroupListItem, GroupMember, GroupPendingInvite, GymContest, GymData, Hack, HackResult, HackSubmission, LanguageConfig, Notification, NotificationPreferences, OnsiteBatchUser, Organization, OrganizationListItem, OrganizationMember, PendingInvite, PendingRemoteSubmission, PlagiarismPair, PlagiarismReport, Problem, ProblemI18n, ProblemListItem, ProblemPermission, ProblemStats, PublicProfile, RankingEntry, RatingHistoryEntry, RemoteLanguage, ScoreboardData, SetterApplication, Submission, Team, TeamListItem, TeamMember, TestResult, TrainingPlan, TrainingPlanDetail, TrainingPlanEnrollment, TrainingPlanProblem, TrainingPlanProgress, TrainingPlanSection, User, UserAchievement, UserProblemStats, UserProfile, VirtualContest, VirtualStatusResponse, WeakTagsRecommendations, Webhook } from '../types/api'
+import type { AIBrief, AIBriefPreset, AIGenerationJob, AIModel, APIKey, ActivityItem, AuthResponse, AuthSessionResponse, BackupFile, BlogListItem, BlogPost, BotAccount, Clarification, Class, ClassListItem, ClassMember, Comment, Contest, ContestDetailResponse, ContestNotice, ContestPermission, ContestProblem, ContestRegistration, ContestSubmissionsResponse, DetectedTool, Editorial, Group, GroupListItem, GroupMember, GroupPendingInvite, GymContest, GymData, Hack, HackResult, HackSubmission, LanguageConfig, Notification, NotificationPreferences, OnsiteBatchUser, Organization, OrganizationListItem, OrganizationMember, PendingInvite, PendingRemoteSubmission, PlagiarismPair, PlagiarismReport, Problem, ProblemI18n, ProblemListItem, ProblemPermission, ProblemStats, PublicProfile, RankingEntry, RatingHistoryEntry, RemoteLanguage, ScoreboardData, SetterApplication, Submission, Team, TeamListItem, TeamMember, TestResult, TrainingPlan, TrainingPlanDetail, TrainingPlanEnrollment, TrainingPlanProblem, TrainingPlanProgress, TrainingPlanSection, User, UserAchievement, UserProblemStats, UserProfile, VirtualContest, VirtualStatusResponse, WeakTagsRecommendations, Webhook } from '../types/api'
 
 export const api = {
     auth: {
@@ -480,16 +480,16 @@ export const api = {
                 request<{ data: AIModel[] }>('/admin/ai-models'),
             getById: (id: string) =>
                 request<AIModel>(`/admin/ai-models/${id}`),
-            create: (d: { name: string; endpoint: string; api_key?: string; model_name: string; enabled: boolean; priority: number; description: string }) =>
+            create: (d: { name: string; endpoint: string; api_key?: string; model_name: string; enabled: boolean; priority: number; description: string; allow_private_network?: boolean; structured_output_mode?: string; request_timeout_seconds?: number; max_output_tokens?: number }) =>
                 request<AIModel>('/admin/ai-models', { method: 'POST', body: JSON.stringify(d) }),
-            update: (id: string, d: { name: string; endpoint: string; api_key?: string; model_name: string; enabled: boolean; priority: number; description: string }) =>
+            update: (id: string, d: { name: string; endpoint: string; api_key?: string; model_name: string; enabled: boolean; priority: number; description: string; allow_private_network?: boolean; structured_output_mode?: string; request_timeout_seconds?: number; max_output_tokens?: number }) =>
                 request<AIModel>(`/admin/ai-models/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
             toggle: (id: string) =>
                 request<{ id: string; enabled: boolean }>(`/admin/ai-models/${id}/toggle`, { method: 'PUT' }),
             delete: (id: string) =>
                 request(`/admin/ai-models/${id}`, { method: 'DELETE' }),
-            testConnection: (d: { endpoint: string; api_key: string; model_name: string }) =>
-                request<{ ok: boolean; error?: string }>('/admin/ai-models/test', { method: 'POST', body: JSON.stringify(d) }),
+            testConnection: (d: { id?: string; endpoint: string; api_key: string; model_name: string; allow_private_network?: boolean; structured_output_mode?: string }) =>
+                request<{ ok: boolean; error?: string; mode?: string; latency_ms?: number }>('/admin/ai-models/test', { method: 'POST', body: JSON.stringify(d) }),
         },
     },
     setter: {
@@ -884,5 +884,18 @@ export const api = {
                 '/generate/problem',
                 { method: 'POST', body: JSON.stringify(d) }
             ),
+    },
+    ai: {
+        connections: () => request<{ data: AIModel[] }>('/ai/connections'),
+        presets: () => request<{ version: string; data: AIBriefPreset[] }>('/ai/brief-presets'),
+        createJob: (d: { problem_id?: string; ai_model_id?: string; artifact_type: string; brief: AIBrief }) =>
+            request<AIGenerationJob>('/ai/jobs', { method: 'POST', body: JSON.stringify(d) }),
+        getJob: (id: string) => request<AIGenerationJob>(`/ai/jobs/${id}`),
+        cancelJob: (id: string) => request<{ cancelled: boolean }>(`/ai/jobs/${id}/cancel`, { method: 'POST' }),
+        discardJob: (id: string) => request<{ discarded: boolean }>(`/ai/jobs/${id}/discard`, { method: 'POST' }),
+        retryJob: (id: string) => request<AIGenerationJob>(`/ai/jobs/${id}/retry`, { method: 'POST' }),
+        applyJob: (id: string, sections: string[], expected_updated_at?: string) =>
+            request<{ problem_id: string; problem_slug: string }>(`/ai/jobs/${id}/apply`, { method: 'POST', body: JSON.stringify({ sections, expected_updated_at }) }),
+        problemJobs: (problemId: string) => request<{ data: AIGenerationJob[] }>(`/ai/problems/${problemId}/jobs`),
     },
 }

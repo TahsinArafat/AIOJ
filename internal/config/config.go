@@ -90,9 +90,16 @@ type RedisConfig struct {
 }
 
 type AIConfig struct {
-	Endpoint string `yaml:"endpoint"` // base URL of OpenAI-compatible API, e.g. http://localhost:8080/v1
-	APIKey   string `yaml:"api_key"`
-	Model    string `yaml:"model"` // model name served at the endpoint
+	Enabled             bool   `yaml:"enabled"`
+	Endpoint            string `yaml:"endpoint"` // base URL of OpenAI-compatible API, e.g. http://localhost:8080/v1
+	APIKey              string `yaml:"api_key"`
+	Model               string `yaml:"model"` // model name served at the endpoint
+	CredentialMasterKey string `yaml:"credential_master_key"`
+	WorkerConcurrency   int    `yaml:"worker_concurrency"`
+	JobTimeoutSeconds   int    `yaml:"job_timeout_seconds"`
+	MaxResponseBytes    int64  `yaml:"max_response_bytes"`
+	RetentionDays       int    `yaml:"retention_days"`
+	StagedTestdataRoot  string `yaml:"staged_testdata_root"`
 }
 
 func Load(path string) (*Config, error) {
@@ -142,6 +149,43 @@ func Load(path string) (*Config, error) {
 	}
 	if v := os.Getenv("AI_MODEL"); v != "" {
 		cfg.AI.Model = v
+	}
+	if v := os.Getenv("AI_CREDENTIAL_MASTER_KEY"); v != "" {
+		cfg.AI.CredentialMasterKey = v
+	}
+	if v := os.Getenv("AI_WORKER_CONCURRENCY"); v != "" {
+		cfg.AI.WorkerConcurrency = atoi(v)
+	}
+	if v := os.Getenv("AI_JOB_TIMEOUT_SECONDS"); v != "" {
+		cfg.AI.JobTimeoutSeconds = atoi(v)
+	}
+	if v := os.Getenv("AI_MAX_RESPONSE_BYTES"); v != "" {
+		n, _ := strconv.ParseInt(v, 10, 64)
+		cfg.AI.MaxResponseBytes = n
+	}
+	if v := os.Getenv("AI_RETENTION_DAYS"); v != "" {
+		cfg.AI.RetentionDays = atoi(v)
+	}
+	if v := os.Getenv("AI_STAGED_TESTDATA_ROOT"); v != "" {
+		cfg.AI.StagedTestdataRoot = v
+	}
+	if v := os.Getenv("AI_ENABLED"); v != "" {
+		cfg.AI.Enabled = strings.EqualFold(v, "true") || v == "1"
+	}
+	if cfg.AI.WorkerConcurrency <= 0 {
+		cfg.AI.WorkerConcurrency = 2
+	}
+	if cfg.AI.JobTimeoutSeconds <= 0 {
+		cfg.AI.JobTimeoutSeconds = 300
+	}
+	if cfg.AI.MaxResponseBytes <= 0 {
+		cfg.AI.MaxResponseBytes = 4 << 20
+	}
+	if cfg.AI.RetentionDays <= 0 {
+		cfg.AI.RetentionDays = 14
+	}
+	if cfg.AI.StagedTestdataRoot == "" {
+		cfg.AI.StagedTestdataRoot = "./testdata/ai-staging"
 	}
 	if v := os.Getenv("CSRF_SECRET"); v != "" {
 		cfg.Auth.CSRFSecret = v

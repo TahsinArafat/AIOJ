@@ -84,6 +84,30 @@ func TestNormalizeICPCProfileRejectsSubtasks(t *testing.T) {
 	}
 }
 
+func TestNormalizeICPCProfileForcesOnsiteTeamDefaults(t *testing.T) {
+	req := baseRequest()
+	req.FormatProfile = ProfileICPC
+	req.SolverMode = SolverSolo
+	req.EventContext = EventOnline
+	got, err := req.Normalize()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.SolverMode != SolverTeam || got.TeamSize != 3 || got.EventContext != EventOnsite || got.ExpectedSolveMinutes != 60 {
+		t.Fatalf("ICPC normalization = %+v", got)
+	}
+}
+
+func TestNormalizeRejectsInteractiveAndOutputOnly(t *testing.T) {
+	for _, kind := range []string{"interactive", "output_only"} {
+		req := baseRequest()
+		req.ProblemType = kind
+		if _, err := req.Normalize(); err == nil {
+			t.Errorf("accepted %s", kind)
+		}
+	}
+}
+
 func TestNormalizeTeamDefaultsToThree(t *testing.T) {
 	req := baseRequest()
 	req.SolverMode = SolverTeam

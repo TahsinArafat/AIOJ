@@ -51,3 +51,4 @@ screenshots/
 # WitDiff verification receipts (transient, regenerated per run)
 .witdiff/
 .playwright-cli/
+.sleepycode/plans/

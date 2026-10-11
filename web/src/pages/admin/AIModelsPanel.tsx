@@ -15,6 +15,11 @@ interface AIModel {
     description: string
     created_at: string
     updated_at: string
+    has_api_key?: boolean
+    allow_private_network?: boolean
+    structured_output_mode?: string
+    request_timeout_seconds?: number
+    max_output_tokens?: number
 }
 
 const emptyForm = {
@@ -25,6 +30,10 @@ const emptyForm = {
     enabled: true,
     priority: 0,
     description: '',
+    allow_private_network: false,
+    structured_output_mode: 'auto',
+    request_timeout_seconds: 120,
+    max_output_tokens: 8192,
 }
 
 type TestState = 'idle' | 'testing' | 'ok' | 'fail'
@@ -73,6 +82,10 @@ export default function AIModelsPanel() {
             enabled: full.enabled,
             priority: full.priority,
             description: full.description,
+            allow_private_network: full.allow_private_network || false,
+            structured_output_mode: full.structured_output_mode || 'auto',
+            request_timeout_seconds: full.request_timeout_seconds || 120,
+            max_output_tokens: full.max_output_tokens || 8192,
         })
         setTestState('idle')
         setTestError('')
@@ -134,9 +147,12 @@ export default function AIModelsPanel() {
         setTestError('')
         try {
             const res = await api.admin.aiModels.testConnection({
+                id: editingId || undefined,
                 endpoint: form.endpoint,
                 api_key: form.api_key,
                 model_name: form.model_name,
+                allow_private_network: form.allow_private_network,
+                structured_output_mode: form.structured_output_mode,
             })
             if (res.ok) {
                 setTestState('ok')
@@ -222,6 +238,10 @@ export default function AIModelsPanel() {
                                     placeholder: 'http://localhost:8080/v1',
                                     hint: 'OpenAI-compatible base URL. Must serve POST /chat/completions.',
                                 })}
+                                <label className="flex gap-3 items-start rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 p-3 text-sm">
+                                    <input type="checkbox" checked={form.allow_private_network} onChange={e => setForm(f => ({ ...f, allow_private_network: e.target.checked }))} className="mt-0.5" />
+                                    <span><strong>Allow private-network endpoint</strong><span className="block text-xs text-amber-700 dark:text-amber-300 mt-1">Only enable for trusted local Ollama/vLLM services. Public endpoints require HTTPS and metadata addresses always remain blocked.</span></span>
+                                </label>
                                 <div className="grid grid-cols-2 gap-4">
                                     {field('API Key', 'api_key', {
                                         type: 'password',
@@ -240,6 +260,11 @@ export default function AIModelsPanel() {
                         <div className="border-t border-gray-100 dark:border-gray-700 pt-4">
                             <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-3">Configuration</h4>
                             <div className="space-y-3">
+                                <div className="grid grid-cols-3 gap-3">
+                                    <label className="text-xs text-gray-600 dark:text-gray-400">Structured output<select value={form.structured_output_mode} onChange={e => setForm(f => ({ ...f, structured_output_mode: e.target.value }))} className="mt-1 w-full border rounded px-2 py-2 bg-white dark:bg-gray-800"><option value="auto">Auto fallback</option><option value="json_schema">JSON Schema</option><option value="json_object">JSON Object</option><option value="text_json">Text JSON</option></select></label>
+                                    <label className="text-xs text-gray-600 dark:text-gray-400">Timeout (seconds)<input type="number" min={10} max={600} value={form.request_timeout_seconds} onChange={e => setForm(f => ({ ...f, request_timeout_seconds: Number(e.target.value) }))} className="mt-1 w-full border rounded px-2 py-2 bg-white dark:bg-gray-800" /></label>
+                                    <label className="text-xs text-gray-600 dark:text-gray-400">Max output tokens<input type="number" min={256} max={65536} value={form.max_output_tokens} onChange={e => setForm(f => ({ ...f, max_output_tokens: Number(e.target.value) }))} className="mt-1 w-full border rounded px-2 py-2 bg-white dark:bg-gray-800" /></label>
+                                </div>
                                 <div>
                                     <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Description</label>
                                     <textarea

@@ -630,6 +630,22 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 		r.Post("/problem", d.Generate.Problem)
 	})
 
+	if d.AIGeneration != nil && d.AIEnabled {
+		r.Route("/api/ai", func(r chi.Router) {
+			r.Use(middleware.AuthMiddleware(jwtManager))
+			r.Use(middleware.RequireRole("admin", "setter"))
+			r.Get("/connections", d.AIGeneration.Connections)
+			r.Get("/brief-presets", d.AIGeneration.Presets)
+			r.Post("/jobs", d.AIGeneration.Create)
+			r.Get("/jobs/{id}", d.AIGeneration.Get)
+			r.Post("/jobs/{id}/cancel", d.AIGeneration.Cancel)
+			r.Post("/jobs/{id}/discard", d.AIGeneration.Discard)
+			r.Post("/jobs/{id}/apply", d.AIGeneration.Apply)
+			r.Post("/jobs/{id}/retry", d.AIGeneration.Retry)
+			r.Get("/problems/{problemId}/jobs", d.AIGeneration.ListProblem)
+		})
+	}
+
 	fileServer := http.FileServer(http.Dir("./media"))
 	r.Handle("/media/*", http.StripPrefix("/media/", fileServer))
 
