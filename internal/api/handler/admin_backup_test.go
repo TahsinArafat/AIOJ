@@ -88,3 +88,12 @@ func TestAdminBackupHandler_Delete(t *testing.T) {
 		t.Errorf("expected file %s to be deleted, but it still exists", filePath)
 	}
 }
+
+func TestGuessBackupTypeMatchesCreateAPIValues(t *testing.T) {
+	cases := map[string]string{"backup_db_20250101.sql": "db", "backup_files_20250101.tar.gz": "files", "backup_full_20250101.tar.gz": "full"}
+	for name, want := range cases {
+		if got := guessBackupType(name); got != want {
+			t.Errorf("guessBackupType(%q)=%q want %q", name, got, want)
+		}
+	}
+}

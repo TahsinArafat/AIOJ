@@ -83,7 +83,7 @@ export default function BackupsPanel() {
         setCreating(true)
         setError(null)
         try {
-            await api.admin.backups.create(createType)
+            await api.admin.backups.create(createType === 'database' ? 'db' : createType)
             loadBackups()
         } catch (err) {
             setError(err instanceof Error ? err.message : String(err))
@@ -148,7 +148,7 @@ export default function BackupsPanel() {
     }
 
     const openRestoreModal = (backup: BackupFile, type: string) => {
-        setRestoreModal({ backup, type })
+        setRestoreModal({ backup, type: type === 'database' ? 'db' : type })
         setPassword('')
     }
 
@@ -254,13 +254,13 @@ export default function BackupsPanel() {
                     </div>
                     <div className="flex-1">
                         <h3 className="font-medium text-sm">Upload Backup Archive</h3>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Upload a .tar.gz backup file to restore</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">Upload an AIOJ .tar.gz archive or database .sql dump</p>
                     </div>
                     <label className="cursor-pointer">
                         <input
                             ref={fileInputRef}
                             type="file"
-                            accept=".tar.gz"
+                            accept=".tar.gz,.sql"
                             onChange={handleUpload}
                             className="hidden"
                         />

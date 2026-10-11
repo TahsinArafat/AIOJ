@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 	"os"
 	"os/exec"
@@ -134,7 +133,8 @@ func (h *AdminBackupHandler) Download(w http.ResponseWriter, r *http.Request) {
 
 // Upload accepts a multipart file upload and saves it as a backup.
 func (h *AdminBackupHandler) Upload(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseMultipartForm(32 << 20); err != nil {
+	r.Body = http.MaxBytesReader(w, r.Body, 256<<20)
+	if err := r.ParseMultipartForm(256 << 20); err != nil {
 		http.Error(w, "failed to parse form", http.StatusBadRequest)
 		return
 	}
@@ -156,6 +156,10 @@ func (h *AdminBackupHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid filename", http.StatusBadRequest)
 		return
 	}
+	if !strings.HasSuffix(strings.ToLower(filename), ".sql") && !strings.HasSuffix(strings.ToLower(filename), ".tar.gz") {
+		http.Error(w, "backup must be a .sql or .tar.gz file", http.StatusBadRequest)
+		return
+	}
 
 	dstPath := filepath.Join(h.dir, filename)
 	dst, err := os.Create(dstPath)
@@ -165,8 +169,17 @@ func (h *AdminBackupHandler) Upload(w http.ResponseWriter, r *http.Request) {
 	}
 	defer dst.Close()
 
-	if _, err := io.Copy(dst, file); err != nil {
+	written, err := io.Copy(dst, file)
+	if err != nil {
+		dst.Close()
+		_ = os.Remove(dstPath)
 		http.Error(w, "failed to write file", http.StatusInternalServerError)
+		return
+	}
+	if written == 0 {
+		dst.Close()
+		_ = os.Remove(dstPath)
+		http.Error(w, "backup file is empty", http.StatusBadRequest)
 		return
 	}
 
@@ -316,8 +329,18 @@ func (h *AdminBackupHandler) Restore(w http.ResponseWriter, r *http.Request) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	if err := h.runTarExtract(path, tmpDir); err != nil {
-		http.Error(w, fmt.Sprintf("restore extract failed: %v", err), http.StatusInternalServerError)
+	if strings.HasSuffix(strings.ToLower(filename), ".tar.gz") {
+		if err := h.runTarExtract(path, tmpDir); err != nil {
+			http.Error(w, fmt.Sprintf("restore extract failed: %v", err), http.StatusBadRequest)
+			return
+		}
+	} else if req.Type == "db" && strings.HasSuffix(strings.ToLower(filename), ".sql") {
+		if err := copyFile(path, filepath.Join(tmpDir, filename)); err != nil {
+			http.Error(w, "failed to prepare database dump", 500)
+			return
+		}
+	} else {
+		http.Error(w, "backup file format does not match restore type", http.StatusBadRequest)
 		return
 	}
 
@@ -344,21 +367,11 @@ func (h *AdminBackupHandler) Restore(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	case "files":
-		os.RemoveAll("./testdata")
-		os.RemoveAll("./media")
-
 		extractedTestData := filepath.Join(tmpDir, "testdata")
-		if _, err := os.Stat(extractedTestData); err == nil {
-			if err := copyDir(extractedTestData, "./testdata"); err != nil {
-				slog.Error("restore: failed to copy testdata directory", "error", err)
-			}
-		}
-
 		extractedMedia := filepath.Join(tmpDir, "media")
-		if _, err := os.Stat(extractedMedia); err == nil {
-			if err := copyDir(extractedMedia, "./media"); err != nil {
-				slog.Error("restore: failed to copy media directory", "error", err)
-			}
+		if err := restoreDirectories(map[string]string{extractedTestData: "./testdata", extractedMedia: "./media"}); err != nil {
+			http.Error(w, fmt.Sprintf("files restore failed: %v", err), 500)
+			return
 		}
 	case "full":
 		var sqlFile string
@@ -382,21 +395,11 @@ func (h *AdminBackupHandler) Restore(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		os.RemoveAll("./testdata")
-		os.RemoveAll("./media")
-
 		extractedTestData := filepath.Join(tmpDir, "testdata")
-		if _, err := os.Stat(extractedTestData); err == nil {
-			if err := copyDir(extractedTestData, "./testdata"); err != nil {
-				slog.Error("restore: failed to copy testdata directory", "error", err)
-			}
-		}
-
 		extractedMedia := filepath.Join(tmpDir, "media")
-		if _, err := os.Stat(extractedMedia); err == nil {
-			if err := copyDir(extractedMedia, "./media"); err != nil {
-				slog.Error("restore: failed to copy media directory", "error", err)
-			}
+		if err := restoreDirectories(map[string]string{extractedTestData: "./testdata", extractedMedia: "./media"}); err != nil {
+			http.Error(w, fmt.Sprintf("files restore failed: %v", err), 500)
+			return
 		}
 	}
 
@@ -434,6 +437,8 @@ func (h *AdminBackupHandler) runPsql(sqlFile string) error {
 		"-p", fmt.Sprintf("%d", h.dbCfg.Port),
 		"-U", h.dbCfg.User,
 		"-d", h.dbCfg.Name,
+		"--set", "ON_ERROR_STOP=1",
+		"--single-transaction",
 		"-f", sqlFile,
 	)
 	cmd.Env = append(os.Environ(), fmt.Sprintf("PGPASSWORD=%s", h.dbCfg.Password))
@@ -449,7 +454,16 @@ func (h *AdminBackupHandler) runPsql(sqlFile string) error {
 func (h *AdminBackupHandler) runTarCreate(filename string, paths ...string) error {
 	dstPath := filepath.Join(h.dir, filename)
 
-	args := append([]string{"-czf", dstPath}, paths...)
+	existing := []string{}
+	for _, p := range paths {
+		if _, err := os.Stat(p); err == nil {
+			existing = append(existing, p)
+		}
+	}
+	if len(existing) == 0 {
+		return fmt.Errorf("no backup source paths exist")
+	}
+	args := append([]string{"-czf", dstPath, "--"}, existing...)
 	cmd := exec.Command("tar", args...)
 
 	output, err := cmd.CombinedOutput()
@@ -461,7 +475,10 @@ func (h *AdminBackupHandler) runTarCreate(filename string, paths ...string) erro
 
 // runTarExtract extracts a tar.gz archive to the destination directory.
 func (h *AdminBackupHandler) runTarExtract(archivePath, destDir string) error {
-	cmd := exec.Command("tar", "-xzf", archivePath, "-C", destDir)
+	if err := validateTarArchive(archivePath); err != nil {
+		return err
+	}
+	cmd := exec.Command("tar", "-xzf", archivePath, "-C", destDir, "--no-same-owner", "--no-same-permissions")
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -490,6 +507,90 @@ func copyDir(src, dst string) error {
 	cmd := exec.Command("cp", "-r", src, dst)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("copy %s -> %s failed: %w, output: %s", src, dst, err, string(output))
+	}
+	return nil
+}
+
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+	if err != nil {
+		return err
+	}
+	_, copyErr := io.Copy(out, in)
+	closeErr := out.Close()
+	if copyErr != nil {
+		return copyErr
+	}
+	return closeErr
+}
+
+func validateTarArchive(path string) error {
+	out, err := exec.Command("tar", "-tzf", path).Output()
+	if err != nil {
+		return fmt.Errorf("invalid tar archive")
+	}
+	if len(out) > 8<<20 {
+		return fmt.Errorf("archive manifest is too large")
+	}
+	for _, entry := range strings.Split(string(out), "\n") {
+		if entry == "" {
+			continue
+		}
+		clean := filepath.Clean(entry)
+		if filepath.IsAbs(clean) || clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator)) {
+			return fmt.Errorf("archive contains unsafe path %q", entry)
+		}
+	}
+	return nil
+}
+
+// restoreDirectories stages every source beside its destination, then swaps
+// them in. Existing data is retained until all staging copies succeed.
+func restoreDirectories(paths map[string]string) error {
+	type swap struct{ stage, dst, old string }
+	var swaps []swap
+	for src, dst := range paths {
+		if _, err := os.Stat(src); os.IsNotExist(err) {
+			continue
+		} else if err != nil {
+			return err
+		}
+		stage := dst + ".restore-new"
+		old := dst + ".restore-old"
+		_ = os.RemoveAll(stage)
+		_ = os.RemoveAll(old)
+		if err := copyDir(src, stage); err != nil {
+			return err
+		}
+		swaps = append(swaps, swap{stage, dst, old})
+	}
+	if len(swaps) == 0 {
+		return fmt.Errorf("archive contains no testdata or media directory")
+	}
+	for i, s := range swaps {
+		if _, err := os.Stat(s.dst); err == nil {
+			if err := os.Rename(s.dst, s.old); err != nil {
+				return err
+			}
+		}
+		if err := os.Rename(s.stage, s.dst); err != nil {
+			if _, oldErr := os.Stat(s.old); oldErr == nil {
+				_ = os.Rename(s.old, s.dst)
+			}
+			for _, done := range swaps[:i] {
+				_ = os.RemoveAll(done.dst)
+				_ = os.Rename(done.old, done.dst)
+			}
+			return err
+		}
+	}
+	for _, s := range swaps {
+		_ = os.RemoveAll(s.old)
 	}
 	return nil
 }
