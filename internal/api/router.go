@@ -661,8 +661,11 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 		})
 	}
 
-	fileServer := http.FileServer(http.Dir("./media"))
-	r.Handle("/media/*", http.StripPrefix("/media/", fileServer))
+	// Serve uploads through the media handler, not http.FileServer: FileServer
+	// lists the directory for /media/ and serves whatever happens to be in it.
+	if mediaH != nil {
+		r.Handle("/media/*", http.HandlerFunc(mediaH.Serve))
+	}
 
 	return r
 }
