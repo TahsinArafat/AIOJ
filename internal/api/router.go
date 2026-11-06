@@ -59,12 +59,17 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 	backupH := d.Backup
 	r := chi.NewRouter()
 	rl := middleware.NewRateLimiter()
+	// Order matters: RealIP must run before the rate limiter, which keys its
+	// buckets on the client address. (It used to run after, so every request
+	// behind nginx was bucketed by its ephemeral port and nothing was limited.)
+	// chi's RealIP is replaced by our trusted-proxy-aware version so a direct
+	// client cannot spoof X-Forwarded-For.
 	r.Use(
 		middleware.SecurityHeaders(),
+		chiMiddleware.RequestID,
+		middleware.RealIPFromEnv(),
 		middleware.CSRF(d.CSRFSecret),
 		middleware.RateLimit(rl, "/api/health", "/api/ws", "/metrics"),
-		chiMiddleware.RequestID,
-		chiMiddleware.RealIP,
 		middleware.Logging,
 		middleware.SentryRecover,
 		chiMiddleware.Recoverer,

@@ -8,15 +8,30 @@ import (
 	"os"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/time/rate"
 )
 
 // visitor holds a rate limiter and last seen time for an IP.
+// lastSeen is atomic: the request path writes it while the cleanup goroutine
+// reads it, and a plain time.Time is a multi-word value that races.
 type visitor struct {
 	limiter  *rate.Limiter
-	lastSeen time.Time
+	lastSeen atomic.Int64 // unix nanoseconds
+}
+
+func newVisitor(l *rate.Limiter) *visitor {
+	v := &visitor{limiter: l}
+	v.touch()
+	return v
+}
+
+func (v *visitor) touch() { v.lastSeen.Store(time.Now().UnixNano()) }
+
+func (v *visitor) idleFor() time.Duration {
+	return time.Since(time.Unix(0, v.lastSeen.Load()))
 }
 
 // RateLimiter manages per-IP rate limiters using a token bucket algorithm.
@@ -81,13 +96,15 @@ func NewRateLimiter() *RateLimiter {
 func (rl *RateLimiter) getVisitor(ip string) *rate.Limiter {
 	if v, ok := rl.visitors.Load(ip); ok {
 		vis := v.(*visitor)
-		vis.lastSeen = time.Now()
+		vis.touch()
 		return vis.limiter
 	}
 
 	limiter := rate.NewLimiter(rl.rps, rl.burst)
-	rl.visitors.Store(ip, &visitor{limiter: limiter, lastSeen: time.Now()})
-	return limiter
+	actual, _ := rl.visitors.LoadOrStore(ip, newVisitor(limiter))
+	vis := actual.(*visitor)
+	vis.touch()
+	return vis.limiter
 }
 
 // cleanup removes stale entries every 10 minutes.
@@ -101,7 +118,7 @@ func (rl *RateLimiter) cleanup() {
 		case <-ticker.C:
 			rl.visitors.Range(func(key, value any) bool {
 				vis := value.(*visitor)
-				if time.Since(vis.lastSeen) > time.Hour {
+				if vis.idleFor() > time.Hour {
 					rl.visitors.Delete(key)
 				}
 				return true
@@ -121,13 +138,11 @@ func (rl *RateLimiter) Stop() {
 // budget on auth endpoints (defaults: 5 burst, 1 req / 5s sustained).
 func (rl *RateLimiter) StrictAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		key := "strict:" + r.RemoteAddr + ":" + r.URL.Path
-		limiter, _ := rl.visitors.LoadOrStore(key, &visitor{
-			limiter:  rate.NewLimiter(rl.strictRPS, rl.strictBurst),
-			lastSeen: time.Now(),
-		})
+		key := "strict:" + ClientIP(r) + ":" + r.URL.Path
+		limiter, _ := rl.visitors.LoadOrStore(key, newVisitor(
+			rate.NewLimiter(rl.strictRPS, rl.strictBurst)))
 		vis := limiter.(*visitor)
-		vis.lastSeen = time.Now()
+		vis.touch()
 		if !vis.limiter.Allow() {
 			w.Header().Set("Retry-After", "5")
 			http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)
@@ -152,7 +167,9 @@ func RateLimit(rl *RateLimiter, skipPaths ...string) func(http.Handler) http.Han
 				return
 			}
 
-			ip := r.RemoteAddr
+			// Host only: RemoteAddr carries an ephemeral port, so keying on it
+			// gave every connection a fresh bucket and defeated the limit.
+			ip := ClientIP(r)
 
 			limiter := rl.getVisitor(ip)
 			if !limiter.Allow() {
