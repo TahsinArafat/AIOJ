@@ -28,7 +28,9 @@ make migrate-up
 for `/api/dev/mail` and only warns about weak secrets. `JWT_SECRET` is mandatory
 (≥32 bytes) — startup aborts without it.
 
-**Default admin:** admin / admin_secret
+**Default admin:** admin / admin_secret — flagged `must_change_password`; the
+session can only reach the profile, password, 2FA and logout endpoints until a
+new password is set.
 
 ---
 
@@ -67,7 +69,9 @@ Browser -> nginx(:80) -> React SPA (Vite + TypeScript + Tailwind)
 5. Checks output against expected using checker (exact, lines, float)
 6. Updates submission with verdict (AC/WA/TLE/MLE/RE/CE/SE)
 
-**Important:** Compilers (g++, python3, java, rust, nodejs) are installed in the **backend** container (see Dockerfile). go-judge only does isolated execution, not compilation.
+**Important:** Compilers (g++, python3, java, rust, nodejs) are installed in the **judge** image (`Dockerfile.judge`), not the backend image. go-judge only does isolated execution, not compilation — it receives an `argv` and runs it.
+
+Worker lifecycle: `WorkerPool.Start` drains the queue; `WorkerPool.Stop` waits up to 30s for in-flight judgments, so a deploy does not write a System Error over a submission that was about to finish. Anything still `judging` after that is re-queued by `internal/judge/reclaimer.go`.
 
 ---
 
@@ -89,16 +93,6 @@ Browser -> nginx(:80) -> React SPA (Vite + TypeScript + Tailwind)
 | **Superiority Phase 5** | Quality Assurance (LCS plagiarism detection, admin dashboard) | Done |
 | **Superiority Phase 6** | Scale & Reliability (Redis queue, distributed judge worker, circuit breaker, read replicas) | Done |
 | **Superiority Phase 7** | Polish (Prometheus /metrics, Grafana dashboards, alerts) | Done |
-
-| Phase | Plans | Status |
-|-------|-------|--------|
-| Phase 1 - Core | 01-04 | Done |
-| Phase 2 - Contests | 05-08 | Done |
-| Phase 3 - Engagement | 09-11 | Done |
-| Phase 4 - Community | 12-14 | Done |
-| Phase 5 - Content | 15-16 | Done |
-| Phase 6 - Platform | 17-19 | Done |
-| Phase 7 - Polish | 20-23 | Done |
 
 **01** Rating System - Elo calculator, color badges (Newbie-LGM)
 **02** Contest Registration - Register/unregister, deadlines, max participants
@@ -147,9 +141,14 @@ Browser -> nginx(:80) -> React SPA (Vite + TypeScript + Tailwind)
 
 ### Run tests
 ```bash
-go test ./... -count=1             # Backend (10 packages, 145+ tests)
+make test                          # Backend: go test ./cmd/... ./internal/...
+cd web && npm test                 # Frontend: vitest
 cd web && npm run build            # Frontend TypeScript check
 ```
+
+Use `make test`, not a bare `go test ./...`: the module root also contains
+`web/node_modules`, and `./...` walks into third-party Go files there
+(`web/node_modules/flatted/golang`). `make test` scopes the pattern correctly.
 
 ### Rebuild after code changes
 ```bash

@@ -62,6 +62,8 @@ services:
       - 1.1.1.1 # the seeder hits no external hosts, but the Docker embedded
       - 8.8.8.8 # resolver can wedge mid-build; explicit DNS keeps it honest.
     environment:
+      # Development is what allows the published demo admin password.
+      AIOJ_ENV: development
       DB_HOST: postgres
       DB_PORT: "5432"
       DB_NAME: aioj

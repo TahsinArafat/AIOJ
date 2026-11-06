@@ -9,19 +9,36 @@ import (
 	"net/http/cookiejar"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/tahsinarafat/aioj/internal/auth"
 )
 
 func TestSeed_defaultsAreNeverEmpty(t *testing.T) {
-	cfg := fillDefaults(Config{})
+	cfg := fillDefaults(Config{AllowDefaultPass: true})
 	if cfg.BackendURL == "" || cfg.AdminUser == "" || cfg.AdminPass == "" || cfg.ProblemSlug == "" {
 		t.Fatalf("defaults must be non-empty: %+v", cfg)
 	}
 	if cfg.BackendURL != defaultBackendURL || cfg.AdminUser != defaultAdminUser ||
 		cfg.AdminPass != defaultAdminPass || cfg.ProblemSlug != defaultProblemSlug {
 		t.Fatalf("unexpected defaults: %+v", cfg)
+	}
+}
+
+// TestSeed_demoPasswordIsDevelopmentOnly: the built-in password is published in
+// this repository, so a non-development seed must refuse to fall back to it.
+func TestSeed_demoPasswordIsDevelopmentOnly(t *testing.T) {
+	if got := fillDefaults(Config{}).AdminPass; got != "" {
+		t.Fatalf("production default password = %q, want empty", got)
+	}
+
+	_, err := Seed(context.Background(), Config{BackendURL: "http://127.0.0.1:1"})
+	if err == nil {
+		t.Fatal("expected an error when no password is supplied outside development")
+	}
+	if !strings.Contains(err.Error(), "SEED_ADMIN_PASSWORD") {
+		t.Fatalf("error should name the missing variable, got: %v", err)
 	}
 }
 

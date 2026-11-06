@@ -34,5 +34,7 @@ jobs:
       - name: Build
         run: go build ./...
 
+      # Scoped to first-party packages: the module root also contains
+      # web/node_modules, and ./... walks into third-party Go files there.
       - name: Test
-        run: go test ./... -count=1
+        run: go test ./cmd/... ./internal/... -count=1

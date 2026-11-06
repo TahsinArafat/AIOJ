@@ -155,7 +155,16 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	onsiteUser, err := h.onsiteStore.GetByUsername(r.Context(), req.Username)
-	if err != nil || onsiteUser == nil || !auth.CheckPassword(req.Password, onsiteUser.PasswordHash) {
+	if err != nil || onsiteUser == nil {
+		// bcrypt is deliberately slow, and skipping it when the account does not
+		// exist made "no such user" answer in microseconds while a real user took
+		// ~100ms — a reliable username oracle. Compare against a throwaway hash so
+		// both paths cost the same.
+		auth.WastePasswordComparisonTime(req.Password)
+		http.Error(w, "invalid credentials", http.StatusUnauthorized)
+		return
+	}
+	if !auth.CheckPassword(req.Password, onsiteUser.PasswordHash) {
 		http.Error(w, "invalid credentials", http.StatusUnauthorized)
 		return
 	}

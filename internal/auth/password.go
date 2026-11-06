@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"strings"
 	"unicode"
@@ -20,6 +22,33 @@ func HashPassword(password string) (string, error) {
 
 func CheckPassword(password, hash string) bool {
 	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil
+}
+
+// dummyHash is a valid bcrypt hash of a random value, used only to burn the
+// same CPU time as a real password check. Hashing random bytes means the hash
+// cannot be matched by any guessable password.
+var dummyHash = func() []byte {
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		return nil
+	}
+	h, err := bcrypt.GenerateFromPassword([]byte(hex.EncodeToString(raw)), bcryptCost)
+	if err != nil {
+		return nil
+	}
+	return h
+}()
+
+// WastePasswordComparisonTime performs a throwaway bcrypt comparison.
+//
+// Login has to spend the same time whether or not the account exists, otherwise
+// the response time tells an attacker which usernames are real — the bcrypt
+// work is the only slow part, so skipping it is measurable.
+func WastePasswordComparisonTime(password string) {
+	if len(dummyHash) == 0 {
+		return
+	}
+	_ = bcrypt.CompareHashAndPassword(dummyHash, []byte(password))
 }
 
 // ValidatePasswordStrength enforces:

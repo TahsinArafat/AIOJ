@@ -31,6 +31,12 @@ type Config struct {
 	AdminPass   string // "Aioj-Sim-Admin-2026!"
 	ProblemSlug string // "hello"
 
+	// AllowDefaultPass permits falling back to the documented demo password
+	// when AdminPass is empty. Set it only for a development/simulation
+	// environment: in production an explicit password is required, because the
+	// default is published in this repository.
+	AllowDefaultPass bool
+
 	// DSN is used for exactly one write: promoting the first user to admin.
 	// There is no bootstrap-admin endpoint in the product (PUT
 	// /api/admin/users/{id}/role needs an existing admin), so the seeder does
@@ -73,7 +79,7 @@ func fillDefaults(cfg Config) Config {
 	if cfg.AdminUser == "" {
 		cfg.AdminUser = defaultAdminUser
 	}
-	if cfg.AdminPass == "" {
+	if cfg.AdminPass == "" && cfg.AllowDefaultPass {
 		cfg.AdminPass = defaultAdminPass
 	}
 	if cfg.ProblemSlug == "" {
@@ -87,6 +93,13 @@ func fillDefaults(cfg Config) Config {
 func Seed(ctx context.Context, cfg Config) (Result, error) {
 	cfg = fillDefaults(cfg)
 	res := Result{}
+
+	// The demo password is published in this repository, so it may only be used
+	// where a public credential is acceptable. Anything else must supply one.
+	if cfg.AdminPass == "" {
+		return res, fmt.Errorf("seed: SEED_ADMIN_PASSWORD is required outside a " +
+			"development environment (the built-in demo password is public)")
+	}
 
 	jar, err := cookiejar.New(nil)
 	if err != nil {

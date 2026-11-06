@@ -409,7 +409,7 @@ make e2e
 
 | Workflow | What it checks |
 |----------|---------------|
-| `backend-test.yml` | `go test ./...` + build against a live Postgres |
+| `backend-test.yml` | `go test ./cmd/... ./internal/...` + build against a live Postgres |
 | `frontend-build.yml` | TypeScript typecheck + Vite build + Vitest |
 | `lint.yml` | `gofmt -l`, `go vet`, `golangci-lint`, `eslint` |
 | `docker-image.yml` | Builds and publishes container images |
