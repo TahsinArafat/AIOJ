@@ -53,8 +53,8 @@ export default function SetterAppsPanel() {
                                 <td className="px-4 py-3 max-w-xs truncate" title={a.reason}>{a.reason}</td>
                                 <td className="px-4 py-3">
                                     <span className={`px-2 py-1 rounded text-xs font-medium ${
-                                        a.status === 'pending' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300' :
-                                        a.status === 'approved' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
+                                        a.status === 'pending' ? 'bg-warn/12 text-warn' :
+                                        a.status === 'approved' ? 'bg-ok/12 text-ok' : 'bg-bad/12 text-bad'
                                     }`}>
                                         {a.status}
                                     </span>
@@ -63,8 +63,8 @@ export default function SetterAppsPanel() {
                                 <td className="px-4 py-3 text-right">
                                     {a.status === 'pending' && (
                                         <div className="flex justify-end gap-2">
-                                            <button onClick={() => handleAppReview(a.user_id, 'approved')} className="text-green-600 dark:text-green-400 hover:underline text-sm">Approve</button>
-                                            <button onClick={() => handleAppReview(a.user_id, 'rejected')} className="text-red-600 dark:text-red-400 hover:underline text-sm">Reject</button>
+                                            <button onClick={() => handleAppReview(a.user_id, 'approved')} className="text-ok hover:underline text-sm">Approve</button>
+                                            <button onClick={() => handleAppReview(a.user_id, 'rejected')} className="text-bad hover:underline text-sm">Reject</button>
                                         </div>
                                     )}
                                 </td>

@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback, useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { api, getAccessToken } from '../lib/api'
 import DivisionBadge from '../components/DivisionBadge'
+import { ContestStatusBadge, ContestFormatBadge, ContestTypeBadge } from '../components/contest/ContestBadges'
 import type { Division } from '../lib/divisions'
 import { EmptyState } from '../components/EmptyState'
 import {
@@ -99,49 +100,6 @@ function getStatus(start: string, end: string, freeze?: string): ContestStatus {
     return 'running'
 }
 
-function StatusBadge({ status }: { status: ContestStatus }) {
-    const map: Record<ContestStatus, { label: string; cls: string; dot: string }> = {
-        upcoming: { label: 'Before start', cls: 'bg-brand-soft text-brand border-blue-200 dark:border-blue-700', dot: 'bg-brand-soft0' },
-        running: { label: 'Running', cls: 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-700', dot: 'bg-green-50 dark:bg-green-900/200 animate-pulse' },
-        frozen: { label: 'Running (frozen)', cls: 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-700', dot: 'bg-amber-50 dark:bg-amber-900/200' },
-        ended: { label: 'Finished', cls: 'bg-surface-3/30 text-muted border-hairline', dot: 'bg-gray-400' },
-    }
-    const m = map[status]
-    return (
-        <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${m.cls}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${m.dot}`} />
-            {m.label}
-        </span>
-    )
-}
-
-function FormatBadge({ format }: { format?: string }) {
-    if (!format) return null
-    const cls: Record<string, string> = {
-        ioi: 'bg-indigo-50 text-indigo-700 border-indigo-200',
-        icpc: 'bg-sky-50 text-sky-700 border-sky-200',
-        cf: 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-700',
-    }
-    return (
-        <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded border uppercase ${cls[format] || 'bg-surface-2/20 text-muted border-hairline'}`}>
-            {format}
-        </span>
-    )
-}
-
-function TypeBadge({ type }: { type?: string }) {
-    if (!type || type === 'standard' || type === 'acm' || type === 'oi' || type === 'ioi' || type === 'practice') return null
-    const cls: Record<string, string> = {
-        educational: 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-700',
-        open: 'bg-teal-50 text-teal-700 border-teal-200',
-    }
-    return (
-        <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded border capitalize ${cls[type] || 'bg-surface-2/20 text-muted border-hairline'}`}>
-            {type}
-        </span>
-    )
-}
-
 // ─── Timer Displays ────────────────────────────────────────────────────────────
 
 function CountdownTimer({ target, label }: { target: string; label: string }) {
@@ -213,8 +171,8 @@ const SIDEBAR_ICONS: Record<string, React.ReactNode> = {
 function SidebarBox({ title, icon, children, accent }: {
     title: string; icon: string; children: React.ReactNode; accent?: string
 }) {
-    const borderCls = accent === 'purple' ? 'border-purple-200 dark:border-purple-700' : accent === 'green' ? 'border-green-200 dark:border-green-700' : accent === 'amber' ? 'border-amber-200 dark:border-amber-700' : 'border-hairline'
-    const headerCls = accent === 'purple' ? 'bg-purple-50 dark:bg-purple-900/20' : accent === 'green' ? 'bg-green-50 dark:bg-green-900/20' : accent === 'amber' ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-surface-2/20'
+    const borderCls = accent === 'purple' ? 'border-accent/30' : accent === 'green' ? 'border-ok/30' : accent === 'amber' ? 'border-warn/30' : 'border-hairline'
+    const headerCls = accent === 'purple' ? 'bg-violet-500/10' : accent === 'green' ? 'bg-ok/10' : accent === 'amber' ? 'bg-warn/10' : 'bg-surface-2/20'
     const iconNode = SIDEBAR_ICONS[icon]
     return (
         <div className={`bg-surface border ${borderCls} rounded-xl shadow-sm overflow-hidden`}>
@@ -485,16 +443,16 @@ export default function ContestDetail() {
     const totalDuration = new Date(contest.end_time).getTime() - new Date(contest.start_time).getTime()
 
     return (
-        <div className="max-w-7xl mx-auto px-4 py-6">
+        <div>
             {/* ── Hero Header ──────────────────────────────────────────────── */}
             <div className="mb-6">
                 {/* flex-wrap: the title plus four badges is 526px of
                     min-content, which overflowed a 390px phone. */}
                 <div className="flex flex-wrap items-center gap-3 mb-2">
                     <h1 className="text-3xl font-extrabold text-ink">{contest.title}</h1>
-                    <StatusBadge status={status} />
-                    {contest.format && <FormatBadge format={contest.format} />}
-                    {contest.type && <TypeBadge type={contest.type} />}
+                    <ContestStatusBadge status={status} />
+                    {contest.format && <ContestFormatBadge format={contest.format} />}
+                    {contest.type && <ContestTypeBadge type={contest.type} />}
                     {contest.division !== undefined && <DivisionBadge division={contest.division as Division} />}
                 </div>
             </div>
@@ -536,7 +494,7 @@ export default function ContestDetail() {
                             }}
                             className={`pb-3 text-sm font-semibold transition-colors flex items-center gap-1.5 ${activeTab === tab.key
                                 ? 'text-brand border-b-2 border-brand'
-                                : 'text-muted hover:text-gray-700 border-b-2 border-transparent'
+                                : 'text-muted hover:text-ink border-b-2 border-transparent'
                                 }`}
                         >
                             {tab.icon === 'problems' && <FileText className="w-4 h-4" />}
@@ -546,7 +504,7 @@ export default function ContestDetail() {
                             {tab.icon === 'announcements' && <Megaphone className="w-4 h-4" />}
                             {tab.label}
                             {tab.unread !== undefined && tab.unread > 0 ? (
-                                <span className="ml-1 px-1.5 py-0.5 text-xs font-bold bg-red-50 dark:bg-red-900/200 text-white rounded-full min-w-[18px] text-center">{tab.unread}</span>
+                                <span className="ml-1 min-w-[18px] rounded-full bg-danger-fill px-1.5 py-0.5 text-center text-xs font-bold text-danger-fill-ink">{tab.unread}</span>
                             ) : null}
                         </button>
                     ))}
@@ -580,7 +538,7 @@ export default function ContestDetail() {
                                                     <td className="px-4 py-3">
                                                         <Link
                                                             to={`/contests/${id}/problem/${p.index || String.fromCharCode(65 + i)}`}
-                                                            className="text-brand hover:text-blue-800 hover:underline font-medium"
+                                                            className="text-brand hover:text-brand hover:underline font-medium"
                                                         >
                                                             {p.title || `Problem ${p.index || String.fromCharCode(65 + i)}`}
                                                         </Link>
@@ -611,7 +569,7 @@ export default function ContestDetail() {
                                 </h2>
                                 <div className="flex items-center gap-2">
                                     {standingsFrozen && (
-                                        <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs font-semibold rounded-full flex items-center gap-1 border border-blue-200 dark:border-blue-800">
+                                        <span className="px-3 py-1 bg-brand-soft text-brand text-xs font-semibold rounded-full flex items-center gap-1 border border-brand/30">
                                             <Clock className="w-3 h-3" /> Frozen
                                         </span>
                                     )}
@@ -619,7 +577,7 @@ export default function ContestDetail() {
                                         href={`/contests/${id}/scoreboard`}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-muted hover:text-brand border border-hairline rounded-full hover:border-blue-300 dark:hover:border-blue-700 hover:bg-surface-2 transition-colors"
+                                        className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-muted hover:text-brand border border-hairline rounded-full hover:border-brand/40 dark:hover:border-brand/40 hover:bg-surface-2 transition-colors"
                                     >
                                         <ExternalLink className="w-3 h-3" />
                                         Full Scoreboard
@@ -638,7 +596,7 @@ export default function ContestDetail() {
                                                 <th className="text-center px-3 py-3 font-bold text-xs uppercase tracking-wider w-16">Rank</th>
                                                 <th className="text-left px-4 py-3 font-bold text-xs uppercase tracking-wider min-w-[180px]">Team</th>
                                                 <th className="text-center px-3 py-3 font-bold text-xs uppercase tracking-wider w-20">
-                                                    <span className="text-emerald-700 dark:text-emerald-400">=</span>
+                                                    <span className="text-ok dark:text-ok">=</span>
                                                 </th>
                                                 <th className="text-center px-3 py-3 font-bold text-xs uppercase tracking-wider w-20">Penalty</th>
                                                 {(standingsProblems.length > 0 ? standingsProblems : problems).map((p, i) => (
@@ -663,20 +621,20 @@ export default function ContestDetail() {
                                                 const ps = sec % 60
                                                 const penaltyStr = ph > 0 ? `${ph}:${String(pm).padStart(2, '0')}:${String(ps).padStart(2, '0')}` : `${pm}:${String(ps).padStart(2, '0')}`
                                                 return (
-                                                    <tr key={row.user_id || idx} className={`transition-colors ${isMe ? 'bg-brand-soft hover:bg-blue-100 dark:hover:bg-blue-900/30' : idx % 2 === 0 ? 'bg-surface hover:bg-surface-2' : 'bg-surface-2/50 hover:bg-surface-2'}`}>
+                                                    <tr key={row.user_id || idx} className={`transition-colors ${isMe ? 'bg-brand-soft hover:bg-brand/15' : idx % 2 === 0 ? 'bg-surface hover:bg-surface-2' : 'bg-surface-2 hover:bg-surface-2'}`}>
                                                         <td className="text-center px-3 py-2.5">
                                                             {medal ? (
-                                                                <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-sm font-black border ${medal === 'gold' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 border-yellow-300 dark:border-yellow-700' :
+                                                                <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-sm font-black border ${medal === 'gold' ? 'bg-warn/12 text-warn dark:text-warn border-warn/40' :
                                                                     medal === 'silver' ? 'bg-surface-3/50 text-ink-soft border-hairline-strong' :
-                                                                        'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 border-orange-300 dark:border-orange-700'
+                                                                        'bg-warn/12 text-warn border-warn/40'
                                                                     }`}>{rank}</span>
                                                             ) : (
                                                                 <span className="text-sm font-bold text-muted">{rank}</span>
                                                             )}
                                                         </td>
-                                                        <td className={`px-4 py-2.5 font-semibold ${isMe ? 'text-blue-700 dark:text-blue-400' : 'text-ink'}`}>
+                                                        <td className={`px-4 py-2.5 font-semibold ${isMe ? 'text-brand' : 'text-ink'}`}>
                                                             {row.username}
-                                                            {isMe && <span className="ml-2 text-[11px] bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 px-1.5 py-0.5 rounded font-bold border border-blue-200 dark:border-blue-800">YOU</span>}
+                                                            {isMe && <span className="ml-2 text-[11px] bg-brand-soft text-brand px-1.5 py-0.5 rounded font-bold border border-brand/30">YOU</span>}
                                                         </td>
                                                         <td className="text-center px-3 py-2.5">
                                                             <span className="text-lg font-black text-ink">{row.total_solved ?? 0}</span>
@@ -694,7 +652,7 @@ export default function ContestDetail() {
                                                             if (solved) {
                                                                 return (
                                                                     <td key={i} className="text-center px-1 py-2.5">
-                                                                        <div className={`inline-flex flex-col items-center justify-center rounded-md px-2 py-1 min-w-[48px] ${isFirst ? 'bg-emerald-600 text-white shadow-sm' : 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'}`}>
+                                                                        <div className={`inline-flex flex-col items-center justify-center rounded-md px-2 py-1 min-w-[48px] ${isFirst ? 'bg-ok-fill text-white shadow-sm' : 'bg-ok/12 text-ok dark:text-ok border border-ok/30'}`}>
                                                                             <span className="text-xs font-black leading-none">{attempts <= 1 ? '+' : `+${attempts - 1}`}</span>
                                                                             <span className="text-[10px] font-mono leading-none mt-0.5 opacity-70">{timeMin}m</span>
                                                                         </div>
@@ -704,7 +662,7 @@ export default function ContestDetail() {
                                                             if (pending > 0) {
                                                                 return (
                                                                     <td key={i} className="text-center px-1 py-2.5">
-                                                                        <div className="inline-flex flex-col items-center justify-center bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-400 border border-sky-200 dark:border-sky-800 rounded-md px-2 py-1 min-w-[48px]">
+                                                                        <div className="inline-flex flex-col items-center justify-center bg-brand-soft text-brand dark:text-brand border border-brand/30 rounded-md px-2 py-1 min-w-[48px]">
                                                                             <span className="text-xs font-black leading-none">?</span>
                                                                             <span className="text-[10px] font-mono leading-none mt-0.5">{pending}</span>
                                                                         </div>
@@ -714,7 +672,7 @@ export default function ContestDetail() {
                                                             if (attempts > 0) {
                                                                 return (
                                                                     <td key={i} className="text-center px-1 py-2.5">
-                                                                        <div className="inline-flex items-center justify-center bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-800 rounded-md px-2 py-1 min-w-[48px]">
+                                                                        <div className="inline-flex items-center justify-center bg-bad/12 dark:bg-bad/12 text-bad dark:text-bad border border-bad/30 dark:border-bad/40 rounded-md px-2 py-1 min-w-[48px]">
                                                                             <span className="text-xs font-black">-{attempts}</span>
                                                                         </div>
                                                                     </td>
@@ -754,7 +712,7 @@ export default function ContestDetail() {
                                                 <button
                                                     onClick={() => setStandingsPage(p => Math.max(1, p - 1))}
                                                     disabled={page <= 1}
-                                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 text-sm font-medium rounded-md border border-hairline bg-surface-2 text-ink-soft hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 text-sm font-medium rounded-md border border-hairline bg-surface-2 text-ink-soft hover:bg-surface-3 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                                                 >
                                                     <ChevronLeft className="w-4 h-4" />
                                                     Prev
@@ -768,7 +726,7 @@ export default function ContestDetail() {
                                                             onClick={() => setStandingsPage(p)}
                                                             className={`min-w-[36px] px-2 py-1.5 text-sm font-medium rounded-md border transition-colors ${p === page
                                                                 ? 'bg-brand text-on-brand border-brand shadow-sm'
-                                                                : 'bg-surface-2 text-ink-soft border-hairline hover:bg-gray-700'
+                                                                : 'bg-surface-2 text-ink-soft border-hairline hover:bg-surface-3'
                                                                 }`}
                                                         >
                                                             {p}
@@ -778,7 +736,7 @@ export default function ContestDetail() {
                                                 <button
                                                     onClick={() => setStandingsPage(p => Math.min(total_pages, p + 1))}
                                                     disabled={page >= total_pages}
-                                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 text-sm font-medium rounded-md border border-hairline bg-surface-2 text-ink-soft hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 text-sm font-medium rounded-md border border-hairline bg-surface-2 text-ink-soft hover:bg-surface-3 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                                                 >
                                                     Next
                                                     <ChevronRight className="w-4 h-4" />
@@ -801,13 +759,13 @@ export default function ContestDetail() {
                                     <div className="flex items-center bg-surface-3/30 rounded-lg p-0.5">
                                         <button
                                             onClick={() => { setSubmissionsMine(true); setSubmissionsOffset(0) }}
-                                            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${submissionsMine ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-gray-700'}`}
+                                            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${submissionsMine ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink'}`}
                                         >
                                             <Eye className="w-3.5 h-3.5" /> My Submissions
                                         </button>
                                         <button
                                             onClick={() => { setSubmissionsMine(false); setSubmissionsOffset(0) }}
-                                            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${!submissionsMine ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-gray-700'}`}
+                                            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${!submissionsMine ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-ink'}`}
                                         >
                                             <EyeOff className="w-3.5 h-3.5" /> All Submissions
                                         </button>
@@ -816,9 +774,9 @@ export default function ContestDetail() {
                             </div>
 
                             {status === 'frozen' && (
-                                <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-2">
+                                <div className="mb-4 p-3 bg-brand-soft border border-brand/30 rounded-lg flex items-center gap-2">
                                     <Clock className="w-4 h-4 text-brand" />
-                                    <span className="text-sm text-blue-700">Standings frozen — only submissions before freeze are shown.</span>
+                                    <span className="text-sm text-brand">Standings frozen — only submissions before freeze are shown.</span>
                                 </div>
                             )}
 
@@ -872,7 +830,7 @@ export default function ContestDetail() {
                                     {(subFilterProblem || subFilterLang || subFilterStatus || subFilterId) && (
                                         <button
                                             onClick={() => { setSubFilterProblem(''); setSubFilterLang(''); setSubFilterStatus(''); setSubFilterId(''); setSubmissionsOffset(0) }}
-                                            className="text-xs text-muted hover:text-red-600 font-medium"
+                                            className="text-xs text-muted hover:text-bad font-medium"
                                         >
                                             Clear Filters
                                         </button>
@@ -908,16 +866,16 @@ export default function ContestDetail() {
                                             <tbody>
                                                 {filteredSubmissions.map((s, i) => {
                                                     const verdictCls: Record<string, string> = {
-                                                        ac: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-300 dark:border-green-700',
-                                                        wa: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-300 dark:border-red-700',
-                                                        tle: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700',
-                                                        mle: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700',
-                                                        re: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-orange-300 dark:border-orange-700',
+                                                        ac: 'bg-ok/12 text-ok border-ok/40',
+                                                        wa: 'bg-bad/12 text-bad border-bad/40',
+                                                        tle: 'bg-warn/12 text-warn border-warn/40',
+                                                        mle: 'bg-warn/12 text-warn border-warn/40',
+                                                        re: 'bg-warn/12 text-warn border-warn/40',
                                                         ce: 'bg-surface-3/30 text-muted border-hairline-strong',
-                                                        pending: 'bg-blue-100 dark:bg-blue-900/30 text-brand border-blue-300 dark:border-blue-700',
-                                                        judging: 'bg-blue-100 dark:bg-blue-900/30 text-brand border-blue-300 dark:border-blue-700',
-                                                        se: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-300 dark:border-red-700',
-                                                        ie: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-300 dark:border-red-700',
+                                                        pending: 'bg-brand-soft text-brand border-brand/40',
+                                                        judging: 'bg-brand-soft text-brand border-brand/40',
+                                                        se: 'bg-bad/12 text-bad border-bad/40',
+                                                        ie: 'bg-bad/12 text-bad border-bad/40',
                                                     }
                                                     const verdictLabel: Record<string, string> = {
                                                         ac: 'Accepted', wa: 'Wrong Answer', tle: 'Time Limit',
@@ -927,7 +885,7 @@ export default function ContestDetail() {
                                                     const problem = problems.find(p => p.problem_id === s.problem_id)
                                                     const problemLabel = problem ? `${problem.index || ''} — ${problem.title}` : s.problem_id?.slice(0, 8)
                                                     const canClick = s.user_id === userId || isJudge
-                                                    const rowCls = canClick ? 'cursor-pointer hover:bg-blue-50' : 'hover:bg-surface-2'
+                                                    const rowCls = canClick ? 'cursor-pointer hover:bg-brand-soft' : 'hover:bg-surface-2'
                                                     return (
                                                         <tr
                                                             key={s.id}
@@ -994,7 +952,7 @@ export default function ContestDetail() {
                             </div>
 
                             {showForm && (
-                                <div className="bg-surface border border-blue-200 dark:border-blue-700 rounded-xl p-4 mb-4 shadow-sm">
+                                <div className="bg-surface border border-brand/30 rounded-xl p-4 mb-4 shadow-sm">
                                     <textarea
                                         value={question}
                                         onChange={e => setQuestion(e.target.value)}
@@ -1021,10 +979,10 @@ export default function ContestDetail() {
                                             </div>
                                             <p className="text-sm text-ink mb-2">{c.question}</p>
                                             {c.answer && (
-                                                <div className={`mt-2 pl-3 border-l-2 ${c.is_public ? 'border-green-400 bg-green-50 dark:bg-green-900/20' : 'border-blue-400 bg-brand-soft'} rounded-r-lg p-3`}>
+                                                <div className={`mt-2 pl-3 border-l-2 ${c.is_public ? 'border-ok/40 bg-ok/10' : 'border-brand/40 bg-brand-soft'} rounded-r-lg p-3`}>
                                                     <p className="text-sm text-ink-soft">{c.answer}</p>
                                                     {c.is_public && (
-                                                        <span className="inline-block text-[10px] text-green-600 dark:text-green-400 font-medium mt-1">
+                                                        <span className="inline-block text-[10px] text-ok font-medium mt-1">
                                                             <Megaphone className="w-3 h-3 inline mr-0.5" />Public response
                                                         </span>
                                                     )}
@@ -1045,8 +1003,8 @@ export default function ContestDetail() {
 
                             {/* Admin: Post new announcement */}
                             {isAdmin && (
-                                <div className="mb-6 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg p-4">
-                                    <h3 className="text-sm font-semibold text-amber-800 dark:text-amber-300 mb-2">Post Announcement</h3>
+                                <div className="mb-6 bg-warn/10 border border-warn/30 rounded-lg p-4">
+                                    <h3 className="text-sm font-semibold text-warn mb-2">Post Announcement</h3>
                                     <div className="flex gap-2">
                                         <input
                                             type="text"
@@ -1058,7 +1016,7 @@ export default function ContestDetail() {
                                         />
                                         <button
                                             onClick={handleAnnounce}
-                                            className="px-4 py-2 bg-amber-50 dark:bg-amber-900/200 text-white text-sm font-semibold rounded-lg hover:bg-amber-600 transition-colors"
+                                            className="px-4 py-2 bg-warn/10 dark:bg-warn text-white text-sm font-semibold rounded-lg hover:bg-warn-fill transition-colors"
                                         >
                                             Post
                                         </button>
@@ -1071,7 +1029,7 @@ export default function ContestDetail() {
                             ) : (
                                 <div className="space-y-3">
                                     {announcements.map((a, i) => (
-                                        <div key={a.id} className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg p-4">
+                                        <div key={a.id} className="bg-warn/10 border border-warn/30 rounded-lg p-4">
                                             <div className="flex items-start justify-between gap-3">
                                                 <div className="flex-1">
                                                     <p className="text-ink text-sm leading-relaxed">{a.content}</p>
@@ -1081,11 +1039,11 @@ export default function ContestDetail() {
                                                     </div>
                                                 </div>
                                                 <div className="flex items-center gap-2 flex-shrink-0">
-                                                    <span className="text-xs text-amber-600 dark:text-amber-400 font-bold bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 rounded">#{i + 1}</span>
+                                                    <span className="text-xs text-warn font-bold bg-warn/12 px-2 py-0.5 rounded">#{i + 1}</span>
                                                     {isAdmin && (
                                                         <button
                                                             onClick={() => handleDeleteAnnouncement(a.id)}
-                                                            className="text-red-400 hover:text-red-600 p-1"
+                                                            className="text-bad hover:text-bad p-1"
                                                         >
                                                             <X className="w-4 h-4" />
                                                         </button>
@@ -1152,13 +1110,13 @@ export default function ContestDetail() {
                                     {contest.max_participants && (
                                         <div className="w-full bg-surface-3/30 rounded-full h-1.5">
                                             <div
-                                                className="bg-brand-soft0 rounded-full h-1.5 transition-all"
+                                                className="bg-brand rounded-full h-1.5 transition-all"
                                                 style={{ width: `${Math.min(100, (registrationCount / contest.max_participants) * 100)}%` }}
                                             />
                                         </div>
                                     )}
                                     {registered && (
-                                        <div className="flex items-center gap-1.5 text-sm text-green-600 dark:text-green-400 font-medium">
+                                        <div className="flex items-center gap-1.5 text-sm text-ok font-medium">
                                             <CheckCircle2 className="w-4 h-4" />
                                             You are registered
                                         </div>
@@ -1167,7 +1125,7 @@ export default function ContestDetail() {
                                         <button
                                             onClick={() => registered ? handleUnregister() : handleRegister()}
                                             className={`w-full py-2 rounded-lg text-sm font-semibold transition-colors ${registered
-                                                ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 border border-red-200 dark:border-red-700'
+                                                ? 'bg-bad/10 text-bad hover:bg-bad/12 border border-bad/30'
                                                 : 'bg-brand text-on-brand hover:bg-brand-hover'
                                                 }`}
                                         >
@@ -1184,7 +1142,7 @@ export default function ContestDetail() {
                                 <div className="space-y-2">
                                     <Link
                                         to={`/contests/${id}/scoreboard`}
-                                        className="flex items-center gap-2 text-sm text-brand hover:text-blue-800 hover:underline"
+                                        className="flex items-center gap-2 text-sm text-brand hover:text-brand hover:underline"
                                     >
                                         <Trophy className="w-4 h-4" /> View Full Scoreboard
                                     </Link>
@@ -1193,7 +1151,7 @@ export default function ContestDetail() {
                                             href={`/api/contests/${id}/pdf`}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="flex items-center gap-2 text-sm text-brand hover:text-blue-800 hover:underline"
+                                            className="flex items-center gap-2 text-sm text-brand hover:text-brand hover:underline"
                                         >
                                             <FileDown className="w-4 h-4" /> Download PDF
                                         </a>
@@ -1218,7 +1176,7 @@ export default function ContestDetail() {
                                         <Settings className="w-4 h-4" /> Manage Contest
                                     </Link>
                                     {isRunning && contest.statement_hidden && (
-                                        <p className="text-xs text-yellow-700 dark:text-yellow-300 font-medium flex items-center gap-1">
+                                        <p className="text-xs text-warn font-medium flex items-center gap-1">
                                             <AlertTriangle className="w-3 h-3" /> Statement hidden mode is ON
                                         </p>
                                     )}

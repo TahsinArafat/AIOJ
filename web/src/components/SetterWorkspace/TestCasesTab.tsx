@@ -76,7 +76,7 @@ export default function TestCasesTab({
                   <td className="px-4 py-2.5 text-right">
                     <button
                       onClick={() => onRemove(idx)}
-                      className="text-red-600 dark:text-red-400 hover:underline cursor-pointer"
+                      className="text-bad hover:underline cursor-pointer"
                     >
                       Remove
                     </button>

@@ -13,23 +13,23 @@ function formatTime(seconds: number): string {
 }
 
 function timerColor(remainingSeconds: number): string {
-    if (remainingSeconds > 1800) return 'text-emerald-600 dark:text-emerald-400'
+    if (remainingSeconds > 1800) return 'text-ok'
     if (remainingSeconds > 300) return 'text-amber-500 dark:text-amber-400'
-    if (remainingSeconds > 60) return 'text-red-500 dark:text-red-400'
-    return 'text-red-600 dark:text-red-400 animate-pulse'
+    if (remainingSeconds > 60) return 'text-bad dark:text-bad'
+    return 'text-bad animate-pulse'
 }
 
 function timerBg(remainingSeconds: number): string {
     if (remainingSeconds > 1800) return 'bg-emerald-50 border-emerald-200 dark:bg-emerald-900/30 dark:border-emerald-700'
-    if (remainingSeconds > 300) return 'bg-amber-50 border-amber-200 dark:bg-amber-900/30 dark:border-amber-700'
-    if (remainingSeconds > 60) return 'bg-red-50 border-red-200 dark:bg-red-900/30 dark:border-red-700'
-    return 'bg-red-100 border-red-300 dark:bg-red-900/50 dark:border-red-700'
+    if (remainingSeconds > 300) return 'bg-warn/10 border-amber-200 dark:bg-amber-900/30 dark:border-amber-700'
+    if (remainingSeconds > 60) return 'bg-bad/10 border-bad/30 dark:bg-red-900/30 dark:border-red-700'
+    return 'bg-bad/12 border-bad/40 dark:bg-red-900/50 dark:border-red-700'
 }
 
 function progressBarColor(remainingSeconds: number): string {
-    if (remainingSeconds > 1800) return 'bg-emerald-500'
+    if (remainingSeconds > 1800) return 'bg-ok-fill'
     if (remainingSeconds > 300) return 'bg-amber-400'
-    return 'bg-red-500'
+    return 'bg-bad/100'
 }
 
 interface VirtualStatusState { is_active?: boolean; ends_at: string; started_at: string; original_contest_id: string; virtual_id?: string }
@@ -289,7 +289,7 @@ export default function VirtualContest() {
                 </div>
                 <button
                     onClick={() => handleComplete(virtualStatus!.virtual_id ?? '')}
-                    className="text-sm text-red-600 bg-red-50 hover:bg-red-100 px-4 py-2 rounded font-medium transition-colors"
+                    className="text-sm text-bad bg-bad/10 hover:bg-bad/12 px-4 py-2 rounded font-medium transition-colors"
                 >
                     End Contest Early
                 </button>

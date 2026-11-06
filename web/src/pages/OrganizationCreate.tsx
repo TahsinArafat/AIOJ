@@ -30,7 +30,7 @@ export default function OrganizationCreate() {
 	return (
 		<div className="max-w-md mx-auto bg-surface border border-hairline rounded-lg p-6 my-10">
 			<h1 className="text-xl font-bold mb-4">Create Organization</h1>
-			{error && <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-2 rounded mb-4 text-sm">{error}</div>}
+			{error && <div className="bg-bad/10 border border-bad/30 text-bad px-4 py-2 rounded mb-4 text-sm">{error}</div>}
 			<form onSubmit={handleSubmit} className="space-y-4">
 				<div>
 					<label className="block text-sm font-medium text-ink-soft mb-1">Organization Name</label>

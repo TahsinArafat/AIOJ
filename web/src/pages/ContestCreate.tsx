@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { api, getAccessToken, contestSlug } from '../lib/api'
 import { DIVISIONS } from '../lib/divisions'
+import { PageHeader } from '../components/ui/PageHeader'
 
 const FORMAT_OPTIONS = [
     { value: 'acm', label: 'ACM/ICPC', desc: 'Standard penalty-based scoring with time penalty.' },
@@ -246,11 +247,11 @@ export default function ContestCreate() {
 
     const difficultyColor = (d: string) => {
         const map: Record<string, string> = {
-            easy: 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20',
-            medium: 'text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20',
-            hard: 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20',
-            'very easy': 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20',
-            'very hard': 'text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-900/30',
+            easy: 'text-ok bg-ok/10',
+            medium: 'text-warn bg-warn/10',
+            hard: 'text-bad bg-bad/10',
+            'very easy': 'text-ok bg-ok/10',
+            'very hard': 'text-bad bg-bad/12',
         }
         return map[(d || '').toLowerCase()] || 'text-muted bg-surface-2/20'
     }
@@ -264,13 +265,14 @@ export default function ContestCreate() {
 
     return (
         <div className="max-w-3xl mx-auto pb-12">
-            <div className="mb-8">
-                <h1 className="text-2xl font-bold text-ink">Create Contest</h1>
-                <p className="text-sm text-muted mt-1">Set up a new competitive programming contest.</p>
-            </div>
+            <PageHeader
+                eyebrow={<Link to="/setter" className="hover:text-ink">← Setter workspace</Link>}
+                title="Create contest"
+                description="Set up a new competitive programming contest."
+            />
 
             {error && (
-                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg mb-6 text-sm flex items-start gap-2">
+                <div role="alert" className="mb-6 flex items-start gap-2 rounded-lg border border-bad/30 bg-bad/10 px-4 py-3 text-sm text-bad">
                     <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                     </svg>
@@ -286,7 +288,7 @@ export default function ContestCreate() {
                     <div className="space-y-4">
                         <div>
                             <label className={labelCls}>
-                                Title <span className="text-red-400">*</span>
+                                Title <span className="text-bad">*</span>
                             </label>
                             <input
                                 required
@@ -330,7 +332,7 @@ export default function ContestCreate() {
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div>
                             <label className={labelCls}>
-                                Start Time <span className="text-red-400">*</span>
+                                Start Time <span className="text-bad">*</span>
                             </label>
                             <input
                                 type="datetime-local"
@@ -342,7 +344,7 @@ export default function ContestCreate() {
                         </div>
                         <div>
                             <label className={labelCls}>
-                                End Time <span className="text-red-400">*</span>
+                                End Time <span className="text-bad">*</span>
                             </label>
                             <input
                                 type="datetime-local"
@@ -493,7 +495,7 @@ export default function ContestCreate() {
                             />
                             {searchLoading && (
                                 <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                                    <div className="w-4 h-4 border-2 border-blue-300 dark:border-blue-700 border-t-blue-600 rounded-full animate-spin" />
+                                    <div className="w-4 h-4 border-2 border-brand/40 border-t-blue-600 rounded-full animate-spin" />
                                 </div>
                             )}
                         </div>
@@ -505,7 +507,7 @@ export default function ContestCreate() {
                                         key={p.id}
                                         type="button"
                                         onClick={() => addProblem(p)}
-                                        className="w-full text-left px-4 py-2.5 hover:bg-blue-50 flex items-center justify-between gap-2 border-b border-hairline last:border-0 transition"
+                                        className="w-full text-left px-4 py-2.5 hover:bg-brand-soft flex items-center justify-between gap-2 border-b border-hairline last:border-0 transition"
                                     >
                                         <div className="min-w-0">
                                             <span className="text-sm font-medium text-ink truncate block">{p.title}</span>
@@ -543,7 +545,7 @@ export default function ContestCreate() {
                                     {selectedProblems.map((p, i) => (
                                         <tr key={p.id} className="border-t border-hairline hover:bg-surface-2">
                                             <td className="px-4 py-2.5">
-                                                <span className="inline-flex items-center justify-center w-6 h-6 rounded bg-blue-100 dark:bg-blue-900/30 text-brand font-bold text-xs">
+                                                <span className="inline-flex items-center justify-center w-6 h-6 rounded bg-brand-soft text-brand font-bold text-xs">
                                                     {PROBLEM_LETTERS[i] || (i + 1)}
                                                 </span>
                                             </td>
@@ -581,7 +583,7 @@ export default function ContestCreate() {
                                                     <button
                                                         type="button"
                                                         onClick={() => removeProblem(i)}
-                                                        className="p-1 text-muted-soft hover:text-red-500"
+                                                        className="p-1 text-muted-soft hover:text-bad"
                                                         title="Remove"
                                                     >
                                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>

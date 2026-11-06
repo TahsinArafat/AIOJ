@@ -209,10 +209,10 @@ export default function BotAccountsPanel() {
     }
 
     const statusColor = (s: string) =>
-        s === 'active' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' :
-            s === 'expired' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300' :
-                s === 'error' ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300' :
-                    s === 'banned' ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300' :
+        s === 'active' ? 'bg-ok/12 text-ok' :
+            s === 'expired' ? 'bg-warn/12 text-warn' :
+                s === 'error' ? 'bg-bad/12 text-bad' :
+                    s === 'banned' ? 'bg-bad/12 text-bad' :
                         'bg-surface-3 text-ink'
 
     const platformHint = PLATFORMS.find(p => p.value === form.platform)?.hint || ''
@@ -493,7 +493,7 @@ export default function BotAccountsPanel() {
                                 <td className="px-4 py-3 text-muted text-xs">{b.rate_limit_rps} rps</td>
                                 <td className="px-4 py-3 text-muted text-xs max-w-[150px] truncate" title={b.proxy_url}>
                                     {b.proxy_enabled ? (
-                                        <span className="text-green-600 dark:text-green-400 font-mono font-medium">Enabled</span>
+                                        <span className="text-ok font-mono font-medium">Enabled</span>
                                     ) : (
                                         <span className="text-muted-soft">Disabled</span>
                                     )}
@@ -506,7 +506,7 @@ export default function BotAccountsPanel() {
                                         <button onClick={() => startEdit(b)} className="text-brand hover:text-brand" title="Edit">
                                             <Pencil className="w-4 h-4" />
                                         </button>
-                                        <button onClick={() => handleDelete(b.id)} className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300" title="Delete">
+                                        <button onClick={() => handleDelete(b.id)} className="text-bad hover:text-red-800 dark:hover:text-red-300" title="Delete">
                                             <Trash2 className="w-4 h-4" />
                                         </button>
                                     </div>

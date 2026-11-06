@@ -24,12 +24,12 @@ export default function SetterApplication() {
     }
 
     if (loading) return <p className="text-sm text-muted-soft">Loading...</p>
-    if (status === 'approved') return <p className="text-green-600 dark:text-green-400 text-sm">You are a problem setter!</p>
-    if (status === 'pending') return <p className="text-yellow-600 dark:text-yellow-400 text-sm">Your application is pending review.</p>
+    if (status === 'approved') return <p className="text-ok text-sm">You are a problem setter!</p>
+    if (status === 'pending') return <p className="text-warn text-sm">Your application is pending review.</p>
 
     return (
         <div>
-            {status === 'rejected' && <p className="text-red-600 dark:text-red-400 text-sm mb-2">Your previous application was rejected. You can re-apply.</p>}
+            {status === 'rejected' && <p className="text-bad text-sm mb-2">Your previous application was rejected. You can re-apply.</p>}
             {!submitted ? (
                 <div>
                     <textarea rows={3} value={reason} onChange={e => setReason(e.target.value)}
@@ -41,7 +41,7 @@ export default function SetterApplication() {
                     </button>
                 </div>
             ) : (
-                <p className="text-green-600 dark:text-green-400 text-sm">Application submitted!</p>
+                <p className="text-ok text-sm">Application submitted!</p>
             )}
         </div>
     )

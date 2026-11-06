@@ -50,7 +50,7 @@ export default function EditorialForm({ problemId, isUserAdmin, onSuccess, onCan
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 text-sm text-ink">
-      {error && <div className="p-3 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 rounded border border-red-200 dark:border-red-800">{error}</div>}
+      {error && <div className="p-3 bg-bad/10 text-bad rounded border border-bad/30">{error}</div>}
       
       <div>
         <label className="block font-medium text-ink-soft mb-1">Title *</label>

@@ -86,12 +86,12 @@ function decodeRole(): string | null {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-    ac: 'text-green-600 dark:text-green-400', success: 'text-green-600 dark:text-green-400',
-    wa: 'text-red-600 dark:text-red-400',
-    tle: 'text-yellow-600 dark:text-yellow-400', TLE: 'text-yellow-600 dark:text-yellow-400',
+    ac: 'text-ok', success: 'text-ok',
+    wa: 'text-bad',
+    tle: 'text-warn', TLE: 'text-warn',
     mle: 'text-orange-600 dark:text-orange-400', MLE: 'text-orange-600 dark:text-orange-400',
-    re: 'text-red-700 dark:text-red-300', RE: 'text-red-700 dark:text-red-300',
-    ce: 'text-purple-600 dark:text-purple-400', CE: 'text-purple-600 dark:text-purple-400',
+    re: 'text-bad', RE: 'text-bad',
+    ce: 'text-accent', CE: 'text-accent',
     pending: 'text-blue-500 dark:text-blue-400', judging: 'text-brand',
     se: 'text-muted', SE: 'text-muted',
 }
@@ -669,7 +669,7 @@ export default function ProblemDetail() {
                     <div className="space-y-6 max-w-2xl py-2">
                         {problem.interactive && (
                             <div className="bg-purple-50 dark:bg-purple-950 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
-                                <h3 className="font-semibold text-purple-800 dark:text-purple-300 mb-1">Interactive Problem</h3>
+                                <h3 className="font-semibold text-accent mb-1">Interactive Problem</h3>
                                 <p className="text-sm text-purple-700 dark:text-purple-400 leading-relaxed">
                                     Your program communicates with an interactor via stdin/stdout. Remember to flush your output buffer after each write.
                                 </p>
@@ -739,7 +739,7 @@ export default function ProblemDetail() {
                             editorials.map(e => (
                                 <Link key={e.id} to={`/editorials/${e.id}`} className="block border rounded p-4 hover:bg-surface-2">
                                     <div className="flex items-center gap-2 mb-1">
-                                        {e.is_official && <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-2 py-0.5 rounded font-medium">Official</span>}
+                                        {e.is_official && <span className="text-xs bg-ok/12 text-ok px-2 py-0.5 rounded font-medium">Official</span>}
                                         <h4 className="font-medium">{e.title}</h4>
                                     </div>
                                     <div className="flex gap-4 text-xs text-muted-soft">
@@ -790,12 +790,12 @@ export default function ProblemDetail() {
                                                 </td>
                                                 <td className="px-4 py-2 text-muted">{s.language}</td>
                                                 <td className="px-4 py-2 font-semibold">
-                                                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${s.status === 'ac' ? 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20' :
-                                                        s.status === 'wa' ? 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20' :
-                                                            s.status === 'tle' ? 'text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20' :
+                                                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${s.status === 'ac' ? 'text-ok bg-ok/10' :
+                                                        s.status === 'wa' ? 'text-bad bg-bad/10' :
+                                                            s.status === 'tle' ? 'text-warn bg-warn/10' :
                                                                 s.status === 'mle' ? 'text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20' :
-                                                                    s.status === 're' ? 'text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/20' :
-                                                                        s.status === 'ce' ? 'text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20' :
+                                                                    s.status === 're' ? 'text-bad bg-bad/10' :
+                                                                        s.status === 'ce' ? 'text-accent bg-violet-500/10' :
                                                                             s.status === 'pending' ? 'text-blue-500 dark:text-blue-400 bg-brand-soft' :
                                                                                 s.status === 'judging' ? 'text-brand bg-brand-soft' :
                                                                                     'text-muted bg-surface-2'
@@ -861,7 +861,7 @@ export default function ProblemDetail() {
                         <button
                             onClick={submit}
                             disabled={submitting}
-                            className="bg-green-600 text-white px-4 py-1.5 rounded text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition-colors cursor-pointer"
+                            className="bg-ok-fill text-white px-4 py-1.5 rounded text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition-colors cursor-pointer"
                         >
                             {submitting ? 'Submitting...' : 'Submit'}
                         </button>
@@ -886,7 +886,7 @@ export default function ProblemDetail() {
                             )}
                         </div>
                         {result.compile_output && (
-                            <pre className="mt-2 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded p-2 overflow-x-auto">{result.compile_output}</pre>
+                            <pre className="mt-2 text-xs text-bad bg-bad/10 rounded p-2 overflow-x-auto">{result.compile_output}</pre>
                         )}
                     </div>
                 )}
@@ -896,9 +896,9 @@ export default function ProblemDetail() {
                     <div className="border border-hairline rounded-lg overflow-hidden bg-surface shadow-sm">
                         <div className="bg-surface-2 border-b border-hairline px-4 py-3 flex items-center justify-between">
                             <span className="font-semibold text-sm text-ink-soft">Sample Test Results</span>
-                            <span className={`text-xs font-medium px-2 py-0.5 rounded ${sampleResults.every(r => r.passed) ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' :
-                                sampleResults.some(r => r.passed) ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300' :
-                                    'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded ${sampleResults.every(r => r.passed) ? 'bg-ok/12 text-ok' :
+                                sampleResults.some(r => r.passed) ? 'bg-warn/12 text-warn' :
+                                    'bg-bad/12 text-bad'
                                 }`}>
                                 {sampleResults.filter(r => r.passed).length}/{sampleResults.length} Passed
                             </span>
@@ -912,7 +912,7 @@ export default function ProblemDetail() {
                                             {r.time > 0 && (
                                                 <span className="text-xs text-muted">{r.time}ms</span>
                                             )}
-                                            <span className={`text-xs font-medium px-2 py-0.5 rounded ${r.passed ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
+                                            <span className={`text-xs font-medium px-2 py-0.5 rounded ${r.passed ? 'bg-ok/12 text-ok' : 'bg-bad/12 text-bad'
                                                 }`}>
                                                 {r.passed ? 'Passed' : 'Failed'}
                                             </span>
@@ -925,19 +925,19 @@ export default function ProblemDetail() {
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                                             <div>
                                                 <span className="block text-xs font-semibold text-muted mb-1">Expected</span>
-                                                <pre className="bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 font-mono text-xs p-2 rounded overflow-x-auto max-h-24 border border-green-100">{r.expected || '(empty)'}</pre>
+                                                <pre className="bg-ok/10 text-ok font-mono text-xs p-2 rounded overflow-x-auto max-h-24 border border-green-100">{r.expected || '(empty)'}</pre>
                                             </div>
                                             <div>
                                                 <span className="block text-xs font-semibold text-muted mb-1">Actual</span>
-                                                <pre className="bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 font-mono text-xs p-2 rounded overflow-x-auto max-h-24 border border-red-100">{r.actual || '(empty)'}</pre>
+                                                <pre className="bg-bad/10 text-bad font-mono text-xs p-2 rounded overflow-x-auto max-h-24 border border-red-100">{r.actual || '(empty)'}</pre>
                                             </div>
                                         </div>
                                     )}
                                     {r.compile_output && (
-                                        <pre className="mt-2 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded p-2 overflow-x-auto">{r.compile_output}</pre>
+                                        <pre className="mt-2 text-xs text-bad bg-bad/10 rounded p-2 overflow-x-auto">{r.compile_output}</pre>
                                     )}
                                     {r.stderr && (
-                                        <pre className="mt-2 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded p-2 overflow-x-auto">{r.stderr}</pre>
+                                        <pre className="mt-2 text-xs text-bad bg-bad/10 rounded p-2 overflow-x-auto">{r.stderr}</pre>
                                     )}
                                 </div>
                             ))}
@@ -973,8 +973,8 @@ export default function ProblemDetail() {
                         {customOutput && (
                             <div className="space-y-3 pt-2 border-t border-hairline">
                                 <div className="flex items-center justify-between text-xs">
-                                    <span className={`font-semibold uppercase tracking-wider ${customOutput.status === 'success' ? 'text-green-600 dark:text-green-400' :
-                                        customOutput.status === 'ce' ? 'text-purple-600 dark:text-purple-400' : 'text-red-600 dark:text-red-400'
+                                    <span className={`font-semibold uppercase tracking-wider ${customOutput.status === 'success' ? 'text-ok' :
+                                        customOutput.status === 'ce' ? 'text-accent' : 'text-bad'
                                         }`}>
                                         Execution: {
                                             customOutput.status === 'success' ? 'Completed' :
@@ -994,8 +994,8 @@ export default function ProblemDetail() {
 
                                 {customOutput.compile_output && (
                                     <div>
-                                        <span className="block text-xs font-semibold text-red-500 dark:text-red-400 mb-1">Compiler Output</span>
-                                        <pre className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 font-mono text-xs p-3 rounded overflow-x-auto max-h-40 border border-red-100">{customOutput.compile_output}</pre>
+                                        <span className="block text-xs font-semibold text-bad dark:text-red-400 mb-1">Compiler Output</span>
+                                        <pre className="bg-bad/10 text-bad font-mono text-xs p-3 rounded overflow-x-auto max-h-40 border border-red-100">{customOutput.compile_output}</pre>
                                     </div>
                                 )}
 

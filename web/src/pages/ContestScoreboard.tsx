@@ -225,7 +225,7 @@ export default function ContestScoreboard() {
   if (error || !data) {
     return (
       <div className="max-w-2xl mx-auto mt-16 text-center">
-        <div className="text-red-500 text-lg mb-4">{error || 'Scoreboard not found'}</div>
+        <div className="text-bad text-lg mb-4">{error || 'Scoreboard not found'}</div>
         <Link to={`/contests/${id}`} className="text-brand hover:underline">
           &larr; Back to contest
         </Link>
@@ -242,15 +242,18 @@ export default function ContestScoreboard() {
   problems.forEach((p) => problemMap.set(p.index, p));
 
   return (
-    <div className="max-w-full mx-auto px-2 sm:px-4 py-4">
+    <div>
       {/* Back link */}
       <div className="mb-3 flex items-center justify-between">
-        <Link
-          to={`/contests/${id}`}
-          className="text-brand hover:underline text-sm font-medium"
-        >
-          &larr; {contest.title || 'Back to contest'}
-        </Link>
+        <div className="min-w-0">
+          <Link to={`/contests/${id}`} className="text-xs font-medium text-brand hover:underline">
+            &larr; {contest.title || 'Back to contest'}
+          </Link>
+          {/* The page had no heading at all — it opened straight into the
+              standings table, so there was nothing for a screen reader to
+              announce and nothing to orient a returning visitor. */}
+          <h1 className="mt-1 text-xl font-semibold tracking-tight text-ink">Standings</h1>
+        </div>
 
         {/* Judge/Public view toggle — only visible to admins/judges */}
         {canSeeJudge && (
@@ -372,9 +375,9 @@ export default function ContestScoreboard() {
                     {/* Rank */}
                     <td className="px-3 py-2.5 text-center">
                       {medal ? (
-                        <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-sm font-black ${medal === 'gold' ? 'bg-yellow-400 text-yellow-900' :
-                          medal === 'silver' ? 'bg-gray-300 text-ink' :
-                            'bg-amber-600 text-white'
+                        <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-sm font-black ${medal === 'gold' ? 'bg-amber-400 text-amber-950' :
+                          medal === 'silver' ? 'bg-hairline-strong text-ink' :
+                            'bg-warn-fill text-white'
                           }`}>{entry.rank}</span>
                       ) : (
                         <span className="text-sm font-bold text-muted">{entry.rank}</span>
@@ -440,7 +443,7 @@ export default function ContestScoreboard() {
                         const attemptStr = cell.attempts <= 1 ? '+' : `+${cell.attempts - 1}`
                         return (
                           <td key={idx} className="px-1 py-2.5 text-center" title={`Solved in ${timeMin}m, ${cell.attempts} attempt(s)`}>
-                            <div className={`inline-flex flex-col items-center justify-center rounded-md px-2 py-1 min-w-[48px] ${isFirst ? 'bg-emerald-500 text-white shadow-sm' : 'bg-ok/12 text-ok border border-ok/30'}`}>
+                            <div className={`inline-flex flex-col items-center justify-center rounded-md px-2 py-1 min-w-[48px] ${isFirst ? 'bg-ok-fill text-white shadow-sm' : 'bg-ok/12 text-ok border border-ok/30'}`}>
                               <span className="text-xs font-black leading-none">{oi ? cell.score : attemptStr}</span>
                               <span className={`text-[10px] font-mono leading-none mt-0.5 ${isFirst ? 'text-white/70' : 'text-ok/70'}`}>{timeMin}m</span>
                             </div>
@@ -485,7 +488,7 @@ export default function ContestScoreboard() {
           {pagination?.total ?? entries.length} participant{(pagination?.total ?? entries.length) !== 1 ? 's' : ''}
         </span>
         <span className="flex items-center gap-1">
-          <span className="inline-block w-3 h-3 rounded-sm bg-green-600"></span>
+          <span className="inline-block w-3 h-3 rounded-sm bg-ok-fill"></span>
           First solver
         </span>
         <span className="flex items-center gap-1">

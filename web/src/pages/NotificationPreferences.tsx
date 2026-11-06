@@ -128,7 +128,7 @@ export default function NotificationPreferences() {
                     {saving ? 'Saving...' : 'Save Preferences'}
                 </button>
                 {saved && (
-                    <span className="text-sm text-green-600 dark:text-green-400 font-medium">Saved successfully!</span>
+                    <span className="text-sm text-ok font-medium">Saved successfully!</span>
                 )}
             </div>
         </div>

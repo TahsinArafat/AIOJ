@@ -73,7 +73,7 @@ export default function HackPanel() {
 
                 <div className="flex gap-4">
                     <button onClick={handleHack} disabled={submitting || !selectedSub || !testInput.trim()}
-                        className="bg-red-600 text-white px-6 py-2 rounded text-sm hover:bg-red-700 font-medium disabled:opacity-50">
+                        className="bg-danger-fill text-white px-6 py-2 rounded text-sm hover:bg-danger-fill-hover font-medium disabled:opacity-50">
                         {submitting ? 'Testing Hack...' : 'Submit Hack'}
                     </button>
                     <button onClick={() => navigate(-1)} className="border px-6 py-2 rounded text-sm hover:bg-surface-2">
@@ -83,8 +83,8 @@ export default function HackPanel() {
             </div>
 
             {result && (
-                <div className={`border rounded-lg p-6 ${result.success ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'}`}>
-                    <h3 className={`font-semibold text-lg ${result.success ? 'text-green-800' : 'text-red-800'}`}>
+                <div className={`border rounded-lg p-6 ${result.success ? 'bg-ok/10 border-ok/30' : 'bg-bad/10 border-bad/30'}`}>
+                    <h3 className={`font-semibold text-lg ${result.success ? 'text-ok' : 'text-bad'}`}>
                         {result.success ? '✓ Hack Successful!' : '✗ Hack Failed'}
                     </h3>
                     <p className="text-sm mt-2 text-ink-soft">Verdict: {result.status}</p>

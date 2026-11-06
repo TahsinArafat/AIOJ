@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { errorMessage } from '../lib/errors'
+import { PageHeader } from '../components/ui/PageHeader'
+import { buttonClass } from '../components/ui/buttonStyles'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { api, getAccessToken } from '../lib/api'
 import { useConfirm } from '../components/ConfirmDialog'
@@ -348,7 +350,7 @@ const [problem, setProblem] = useState<LoadedProblem | null>(null)
     if (error) {
       return (
         <div className="text-center py-20 space-y-4">
-          <p className="text-red-600 dark:text-red-400 text-sm font-semibold">{error}</p>
+          <p className="text-bad text-sm font-semibold">{error}</p>
           <button
             type="button"
             onClick={() => loadProblem()}
@@ -364,36 +366,31 @@ const [problem, setProblem] = useState<LoadedProblem | null>(null)
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-hairline pb-4">
-        <div>
-          <span className="text-xs text-muted-soft uppercase tracking-wider font-semibold">Polygon Workspace</span>
-          <h1 className="text-2xl font-bold text-ink">{problem.title as string}</h1>
-        </div>
-        <div className="flex gap-3">
-          <Link
-            to={`/problems/${problem.slug as string}`}
-            className="border border-hairline-strong text-ink-soft px-4 py-2 rounded text-sm hover:bg-surface-2 transition-colors"
-          >
-            View Public
-          </Link>
-          <Link
-            to="/setter"
-            className="bg-surface-3 border border-hairline text-ink-soft px-4 py-2 rounded text-sm hover:bg-surface-3 transition-colors"
-          >
-            Back to Setter Workspace
-          </Link>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Problem workspace"
+        title={problem.title as string}
+        description="Statement, tests, checker, permissions and editorial for this problem."
+        actions={
+          <>
+            <Link to={`/problems/${problem.slug as string}`} className={buttonClass({ variant: 'secondary', size: 'sm' })}>
+              View public
+            </Link>
+            {/* `bg-surface-3 … hover:bg-surface-3` hovered to its own colour. */}
+            <Link to="/setter" className={buttonClass({ variant: 'ghost', size: 'sm' })}>
+              Back to workspace
+            </Link>
+          </>
+        }
+      />
 
       {/* Status messages */}
       {error && (
-        <div className="bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 p-4 text-sm text-red-700 dark:text-red-300 rounded-r">
+        <div role="alert" className="rounded-lg border border-bad/30 bg-bad/10 p-4 text-sm text-bad">
           {error}
         </div>
       )}
       {success && (
-        <div className="bg-green-50 dark:bg-green-900/20 border-l-4 border-green-500 p-4 text-sm text-green-700 dark:text-green-300 rounded-r">
+        <div className="bg-ok/10 border-l-4 border-ok/50 p-4 text-sm text-ok rounded-r">
           {success}
         </div>
       )}

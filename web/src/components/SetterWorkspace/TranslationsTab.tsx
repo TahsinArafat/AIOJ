@@ -144,7 +144,7 @@ export default function TranslationsTab({ problemId, defaultTitle, defaultDescri
             }`}
           >
             {label}
-            {rows[code] && <span className="ml-1.5 text-emerald-500">•</span>}
+            {rows[code] && <span className="ml-1.5 text-ok">•</span>}
           </button>
         ))}
       </div>
@@ -176,10 +176,10 @@ export default function TranslationsTab({ problemId, defaultTitle, defaultDescri
           </div>
 
           {error && (
-            <div className="text-sm text-red-600 dark:text-red-400">{error}</div>
+            <div className="text-sm text-bad">{error}</div>
           )}
           {saved && !error && (
-            <div className="text-sm text-emerald-600 dark:text-emerald-400">Saved.</div>
+            <div className="text-sm text-ok">Saved.</div>
           )}
 
           <div className="flex gap-2">
@@ -196,7 +196,7 @@ export default function TranslationsTab({ problemId, defaultTitle, defaultDescri
                 type="button"
                 onClick={handleRemove}
                 disabled={saving}
-                className="px-4 py-2 border border-red-300 text-red-600 rounded text-sm font-medium hover:bg-red-50 disabled:opacity-50"
+                className="px-4 py-2 border border-bad/40 text-bad rounded text-sm font-medium hover:bg-bad/10 disabled:opacity-50"
               >
                 Remove translation
               </button>

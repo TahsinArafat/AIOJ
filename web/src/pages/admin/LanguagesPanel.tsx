@@ -206,7 +206,7 @@ export default function LanguagesPanel() {
                         <RefreshCw size={16} />
                     </button>
                     <button onClick={handleDetect}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white text-sm rounded hover:bg-green-700 cursor-pointer">
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-ok-fill text-white text-sm rounded hover:bg-green-700 cursor-pointer">
                         <Cpu size={14} /> Detect Tools
                     </button>
                     <button onClick={handleLoadTemplates}
@@ -394,7 +394,7 @@ export default function LanguagesPanel() {
                                     {t.compile ? `compile: ${t.compile.substring(0, 30)}...` : `runtime: ${t.runtime}`}
                                 </div>
                                 <button onClick={() => applyTemplate(t)}
-                                    className="mt-2 text-xs px-2 py-1 bg-purple-100 text-purple-700 dark:text-purple-300 rounded hover:bg-purple-200 cursor-pointer w-full">Use Template</button>
+                                    className="mt-2 text-xs px-2 py-1 bg-purple-100 text-accent rounded hover:bg-purple-200 cursor-pointer w-full">Use Template</button>
                             </div>
                         ))}
                     </div>
@@ -403,7 +403,7 @@ export default function LanguagesPanel() {
 
             {/* Test Result */}
             {testResult && (
-                <div className={`border rounded-lg p-4 ${testResult.status === 'error' ? 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20' : testResult.status === 'warning' ? 'border-yellow-200 bg-yellow-50 dark:bg-yellow-900/20' : 'border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20'}`}>
+                <div className={`border rounded-lg p-4 ${testResult.status === 'error' ? 'border-bad/30 bg-bad/10' : testResult.status === 'warning' ? 'border-warn/30 bg-warn/10' : 'border-ok/30 bg-ok/10'}`}>
                     <div className="flex items-center justify-between mb-2">
                         <span className="font-medium text-sm">{testResult.key}</span>
                         <button onClick={() => setTestResult(null)} className="text-muted-soft hover:text-ink cursor-pointer"><X size={14} /></button>

@@ -30,7 +30,7 @@ export default function EditorialList() {
                     <Link key={e.id} to={`/editorials/${e.id}`} className="block border rounded-lg p-4 hover:bg-surface-2 transition-colors">
                         <div className="flex items-center gap-2 mb-1">
                             {e.is_official && (
-                                <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-2 py-0.5 rounded font-medium">Official</span>
+                                <span className="text-xs bg-ok/12 text-ok px-2 py-0.5 rounded font-medium">Official</span>
                             )}
                             <h3 className="font-semibold">{e.title}</h3>
                         </div>

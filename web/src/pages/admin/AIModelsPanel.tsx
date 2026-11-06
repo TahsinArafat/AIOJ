@@ -178,7 +178,7 @@ export default function AIModelsPanel() {
     ) => (
         <div>
             <label className="block text-xs font-medium text-muted mb-1">
-                {label} {opts?.required && <span className="text-red-500">*</span>}
+                {label} {opts?.required && <span className="text-bad">*</span>}
             </label>
             <input
                 type={opts?.type || 'text'}
@@ -238,9 +238,9 @@ export default function AIModelsPanel() {
                                     placeholder: 'http://localhost:8080/v1',
                                     hint: 'OpenAI-compatible base URL. Must serve POST /chat/completions.',
                                 })}
-                                <label className="flex gap-3 items-start rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 p-3 text-sm">
+                                <label className="flex gap-3 items-start rounded-lg border border-amber-200 bg-warn/10 dark:border-amber-800 p-3 text-sm">
                                     <input type="checkbox" checked={form.allow_private_network} onChange={e => setForm(f => ({ ...f, allow_private_network: e.target.checked }))} className="mt-0.5" />
-                                    <span><strong>Allow private-network endpoint</strong><span className="block text-xs text-amber-700 dark:text-amber-300 mt-1">Only enable for trusted local Ollama/vLLM services. Public endpoints require HTTPS and metadata addresses always remain blocked.</span></span>
+                                    <span><strong>Allow private-network endpoint</strong><span className="block text-xs text-warn mt-1">Only enable for trusted local Ollama/vLLM services. Public endpoints require HTTPS and metadata addresses always remain blocked.</span></span>
                                 </label>
                                 <div className="grid grid-cols-2 gap-4">
                                     {field('API Key', 'api_key', {
@@ -299,10 +299,10 @@ export default function AIModelsPanel() {
                                 {testState === 'testing' ? 'Testing…' : 'Test Connection'}
                             </button>
                             {testState === 'ok' && (
-                                <span className="text-sm text-green-600 dark:text-green-400 font-medium">✓ Connection OK</span>
+                                <span className="text-sm text-ok font-medium">✓ Connection OK</span>
                             )}
                             {testState === 'fail' && (
-                                <span className="text-sm text-red-500 dark:text-red-400">✗ {testError || 'Connection failed'}</span>
+                                <span className="text-sm text-bad dark:text-red-400">✗ {testError || 'Connection failed'}</span>
                             )}
                         </div>
 
@@ -371,7 +371,7 @@ export default function AIModelsPanel() {
                                             onClick={() => handleToggle(m)}
                                             className={`px-2.5 py-1 rounded-full text-xs font-medium cursor-pointer transition-colors ${
                                                 m.enabled
-                                                    ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/50'
+                                                    ? 'bg-ok/12 text-ok hover:bg-green-200 dark:hover:bg-green-900/50'
                                                     : 'bg-surface-3 text-muted hover:bg-surface-3'
                                             }`}
                                         >

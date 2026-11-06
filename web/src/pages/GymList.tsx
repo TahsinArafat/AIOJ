@@ -31,11 +31,11 @@ export default function GymList() {
 
     const getDifficultyColor = (rating?: number | null) => {
         if (!rating) return 'text-muted bg-surface-2'
-        if (rating < 1200) return 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20'
+        if (rating < 1200) return 'text-ok bg-ok/10'
         if (rating < 1600) return 'text-brand bg-brand-soft'
-        if (rating < 2000) return 'text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20'
-        if (rating < 2400) return 'text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20'
-        return 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20'
+        if (rating < 2000) return 'text-accent bg-violet-500/10'
+        if (rating < 2400) return 'text-orange-600 dark:text-orange-400 bg-warn/10 dark:bg-warn/10'
+        return 'text-bad bg-bad/10'
     }
 
     return (

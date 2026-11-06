@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { api } from '../lib/api'
 import { errorMessage } from '../lib/errors'
+import { PageHeader } from '../components/ui/PageHeader'
 import { useTheme } from '../context/ThemeContext'
 import {
     FileText, FileDown, MessageSquare, Users, FileCode, Printer,
@@ -115,12 +116,12 @@ export default function ContestManage() {
     if (!contest) return null
 
     return (
-        <div className="max-w-7xl mx-auto px-4 py-6">
-            {/* Header */}
-            <div className="mb-6">
-                <Link to={`/contests/${id}`} className="text-sm text-brand hover:underline">← {contest.title}</Link>
-                <h1 className="text-2xl font-bold mt-1">Contest Management</h1>
-            </div>
+        <div>
+            <PageHeader
+                eyebrow={<Link to={`/contests/${id}`} className="hover:text-ink">← {contest.title}</Link>}
+                title="Contest management"
+                description="Problems, participants, judging and the arena for this contest."
+            />
 
             {/* Stack under lg: the 14rem tab rail sat beside the panel on a 390px
                 phone, squeezing the panel to ~150px. On mobile the rail scrolls
@@ -134,7 +135,7 @@ export default function ContestManage() {
                                 key={t.key}
                                 onClick={() => setTab(t.key)}
                                 className={`w-auto lg:w-full shrink-0 whitespace-nowrap flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors text-left ${tab === t.key
-                                    ? 'bg-blue-50 text-blue-700 font-medium border-l-3 border-brand'
+                                    ? 'bg-brand-soft text-brand font-medium border-l-3 border-brand'
                                     : 'text-muted hover:bg-surface-2 border-l-3 border-transparent'
                                     }`}
                             >
@@ -144,7 +145,7 @@ export default function ContestManage() {
                         ))}
                         <Link
                             to={`/contests/${id}/problem/${problems[0]?.index || 'A'}`}
-                            className="w-auto lg:w-full shrink-0 whitespace-nowrap flex items-center gap-2.5 px-4 py-2.5 text-sm text-muted hover:bg-green-50 hover:text-green-700 transition-colors border-t lg:border-t-0 border-l-3 border-transparent"
+                            className="w-auto lg:w-full shrink-0 whitespace-nowrap flex items-center gap-2.5 px-4 py-2.5 text-sm text-muted hover:bg-ok/10 hover:text-ok transition-colors border-t lg:border-t-0 border-l-3 border-transparent"
                         >
                             <span className="text-base"><Play className="w-4 h-4" /></span>
                             Arena
@@ -273,7 +274,7 @@ export function ChallengesTab({ contestId }: { contestId: string }) {
             </button>
         }>
             {showAdd && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                <div className="bg-brand-soft border border-brand/30 rounded-lg p-4 mb-4">
                     <div className="flex gap-2 mb-3">
                         <input value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => e.key === 'Enter' && searchProblems()}
                             placeholder="Search problems..." className="flex-1 border rounded-lg px-3 py-1.5 text-sm" />
@@ -316,7 +317,7 @@ export function ChallengesTab({ contestId }: { contestId: string }) {
                                             aria-label={`Move ${p.title || p.problem_id} up`}
                                             aria-busy={reordering}
                                             title="Move up"
-                                            className="h-10 w-10 inline-flex items-center justify-center rounded-lg border border-hairline text-muted transition-colors hover:bg-surface-2 hover:text-gray-800 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-30 dark:border-gray-600 dark:hover:bg-gray-700"
+                                            className="h-10 w-10 inline-flex items-center justify-center rounded-lg border border-hairline text-muted transition-colors hover:bg-surface-2 hover:text-ink focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-30 dark:border-hairline-strong dark:hover:bg-surface-3"
                                         >
                                             {reordering ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
                                         </button>
@@ -327,17 +328,17 @@ export function ChallengesTab({ contestId }: { contestId: string }) {
                                             aria-label={`Move ${p.title || p.problem_id} down`}
                                             aria-busy={reordering}
                                             title="Move down"
-                                            className="h-10 w-10 inline-flex items-center justify-center rounded-lg border border-hairline text-muted transition-colors hover:bg-surface-2 hover:text-gray-800 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-30 dark:border-gray-600 dark:hover:bg-gray-700"
+                                            className="h-10 w-10 inline-flex items-center justify-center rounded-lg border border-hairline text-muted transition-colors hover:bg-surface-2 hover:text-ink focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-30 dark:border-hairline-strong dark:hover:bg-surface-3"
                                         >
                                             {reordering ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowDown className="h-4 w-4" />}
                                         </button>
                                     </div>
                                     {p.slug && (
-                                        <Link to={`/setter/${p.slug}`} className="px-2 py-1 bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200 text-xs rounded">
+                                        <Link to={`/setter/${p.slug}`} className="px-2 py-1 bg-warn/10 text-warn hover:bg-warn/15 border border-warn/30 text-xs rounded">
                                             Edit
                                         </Link>
                                     )}
-                                    <button onClick={() => removeProblem(p.problem_id)} className="px-2 py-1 bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 text-xs rounded">
+                                    <button onClick={() => removeProblem(p.problem_id)} className="px-2 py-1 bg-bad/10 text-bad hover:bg-bad/12 border border-bad/30 text-xs rounded">
                                         Remove
                                     </button>
                                 </div>
@@ -362,7 +363,7 @@ function BookletTab({ contestId }: { contestId: string }) {
     return (
         <TabShell title="Booklet">
             <div className="text-center py-10">
-                <FileDown className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                <FileDown className="w-16 h-16 text-muted mx-auto mb-4" />
                 <p className="text-muted mb-4">Generate and download the contest problem booklet as PDF</p>
                 <a href={`/api/contests/${contestId}/pdf`} target="_blank" rel="noopener noreferrer"
                     className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand text-on-brand rounded-lg hover:bg-brand-hover font-medium">
@@ -413,10 +414,10 @@ function ClarificationsTab({ contestId }: { contestId: string }) {
                                     {c.problem_index && <span className="ml-2 text-xs bg-surface-3 px-1.5 py-0.5 rounded font-mono">Problem {c.problem_index}</span>}
                                     {c.username && <span className="ml-2 text-xs text-muted">by {c.username}</span>}
                                 </div>
-                                {c.answered ? <span className="text-xs text-green-600 font-medium">Answered</span> : <span className="text-xs text-orange-500 font-medium">⏳ Pending</span>}
+                                {c.answered ? <span className="text-xs text-ok font-medium">Answered</span> : <span className="text-xs text-warn font-medium">⏳ Pending</span>}
                             </div>
                             <p className="text-sm text-ink mb-2">{c.question}</p>
-                            {c.answer && <div className="bg-green-50 border border-green-200 rounded p-2 text-sm text-green-800 mt-2"><strong>Answer:</strong> {c.answer}</div>}
+                            {c.answer && <div className="bg-ok/10 border border-ok/30 rounded p-2 text-sm text-ok mt-2"><strong>Answer:</strong> {c.answer}</div>}
                             {!c.answered && (
                                 <div className="mt-3 flex gap-2">
                                     <input value={answer[c.id] || ''} onChange={e => setAnswer(p => ({ ...p, [c.id]: e.target.value }))}
@@ -425,7 +426,7 @@ function ClarificationsTab({ contestId }: { contestId: string }) {
                                         <input type="checkbox" checked={publicAns[c.id] || false} onChange={e => setPublicAns(p => ({ ...p, [c.id]: e.target.checked }))} />
                                         Public
                                     </label>
-                                    <button onClick={() => handleAnswer(c.id)} className="px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700">Reply</button>
+                                    <button onClick={() => handleAnswer(c.id)} className="px-3 py-1.5 bg-ok-fill text-white text-sm rounded-lg hover:bg-ok-fill">Reply</button>
                                 </div>
                             )}
                         </div>
@@ -490,9 +491,9 @@ function SubmissionsTab({ contestId }: { contestId: string }) {
     if (loading) return <TabLoading />
 
     const verdictColor = (s: string) => {
-        if (s === 'ACCEPTED') return 'text-green-600 bg-green-50'
-        if (s?.includes('PENDING') || s === 'JUDGING') return 'text-yellow-600 bg-yellow-50'
-        return 'text-red-600 bg-red-50'
+        if (s === 'ACCEPTED') return 'text-ok bg-ok/10'
+        if (s?.includes('PENDING') || s === 'JUDGING') return 'text-warn bg-warn/10'
+        return 'text-bad bg-bad/10'
     }
 
     return (
@@ -548,9 +549,9 @@ function PrintsTab({ contestId }: { contestId: string }) {
     if (loading) return <TabLoading />
 
     const statusColor = (s: string) => {
-        if (s === 'printed') return 'text-green-700 bg-green-100'
-        if (s === 'cancelled') return 'text-red-700 bg-red-100'
-        return 'text-yellow-700 bg-yellow-100'
+        if (s === 'printed') return 'text-ok bg-ok/12'
+        if (s === 'cancelled') return 'text-bad bg-bad/12'
+        return 'text-warn bg-warn/12'
     }
 
     return (
@@ -571,8 +572,8 @@ function PrintsTab({ contestId }: { contestId: string }) {
                                 <div className="flex gap-2">
                                     {p.status === 'pending' && (
                                         <>
-                                            <button onClick={() => updateStatus(p.id, 'printed')} className="text-xs px-2 py-1 bg-green-600 text-white rounded hover:bg-green-700">Mark Printed</button>
-                                            <button onClick={() => updateStatus(p.id, 'cancelled')} className="text-xs px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200">Cancel</button>
+                                            <button onClick={() => updateStatus(p.id, 'printed')} className="text-xs px-2 py-1 bg-ok-fill text-white rounded hover:bg-ok-fill">Mark Printed</button>
+                                            <button onClick={() => updateStatus(p.id, 'cancelled')} className="text-xs px-2 py-1 bg-bad/12 text-bad rounded hover:bg-bad/20">Cancel</button>
                                         </>
                                     )}
                                 </div>
@@ -621,7 +622,7 @@ function StatisticsTab({ contestId }: { contestId: string }) {
     }, [contestId])
 
     if (loading) return <TabLoading />
-    if (error) return <TabShell title="Statistics"><div className="text-red-500 text-sm p-4">{error}</div></TabShell>
+    if (error) return <TabShell title="Statistics"><div className="text-bad text-sm p-4">{error}</div></TabShell>
     if (!stats) return <TabShell title="Statistics"><EmptyState text="No statistics yet" description="Statistics appear once participants register and submit solutions." /></TabShell>
 
     const languagesArray = stats.languages ? Object.entries(stats.languages).map(([language, count]) => ({ language, count: count as number })) : []
@@ -633,7 +634,7 @@ function StatisticsTab({ contestId }: { contestId: string }) {
             <div className="grid grid-cols-3 gap-4 mb-6">
                 <StatCard label="Participants" value={stats.total_participants} icon={<Users className="w-5 h-5 text-muted-soft" />} />
                 <StatCard label="Submissions" value={stats.total_submissions} icon={<FileCode className="w-5 h-5 text-muted-soft" />} />
-                <StatCard label="Accepted" value={stats.accepted_submissions} icon={<Check className="w-5 h-5 text-green-500" />} />
+                <StatCard label="Accepted" value={stats.accepted_submissions} icon={<Check className="w-5 h-5 text-ok" />} />
             </div>
 
             {/* Per-problem solve rate */}
@@ -645,7 +646,7 @@ function StatisticsTab({ contestId }: { contestId: string }) {
                             <div key={p.problem_id} className="flex items-center gap-3">
                                 <span className="font-mono font-bold text-brand w-8">{p.index}</span>
                                 <div className="flex-1 bg-surface-3 rounded-full h-5 overflow-hidden">
-                                    <div className="bg-green-500 h-5 rounded-full flex items-center justify-end pr-2 text-xs text-white font-medium transition-all"
+                                    <div className="bg-ok/100 h-5 rounded-full flex items-center justify-end pr-2 text-xs text-white font-medium transition-all"
                                         style={{ width: `${Math.max(p.solve_rate, 2)}%` }}>
                                         {p.solve_rate > 10 && `${p.solve_rate}%`}
                                     </div>
@@ -677,8 +678,8 @@ function StatisticsTab({ contestId }: { contestId: string }) {
                     <h3 className="text-sm font-semibold text-ink-soft mb-3">Verdicts</h3>
                     <div className="flex gap-2 flex-wrap">
                         {verdictsArray.map((v) => {
-                            const color = v.status === 'ACCEPTED' ? 'bg-green-100 text-green-800' :
-                                v.status?.includes('PENDING') ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
+                            const color = v.status === 'ACCEPTED' ? 'bg-ok/12 text-ok' :
+                                v.status?.includes('PENDING') ? 'bg-warn/12 text-warn' : 'bg-bad/12 text-bad'
                             return <span key={v.status} className={`text-xs px-3 py-1.5 rounded-full ${color}`}>{v.status}: <strong>{v.count}</strong></span>
                         })}
                     </div>
@@ -765,9 +766,9 @@ function BalloonsTab({ contestId }: { contestId: string }) {
             /> : (
                 <div className="space-y-2">
                     {filtered.map((b) => (
-                        <div key={b.id} className={`flex items-center justify-between p-3 rounded-lg border ${b.dispatched ? 'bg-surface-2 border-hairline' : 'bg-surface border-blue-200'}`}>
+                        <div key={b.id} className={`flex items-center justify-between p-3 rounded-lg border ${b.dispatched ? 'bg-surface-2 border-hairline' : 'bg-surface border-brand/30'}`}>
                             <div className="flex items-center gap-3">
-                                <CircleDot className="w-5 h-5 text-blue-500" />
+                                <CircleDot className="w-5 h-5 text-brand" />
                                 <div>
                                     <div className="flex items-center gap-2">
                                         <span className="font-mono font-bold text-brand">{b.problem_index}</span>
@@ -778,11 +779,11 @@ function BalloonsTab({ contestId }: { contestId: string }) {
                                 </div>
                             </div>
                             {!b.dispatched ? (
-                                <button onClick={() => dispatch(b.id)} className="px-3 py-1.5 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 font-medium">
+                                <button onClick={() => dispatch(b.id)} className="px-3 py-1.5 bg-ok-fill text-white text-xs rounded-lg hover:bg-ok-fill font-medium">
                                     Dispatch
                                 </button>
                             ) : (
-                                <span className="text-xs text-green-600 font-medium">Dispatched</span>
+                                <span className="text-xs text-ok font-medium">Dispatched</span>
                             )}
                         </div>
                     ))}
@@ -833,12 +834,12 @@ function AnnouncementsTab({ contestId }: { contestId: string }) {
             /> : (
                 <div className="space-y-2">
                     {items.map((n) => (
-                        <div key={n.id} className="flex items-start justify-between p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <div key={n.id} className="flex items-start justify-between p-3 bg-warn/10 border border-warn/30 rounded-lg">
                             <div>
                                 <p className="text-sm text-ink">{n.content}</p>
                                 <span className="text-xs text-muted-soft">{new Date(n.created_at).toLocaleString()}</span>
                             </div>
-                            <button onClick={() => remove(n.id)} className="text-red-400 hover:text-red-600 text-xs ml-4">✕</button>
+                            <button onClick={() => remove(n.id)} className="text-bad hover:text-bad text-xs ml-4">✕</button>
                         </div>
                     ))}
                 </div>
@@ -877,7 +878,7 @@ function ModeratorsTab({ contestId }: { contestId: string }) {
 
     const levelColor = (l: string) => {
         if (l === 'manager') return 'bg-purple-100 text-purple-700'
-        if (l === 'judge') return 'bg-blue-100 text-blue-700'
+        if (l === 'judge') return 'bg-brand-soft text-brand'
         return 'bg-surface-3 text-ink-soft'
     }
 
@@ -904,7 +905,7 @@ function ModeratorsTab({ contestId }: { contestId: string }) {
                                 <Link to={`/user/${p.username}`} className="font-medium text-sm text-ink hover:text-brand">{p.username || p.user_id}</Link>
                                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${levelColor(p.access_level)}`}>{p.access_level}</span>
                             </div>
-                            <button onClick={() => remove(p.user_id)} className="text-red-400 hover:text-red-600 text-xs">Remove</button>
+                            <button onClick={() => remove(p.user_id)} className="text-bad hover:text-bad text-xs">Remove</button>
                         </div>
                     ))}
                 </div>
@@ -964,8 +965,8 @@ function OnsiteTeamsTab({ contestId }: { contestId: string }) {
 
     return (
         <TabShell title="Onsite Teams" subtitle={`${teams.length} generated`}>
-            <div className="space-y-4 mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <h3 className="text-sm font-semibold text-blue-800">Generate Team Credentials</h3>
+            <div className="space-y-4 mb-6 p-4 bg-brand-soft border border-brand/30 rounded-lg">
+                <h3 className="text-sm font-semibold text-brand">Generate Team Credentials</h3>
                 <p className="text-xs text-brand">Enter one team per line: <code>TeamName, Institution</code></p>
                 <textarea
                     value={teamInput}
@@ -1007,14 +1008,14 @@ function OnsiteTeamsTab({ contestId }: { contestId: string }) {
                                         <td className="py-2 pr-3 font-mono text-xs">{t.password || '—'}</td>
                                         <td className="py-2">
                                             {t.is_used ? (
-                                                <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">Used</span>
+                                                <span className="text-xs px-2 py-0.5 bg-ok/12 text-ok rounded-full">Used</span>
                                             ) : (
-                                                <span className="text-xs px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full">New</span>
+                                                <span className="text-xs px-2 py-0.5 bg-warn/12 text-warn rounded-full">New</span>
                                             )}
                                         </td>
                                         <td className="py-2">
                                             <button onClick={() => deleteUser(t.id)}
-                                                className="text-red-400 hover:text-red-600 text-xs font-medium">
+                                                className="text-bad hover:text-bad text-xs font-medium">
                                                 Del
                                             </button>
                                         </td>
@@ -1115,7 +1116,7 @@ function SettingsTab({ contestId }: { contestId: string }) {
 
     return (
         <TabShell title="Settings">
-            {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded mb-4 text-sm">{error}</div>}
+            {error && <div className="bg-bad/10 border border-bad/30 text-bad px-4 py-2 rounded mb-4 text-sm">{error}</div>}
 
             <div className="space-y-5">
                 {/* Title */}
@@ -1194,7 +1195,7 @@ function SettingsTab({ contestId }: { contestId: string }) {
                             ['upsolving_enabled', 'Enable Upsolving', Loader2],
                             ['virtual_contest_enabled', 'Virtual Contests', Play],
                         ] as const).map(([key, label, icon]) => (
-                            <label key={key} className="flex items-center gap-2 cursor-pointer p-2 rounded-lg hover:bg-surface-2 border border-gray-100">
+                            <label key={key} className="flex items-center gap-2 cursor-pointer p-2 rounded-lg hover:bg-surface-2 border border-hairline">
                                 <input type="checkbox" checked={form[key] as boolean}
                                     onChange={e => setForm(p => ({ ...p, [key]: e.target.checked }))}
                                     className="rounded border-hairline-strong text-brand focus-visible:outline-[var(--ring)]" />

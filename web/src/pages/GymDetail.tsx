@@ -39,7 +39,7 @@ export default function GymDetail() {
     if (!gym) {
         return (
             <div className="py-16">
-                <EmptyState icon={<AlertTriangle className="w-12 h-12 text-red-400" />} text="Gym contest not found" description="This gym contest may have been removed, or the link is incorrect." />
+                <EmptyState icon={<AlertTriangle className="w-12 h-12 text-bad" />} text="Gym contest not found" description="This gym contest may have been removed, or the link is incorrect." />
             </div>
         )
     }
@@ -79,11 +79,11 @@ export default function GymDetail() {
                     Enter Contest
                 </Link>
                 {getAccessToken() && !solved && (
-                    <button onClick={handleMarkSolved} className="bg-green-600 text-white px-6 py-2 rounded text-sm hover:bg-green-700 font-medium">
+                    <button onClick={handleMarkSolved} className="bg-ok-fill text-white px-6 py-2 rounded text-sm hover:bg-ok-fill font-medium">
                         Mark as Solved
                     </button>
                 )}
-                {solved && <span className="text-green-600 dark:text-green-400 font-semibold flex items-center">✓ Marked as Solved</span>}
+                {solved && <span className="text-ok font-semibold flex items-center">✓ Marked as Solved</span>}
             </div>
         </div>
     )

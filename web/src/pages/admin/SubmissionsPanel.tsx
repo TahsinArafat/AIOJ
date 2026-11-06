@@ -129,7 +129,7 @@ export default function SubmissionsPanel() {
                                     </td>
                                     <td className="px-4 py-3">{s.bot_slug || '-'}</td>
                                     <td className="px-4 py-3">
-                                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300">
+                                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-warn/12 text-warn">
                                             {s.status}
                                         </span>
                                     </td>

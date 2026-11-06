@@ -235,7 +235,7 @@ export default function StatementTab({
               <button
                 type="button"
                 onClick={() => onUpdate('sampleCases', formState.sampleCases.filter((_, j) => j !== i))}
-                className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 text-xs cursor-pointer"
+                className="text-bad hover:text-bad/80 text-xs cursor-pointer"
               >
                 Remove
               </button>

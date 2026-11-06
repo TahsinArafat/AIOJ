@@ -82,7 +82,7 @@ export default function TrainingPlanCreate() {
 	return (
 		<div className="max-w-2xl mx-auto space-y-6 my-10">
 			<h1 className="text-2xl font-bold text-ink">Create Training Plan</h1>
-			{error && <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-2 rounded text-sm">{error}</div>}
+			{error && <div className="bg-bad/10 border border-bad/30 text-bad px-4 py-2 rounded text-sm">{error}</div>}
 			<form onSubmit={handleSubmit} className="space-y-6 bg-surface border border-hairline rounded-lg p-6 shadow-sm">
 				<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 					<div>

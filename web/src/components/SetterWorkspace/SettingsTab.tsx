@@ -47,14 +47,14 @@ export default function SettingsTab({
       <hr className="border-hairline" />
 
       <div className="space-y-2">
-        <h3 className="text-sm font-bold text-red-600 dark:text-red-400 uppercase tracking-wider">Danger Zone</h3>
+        <h3 className="text-sm font-bold text-bad uppercase tracking-wider">Danger Zone</h3>
         <p className="text-xs text-muted-soft">
           Deleting the problem will discard all statements, submissions history, and testcase files
           from the server sandbox. This operation cannot be undone.
         </p>
         <button
           onClick={onDelete}
-          className="bg-red-600 text-white px-4 py-2 rounded text-sm font-semibold hover:bg-red-700 transition-colors cursor-pointer"
+          className="bg-danger-fill text-white px-4 py-2 rounded text-sm font-semibold hover:bg-danger-fill-hover transition-colors cursor-pointer"
         >
           Delete Problem
         </button>

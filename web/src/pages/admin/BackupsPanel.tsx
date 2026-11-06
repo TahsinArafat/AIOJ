@@ -62,11 +62,11 @@ export default function BackupsPanel() {
                 icon: <Database className="w-3 h-3" />,
             },
             files: {
-                color: 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300',
+                color: 'bg-warn/12 text-warn',
                 icon: <HardDrive className="w-3 h-3" />,
             },
             full: {
-                color: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-300',
+                color: 'bg-ok/12 text-emerald-800 dark:text-emerald-300',
                 icon: <Archive className="w-3 h-3" />,
             },
         }
@@ -179,7 +179,7 @@ export default function BackupsPanel() {
             </div>
 
             {error && (
-                <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-700 dark:text-red-300 flex items-center gap-2">
+                <div className="mb-4 p-3 bg-bad/10 border border-bad/30 rounded-lg text-sm text-bad flex items-center gap-2">
                     <AlertTriangle className="w-4 h-4 flex-shrink-0" />
                     {error}
                     <button onClick={() => setError(null)} className="ml-auto">
@@ -210,8 +210,8 @@ export default function BackupsPanel() {
 
                 <div className="bg-surface border border-hairline rounded-lg p-4">
                     <div className="flex items-center gap-3 mb-3">
-                        <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
-                            <HardDrive className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                        <div className="p-2 bg-warn/12 rounded-lg">
+                            <HardDrive className="w-5 h-5 text-warn" />
                         </div>
                         <div>
                             <h3 className="font-medium text-sm">Files Backup</h3>
@@ -221,7 +221,7 @@ export default function BackupsPanel() {
                     <button
                         onClick={() => { setCreateType('files'); handleCreateBackup() }}
                         disabled={creating}
-                        className="w-full px-3 py-2 bg-amber-600 text-white text-sm rounded hover:bg-amber-700 disabled:opacity-50 transition-colors"
+                        className="w-full px-3 py-2 bg-warn-fill text-white text-sm rounded hover:bg-amber-700 disabled:opacity-50 transition-colors"
                     >
                         {creating && createType === 'files' ? 'Creating...' : 'Create Files Backup'}
                     </button>
@@ -229,8 +229,8 @@ export default function BackupsPanel() {
 
                 <div className="bg-surface border border-hairline rounded-lg p-4">
                     <div className="flex items-center gap-3 mb-3">
-                        <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg">
-                            <Archive className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                        <div className="p-2 bg-ok/12 rounded-lg">
+                            <Archive className="w-5 h-5 text-ok" />
                         </div>
                         <div>
                             <h3 className="font-medium text-sm">Full Backup</h3>
@@ -249,8 +249,8 @@ export default function BackupsPanel() {
 
             <div className="bg-surface border border-hairline rounded-lg p-4 mb-6">
                 <div className="flex items-center gap-3">
-                    <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-                        <FolderArchive className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                    <div className="p-2 bg-violet-500/12 rounded-lg">
+                        <FolderArchive className="w-5 h-5 text-accent" />
                     </div>
                     <div className="flex-1">
                         <h3 className="font-medium text-sm">Upload Backup Archive</h3>
@@ -304,14 +304,14 @@ export default function BackupsPanel() {
                                         </button>
                                         <button
                                             onClick={() => openRestoreModal(b, b.type)}
-                                            className="p-1.5 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded transition-colors"
+                                            className="p-1.5 text-warn hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded transition-colors"
                                             title="Restore"
                                         >
                                             <ShieldAlert className="w-4 h-4" />
                                         </button>
                                         <button
                                             onClick={() => handleDelete(b.filename)}
-                                            className="p-1.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+                                            className="p-1.5 text-bad hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
                                             title="Delete"
                                         >
                                             <Trash2 className="w-4 h-4" />
@@ -336,7 +336,7 @@ export default function BackupsPanel() {
                 <div className="fixed inset-0 z-50 flex items-center justify-center">
                     <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !restoring && setRestoreModal(null)} />
                     <div className="relative bg-surface rounded-xl shadow-2xl border border-hairline w-full max-w-md mx-4 overflow-hidden">
-                        <div className="bg-red-600 px-6 py-4 flex items-center gap-3">
+                        <div className="bg-danger-fill px-6 py-4 flex items-center gap-3">
                             <div className="p-2 bg-white/20 rounded-lg">
                                 <AlertTriangle className="w-6 h-6 text-white" />
                             </div>
@@ -347,14 +347,14 @@ export default function BackupsPanel() {
                         </div>
 
                         <div className="p-6">
-                            <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-200 dark:border-red-800 rounded-lg p-4 mb-4">
+                            <div className="bg-bad/10 border-2 border-bad/30 rounded-lg p-4 mb-4">
                                 <div className="flex items-start gap-3">
-                                    <ShieldAlert className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                                    <ShieldAlert className="w-5 h-5 text-bad flex-shrink-0 mt-0.5" />
                                     <div>
-                                        <p className="text-sm font-bold text-red-800 dark:text-red-300 uppercase tracking-wide mb-1">
+                                        <p className="text-sm font-bold text-bad uppercase tracking-wide mb-1">
                                             Destructive Operation
                                         </p>
-                                        <p className="text-sm text-red-700 dark:text-red-400">
+                                        <p className="text-sm text-bad">
                                             Restoring will <strong>permanently overwrite</strong> your current {restoreModal.type} data.
                                             All changes made after this backup was created will be <strong>lost</strong>.
                                         </p>
@@ -399,7 +399,7 @@ export default function BackupsPanel() {
                                 <button
                                     onClick={handleRestore}
                                     disabled={!password || restoring}
-                                    className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                                    className="px-4 py-2 bg-danger-fill text-white text-sm font-medium rounded hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
                                 >
                                     {restoring ? (
                                         <>

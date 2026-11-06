@@ -93,7 +93,7 @@ export default function GroupList() {
                         {joining ? 'Joining...' : 'Join'}
                     </button>
                     {joinMessage && (
-                        <span className={`text-sm ${joinMessage.startsWith('Failed') ? 'text-red-600' : 'text-green-600'}`}>{joinMessage}</span>
+                        <span className={`text-sm ${joinMessage.startsWith('Failed') ? 'text-bad' : 'text-ok'}`}>{joinMessage}</span>
                     )}
                 </div>
             )}

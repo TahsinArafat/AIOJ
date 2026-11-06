@@ -113,15 +113,15 @@ int main(int argc, char* argv[]) {
 
       {formState.checkerType === 'custom' && (
         <div className="space-y-4">
-          <div className="bg-gray-900 border border-gray-800 rounded-lg p-5 text-gray-300 shadow-md space-y-3">
-            <div className="flex items-center space-x-2 text-yellow-400">
-              <span className="w-2.5 h-2.5 rounded-full bg-yellow-400 animate-pulse" />
+          <div className="bg-code border border-code-border rounded-lg p-5 text-code-ink shadow-md space-y-3">
+            <div className="flex items-center space-x-2 text-warn">
+              <span className="w-2.5 h-2.5 rounded-full bg-warn-fill animate-pulse" />
               <p className="font-bold text-xs uppercase tracking-wider">Special Judge (SPJ) Sandbox Environment Protocol</p>
             </div>
             <p className="text-xs leading-relaxed text-muted-soft">
               Your compiled C++ checker binary runs inside a secure isolated sandbox with execution parameters:
             </p>
-            <div className="bg-black/40 border border-gray-800 rounded p-2.5 font-mono text-[11px] text-emerald-400 dark:text-emerald-400 select-all">
+            <div className="bg-black/40 border border-code-border rounded p-2.5 font-mono text-[11px] text-ok select-all">
               ./spj input.txt user.txt answer.txt
             </div>
             <div className="grid grid-cols-2 gap-4 pt-2 text-[11px]">
@@ -135,8 +135,8 @@ int main(int argc, char* argv[]) {
               <div className="space-y-1.5">
                 <span className="font-semibold block text-muted-soft uppercase tracking-wider text-[10px]">Return Status Codes</span>
                 <ul className="list-disc pl-4 space-y-0.5 text-muted">
-                  <li><span className="font-semibold text-emerald-400 dark:text-emerald-400">exit status 0</span>: Accepted (AC)</li>
-                  <li><span className="font-semibold text-rose-400">exit status 1</span>: Wrong Answer (WA)</li>
+                  <li><span className="font-semibold text-ok">exit status 0</span>: Accepted (AC)</li>
+                  <li><span className="font-semibold text-bad">exit status 1</span>: Wrong Answer (WA)</li>
                 </ul>
               </div>
             </div>
@@ -210,7 +210,7 @@ int main(int argc, char* argv[]) {
         </div>
 
         {formState.interactive && (
-          <div className="space-y-3 pl-6 border-l-2 border-blue-200 dark:border-blue-800">
+          <div className="space-y-3 pl-6 border-l-2 border-brand/30">
             <div>
               <label className="block text-xs font-medium text-muted mb-1">Interactor Language</label>
               <select

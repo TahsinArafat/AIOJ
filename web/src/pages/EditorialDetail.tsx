@@ -26,7 +26,7 @@ export default function EditorialDetail() {
                     <span className="font-semibold text-ink-soft">{editorial.username}</span>
                     <span>{new Date(editorial.created_at).toLocaleDateString()}</span>
                     {editorial.is_official && (
-                        <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-2 py-0.5 rounded font-medium">Official</span>
+                        <span className="text-xs bg-ok/12 text-ok px-2 py-0.5 rounded font-medium">Official</span>
                     )}
                 </div>
 

@@ -70,7 +70,7 @@ export default function RatingHistory() {
 
   if (error) {
     return (
-      <div className="max-w-2xl mx-auto py-20 text-center text-red-500 dark:text-red-400">
+      <div className="max-w-2xl mx-auto py-20 text-center text-bad dark:text-red-400">
         {error}
       </div>
     )
@@ -109,7 +109,7 @@ export default function RatingHistory() {
         <div className="space-y-3">
           {history.map((entry) => {
             const delta = entry.rating_change
-            const deltaColor = delta > 0 ? 'text-green-600 dark:text-green-400' : delta < 0 ? 'text-red-600 dark:text-red-400' : 'text-muted'
+            const deltaColor = delta > 0 ? 'text-ok' : delta < 0 ? 'text-bad' : 'text-muted'
             const deltaSign = delta > 0 ? '+' : ''
 
             return (

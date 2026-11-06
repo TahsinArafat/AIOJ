@@ -214,8 +214,8 @@ const [team, setTeam] = useState<TeamInfo | null>(null)
                                 <h1 className="text-2xl font-bold">{team.name}</h1>
                                 <span className={`text-xs px-2 py-0.5 rounded font-semibold ${
                                     team.is_public
-                                        ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300'
-                                        : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300'
+                                        ? 'bg-ok/10 text-ok'
+                                        : 'bg-bad/10 text-bad'
                                 }`}>
                                     {team.is_public ? 'Public' : 'Private'}
                                 </span>
@@ -234,7 +234,7 @@ const [team, setTeam] = useState<TeamInfo | null>(null)
                                             </button>
                                             {canDelete && (
                                                 <button onClick={handleDelete}
-                                                    className="px-4 py-2 bg-red-600 text-white rounded text-sm hover:bg-red-700 cursor-pointer">
+                                                    className="px-4 py-2 bg-danger-fill text-white rounded text-sm hover:bg-red-700 cursor-pointer">
                                                     Delete
                                                 </button>
                                             )}
@@ -242,7 +242,7 @@ const [team, setTeam] = useState<TeamInfo | null>(null)
                                     )}
                                     {isMember ? (
                                         <button onClick={handleLeave}
-                                            className="px-4 py-2 rounded text-sm font-medium bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 transition-colors cursor-pointer">
+                                            className="px-4 py-2 rounded text-sm font-medium bg-bad/10 text-bad hover:bg-red-100 transition-colors cursor-pointer">
                                             Leave Team
                                         </button>
                                     ) : team.is_public ? (
@@ -312,7 +312,7 @@ const [team, setTeam] = useState<TeamInfo | null>(null)
                                                         <span className="text-sm font-medium">{pm.username || pm.user_id}</span>
                                                         <span className={`text-xs px-1.5 py-0.5 rounded ${
                                                             pm.role === 'requested'
-                                                                ? 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300'
+                                                                ? 'bg-warn/10 text-warn'
                                                                 : 'bg-brand-soft text-brand'
                                                         }`}>
                                                             {pm.role === 'requested' ? 'Join Request' : 'Invited'}
@@ -323,12 +323,12 @@ const [team, setTeam] = useState<TeamInfo | null>(null)
                                                             <>
                                                                 <button onClick={() => handleRespond(pm.user_id, 'approve')}
                                                                     disabled={acting === `${pm.user_id}-approve`}
-                                                                    className="bg-green-600 text-white px-2.5 py-1 rounded text-xs hover:bg-green-700 disabled:opacity-50 cursor-pointer">
+                                                                    className="bg-ok-fill text-white px-2.5 py-1 rounded text-xs hover:bg-green-700 disabled:opacity-50 cursor-pointer">
                                                                     Approve
                                                                 </button>
                                                                 <button onClick={() => handleRespond(pm.user_id, 'reject')}
                                                                     disabled={acting === `${pm.user_id}-reject`}
-                                                                    className="bg-red-600 text-white px-2.5 py-1 rounded text-xs hover:bg-red-700 disabled:opacity-50 cursor-pointer">
+                                                                    className="bg-danger-fill text-white px-2.5 py-1 rounded text-xs hover:bg-red-700 disabled:opacity-50 cursor-pointer">
                                                                     Reject
                                                                 </button>
                                                             </>

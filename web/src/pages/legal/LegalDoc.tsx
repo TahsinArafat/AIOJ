@@ -33,7 +33,7 @@ export default function LegalDoc({
 
     if (err) {
         return (
-            <div className="max-w-3xl mx-auto mt-12 p-6 border border-red-200 dark:border-red-800 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300">
+            <div className="max-w-3xl mx-auto mt-12 p-6 border border-bad/30 rounded-lg bg-bad/10 text-bad">
                 Failed to load {title}: {err}
             </div>
         )

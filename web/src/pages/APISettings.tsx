@@ -87,8 +87,8 @@ export default function APISettings() {
                             </button>
                         </div>
                         {newSecret && (
-                            <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-900/30 rounded animate-pulse">
-                                <p className="text-xs font-bold text-yellow-800 dark:text-yellow-300 mb-2 uppercase">Save this secret - it won't be shown again!</p>
+                            <div className="mt-4 p-3 bg-warn/10 border border-warn/30 dark:border-yellow-900/30 rounded animate-pulse">
+                                <p className="text-xs font-bold text-warn mb-2 uppercase">Save this secret - it won't be shown again!</p>
                                 <code className="block bg-surface p-2 rounded text-xs font-mono break-all border border-hairline-strong">{newSecret}</code>
                             </div>
                         )}
@@ -107,7 +107,7 @@ export default function APISettings() {
                                             <p className="text-xs text-muted-soft font-mono mt-1">{k.key_preview}</p>
                                         </div>
                                         <button onClick={() => handleDelete(k.id)}
-                                            className="text-red-600 dark:text-red-400 text-xs hover:underline font-medium cursor-pointer">Delete</button>
+                                            className="text-bad text-xs hover:underline font-medium cursor-pointer">Delete</button>
                                     </div>
                                 ))}
                             </div>
@@ -140,7 +140,7 @@ export default function APISettings() {
                                                         </span>
                                                         <span className="font-mono text-sm font-semibold">{path}</span>
                                                         {details.security && (
-                                                            <span className="text-xs font-medium text-amber-600 dark:text-amber-400 border border-amber-300 dark:border-amber-700/50 px-1.5 py-0.5 rounded font-mono">🔑 Auth Required</span>
+                                                            <span className="text-xs font-medium text-warn border border-warn/40/50 px-1.5 py-0.5 rounded font-mono">🔑 Auth Required</span>
                                                         )}
                                                     </div>
                                                     <p className="text-sm font-medium">{details.summary}</p>

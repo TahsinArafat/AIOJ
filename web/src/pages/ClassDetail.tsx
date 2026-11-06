@@ -51,7 +51,7 @@ export default function ClassDetail() {
 		<div className="max-w-md mx-auto bg-surface border border-hairline rounded-lg p-6 my-10 space-y-4">
 			<h1 className="text-xl font-bold">Class Not Found</h1>
 			<p className="text-muted text-sm">You might not be enrolled. Enter class invite code to join:</p>
-			{joinError && <div className="text-red-600 dark:text-red-400 text-xs">{joinError}</div>}
+			{joinError && <div className="text-bad text-xs">{joinError}</div>}
 			<form onSubmit={handleJoinByCode} className="flex gap-2">
 				<input required value={joiningCode} onChange={e => setJoiningCode(e.target.value)}
 					placeholder="8-character code"

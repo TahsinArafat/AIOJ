@@ -44,12 +44,12 @@ export default function TwoFactorSetup() {
             <h1 className="text-xl font-semibold">{t('auth.twoFactorSetupTitle')}</h1>
             <p className="text-sm text-muted">{t('auth.twoFactorScanQR')}</p>
             {error && (
-                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-2 rounded text-sm">
+                <div className="bg-bad/10 border border-bad/30 text-bad px-4 py-2 rounded text-sm">
                     {error}
                 </div>
             )}
             {backupCodes.length > 0 ? (
-                <div className="bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-900 p-3 rounded space-y-2">
+                <div className="bg-yellow-50 dark:bg-yellow-950/20 border border-warn/30 dark:border-yellow-900 p-3 rounded space-y-2">
                     <p className="font-semibold text-sm text-yellow-900 dark:text-yellow-100">
                         Save these backup codes:
                     </p>

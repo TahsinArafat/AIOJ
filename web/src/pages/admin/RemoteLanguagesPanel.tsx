@@ -231,14 +231,14 @@ export default function RemoteLanguagesPanel() {
                                     <td className="px-4 py-3 text-muted">{l.sort_order}</td>
                                     <td className="px-4 py-3">
                                         <button onClick={() => handleToggle(l)}
-                                            className={`px-2 py-0.5 rounded text-xs font-medium cursor-pointer ${l.enabled ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-surface-3 text-muted'}`}>
+                                            className={`px-2 py-0.5 rounded text-xs font-medium cursor-pointer ${l.enabled ? 'bg-ok/12 text-ok' : 'bg-surface-3 text-muted'}`}>
                                             {l.enabled ? 'Enabled' : 'Disabled'}
                                         </button>
                                     </td>
                                     <td className="px-4 py-3 text-right">
                                         <div className="flex justify-end gap-2">
                                             <button onClick={() => startEdit(l)} className="text-brand hover:text-brand"><Pencil className="w-4 h-4" /></button>
-                                            <button onClick={() => handleDelete(l.id)} className="text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300"><Trash2 className="w-4 h-4" /></button>
+                                            <button onClick={() => handleDelete(l.id)} className="text-bad hover:text-red-800 dark:hover:text-red-300"><Trash2 className="w-4 h-4" /></button>
                                         </div>
                                     </td>
                                 </tr>
@@ -299,7 +299,7 @@ export default function RemoteLanguagesPanel() {
                                                     </td>
                                                     <td className="px-3 py-2">{m.display_name}</td>
                                                     <td className="px-3 py-2 font-mono text-xs">{m.remote_id}</td>
-                                                    <td className="px-3 py-2 font-mono text-xs text-green-600 dark:text-green-400">{m.local_id}</td>
+                                                    <td className="px-3 py-2 font-mono text-xs text-ok">{m.local_id}</td>
                                                 </tr>
                                             ))}
                                         </tbody>
@@ -360,7 +360,7 @@ export default function RemoteLanguagesPanel() {
                                 Cancel
                             </button>
                             <button onClick={handleBulkSave} disabled={selectedForSave.size === 0}
-                                className="flex items-center gap-1.5 bg-green-600 text-white px-4 py-2 rounded text-sm hover:bg-green-700 transition-colors disabled:opacity-50">
+                                className="flex items-center gap-1.5 bg-ok-fill text-white px-4 py-2 rounded text-sm hover:bg-green-700 transition-colors disabled:opacity-50">
                                 <Save className="w-4 h-4" /> Save Selected
                             </button>
                         </div>

@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
 import { errorMessage } from '../lib/errors'
+import { PageHeader } from '../components/ui/PageHeader'
+import { buttonClass } from '../components/ui/buttonStyles'
 import SetterApplication from '../components/SetterApplication'
 import { useToast } from '../components/Toast'
 import { EmptyState } from '../components/EmptyState'
@@ -221,40 +223,43 @@ export default function SetterPanel() {
 
     return (
         <div>
-            {/* Stacks under sm — the three action buttons are 276px of
-                min-content and sat beside the heading, overflowing a phone. */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-                <h1 className="text-2xl font-bold">Problem Setter Workspace</h1>
-                <div className="flex flex-wrap gap-2">
-                    <Link to="/setter/contest/create" className="bg-green-600 text-white px-4 py-2 rounded text-sm hover:bg-green-700 transition-colors">+ Create Contest</Link>
-                    <Link to="/setter/create" className="bg-brand text-on-brand px-4 py-2 rounded text-sm hover:bg-brand-hover transition-colors">+ Create Problem</Link>
-                    <Link to="/generate/problem" className="bg-purple-600 text-white px-4 py-2 rounded text-sm hover:bg-purple-700 transition-colors flex items-center gap-1">✦ Generate with AI</Link>
-                </div>
-            </div>
+            <PageHeader
+                title="Problem setter workspace"
+                description="Author problems, assemble contests and manage what you have published."
+                actions={
+                    <>
+                        {/* `bg-ok-fill … hover:bg-ok-fill` hovered to the same colour,
+                            so the create-contest button gave no feedback at all. */}
+                        <Link to="/setter/create" className={buttonClass({ size: 'sm' })}>New problem</Link>
+                        <Link to="/setter/contest/create" className={buttonClass({ variant: 'secondary', size: 'sm' })}>New contest</Link>
+                        <Link to="/generate/problem" className={buttonClass({ variant: 'secondary', size: 'sm' })}>Generate with AI</Link>
+                    </>
+                }
+            />
 
             <div className="border-b border-hairline flex gap-4 mb-6">
                 <button
                     onClick={() => setActiveTab('my-problems')}
-                    className={`pb-2 text-sm font-medium border-b-2 cursor-pointer ${activeTab === 'my-problems' ? 'border-brand text-brand' : 'border-transparent text-muted hover:text-gray-700'}`}
+                    className={`pb-2 text-sm font-medium border-b-2 cursor-pointer ${activeTab === 'my-problems' ? 'border-brand text-brand' : 'border-transparent text-muted hover:text-ink'}`}
                 >
                     My Problems
                 </button>
                 <button
                     onClick={() => setActiveTab('my-contests')}
-                    className={`pb-2 text-sm font-medium border-b-2 cursor-pointer ${activeTab === 'my-contests' ? 'border-brand text-brand' : 'border-transparent text-muted hover:text-gray-700'}`}
+                    className={`pb-2 text-sm font-medium border-b-2 cursor-pointer ${activeTab === 'my-contests' ? 'border-brand text-brand' : 'border-transparent text-muted hover:text-ink'}`}
                 >
                     My Contests
                 </button>
                 <button
                     onClick={() => setActiveTab('all-problems')}
-                    className={`pb-2 text-sm font-medium border-b-2 cursor-pointer ${activeTab === 'all-problems' ? 'border-brand text-brand' : 'border-transparent text-muted hover:text-gray-700'}`}
+                    className={`pb-2 text-sm font-medium border-b-2 cursor-pointer ${activeTab === 'all-problems' ? 'border-brand text-brand' : 'border-transparent text-muted hover:text-ink'}`}
                 >
                     All Problems
                 </button>
                 {isAdmin && (
                     <button
                         onClick={() => setActiveTab('import')}
-                        className={`pb-2 text-sm font-medium border-b-2 cursor-pointer ${activeTab === 'import' ? 'border-brand text-brand' : 'border-transparent text-muted hover:text-gray-700'}`}
+                        className={`pb-2 text-sm font-medium border-b-2 cursor-pointer ${activeTab === 'import' ? 'border-brand text-brand' : 'border-transparent text-muted hover:text-ink'}`}
                     >
                         Import Problems
                     </button>
@@ -289,16 +294,16 @@ export default function SetterPanel() {
                             <h3 className="font-semibold text-sm">Import Results</h3>
                             {importResults.success.length > 0 && (
                                 <div className="space-y-1">
-                                    <h4 className="text-xs font-semibold text-green-600 uppercase">Successfully Imported ({importResults.success.length}):</h4>
-                                    <ul className="list-disc pl-5 text-sm text-green-700 dark:text-green-400">
+                                    <h4 className="text-xs font-semibold text-ok uppercase">Successfully Imported ({importResults.success.length}):</h4>
+                                    <ul className="list-disc pl-5 text-sm text-ok">
                                         {importResults.success.map((s, idx) => <li key={idx}>{s}</li>)}
                                     </ul>
                                 </div>
                             )}
                             {importResults.failed.length > 0 && (
                                 <div className="space-y-1">
-                                    <h4 className="text-xs font-semibold text-red-600 uppercase">Failed Imports ({importResults.failed.length}):</h4>
-                                    <ul className="list-disc pl-5 text-sm text-red-700 dark:text-red-400">
+                                    <h4 className="text-xs font-semibold text-bad uppercase">Failed Imports ({importResults.failed.length}):</h4>
+                                    <ul className="list-disc pl-5 text-sm text-bad">
                                         {importResults.failed.map((f, idx) => <li key={idx}>{f}</li>)}
                                     </ul>
                                 </div>
@@ -340,7 +345,7 @@ export default function SetterPanel() {
                                         placeholder="e.g. 1068, 1069" className="w-full border rounded px-3 py-2 text-sm border-hairline-strong bg-transparent text-ink" />
                                 </div>
                                 <button onClick={handleCSESImport} disabled={importing}
-                                    className="w-full bg-teal-600 text-white px-4 py-2 rounded text-sm hover:bg-teal-700 disabled:opacity-50 transition-colors cursor-pointer font-medium">
+                                    className="w-full bg-ok-fill text-white px-4 py-2 rounded text-sm hover:bg-ok-fill-hover disabled:opacity-50 transition-colors cursor-pointer font-medium">
                                     {importing ? 'Importing...' : 'Import Problem(s)'}
                                 </button>
                             </div>
@@ -363,7 +368,7 @@ export default function SetterPanel() {
                                     </div>
                                 </div>
                                 <button onClick={handleAtCoderImport} disabled={importing}
-                                    className="w-full bg-red-600 text-white px-4 py-2 rounded text-sm hover:bg-red-700 disabled:opacity-50 transition-colors cursor-pointer font-medium">
+                                    className="w-full bg-danger-fill text-white px-4 py-2 rounded text-sm hover:bg-danger-fill-hover disabled:opacity-50 transition-colors cursor-pointer font-medium">
                                     {importing ? 'Importing...' : 'Import Problem(s)'}
                                 </button>
                             </div>
@@ -379,7 +384,7 @@ export default function SetterPanel() {
                                         placeholder="e.g. copycat, formatted-numbers" className="w-full border rounded px-3 py-2 text-sm border-hairline-strong bg-transparent text-ink" />
                                 </div>
                                 <button onClick={handleTophImport} disabled={importing}
-                                    className="w-full bg-orange-600 text-white px-4 py-2 rounded text-sm hover:bg-orange-700 disabled:opacity-50 transition-colors cursor-pointer font-medium">
+                                    className="w-full bg-warn-fill text-white px-4 py-2 rounded text-sm hover:bg-warn-fill disabled:opacity-50 transition-colors cursor-pointer font-medium">
                                     {importing ? 'Importing...' : 'Import Problem(s)'}
                                 </button>
                             </div>
@@ -405,8 +410,8 @@ export default function SetterPanel() {
             ) : activeTab === 'my-contests' ? (
                 <section>
                     <h2 className="text-lg font-semibold mb-3">My Contests</h2>
-                    <div className="border border-hairline rounded-lg overflow-hidden bg-surface shadow-sm">
-                        <table className="w-full text-sm">
+                    <div className="overflow-x-auto rounded-xl border border-hairline bg-surface shadow-[var(--shadow-card)]">
+                        <table className="w-full min-w-[36rem] text-sm">
                             <thead className="bg-surface-2 text-muted text-xs uppercase">
                                 <tr>
                                     <th className="px-4 py-3 text-left">Title</th>
@@ -423,14 +428,14 @@ export default function SetterPanel() {
                                         <td className="px-4 py-3 text-xs text-muted">{new Date(c.start_time).toLocaleString()}</td>
                                         <td className="px-4 py-3 text-xs capitalize">{c.format}</td>
                                         <td className="px-4 py-3">
-                                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${c.visible ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300' : 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300'}`}>
+                                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${c.visible ? 'bg-ok/12 text-ok dark:bg-ok/10 dark:text-ok' : 'bg-bad/12 text-bad dark:bg-bad/10 dark:text-bad'}`}>
                                                 {c.visible ? 'Public' : 'Hidden'}
                                             </span>
                                         </td>
                                         <td className="px-4 py-3 text-right flex gap-2 justify-end items-center">
                                             <Link to={`/contests/${c.id}`} className="text-brand hover:underline text-xs">View</Link>
-                                            <Link to={`/setter/contest/${c.id}/manage#settings`} className="bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 border border-orange-200 text-orange-700 dark:text-orange-300 px-2.5 py-1 rounded text-xs">Edit settings</Link>
-                                            <Link to={`/setter/contest/${c.id}/manage`} className="bg-brand-soft hover:bg-blue-100 border border-blue-200 text-brand px-2.5 py-1 rounded text-xs">Manage</Link>
+                                            <Link to={`/setter/contest/${c.id}/manage#settings`} className="bg-warn/10 dark:bg-warn/10 hover:bg-warn/15 border border-warn/30 text-warn px-2.5 py-1 rounded text-xs">Edit settings</Link>
+                                            <Link to={`/setter/contest/${c.id}/manage`} className="bg-brand-soft hover:bg-brand/15 border border-brand/30 text-brand px-2.5 py-1 rounded text-xs">Manage</Link>
                                         </td>
                                     </tr>
                                 ))}
@@ -446,8 +451,8 @@ export default function SetterPanel() {
                     <h2 className="text-lg font-semibold mb-3">
                         {activeTab === 'my-problems' ? 'My Problems' : 'All Problems'}
                     </h2>
-                    <div className="border border-hairline rounded-lg overflow-hidden bg-surface shadow-sm">
-                        <table className="w-full text-sm">
+                    <div className="overflow-x-auto rounded-xl border border-hairline bg-surface shadow-[var(--shadow-card)]">
+                        <table className="w-full min-w-[36rem] text-sm">
                             <thead className="bg-surface-2 text-muted text-xs uppercase">
                                 <tr>
                                     <th className="px-4 py-3 text-left">Title</th>
@@ -462,13 +467,13 @@ export default function SetterPanel() {
                                         <td className="px-4 py-3 font-medium">{p.title}</td>
                                         <td className="px-4 py-3 text-xs text-muted">{p.source || 'local'}</td>
                                         <td className="px-4 py-3">
-                                            <span className={`px-2 py-1 rounded text-xs font-medium ${p.difficulty === 'easy' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' :
-                                                p.difficulty === 'medium' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300' : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
+                                            <span className={`px-2 py-1 rounded text-xs font-medium ${p.difficulty === 'easy' ? 'bg-ok/12 text-ok' :
+                                                p.difficulty === 'medium' ? 'bg-warn/12 text-warn' : 'bg-bad/12 text-bad'
                                                 }`}>{p.difficulty}</span>
                                         </td>
                                         <td className="px-4 py-3 text-right flex gap-2 justify-end items-center">
                                             <Link to={`/problems/${p.slug}`} className="text-brand hover:underline text-xs">View</Link>
-                                            <Link to={`/setter/${p.slug}`} className="bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 border border-orange-200 text-orange-700 dark:text-orange-300 px-2.5 py-1 rounded text-xs">Edit</Link>
+                                            <Link to={`/setter/${p.slug}`} className="bg-warn/10 dark:bg-warn/10 hover:bg-warn/15 border border-warn/30 text-warn px-2.5 py-1 rounded text-xs">Edit</Link>
                                         </td>
                                     </tr>
                                 ))}

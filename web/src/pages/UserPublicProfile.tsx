@@ -72,18 +72,18 @@ function fmtDateShort(s: string) {
 function StatusBadge({ status }: { status: string }) {
   const s = status.toLowerCase().replace(/[\s-]/g, '_')
   const map: Record<string, { label: string; cls: string }> = {
-    accepted:            { label: 'AC',  cls: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' },
-    ac:                  { label: 'AC',  cls: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' },
-    wrong_answer:        { label: 'WA',  cls: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400' },
-    wa:                  { label: 'WA',  cls: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400' },
-    time_limit_exceeded: { label: 'TLE', cls: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400' },
-    tle:                 { label: 'TLE', cls: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400' },
+    accepted:            { label: 'AC',  cls: 'bg-ok/12 text-ok' },
+    ac:                  { label: 'AC',  cls: 'bg-ok/12 text-ok' },
+    wrong_answer:        { label: 'WA',  cls: 'bg-bad/12 text-bad' },
+    wa:                  { label: 'WA',  cls: 'bg-bad/12 text-bad' },
+    time_limit_exceeded: { label: 'TLE', cls: 'bg-warn/12 text-yellow-700 dark:text-yellow-400' },
+    tle:                 { label: 'TLE', cls: 'bg-warn/12 text-yellow-700 dark:text-yellow-400' },
     runtime_error:       { label: 'RE',  cls: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700' },
     re:                  { label: 'RE',  cls: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700' },
     compilation_error:   { label: 'CE',  cls: 'bg-surface-3 text-muted' },
     ce:                  { label: 'CE',  cls: 'bg-surface-3 text-muted' },
-    memory_limit_exceeded: { label: 'MLE', cls: 'bg-purple-100 dark:bg-purple-900/30 text-purple-700' },
-    mle:                 { label: 'MLE', cls: 'bg-purple-100 dark:bg-purple-900/30 text-purple-700' },
+    memory_limit_exceeded: { label: 'MLE', cls: 'bg-violet-500/12 text-purple-700' },
+    mle:                 { label: 'MLE', cls: 'bg-violet-500/12 text-purple-700' },
   }
   const entry = map[s] ?? { label: status.toUpperCase().slice(0, 4), cls: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700' }
   return <span className={`px-2 py-0.5 rounded text-xs font-bold font-mono ${entry.cls}`}>{entry.label}</span>
@@ -92,7 +92,7 @@ function StatusBadge({ status }: { status: string }) {
 function DeltaBadge({ delta }: { delta: number }) {
   if (delta === 0) return <span className="text-muted-soft">±0</span>
   return (
-    <span className={delta > 0 ? 'text-green-600 dark:text-green-400 font-semibold' : 'text-red-600 dark:text-red-400 font-semibold'}>
+    <span className={delta > 0 ? 'text-ok font-semibold' : 'text-bad font-semibold'}>
       {delta > 0 ? '+' : ''}{delta}
     </span>
   )

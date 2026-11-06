@@ -256,14 +256,14 @@ export default function GroupDetail() {
                             <div className="flex items-center gap-3 flex-wrap">
                                 <h1 className="text-2xl font-bold">{group.name}</h1>
                                 <span className={`text-xs px-2 py-0.5 rounded font-semibold ${group.is_public
-                                    ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300'
-                                    : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300'
+                                    ? 'bg-ok/10 text-ok'
+                                    : 'bg-bad/10 text-bad'
                                     }`}>
                                     {group.is_public ? 'Public' : 'Private'}
                                 </span>
                                 <span className={`text-xs px-2 py-0.5 rounded font-semibold ${group.join_policy === 'auto_approve'
                                     ? 'bg-brand-soft text-brand'
-                                    : 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300'
+                                    : 'bg-warn/10 text-warn'
                                     }`}>
                                     {group.join_policy === 'auto_approve' ? 'Auto-Join via Link' : 'Approval Required'}
                                 </span>
@@ -277,13 +277,13 @@ export default function GroupDetail() {
                                         className="px-4 py-2 border border-hairline-strong rounded text-sm hover:bg-surface-2 cursor-pointer">Edit</button>
                                     {canDelete && (
                                         <button onClick={handleDelete}
-                                            className="px-4 py-2 bg-red-600 text-white rounded text-sm hover:bg-red-700 cursor-pointer">Delete</button>
+                                            className="px-4 py-2 bg-danger-fill text-white rounded text-sm hover:bg-red-700 cursor-pointer">Delete</button>
                                     )}
                                 </>
                             )}
                             {getAccessToken() && (
                                 <button onClick={isMember ? handleLeave : handleJoin}
-                                    className={`px-4 py-2 rounded text-sm font-medium transition-colors cursor-pointer ${isMember ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100' : 'bg-brand text-on-brand hover:bg-brand-hover'
+                                    className={`px-4 py-2 rounded text-sm font-medium transition-colors cursor-pointer ${isMember ? 'bg-bad/10 text-bad hover:bg-red-100' : 'bg-brand text-on-brand hover:bg-brand-hover'
                                         }`}>
                                     {isMember ? 'Leave Group' : 'Join Group'}
                                 </button>
@@ -345,7 +345,7 @@ export default function GroupDetail() {
                                         <div className="flex items-center gap-4 text-xs text-muted-soft">
                                             <span>Type: {c.type}</span>
                                             {canManage && (
-                                                <button onClick={() => handleRemoveContest(c.id)} className="text-red-600 hover:underline cursor-pointer">
+                                                <button onClick={() => handleRemoveContest(c.id)} className="text-bad hover:underline cursor-pointer">
                                                     Remove
                                                 </button>
                                             )}
@@ -406,7 +406,7 @@ export default function GroupDetail() {
                                                 <div className="flex items-center gap-2">
                                                     <span className="font-medium">{pm.username || pm.user_id}</span>
                                                     <span className={`text-xs px-1.5 py-0.5 rounded ${pm.role === 'requested'
-                                                        ? 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300'
+                                                        ? 'bg-warn/10 text-warn'
                                                         : 'bg-brand-soft text-brand'
                                                         }`}>
                                                         {pm.role === 'requested' ? 'Join Request' : 'Invited'}
@@ -417,12 +417,12 @@ export default function GroupDetail() {
                                                         <>
                                                             <button onClick={() => handleRespond(pm.user_id as string, 'approve')}
                                                                 disabled={acting === `${pm.user_id}-approve`}
-                                                                className="bg-green-600 text-white px-2.5 py-1 rounded text-xs hover:bg-green-700 disabled:opacity-50 cursor-pointer">
+                                                                className="bg-ok-fill text-white px-2.5 py-1 rounded text-xs hover:bg-green-700 disabled:opacity-50 cursor-pointer">
                                                                 Approve
                                                             </button>
                                                             <button onClick={() => handleRespond(pm.user_id as string, 'reject')}
                                                                 disabled={acting === `${pm.user_id}-reject`}
-                                                                className="bg-red-600 text-white px-2.5 py-1 rounded text-xs hover:bg-red-700 disabled:opacity-50 cursor-pointer">
+                                                                className="bg-danger-fill text-white px-2.5 py-1 rounded text-xs hover:bg-red-700 disabled:opacity-50 cursor-pointer">
                                                                 Reject
                                                             </button>
                                                         </>

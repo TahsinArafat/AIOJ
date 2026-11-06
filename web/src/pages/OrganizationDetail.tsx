@@ -102,7 +102,7 @@ const [org, setOrg] = useState<OrgInfo | null>(null)
 				{getAccessToken() && (
 					<button onClick={handleJoinLeave} disabled={joining}
 						className={`px-6 py-2 rounded font-semibold text-sm transition-colors ${isMember
-								? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-100 hover:bg-red-100'
+								? 'bg-bad/10 text-bad border border-red-100 hover:bg-red-100'
 								: 'bg-brand text-on-brand hover:bg-brand-hover'
 							}`}>
 						{isMember ? 'Leave Organization' : 'Join Organization'}
@@ -132,7 +132,7 @@ const [org, setOrg] = useState<OrgInfo | null>(null)
 			{showAddClass && (
 				<form onSubmit={handleCreateClass} className="bg-surface-2 border border-hairline rounded-lg p-5 space-y-3">
 					<h3 className="font-semibold text-ink-soft text-sm">Add New Class</h3>
-					{classError && <div className="text-red-600 dark:text-red-400 text-xs">{classError}</div>}
+					{classError && <div className="text-bad text-xs">{classError}</div>}
 					<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 						<input required value={className} onChange={e => setClassName(e.target.value)}
 							placeholder="Class Name (e.g. CS101 Section A)"

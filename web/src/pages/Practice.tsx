@@ -103,9 +103,9 @@ export default function Practice() {
                                     {p.title}
                                 </Link>
                                 <div className="flex flex-wrap gap-2 pt-1 items-center">
-                                    <span className={`px-2 py-0.5 rounded text-xs font-semibold uppercase ${p.difficulty === 'easy' ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border border-green-100 dark:border-green-800' :
-                                        p.difficulty === 'medium' ? 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300 border border-yellow-100 dark:border-yellow-800' :
-                                            'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border border-red-100 dark:border-red-800'
+                                    <span className={`px-2 py-0.5 rounded text-xs font-semibold uppercase ${p.difficulty === 'easy' ? 'bg-ok/10 text-ok border border-green-100 dark:border-green-800' :
+                                        p.difficulty === 'medium' ? 'bg-warn/10 text-warn border border-yellow-100 dark:border-yellow-800' :
+                                            'bg-bad/10 text-bad border border-red-100 dark:border-red-800'
                                         }`}>
                                         {p.difficulty}
                                     </span>
@@ -131,7 +131,7 @@ export default function Practice() {
                 )}
 
                 {activeTab === 'weak' && rec?.weak_tags?.tags && rec.weak_tags.tags.length > 0 && (
-                    <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg p-4 text-sm text-amber-800 dark:text-amber-300 mt-6">
+                    <div className="bg-warn/10 border border-warn/30 rounded-lg p-4 text-sm text-warn mt-6">
                         🎯 Recommending problems on your weakest tags: <span className="font-bold">{rec.weak_tags.tags.join(', ')}</span>
                     </div>
                 )}

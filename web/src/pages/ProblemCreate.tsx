@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { api } from '../lib/api'
+import { PageHeader } from '../components/ui/PageHeader'
 
 export default function ProblemCreate() {
     const nav = useNavigate()
@@ -46,9 +47,19 @@ export default function ProblemCreate() {
     }
 
     return (
-        <div className="max-w-2xl mx-auto">
-            <h1 className="text-2xl font-bold mb-6">Create Problem</h1>
-            {error && <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-2 rounded mb-4 text-sm">{error}</div>}
+        // Left-aligned like every other page: `mx-auto` on a narrow column put
+        // this heading at x=74 while the rest of the app sits at x=24.
+        <div className="max-w-2xl">
+            <PageHeader
+                eyebrow={<Link to="/setter" className="hover:text-ink">← Setter workspace</Link>}
+                title="Create problem"
+                description="Set up the statement and limits. Test cases and the checker come next."
+            />
+            {error && (
+                <div role="alert" className="mb-4 rounded-lg border border-bad/30 bg-bad/10 px-4 py-2 text-sm text-bad">
+                    {error}
+                </div>
+            )}
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                     <div>

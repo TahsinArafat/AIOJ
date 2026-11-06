@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { api } from '../lib/api'
+import { PageHeader } from '../components/ui/PageHeader'
 
 // ── Common topic tags surfaced as quick-pick chips ──────────────────────────
 const TOPIC_SUGGESTIONS = [
@@ -53,7 +54,7 @@ function TagInput({
                         disabled={tags.includes(s)}
                         className={`px-2 py-0.5 rounded-full text-xs border transition-colors cursor-pointer
                             ${tags.includes(s)
-                                ? 'bg-blue-100 dark:bg-blue-900 border-blue-400 text-brand opacity-60 cursor-default'
+                                ? 'bg-brand-soft border-brand/50 text-brand opacity-60 cursor-default'
                                 : 'border-hairline-strong text-muted hover:bg-surface-2'}`}
                     >
                         {s}
@@ -98,7 +99,7 @@ function TagInput({
                             <button
                                 type="button"
                                 onClick={() => remove(t)}
-                                className="hover:text-blue-200 leading-none cursor-pointer"
+                                className="hover:text-canvas leading-none cursor-pointer"
                             >
                                 ×
                             </button>
@@ -123,13 +124,13 @@ function RatingSlider({
 
     function color(r: number) {
         if (r < 1200) return 'text-muted'
-        if (r < 1400) return 'text-green-600 dark:text-green-400'
-        if (r < 1600) return 'text-teal-600 dark:text-teal-400'
+        if (r < 1400) return 'text-ok'
+        if (r < 1600) return 'text-accent'
         if (r < 1900) return 'text-brand'
         if (r < 2100) return 'text-violet-600 dark:text-violet-400'
-        if (r < 2300) return 'text-orange-500'
-        if (r < 2400) return 'text-orange-600'
-        return 'text-red-600 dark:text-red-400'
+        if (r < 2300) return 'text-warn'
+        if (r < 2400) return 'text-warn-fill'
+        return 'text-bad'
     }
 
     function label(r: number) {
@@ -266,22 +267,21 @@ export default function GenerateProblem() {
     }
 
     return (
-        <div className="max-w-3xl mx-auto py-8 px-4">
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold text-ink mb-1">
-                    AI Problem Generator
-                </h1>
-                <p className="text-sm text-muted">
-                    Generates a complete Codeforces-style problem — statement, solution, editorial — and saves it as a <span className="font-medium text-yellow-600 dark:text-yellow-400">draft</span> for your review.
-                </p>
-            </div>
+        // Left-aligned with the shell like every other page; `mx-auto` on a
+        // 3xl column pushed this heading to x=42 while the rest sit at x=24.
+        <div className="max-w-3xl">
+            <PageHeader
+                eyebrow={<Link to="/setter" className="hover:text-ink">← Setter workspace</Link>}
+                title="AI problem generator"
+                description="Generates a complete Codeforces-style problem — statement, solution, editorial — and saves it as a draft for your review."
+            />
 
             {/* ── Result banner ─────────────────────────────────────────────── */}
             {result && (
-                <div className="mb-6 bg-green-50 dark:bg-green-900/20 border border-green-300 dark:border-green-700 rounded-xl p-5 space-y-3">
+                <div className="mb-6 bg-ok/10 border border-ok/40 rounded-xl p-5 space-y-3">
                     <div className="flex items-center gap-2">
-                        <span className="text-green-600 dark:text-green-400 text-xl">✓</span>
-                        <p className="font-semibold text-green-700 dark:text-green-300">Problem generated successfully!</p>
+                        <span className="text-ok text-xl">✓</span>
+                        <p className="font-semibold text-ok">Problem generated successfully!</p>
                     </div>
                     <p className="text-sm text-muted">
                         Saved as a draft. Review it in the setter workspace and publish when ready.
@@ -310,7 +310,7 @@ export default function GenerateProblem() {
 
             {/* ── Error banner ───────────────────────────────────────────────── */}
             {error && (
-                <div className="mb-6 bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700 rounded-xl p-4 text-sm text-red-700 dark:text-red-300">
+                <div className="mb-6 bg-bad/10 border border-bad/40 rounded-xl p-4 text-sm text-bad">
                     <span className="font-semibold">Error: </span>{error}
                 </div>
             )}
@@ -321,7 +321,7 @@ export default function GenerateProblem() {
                 {/* Tags */}
                 <fieldset className="bg-surface border border-hairline rounded-xl p-5 shadow-sm">
                     <legend className="px-2 text-sm font-semibold text-ink-soft">
-                        Algorithmic Topics <span className="text-red-500">*</span>
+                        Algorithmic Topics <span className="text-bad">*</span>
                     </legend>
                     <p className="text-xs text-muted mb-3">
                         Click chips or type custom tags. The model will weave these topics into the problem.
@@ -332,7 +332,7 @@ export default function GenerateProblem() {
                 {/* Rating */}
                 <fieldset className="bg-surface border border-hairline rounded-xl p-5 shadow-sm">
                     <legend className="px-2 text-sm font-semibold text-ink-soft">
-                        Difficulty Rating <span className="text-red-500">*</span>
+                        Difficulty Rating <span className="text-bad">*</span>
                     </legend>
                     <p className="text-xs text-muted mb-3">
                         Codeforces-style rating. This calibrates the algorithmic depth and expected solution complexity.

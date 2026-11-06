@@ -145,7 +145,7 @@ export default function BlogDetail() {
                         {canManage && (
                             <div className="flex gap-2">
                                 <button onClick={handleStartEdit} className="px-3 py-1 border border-hairline-strong text-xs rounded hover:bg-surface-2">Edit</button>
-                                <button onClick={handleDelete} className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded">Delete</button>
+                                <button onClick={handleDelete} className="px-3 py-1 bg-danger-fill hover:bg-red-700 text-white text-xs rounded">Delete</button>
                             </div>
                         )}
                     </div>
@@ -168,9 +168,9 @@ export default function BlogDetail() {
 
                     {getAccessToken() && (
                         <div className="flex items-center gap-4 mt-8 pt-4 border-t border-hairline">
-                            <button onClick={() => handleVote(1)} className={`text-lg cursor-pointer ${vote === 1 ? 'text-green-600 dark:text-green-400' : 'text-muted-soft hover:text-green-600'}`}>▲</button>
+                            <button onClick={() => handleVote(1)} className={`text-lg cursor-pointer ${vote === 1 ? 'text-ok' : 'text-muted-soft hover:text-green-600'}`}>▲</button>
                             <span className="font-semibold text-ink-soft">+{post.upvotes} / -{post.downvotes}</span>
-                            <button onClick={() => handleVote(-1)} className={`text-lg cursor-pointer ${vote === -1 ? 'text-red-600 dark:text-red-400' : 'text-muted-soft hover:text-red-600'}`}>▼</button>
+                            <button onClick={() => handleVote(-1)} className={`text-lg cursor-pointer ${vote === -1 ? 'text-bad' : 'text-muted-soft hover:text-red-600'}`}>▼</button>
                         </div>
                     )}
                 </article>

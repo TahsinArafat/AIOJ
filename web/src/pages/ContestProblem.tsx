@@ -76,19 +76,19 @@ const STATUS_LABELS: Record<string, string> = {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-    ac: 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 border-green-300 dark:border-green-700',
-    success: 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 border-green-300 dark:border-green-700',
-    wa: 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 border-red-300 dark:border-red-700',
-    tle: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border-yellow-300 dark:border-yellow-700',
-    TLE: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 border-yellow-300 dark:border-yellow-700',
-    mle: 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300 border-orange-300 dark:border-orange-700',
-    MLE: 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300 border-orange-300 dark:border-orange-700',
-    re: 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 border-red-300 dark:border-red-700',
-    RE: 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 border-red-300 dark:border-red-700',
-    ce: 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300 border-purple-300 dark:border-purple-700',
-    CE: 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300 border-purple-300 dark:border-purple-700',
-    pending: 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 border-blue-300 dark:border-blue-700',
-    judging: 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 border-blue-300 dark:border-blue-700',
+    ac: 'bg-ok/12 text-ok border-ok/40',
+    success: 'bg-ok/12 text-ok border-ok/40',
+    wa: 'bg-bad/12 text-bad border-bad/40',
+    tle: 'bg-warn/12 text-warn border-warn/40',
+    TLE: 'bg-warn/12 text-warn border-warn/40',
+    mle: 'bg-warn/12 text-warn border-warn/40',
+    MLE: 'bg-warn/12 text-warn border-warn/40',
+    re: 'bg-bad/12 text-bad border-bad/40',
+    RE: 'bg-bad/12 text-bad border-bad/40',
+    ce: 'bg-violet-500/12 text-accent border-purple-300 dark:border-purple-700',
+    CE: 'bg-violet-500/12 text-accent border-purple-300 dark:border-purple-700',
+    pending: 'bg-brand-soft text-brand border-brand/40',
+    judging: 'bg-brand-soft text-brand border-brand/40',
     se: 'bg-surface-3/30 text-ink border-hairline-strong',
     SE: 'bg-surface-3/30 text-ink border-hairline-strong',
 }
@@ -204,7 +204,7 @@ function CopyButton({ text }: { text: string }) {
     return (
         <button
             onClick={handleCopy}
-            className="text-xs text-muted hover:text-gray-700 transition-colors px-2 py-1 rounded hover:bg-surface-3"
+            className="text-xs text-muted hover:text-ink transition-colors px-2 py-1 rounded hover:bg-surface-3"
             title="Copy to clipboard"
         >
             {copied ? <><Check className="w-3.5 h-3.5" /> Copied</> : <><Copy className="w-3.5 h-3.5" /> Copy</>}
@@ -256,16 +256,16 @@ function HintSection({ hint }: { hint: string }) {
     const [expanded, setExpanded] = useState(false)
 
     return (
-        <div className="border border-amber-200 dark:border-amber-700 rounded-lg overflow-hidden">
+        <div className="border border-warn/30 rounded-lg overflow-hidden">
             <button
                 onClick={() => setExpanded(!expanded)}
-                className="w-full flex items-center justify-between px-4 py-3 bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 transition-colors text-left"
+                className="w-full flex items-center justify-between px-4 py-3 bg-warn/10 hover:bg-warn/12 transition-colors text-left"
             >
-                <span className="text-sm font-semibold text-amber-800 dark:text-amber-300 flex items-center gap-1.5"><Lightbulb className="w-4 h-4" /> Hint</span>
-                <span className="text-amber-600 dark:text-amber-400 text-sm">{expanded ? '▲ Hide' : '▼ Show'}</span>
+                <span className="text-sm font-semibold text-warn flex items-center gap-1.5"><Lightbulb className="w-4 h-4" /> Hint</span>
+                <span className="text-warn text-sm">{expanded ? '▲ Hide' : '▼ Show'}</span>
             </button>
             {expanded && (
-                <div className="px-4 py-3 bg-surface border-t border-amber-200 dark:border-amber-700">
+                <div className="px-4 py-3 bg-surface border-t border-warn/30">
                     <div className="prose prose-sm max-w-none text-ink-soft">
                         <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
                             {hint}
@@ -282,11 +282,11 @@ function SubmissionResult({ result }: { result: SubmissionView }) {
 
     if (result.error) {
         return (
-            <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg">
+            <div className="p-4 bg-bad/10 border border-bad/30 rounded-lg">
                 <div className="flex items-center gap-2">
-                    <span className="text-red-600 dark:text-red-400 font-semibold text-sm">Error</span>
+                    <span className="text-bad font-semibold text-sm">Error</span>
                 </div>
-                <p className="text-red-700 dark:text-red-300 text-sm mt-1">{result.error}</p>
+                <p className="text-bad text-sm mt-1">{result.error}</p>
             </div>
         )
     }
@@ -311,7 +311,7 @@ function SubmissionResult({ result }: { result: SubmissionView }) {
                 {result.id && (
                     <Link
                         to={`/submissions/${result.id}`}
-                        className="text-xs text-brand hover:text-blue-800 hover:underline font-medium"
+                        className="text-xs text-brand hover:text-brand hover:underline font-medium"
                     >
                         View Details →
                     </Link>
@@ -355,7 +355,7 @@ function SubmissionResult({ result }: { result: SubmissionView }) {
             {result.status === 'ce' && result.compile_output && (
                 <div className="mt-2">
                     <div className="text-xs font-semibold text-muted mb-1">Compile Output:</div>
-                    <pre className="bg-gray-900 text-red-400 text-xs p-3 rounded-md overflow-x-auto font-mono max-h-40">
+                    <pre className="bg-code text-bad text-xs p-3 rounded-md overflow-x-auto font-mono max-h-40">
                         {result.compile_output}
                     </pre>
                 </div>
@@ -717,7 +717,7 @@ export default function ContestProblem() {
     if (error) {
         return (
             <div className="max-w-2xl mx-auto py-20 text-center space-y-4">
-                <div className="text-red-500 text-lg font-medium">{error}</div>
+                <div className="text-bad text-lg font-medium">{error}</div>
                 <Link to={`/contests/${contestId}`} className="text-brand hover:underline text-sm">
                     ← Back to Contest
                 </Link>
@@ -738,7 +738,7 @@ export default function ContestProblem() {
     }
 
     return (
-        <div className="max-w-7xl mx-auto px-4 py-6">
+        <div>
             {isUpcoming && (
                 <div className="mb-6">
                     <CountdownTimer target={contest?.start_time ?? ''} label="Contest starts in" />
@@ -752,11 +752,11 @@ export default function ContestProblem() {
 
             {/* Notices */}
             {upsolvingDisabled && (
-                <div className="mb-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-300 dark:border-yellow-700 rounded-lg flex items-start gap-3">
-                    <span className="text-yellow-600 dark:text-yellow-400 text-lg mt-0.5">⚠</span>
+                <div className="mb-6 p-4 bg-warn/10 border border-warn/40 rounded-lg flex items-start gap-3">
+                    <span className="text-warn text-lg mt-0.5">⚠</span>
                     <div>
-                        <p className="text-yellow-800 dark:text-yellow-300 font-medium text-sm">Upsolving is disabled</p>
-                        <p className="text-yellow-700 dark:text-yellow-300 text-sm mt-1">
+                        <p className="text-warn font-medium text-sm">Upsolving is disabled</p>
+                        <p className="text-warn text-sm mt-1">
                             You can view the problem but cannot submit new solutions.
                         </p>
                     </div>
@@ -764,10 +764,10 @@ export default function ContestProblem() {
             )}
 
             {statementHidden && (
-                <div className="mb-6 p-4 bg-brand-soft border border-blue-300 dark:border-blue-700 rounded-lg flex items-start gap-3">
+                <div className="mb-6 p-4 bg-brand-soft border border-brand/40 rounded-lg flex items-start gap-3">
                     <span className="text-brand mt-0.5"><ClipboardList className="w-5 h-5" /></span>
                     <div>
-                        <p className="text-blue-800 dark:text-blue-300 font-medium text-sm">Problem statement is hidden</p>
+                        <p className="text-brand font-medium text-sm">Problem statement is hidden</p>
                         <p className="text-brand text-sm mt-1">
                             The full problem statement is only available in printed form. Please refer to your printed problem set.
                             Sample cases are shown below for reference.
@@ -793,7 +793,7 @@ export default function ContestProblem() {
                     {/* Back link */}
                     <Link
                         to={`/contests/${contestId}`}
-                        className="text-brand hover:text-blue-800 hover:underline text-sm font-medium transition-colors"
+                        className="text-brand hover:text-brand hover:underline text-sm font-medium transition-colors"
                     >
                         ← {contest?.title || 'Contest'}
                     </Link>
@@ -809,30 +809,30 @@ export default function ContestProblem() {
                         <span className="flex items-center gap-1.5">
                             <span className="font-semibold text-ink-soft">Time Limit:</span> {problem.time_limit} ms
                         </span>
-                        <span className="text-gray-300">|</span>
+                        <span className="text-muted">|</span>
                         <span className="flex items-center gap-1.5">
                             <span className="font-semibold text-ink-soft">Memory Limit:</span> {Math.round(problem.memory_limit / 1024)} MB
                         </span>
                         {problem.interactive && (
                             <>
-                                <span className="text-gray-300">|</span>
-                                <span className="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300">
+                                <span className="text-muted">|</span>
+                                <span className="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-violet-500/12 text-accent">
                                     Interactive
                                 </span>
                             </>
                         )}
                         {problem.problem_type === 'output' && (
                             <>
-                                <span className="text-gray-300">|</span>
-                                <span className="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300">
+                                <span className="text-muted">|</span>
+                                <span className="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-warn/12 text-warn">
                                     Output-Only
                                 </span>
                             </>
                         )}
                         {problem.scoring_mode === 'partial' && (
                             <>
-                                <span className="text-gray-300">|</span>
-                                <span className="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">
+                                <span className="text-muted">|</span>
+                                <span className="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-brand-soft text-brand">
                                     Partial Scoring
                                 </span>
                             </>
@@ -844,7 +844,7 @@ export default function ContestProblem() {
                             onClick={() => setTab('statement')}
                             className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${tab === 'statement'
                                 ? 'border-brand text-brand'
-                                : 'border-transparent text-muted hover:text-gray-700 hover:border-gray-300'
+                                : 'border-transparent text-muted hover:text-ink hover:border-hairline-strong'
                                 }`}
                         >
                             Statement
@@ -854,7 +854,7 @@ export default function ContestProblem() {
                                 onClick={() => setTab('submissions')}
                                 className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${tab === 'submissions'
                                     ? 'border-brand text-brand'
-                                    : 'border-transparent text-muted hover:text-gray-700 hover:border-gray-300'
+                                    : 'border-transparent text-muted hover:text-ink hover:border-hairline-strong'
                                     }`}
                             >
                                 My Submissions
@@ -874,7 +874,7 @@ export default function ContestProblem() {
                                                 href={problem.description}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-brand bg-brand-soft border border-blue-200 dark:border-blue-800 rounded-lg hover:bg-brand-soft transition-colors"
+                                                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-brand bg-brand-soft border border-brand/30 rounded-lg hover:bg-brand-soft transition-colors"
                                             >
                                                 <Download className="w-4 h-4" />
                                                 Download PDF
@@ -943,7 +943,7 @@ export default function ContestProblem() {
                 {/* DIVIDER */}
                 <div
                     onMouseDown={handleMouseDown}
-                    className={`w-3 flex-shrink-0 cursor-col-resize group transition-colors relative ${dragging ? 'bg-blue-500' : 'bg-surface-3 hover:bg-blue-500'}`}
+                    className={`w-3 flex-shrink-0 cursor-col-resize group transition-colors relative ${dragging ? 'bg-brand' : 'bg-surface-3 hover:bg-brand'}`}
                 >
                     {/* Grip dots indicator */}
                     <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
@@ -977,7 +977,7 @@ export default function ContestProblem() {
                                     <button
                                         onClick={handleSubmit}
                                         disabled={submitting || !code.trim()}
-                                        className="bg-green-600 text-white px-4 py-1.5 rounded text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition-colors cursor-pointer"
+                                        className="bg-ok-fill text-white px-4 py-1.5 rounded text-sm font-medium hover:bg-ok-fill disabled:opacity-50 transition-colors cursor-pointer"
                                     >
                                         {submitting ? 'Submitting...' : 'Submit'}
                                     </button>
@@ -996,9 +996,9 @@ export default function ContestProblem() {
                                 <div className="border border-hairline rounded-lg overflow-hidden bg-surface shadow-sm">
                                     <div className="bg-surface-2 border-b border-hairline px-4 py-3 flex items-center justify-between">
                                         <span className="font-semibold text-sm text-ink-soft">Sample Test Results</span>
-                                        <span className={`text-xs font-medium px-2 py-0.5 rounded ${sampleResults.every(r => r.passed) ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' :
-                                            sampleResults.some(r => r.passed) ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300' :
-                                                'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
+                                        <span className={`text-xs font-medium px-2 py-0.5 rounded ${sampleResults.every(r => r.passed) ? 'bg-ok/12 text-ok' :
+                                            sampleResults.some(r => r.passed) ? 'bg-warn/12 text-warn' :
+                                                'bg-bad/12 text-bad'
                                             }`}>
                                             {sampleResults.filter(r => r.passed).length}/{sampleResults.length} Passed
                                         </span>
@@ -1012,7 +1012,7 @@ export default function ContestProblem() {
                                                         {(r.time ?? 0) > 0 && (
                                                             <span className="text-xs text-muted">{r.time}ms</span>
                                                         )}
-                                                        <span className={`text-xs font-medium px-2 py-0.5 rounded ${r.passed ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
+                                                        <span className={`text-xs font-medium px-2 py-0.5 rounded ${r.passed ? 'bg-ok/12 text-ok' : 'bg-bad/12 text-bad'
                                                             }`}>
                                                             {r.passed ? 'Passed' : 'Failed'}
                                                         </span>
@@ -1025,19 +1025,19 @@ export default function ContestProblem() {
                                                     <div className="grid grid-cols-2 gap-2">
                                                         <div>
                                                             <span className="block text-xs font-semibold text-muted mb-1">Expected</span>
-                                                            <pre className="bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 font-mono text-xs p-2 rounded overflow-x-auto max-h-24 border border-green-100">{r.expected || '(empty)'}</pre>
+                                                            <pre className="bg-ok/10 text-ok font-mono text-xs p-2 rounded overflow-x-auto max-h-24 border border-ok/20">{r.expected || '(empty)'}</pre>
                                                         </div>
                                                         <div>
                                                             <span className="block text-xs font-semibold text-muted mb-1">Actual</span>
-                                                            <pre className="bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 font-mono text-xs p-2 rounded overflow-x-auto max-h-24 border border-red-100">{r.actual || '(empty)'}</pre>
+                                                            <pre className="bg-bad/10 text-bad font-mono text-xs p-2 rounded overflow-x-auto max-h-24 border border-bad/20">{r.actual || '(empty)'}</pre>
                                                         </div>
                                                     </div>
                                                 )}
                                                 {r.compile_output && (
-                                                    <pre className="mt-2 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded p-2 overflow-x-auto">{r.compile_output}</pre>
+                                                    <pre className="mt-2 text-xs text-bad bg-bad/10 rounded p-2 overflow-x-auto">{r.compile_output}</pre>
                                                 )}
                                                 {r.stderr && (
-                                                    <pre className="mt-2 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded p-2 overflow-x-auto">{r.stderr}</pre>
+                                                    <pre className="mt-2 text-xs text-bad bg-bad/10 rounded p-2 overflow-x-auto">{r.stderr}</pre>
                                                 )}
                                             </div>
                                         ))}
@@ -1072,8 +1072,8 @@ export default function ContestProblem() {
                                     {customOutput && (
                                         <div className="space-y-3 pt-2 border-t border-hairline">
                                             <div className="flex items-center justify-between text-xs">
-                                                <span className={`font-semibold uppercase tracking-wider ${customOutput.status === 'success' ? 'text-green-600 dark:text-green-400' :
-                                                    customOutput.status === 'ce' ? 'text-purple-600 dark:text-purple-400' : 'text-red-600 dark:text-red-400'
+                                                <span className={`font-semibold uppercase tracking-wider ${customOutput.status === 'success' ? 'text-ok' :
+                                                    customOutput.status === 'ce' ? 'text-accent' : 'text-bad'
                                                     }`}>
                                                     Execution: {
                                                         customOutput.status === 'success' ? 'Completed' :
@@ -1093,8 +1093,8 @@ export default function ContestProblem() {
 
                                             {customOutput.compile_output && (
                                                 <div>
-                                                    <span className="block text-xs font-semibold text-red-500 dark:text-red-400 mb-1">Compiler Output</span>
-                                                    <pre className="bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 font-mono text-xs p-3 rounded overflow-x-auto max-h-40 border border-red-100">{customOutput.compile_output}</pre>
+                                                    <span className="block text-xs font-semibold text-bad dark:text-bad mb-1">Compiler Output</span>
+                                                    <pre className="bg-bad/10 text-bad font-mono text-xs p-3 rounded overflow-x-auto max-h-40 border border-bad/20">{customOutput.compile_output}</pre>
                                                 </div>
                                             )}
 

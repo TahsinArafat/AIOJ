@@ -51,8 +51,8 @@ export default function Settings() {
                 </div>
             </section>
 
-            <section className="bg-surface border border-red-200 dark:border-red-900 rounded-lg p-6">
-                <h2 className="text-lg font-semibold text-red-700 dark:text-red-400 mb-2">
+            <section className="bg-surface border border-bad/30 dark:border-red-900 rounded-lg p-6">
+                <h2 className="text-lg font-semibold text-bad mb-2">
                     Danger Zone
                 </h2>
                 <p className="text-sm text-muted mb-4">

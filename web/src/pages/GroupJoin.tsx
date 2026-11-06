@@ -75,7 +75,7 @@ export default function GroupJoin() {
                             <p className="text-muted mb-2">
                                 You were invited to join a group using code: <code className="font-mono bg-surface-3 px-2 py-0.5 rounded">{code}</code>
                             </p>
-                            {message && <p className="text-red-600 dark:text-red-400 text-sm mb-4">{message}</p>}
+                            {message && <p className="text-bad text-sm mb-4">{message}</p>}
                             <button onClick={handleJoin}
                                 className="px-6 py-2 bg-brand text-on-brand rounded text-sm hover:bg-brand-hover font-medium cursor-pointer">
                                 Try Again
@@ -83,7 +83,7 @@ export default function GroupJoin() {
                         </div>
                     ) : (
                         <div>
-                            <p className="text-red-600 dark:text-red-400 mb-4">{message}</p>
+                            <p className="text-bad mb-4">{message}</p>
                             <Link to="/groups" className="px-6 py-2 bg-brand text-on-brand rounded text-sm hover:bg-brand-hover font-medium">
                                 Browse Groups
                             </Link>

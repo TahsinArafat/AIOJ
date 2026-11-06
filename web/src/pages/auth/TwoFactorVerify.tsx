@@ -44,7 +44,7 @@ export default function TwoFactorVerify() {
                     className="border border-hairline-strong rounded px-2 py-1 w-full text-sm dark:bg-gray-900"
                     required
                 />
-                {error && <p className="text-red-600 text-sm">{error}</p>}
+                {error && <p className="text-bad text-sm">{error}</p>}
                 <button
                     type="submit"
                     disabled={busy}

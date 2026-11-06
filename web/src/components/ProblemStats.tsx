@@ -40,7 +40,7 @@ export default function ProblemStats({ problemId }: ProblemStatsProps) {
                 </div>
                 <div className="bg-surface-2 p-4 rounded-lg">
                     <p className="text-sm text-muted">Accepted</p>
-                    <p className="text-2xl font-bold mt-1 text-green-600 dark:text-green-400">{stats.accepted_submissions}</p>
+                    <p className="text-2xl font-bold mt-1 text-ok">{stats.accepted_submissions}</p>
                 </div>
                 <div className="bg-surface-2 p-4 rounded-lg">
                     <p className="text-sm text-muted">Acceptance Rate</p>

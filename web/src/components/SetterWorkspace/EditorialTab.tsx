@@ -75,7 +75,7 @@ export default function EditorialTab({ problemId, isUserAdmin }: EditorialTabPro
               <div>
                 <div className="flex items-center gap-2">
                   {e.is_official && (
-                    <span className="text-[10px] font-bold uppercase bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 px-1.5 py-0.5 rounded">
+                    <span className="text-[10px] font-bold uppercase bg-ok/12 text-ok px-1.5 py-0.5 rounded">
                       Official
                     </span>
                   )}

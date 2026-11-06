@@ -105,7 +105,7 @@ export default function TrainingPlanDetail() {
 				{getAccessToken() && (
 					<button onClick={handleEnrollToggle} disabled={enrolling}
 						className={`px-6 py-2 rounded font-semibold text-sm transition-colors ${data.enrolled
-							? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-100 hover:bg-red-100'
+							? 'bg-bad/10 text-bad border border-red-100 hover:bg-red-100'
 							: 'bg-brand text-on-brand hover:bg-brand-hover'
 							}`}>
 						{data.enrolled ? 'Leave Plan' : 'Enroll in Plan'}

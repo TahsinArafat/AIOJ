@@ -203,7 +203,7 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
     }
 }
 
-import type { AIBrief, AIBriefPreset, AIGenerationJob, AIModel, APIKey, ActivityItem, AuthResponse, AuthSessionResponse, BackupFile, BlogListItem, BlogPost, BotAccount, Clarification, Class, ClassListItem, ClassMember, Comment, Contest, ContestDetailResponse, ContestNotice, ContestPermission, ContestProblem, ContestRegistration, ContestSubmissionsResponse, DetectedTool, Editorial, Group, GroupListItem, GroupMember, GroupPendingInvite, GymContest, GymData, Hack, HackResult, HackSubmission, LanguageConfig, Notification, NotificationPreferences, OnsiteBatchUser, Organization, OrganizationListItem, OrganizationMember, PendingInvite, PendingRemoteSubmission, PlagiarismPair, PlagiarismReport, Problem, ProblemI18n, ProblemListItem, ProblemPermission, ProblemStats, PublicProfile, RankingEntry, RatingHistoryEntry, RemoteLanguage, ScoreboardData, SetterApplication, Submission, Team, TeamListItem, TeamMember, TestResult, TrainingPlan, TrainingPlanDetail, TrainingPlanEnrollment, TrainingPlanProblem, TrainingPlanProgress, TrainingPlanSection, User, UserAchievement, UserProblemStats, UserProfile, VirtualContest, VirtualStatusResponse, WeakTagsRecommendations, Webhook } from '../types/api'
+import type { AIBrief, AIBriefPreset, AIGenerationJob, AIModel, APIKey, ActivityItem, AuthResponse, AuthSessionResponse, BackupFile, BlogListItem, BlogPost, BotAccount, Clarification, Class, ClassListItem, ClassMember, Comment, Contest, ContestDetailResponse, ContestNotice, ContestPermission, ContestProblem, ContestRegistration, ContestSubmissionsResponse, DetectedTool, Editorial, Group, GroupListItem, GroupMember, GroupPendingInvite, GymContest, GymData, Hack, HackResult, HackSubmission, LanguageConfig, Notification, NotificationPreferences, OnsiteBatchUser, Organization, OrganizationListItem, OrganizationMember, PendingInvite, PendingRemoteSubmission, PlagiarismPairDetail, PlagiarismReport, Problem, ProblemI18n, ProblemListItem, ProblemPermission, ProblemStats, PublicProfile, RankingEntry, RatingHistoryEntry, RemoteLanguage, ScoreboardData, SetterApplication, Submission, Team, TeamListItem, TeamMember, TestResult, TrainingPlan, TrainingPlanDetail, TrainingPlanEnrollment, TrainingPlanProblem, TrainingPlanProgress, TrainingPlanSection, User, UserAchievement, UserProblemStats, UserProfile, VirtualContest, VirtualStatusResponse, WeakTagsRecommendations, Webhook } from '../types/api'
 
 export const api = {
     auth: {
@@ -839,8 +839,12 @@ export const api = {
             }),
         getReport: (contestId: string) =>
             request<PlagiarismReport>(`/contests/${contestId}/plagiarism/report`),
+        // The endpoint returns PlagiarismPairDetail rows (user names, problem
+        // title, languages), not the bare PlagiarismPair model. Typing it as the
+        // latter made every render of those fields a type error waiting to be
+        // papered over with an `as never`.
         listPairs: (contestId: string, reportId: string, offset = 0, limit = 50) =>
-            request<{ data: PlagiarismPair[]; total: number }>(
+            request<{ data: PlagiarismPairDetail[]; total: number }>(
                 `/contests/${contestId}/plagiarism/report/${reportId}/pairs?offset=${offset}&limit=${limit}`
             ),
         updatePair: (contestId: string, pairId: string, status: string) =>

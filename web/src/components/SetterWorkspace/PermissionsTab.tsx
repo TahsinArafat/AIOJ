@@ -56,7 +56,7 @@ export default function PermissionsTab({
                   {c.access_level !== 'owner' ? (
                     <button
                       onClick={() => onRemove(c.user_id)}
-                      className="text-red-600 dark:text-red-400 hover:underline cursor-pointer"
+                      className="text-bad hover:underline cursor-pointer"
                     >
                       Remove
                     </button>
