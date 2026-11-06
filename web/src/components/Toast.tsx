@@ -74,8 +74,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         info: Info,
     }
     const styles = {
-        success: 'text-green-600 dark:text-green-400',
-        error: 'text-red-600 dark:text-red-400',
+        success: 'text-ok',
+        error: 'text-bad',
         info: 'text-brand',
     }
 

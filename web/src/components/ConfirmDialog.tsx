@@ -97,12 +97,12 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
                             aria-modal="true"
                             aria-labelledby="confirm-dialog-title"
                             aria-describedby="confirm-dialog-message"
-                            className="relative w-full max-w-md bg-surface rounded-lg shadow-xl p-6"
+                            className="relative w-full max-w-md rounded-xl border border-hairline bg-surface p-6 shadow-xl"
                         >
                             <div className="flex gap-3">
                                 {variant === 'danger' && (
-                                    <div className="shrink-0 w-10 h-10 rounded-full bg-red-50 dark:bg-red-900/30 flex items-center justify-center">
-                                        <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                                    <div className="shrink-0 w-10 h-10 rounded-full bg-bad/12 flex items-center justify-center">
+                                        <AlertTriangle className="w-5 h-5 text-bad" />
                                     </div>
                                 )}
                                 <div className="min-w-0">
@@ -126,11 +126,13 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
                                     type="button"
                                     ref={confirmButtonRef}
                                     onClick={() => settle(true)}
-                                    className={`px-4 py-2 text-sm font-medium text-white rounded transition-colors ${
-                                        variant === 'danger'
-                                            ? 'bg-red-600 hover:bg-red-700'
-                                            : 'bg-brand hover:bg-brand-hover'
-                                    }`}
+                                    // A destructive action needs a filled red in both themes.
+                                    // `bg-bad` alone would not work: in dark mode it is the light
+                                    // red used for text, so white-on-it is ~1.9:1.
+                                    className={`px-4 py-2 text-sm font-medium rounded transition-colors ${variant === 'danger'
+                                        ? 'bg-danger-fill text-danger-fill-ink hover:bg-danger-fill-hover'
+                                        : 'bg-brand text-on-brand hover:bg-brand-hover'
+                                        }`}
                                 >
                                     {confirmLabel}
                                 </button>
