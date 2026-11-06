@@ -98,7 +98,10 @@ func main() {
 	var judgeQueue queue.JudgeQueue = queue.NewMemory()
 	var redisClient *redis.Client
 	if cfg.Redis.URL != "" {
-		redisClient = redis.NewClient(&redis.Options{Addr: cfg.Redis.URL})
+		redisClient = redis.NewClient(&redis.Options{
+			Addr:     cfg.Redis.Addr(),
+			Password: cfg.Redis.ResolvePassword(),
+		})
 		judgeQueue = queue.NewRedisQueue(redisClient)
 		slog.Info("using redis judge queue", "url", cfg.Redis.URL)
 	}

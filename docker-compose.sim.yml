@@ -35,8 +35,16 @@ services:
   # would 429 it. Production defaults are unchanged; only the sim is relaxed.
   backend:
     environment:
+      # The Playwright suite reads verification links from /api/dev/mail, which
+      # is only mounted in development.
+      AIOJ_ENV: development
       AUTH_RATE_LIMIT_RPS: "20"
       AUTH_RATE_LIMIT_BURST: "500"
+      # Client IPs now resolve correctly through nginx (they used to be bucketed
+      # per ephemeral port, which meant nothing was ever throttled), so the
+      # whole suite shares one bucket. Give the sim headroom; prod is unchanged.
+      RATE_LIMIT_RPS: "200"
+      RATE_LIMIT_BURST: "1000"
     healthcheck:
       test: [ "CMD-SHELL", "wget -qO- http://localhost:8080/api/health >/dev/null" ]
       interval: 2s
