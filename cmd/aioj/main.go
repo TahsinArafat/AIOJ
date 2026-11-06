@@ -128,7 +128,7 @@ func main() {
 		return
 	}
 
-	wsManager := handler.NewWSManager()
+	wsManager := handler.NewWSManager(jwtManager)
 	passwordResetTokenStore := postgres.NewPasswordResetTokenStore(db)
 	onsiteUserStore := postgres.NewOnsiteUserStore(db)
 	evtStore := postgres.NewEmailVerificationTokenStore(db)
