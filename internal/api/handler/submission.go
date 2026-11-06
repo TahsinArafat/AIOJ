@@ -29,12 +29,33 @@ type SubmissionHandler struct {
 	langDir      string
 	vjudgeSvc    *vjudge.Service
 	users        store.UserStore
+	// submitQuota and runQuota are per-user budgets. Without them a single
+	// account could flood the judge queue or use /run as a free compile-and-
+	// execute service, starving everybody else.
+	submitQuota *userQuota
+	runQuota    *userQuota
 }
 
 func NewSubmissionHandler(sub store.SubmissionStore, prob store.ProblemStore, contest store.ContestStore,
 	q queue.JudgeQueue, ws *WSManager, exec *executor.Client, langDir string, vjSvc *vjudge.Service,
 	users store.UserStore) *SubmissionHandler {
-	return &SubmissionHandler{subStore: sub, probStore: prob, contestStore: contest, queue: q, wsManager: ws, exec: exec, langDir: langDir, vjudgeSvc: vjSvc, users: users}
+	return &SubmissionHandler{subStore: sub, probStore: prob, contestStore: contest, queue: q, wsManager: ws, exec: exec, langDir: langDir, vjudgeSvc: vjSvc, users: users,
+		submitQuota: newSubmissionQuota(), runQuota: newRunQuota()}
+}
+
+// checkQuota enforces a per-user budget and writes a 429 when it is exhausted.
+// A nil quota (handler built without the constructor, as some tests do) is
+// unlimited.
+func checkQuota(w http.ResponseWriter, quota *userQuota, userID string) bool {
+	if quota == nil {
+		return true
+	}
+	ok, retryAfter := quota.allow(userID)
+	if ok {
+		return true
+	}
+	writeQuotaExceeded(w, retryAfter)
+	return false
 }
 
 type CustomRunRequest struct {
@@ -153,6 +174,9 @@ func (h *SubmissionHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if !h.requireVerifiedEmail(w, r, claims.UserID) {
 		return
 	}
+	if !checkQuota(w, h.submitQuota, claims.UserID) {
+		return
+	}
 
 	var req struct {
 		ProblemID  string `json:"problem_id"`
@@ -224,6 +248,9 @@ func (h *SubmissionHandler) CreateUpsolving(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	if !h.requireVerifiedEmail(w, r, claims.UserID) {
+		return
+	}
+	if !checkQuota(w, h.submitQuota, claims.UserID) {
 		return
 	}
 
@@ -400,6 +427,11 @@ func (h *SubmissionHandler) CustomRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !h.requireVerifiedEmail(w, r, claims.UserID) {
+		return
+	}
+	// /run compiles and executes on demand: the most expensive thing a user can
+	// ask for, so it gets the tighter budget.
+	if !checkQuota(w, h.runQuota, claims.UserID) {
 		return
 	}
 
