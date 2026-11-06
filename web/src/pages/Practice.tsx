@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, getAccessToken } from '../lib/api'
+import { Button } from '../components/ui/Button'
 
 interface PracticeProblem { id: string; slug: string; title: string; difficulty?: string; tags?: string[]; submission_count: number; accepted_count: number }
 interface Recommendations { hybrid?: PracticeProblem[]; progression?: PracticeProblem[]; weak_tags?: { tags?: string[]; problems?: PracticeProblem[] } }
@@ -25,7 +26,20 @@ export default function Practice() {
     }, [])
 
     if (loading) return <div className="text-center py-12 text-muted">Loading recommendations...</div>
-    if (error) return <div className="max-w-xl mx-auto bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 p-4 rounded-md border border-red-100 dark:border-red-800 my-6">{error}</div>
+    // The error state had no page heading and no way to retry.
+    if (error) {
+        return (
+            <div className="mx-auto max-w-xl py-12">
+                <h1 className="text-2xl font-semibold tracking-tight text-ink">Personalized Practice</h1>
+                <div role="alert" className="mt-4 rounded-lg border border-bad/30 bg-bad/10 p-4 text-sm text-bad">
+                    {error}
+                </div>
+                <Button variant="secondary" className="mt-4" onClick={() => window.location.reload()}>
+                    Try again
+                </Button>
+            </div>
+        )
+    }
 
     if (!getAccessToken()) {
         return (

@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import katex from 'katex'
+import { Button } from '../ui/Button'
+import { Field } from '../ui/Field'
 
 interface MathDialogProps {
   onInsert: (latex: string, displayMode: boolean) => void
@@ -25,11 +27,30 @@ const SYMBOLS_MAP: Record<string, string> = {
 
 const TEMPLATES = [
   { label: 'Fraction', latex: '\\frac{a}{b}' },
-  { label: 'Square Root', latex: '\\sqrt{x}' },
+  { label: 'Square root', latex: '\\sqrt{x}' },
   { label: 'Sum', latex: '\\sum_{i=1}^{n}' },
   { label: 'Integral', latex: '\\int_{a}^{b}' },
   { label: 'Matrix', latex: '\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}' },
 ]
+
+function SymbolRow({ label, symbols, onPick }: { label: string; symbols: string[]; onPick: (s: string) => void }) {
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      <span className="w-14 shrink-0 text-xs text-muted">{label}</span>
+      {symbols.map(s => (
+        <button
+          key={s}
+          type="button"
+          onClick={() => onPick(s)}
+          aria-label={`Insert ${s}`}
+          className="rounded-md border border-hairline bg-surface px-2 py-1 text-sm text-ink-soft transition-colors hover:border-hairline-strong hover:bg-surface-2"
+        >
+          {s}
+        </button>
+      ))}
+    </div>
+  )
+}
 
 export default function MathDialog({ onInsert, onClose }: MathDialogProps) {
   const [latex, setLatex] = useState('')
@@ -90,68 +111,70 @@ export default function MathDialog({ onInsert, onClose }: MathDialogProps) {
     }
   }
 
+  const canInsert = Boolean(latex) && !error
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-surface rounded-lg shadow-xl max-w-2xl w-full mx-4" onClick={e => e.stopPropagation()}>
-        <div className="p-4 border-b">
-          <h3 className="text-lg font-semibold">Insert Math Formula</h3>
+    <div
+      // `bg-opacity-50` is a Tailwind v3 utility that no longer exists in v4,
+      // so the scrim was fully transparent and the page showed through.
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onClick={onClose}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="math-dialog-title"
+        className="w-full max-w-2xl overflow-hidden rounded-xl border border-hairline bg-surface shadow-xl"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="border-b border-hairline px-4 py-3">
+          <h3 id="math-dialog-title" className="text-sm font-semibold text-ink">Insert math formula</h3>
         </div>
 
-        <div className="p-4 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-ink-soft mb-1">LaTeX Input</label>
+        <div className="max-h-[70vh] space-y-4 overflow-y-auto p-4">
+          <Field label="LaTeX" htmlFor="math-latex">
             <textarea
+              id="math-latex"
               ref={inputRef}
               value={latex}
               onChange={e => setLatex(e.target.value)}
               onKeyDown={handleKeyDown}
-              className="w-full border border-hairline-strong rounded px-3 py-2 font-mono text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)]"
               rows={3}
-              placeholder="e.g., \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}"
+              placeholder="e.g. \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}"
+              className="w-full rounded-lg border border-hairline-strong bg-surface px-3 py-2 font-mono text-sm text-ink placeholder:text-muted-soft transition-colors hover:border-muted-soft focus:border-brand focus:outline-none"
             />
-          </div>
+          </Field>
 
           <div>
-            <label className="block text-sm font-medium text-ink-soft mb-1">Preview</label>
+            <p className="mb-1.5 text-xs font-medium text-ink-soft">Preview</p>
             <div
               ref={previewRef}
-              className={`border rounded p-4 min-h-[60px] flex items-center justify-center ${error ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20' : 'border-hairline bg-surface-2'}`}
+              className={`flex min-h-[60px] items-center justify-center rounded-lg border p-4 ${error ? 'border-bad/30 bg-bad/10' : 'border-hairline bg-surface-2'
+                }`}
             />
-            {error && <p className="text-red-500 dark:text-red-400 text-xs mt-1">{error}</p>}
+            {error && (
+              // `role="alert"` so the invalid-LaTeX message is announced rather
+              // than only coloured red.
+              <p role="alert" className="mt-1.5 text-xs text-bad">{error}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-ink-soft">Quick insert</p>
+            <SymbolRow label="Greek" symbols={GREEK_LETTERS} onPick={insertSymbol} />
+            <SymbolRow label="Operators" symbols={OPERATORS} onPick={insertSymbol} />
+            <SymbolRow label="Arrows" symbols={ARROWS} onPick={insertSymbol} />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-ink-soft mb-2">Quick Insert</label>
-            <div className="space-y-2">
-              <div className="flex flex-wrap gap-1">
-                <span className="text-xs text-muted w-12">Greek:</span>
-                {GREEK_LETTERS.map(l => (
-                  <button key={l} onClick={() => insertSymbol(l)} className="px-2 py-1 text-sm border rounded hover:bg-surface-2">{l}</button>
-                ))}
-              </div>
-              <div className="flex flex-wrap gap-1">
-                <span className="text-xs text-muted w-12">Ops:</span>
-                {OPERATORS.map(o => (
-                  <button key={o} onClick={() => insertSymbol(o)} className="px-2 py-1 text-sm border rounded hover:bg-surface-2">{o}</button>
-                ))}
-              </div>
-              <div className="flex flex-wrap gap-1">
-                <span className="text-xs text-muted w-12">Arrows:</span>
-                {ARROWS.map(a => (
-                  <button key={a} onClick={() => insertSymbol(a)} className="px-2 py-1 text-sm border rounded hover:bg-surface-2">{a}</button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-ink-soft mb-2">Templates</label>
+            <p className="mb-2 text-xs font-medium text-ink-soft">Templates</p>
             <div className="flex flex-wrap gap-2">
               {TEMPLATES.map(t => (
                 <button
                   key={t.label}
+                  type="button"
                   onClick={() => insertTemplate(t.latex)}
-                  className="px-3 py-1 text-sm border rounded hover:bg-brand-soft hover:border-blue-300"
+                  className="rounded-lg border border-hairline bg-surface px-3 py-1 text-sm text-ink-soft transition-colors hover:border-brand/40 hover:bg-brand-soft hover:text-brand"
                 >
                   {t.label}
                 </button>
@@ -160,24 +183,14 @@ export default function MathDialog({ onInsert, onClose }: MathDialogProps) {
           </div>
         </div>
 
-        <div className="p-4 border-t flex justify-end gap-2">
-          <button onClick={onClose} className="px-4 py-2 text-sm border rounded hover:bg-surface-2">
-            Cancel
-          </button>
-          <button
-            onClick={() => onInsert(latex, false)}
-            disabled={!latex || !!error}
-            className="px-4 py-2 text-sm bg-brand text-on-brand rounded hover:bg-brand-hover disabled:opacity-50"
-          >
-            Insert Inline
-          </button>
-          <button
-            onClick={() => onInsert(latex, true)}
-            disabled={!latex || !!error}
-            className="px-4 py-2 text-sm bg-blue-700 text-white rounded hover:bg-blue-800 disabled:opacity-50"
-          >
-            Insert Block
-          </button>
+        <div className="flex flex-wrap justify-end gap-2 border-t border-hairline px-4 py-3">
+          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button variant="secondary" onClick={() => onInsert(latex, false)} disabled={!canInsert}>
+            Insert inline
+          </Button>
+          <Button onClick={() => onInsert(latex, true)} disabled={!canInsert}>
+            Insert block
+          </Button>
         </div>
       </div>
     </div>

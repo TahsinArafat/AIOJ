@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom'
 import { ExternalLink, RefreshCw } from 'lucide-react'
 import { api } from '../lib/api'
 import { resolveProblemSlug, resolveProblemTitle } from '../lib/problemSlugResolver'
+import { languageName } from '../lib/languages'
 import { useToast } from '../components/Toast'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
@@ -10,20 +11,6 @@ import { Card, CardHeader } from '../components/ui/Card'
 import { Skeleton } from '../components/ui/PageHeader'
 import { VerdictBadge } from '../components/ui/VerdictBadge'
 import { isPendingVerdict, verdictMeta } from '../components/ui/verdict'
-
-const LANGUAGE_LABEL: Record<string, string> = {
-    'cpp-gpp-64': 'C++ 20 (GCC)',
-    'cpp-gpp-32': 'C++ 20 (GCC 32)',
-    'cpp-clang': 'C++ 20 (Clang)',
-    'c-gcc': 'C 17 (GCC)',
-    python: 'Python 3',
-    pypy: 'PyPy 3',
-    java: 'Java 21',
-    rust: 'Rust 1.79',
-    nodejs: 'Node.js 22',
-    javascript: 'JavaScript',
-    csharp: 'C# 12',
-}
 
 function groupBySubtask(results: JudgeCase[]): Map<number, JudgeCase[]> {
     const groups = new Map<number, JudgeCase[]>()
@@ -177,7 +164,7 @@ export default function SubmissionDetail() {
                                 <span>{problemTitle || `Problem ${sub.problem_id?.slice(0, 8)}`}</span>
                             )}
                             <span aria-hidden="true">·</span>
-                            <span>{LANGUAGE_LABEL[sub.language] || sub.language}</span>
+                            <span>{languageName(sub.language)}</span>
                             <span aria-hidden="true">·</span>
                             <time dateTime={sub.created_at}>{new Date(sub.created_at).toLocaleString()}</time>
                         </p>
@@ -263,7 +250,7 @@ export default function SubmissionDetail() {
                 <div className="overflow-hidden rounded-xl border border-code-border">
                     <div className="flex items-center justify-between border-b border-code-border bg-code px-4 py-2">
                         <span className="text-xs font-medium text-code-ink/70">
-                            {LANGUAGE_LABEL[sub.language] || sub.language}
+                            {languageName(sub.language)}
                         </span>
                         {sub.code_size ? (
                             <span className="tnum text-[11px] text-code-ink/50">{sub.code_size.toLocaleString()} bytes</span>

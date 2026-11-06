@@ -2,77 +2,31 @@ import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import CodeEditor from '../components/CodeEditor'
 import { api, getAccessToken } from '../lib/api'
+import { DEFAULT_LANGUAGE, LANGUAGE_OPTIONS, languageTemplate } from '../lib/languages'
+import { VerdictBadge } from '../components/ui/VerdictBadge'
 import { Play, Clock, Cpu, AlertTriangle, Maximize2, Minimize2 } from 'lucide-react'
+
+/**
+ * The verdict to show for a run.
+ *
+ * `passed` is authoritative when the request supplied expected output; without
+ * it, fall back to the raw status. Anything that ran cleanly with no expected
+ * output is reported as "Executed" rather than a pass/fail verdict.
+ */
+function runVerdict(o: Record<string, unknown>): string {
+  if (o.passed === false) return 'wa'
+  if (o.passed === true) return 'ac'
+  const status = String(o.status ?? '')
+  return status || 'executed'
+}
 
 const IDE_TIME_LIMIT_MS = 5000
 const IDE_MEMORY_LIMIT_KB = 524288
 const COOLDOWN_MS = 5000
 const MAX_OUTPUT_LENGTH = 100000
 
-const LANGS = [
-    { value: 'cpp-gpp-64', label: 'GNU G++17 7.3.0 (64 bit)' },
-    { value: 'cpp-gpp-32', label: 'GNU G++14 6.4.0 (32 bit)' },
-    { value: 'c-gcc-64', label: 'GNU GCC C11 9.2.0 (64 bit)' },
-    { value: 'python', label: 'Python 3.8.10' },
-    { value: 'java', label: 'Java 11.0.6' },
-    { value: 'rust', label: 'Rust 1.75.0' },
-    { value: 'nodejs', label: 'Node.js 18.16.1' },
-    { value: 'csharp', label: 'Mono C# 6.12.0' },
-]
-
-const TEMPLATE_CODE: Record<string, string> = {
-    'cpp-gpp-64': `#include <iostream>
-using namespace std;
-
-int main() {
-    // Your code here
-    
-    return 0;
-}`,
-    'cpp-gpp-32': `#include <iostream>
-using namespace std;
-
-int main() {
-    // Your code here
-    
-    return 0;
-}`,
-    'c-gcc-64': `#include <stdio.h>
-
-int main() {
-    // Your code here
-    
-    return 0;
-}`,
-    'python': `# Your code here
-`,
-    'java': `import java.util.Scanner;
-
-public class Main {
-    public static void main(String[] args) {
-        Scanner sc = new Scanner(System.in);
-        // Your code here
-        
-    }
-}`,
-    'rust': `fn main() {
-    // Your code here
-    
-}`,
-    'nodejs': `// Your code here
-`,
-    'csharp': `using System;
-
-class Program {
-    static void Main() {
-        // Your code here
-        
-    }
-}`,
-}
-
 export default function IDE() {
-    const [language, setLanguage] = useState(() => localStorage.getItem('aioj_ide_lang') || 'cpp-gpp-64')
+    const [language, setLanguage] = useState(() => localStorage.getItem('aioj_ide_lang') || DEFAULT_LANGUAGE)
     const [code, setCode] = useState('')
     const [customInput, setCustomInput] = useState('')
     const [output, setOutput] = useState<Record<string, unknown> | null>(null)
@@ -108,7 +62,7 @@ export default function IDE() {
     useEffect(() => {
         const saved = localStorage.getItem(`aioj_ide_code_${language}`)
         // deferred a microtask: draft lands pre-paint (react-hooks/set-state-in-effect)
-        queueMicrotask(() => setCode(saved || TEMPLATE_CODE[language] || ''))
+        queueMicrotask(() => setCode(saved || languageTemplate(language)))
     }, [language])
 
     const handleCodeChange = (newCode: string) => {
@@ -196,14 +150,15 @@ export default function IDE() {
                         Limits: {IDE_TIME_LIMIT_MS / 1000}s / {IDE_MEMORY_LIMIT_KB / 1024}MB
                     </span>
                     {cooldownRemaining > 0 && (
-                        <span className="text-xs text-yellow-600 dark:text-yellow-400 whitespace-nowrap">
+                        <span className="text-xs text-warn whitespace-nowrap">
                             Cooldown: {Math.ceil(cooldownRemaining / 1000)}s
                         </span>
                     )}
                 </div>
                 <button
                     onClick={() => setIsFullscreen(!isFullscreen)}
-                    className="p-2 rounded hover:bg-surface-2 transition-colors text-muted cursor-pointer"
+                    className="flex h-10 w-10 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-2 hover:text-ink cursor-pointer"
+                    aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
                     title={isFullscreen ? 'Exit fullscreen (Esc)' : 'Fullscreen'}
                 >
                     {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
@@ -215,9 +170,9 @@ export default function IDE() {
                 <select
                     value={language}
                     onChange={e => handleLanguageChange(e.target.value)}
-                    className="border border-hairline-strong rounded px-2 py-1.5 text-sm bg-surface text-ink-soft focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)] min-w-0 max-w-[50vw] md:max-w-none"
+                    className="h-9 rounded-lg border border-hairline-strong bg-surface px-2 text-sm text-ink-soft transition-colors hover:border-muted-soft focus:border-brand focus:outline-none min-w-0 max-w-[50vw] md:max-w-none"
                 >
-                    {LANGS.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
+                    {LANGUAGE_OPTIONS.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
                 </select>
                 <div className="flex-1" />
             </div>
@@ -265,7 +220,8 @@ export default function IDE() {
                         </div>
                         <button
                             onClick={() => setConsoleOpen(false)}
-                            className="text-muted hover:text-gray-900 dark:hover:text-white p-2 cursor-pointer transition-colors"
+                            aria-label="Close console"
+                            className="flex h-9 w-9 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-2 hover:text-ink cursor-pointer"
                             title="Close console"
                         >
                             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -290,7 +246,7 @@ export default function IDE() {
                         {/* Result pane */}
                         <div className={`absolute inset-0 p-3 md:p-4 overflow-y-auto ${consoleTab === 'result' ? 'block' : 'hidden'}`}>
                             {error && (
-                                <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg text-sm text-red-700 dark:text-red-300 mb-3">
+                                <div className="p-3 bg-bad/10 border border-bad/30 rounded-lg text-sm text-bad mb-3">
                                     {error}
                                 </div>
                             )}
@@ -306,32 +262,29 @@ export default function IDE() {
                                                 <span className="flex items-center gap-1">
                                                     <Clock className="w-3.5 h-3.5" />
                                                     {typeof output.time_used === 'number' && output.time_used > 0 ? `${output.time_used}ms` : '—'}
-                                                    {output.status === 'TLE' && <span className="text-red-500">(limit {IDE_TIME_LIMIT_MS / 1000}s)</span>}
+                                                    {output.status === 'TLE' && <span className="text-bad">(limit {IDE_TIME_LIMIT_MS / 1000}s)</span>}
                                                 </span>
                                                 <span className="flex items-center gap-1">
                                                     <Cpu className="w-3.5 h-3.5" />
                                                     {typeof output.memory_used === 'number' && output.memory_used > 0 ? `${Math.round(output.memory_used / 1024)}MB` : '—'}
-                                                    {output.status === 'MLE' && <span className="text-red-500">(limit {IDE_MEMORY_LIMIT_KB / 1024}MB)</span>}
+                                                    {output.status === 'MLE' && <span className="text-bad">(limit {IDE_MEMORY_LIMIT_KB / 1024}MB)</span>}
                                                 </span>
-                                                <span className={`ml-auto font-medium px-2 py-0.5 rounded text-xs ${isError
-                                                    ? 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20'
-                                                    : 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20'
-                                                    }`}>
-                                                    {output.status === 'CE' ? 'Compile Error' :
-                                                        output.status === 'RE' ? 'Runtime Error' :
-                                                            output.status === 'TLE' ? 'Time Limit Exceeded' :
-                                                                output.status === 'MLE' ? 'Memory Limit Exceeded' :
-                                                                    output.status === 'SE' ? 'System Error' :
-                                                                        'Executed'}
+                                                {/* This pill used to know only CE/RE/TLE/MLE/SE and fell
+                                                    through to a green "Executed" for everything else — so a
+                                                    wrong answer was reported as a success. `passed` from the
+                                                    run endpoint is the authoritative signal when expected
+                                                    output was supplied. */}
+                                                <span className="ml-auto">
+                                                    <VerdictBadge status={runVerdict(output)} />
                                                 </span>
                                             </div>
 
                                             {errorText && (
                                                 <div>
-                                                    <span className="block text-xs font-semibold text-red-600 dark:text-red-400 mb-1">
+                                                    <span className="block text-xs font-semibold text-bad mb-1">
                                                         {output.status === 'CE' ? 'Compilation Error' : 'Error Output'}
                                                     </span>
-                                                    <pre className="bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 text-xs p-3 rounded overflow-x-auto font-mono whitespace-pre-wrap">
+                                                    <pre className="bg-bad/10 text-bad text-xs p-3 rounded overflow-x-auto font-mono whitespace-pre-wrap">
                                                         {errorText}
                                                     </pre>
                                                 </div>
@@ -340,7 +293,7 @@ export default function IDE() {
                                             {(!!output.stdout || !isError) && (
                                                 <div>
                                                     <span className="block text-xs font-semibold text-muted mb-1">stdout</span>
-                                                    <pre className="bg-gray-900 text-green-400 text-sm p-3 rounded overflow-x-auto font-mono whitespace-pre-wrap">
+                                                    <pre className="bg-code text-code-ink text-sm p-3 rounded overflow-x-auto font-mono whitespace-pre-wrap">
                                                         {(output.stdout as string) || '(no output)'}
                                                     </pre>
                                                 </div>
@@ -348,8 +301,8 @@ export default function IDE() {
 
                                             {!!output.stderr && (output.stderr as string) !== errorText && (
                                                 <div>
-                                                    <span className="block text-xs font-semibold text-yellow-600 dark:text-yellow-400 mb-1">stderr</span>
-                                                    <pre className="bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300 text-xs p-3 rounded overflow-x-auto font-mono whitespace-pre-wrap">
+                                                    <span className="block text-xs font-semibold text-warn mb-1">stderr</span>
+                                                    <pre className="bg-warn/10 text-warn text-xs p-3 rounded overflow-x-auto font-mono whitespace-pre-wrap">
                                                         {output.stderr as string}
                                                     </pre>
                                                 </div>
@@ -372,7 +325,7 @@ export default function IDE() {
                     <div className="flex items-center gap-2">
                         <button
                             onClick={openCustomTest}
-                            className="inline-flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium bg-surface-3 text-ink-soft border border-hairline-strong hover:bg-surface-3 transition-colors cursor-pointer"
+                            className="inline-flex h-10 items-center gap-2 rounded-lg border border-hairline-strong bg-surface-3 px-3 text-sm font-medium text-ink-soft transition-colors hover:bg-hairline cursor-pointer"
                         >
                             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <path d="M12 20h9" />
@@ -383,7 +336,7 @@ export default function IDE() {
                         <button
                             onClick={handleRun}
                             disabled={running || !code.trim()}
-                            className="inline-flex items-center gap-2 bg-brand text-on-brand px-3 md:px-4 py-1.5 md:py-2 rounded text-sm font-medium hover:bg-brand-hover disabled:opacity-50 transition-colors cursor-pointer whitespace-nowrap"
+                            className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-lg bg-brand px-3 text-sm font-medium text-on-brand transition-colors hover:bg-brand-hover disabled:opacity-50 cursor-pointer md:px-4"
                         >
                             <Play className="w-4 h-4" />
                             {running ? 'Running...' : 'Run'}

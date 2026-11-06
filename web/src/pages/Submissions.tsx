@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
+import { languageName } from '../lib/languages'
 import { EmptyState } from '../components/EmptyState'
 import { Button } from '../components/ui/Button'
 import { PageHeader, Skeleton } from '../components/ui/PageHeader'
@@ -18,20 +19,6 @@ interface SubRow {
 }
 
 /** Machine language keys (`cpp-gpp-64`) are not user-facing names. */
-const LANGUAGE_LABEL: Record<string, string> = {
-    'cpp-gpp-64': 'C++ 20 (GCC)',
-    'cpp-gpp-32': 'C++ 20 (GCC 32)',
-    'cpp-clang': 'C++ 20 (Clang)',
-    'c-gcc': 'C 17 (GCC)',
-    python: 'Python 3',
-    pypy: 'PyPy 3',
-    java: 'Java 21',
-    rust: 'Rust 1.79',
-    nodejs: 'Node.js 22',
-    javascript: 'JavaScript',
-    csharp: 'C# 12',
-}
-
 function formatTime(ms?: number): string {
     if (!ms || ms <= 0) return '—'
     return ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(2)} s`
@@ -108,7 +95,7 @@ export default function Submissions() {
                                             </Link>
                                         </Td>
                                         <Td className="text-xs text-ink-soft">
-                                            {LANGUAGE_LABEL[s.language || ''] || s.language || '—'}
+                                            {languageName(s.language)}
                                         </Td>
                                         <Td>
                                             <VerdictBadge status={s.status} />

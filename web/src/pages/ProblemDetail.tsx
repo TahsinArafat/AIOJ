@@ -15,6 +15,7 @@ import { Download, Copy, Check, Timer, MemoryStick, type LucideIcon } from 'luci
 import { useTranslation } from 'react-i18next'
 import { useToast } from '../components/Toast'
 import { Badge, type BadgeTone } from '../components/ui/Badge'
+import { DEFAULT_LANGUAGE, LANGUAGE_OPTIONS, languageTemplate } from '../lib/languages'
 import { Skeleton } from '../components/ui/PageHeader'
 
 function useIsDesktop(breakpoint = 768) {
@@ -82,85 +83,6 @@ function decodeRole(): string | null {
     } catch {
         return null
     }
-}
-
-const DEFAULT_LANGS = [
-    { value: 'cpp-gpp-64', label: 'GNU G++17 7.3.0 (64 bit)' },
-    { value: 'cpp-gpp-32', label: 'GNU G++14 6.4.0 (32 bit)' },
-    { value: 'c-gcc-64', label: 'GNU GCC C11 9.2.0 (64 bit)' },
-    { value: 'c-gcc-32', label: 'GNU GCC C11 9.2.0 (32 bit)' },
-    { value: 'cpp-clang', label: 'Clang++17' },
-    { value: 'python', label: 'Python 3.8.10' },
-    { value: 'java', label: 'Java 11.0.6' },
-    { value: 'rust', label: 'Rust 1.75.0' },
-    { value: 'nodejs', label: 'Node.js 18.16.1' },
-    { value: 'csharp', label: 'Mono C# 6.12.0' },
-]
-
-const TEMPLATE_CODE: Record<string, string> = {
-    'cpp-gpp-64': `#include <iostream>
-using namespace std;
-
-int main() {
-    // Your code here
-    
-    return 0;
-}`,
-    'cpp-gpp-32': `#include <iostream>
-using namespace std;
-
-int main() {
-    // Your code here
-    
-    return 0;
-}`,
-    'c-gcc-64': `#include <stdio.h>
-
-int main() {
-    // Your code here
-    
-    return 0;
-}`,
-    'c-gcc-32': `#include <stdio.h>
-
-int main() {
-    // Your code here
-    
-    return 0;
-}`,
-    'cpp-clang': `#include <iostream>
-using namespace std;
-
-int main() {
-    // Your code here
-    
-    return 0;
-}`,
-    'python': `# Your code here
-`,
-    'java': `import java.util.Scanner;
-
-public class Main {
-    public static void main(String[] args) {
-        Scanner sc = new Scanner(System.in);
-        // Your code here
-        
-    }
-}`,
-    'rust': `fn main() {
-    // Your code here
-    
-}`,
-    'nodejs': `// Your code here
-`,
-    'csharp': `using System;
-
-class Program {
-    static void Main() {
-        // Your code here
-        
-    }
-}`,
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -246,8 +168,8 @@ export default function ProblemDetail() {
     // one for the active language, otherwise the problem's default. Centralised
     // so the PDF-vs-markdown branch and the markdown body can't disagree.
     const effectiveDescription = translation?.description || problem?.description
-    const [lang, setLang] = useState('cpp-gpp-64')
-    const [languages, setLanguages] = useState(DEFAULT_LANGS)
+    const [lang, setLang] = useState(DEFAULT_LANGUAGE)
+    const [languages, setLanguages] = useState(LANGUAGE_OPTIONS)
     const [code, setCode] = useState('')
     const [result, setResult] = useState<RunResult | null>(null)
     const [submitting, setSubmitting] = useState(false)
@@ -313,7 +235,7 @@ export default function ProblemDetail() {
                 setProblem(p)
                 // local/default problems render the built-in language list; previously
                 // this reset was a synchronous setLanguages in the languages effect
-                if (!p?.source || p.source === 'local') setLanguages(DEFAULT_LANGS)
+                if (!p?.source || p.source === 'local') setLanguages(LANGUAGE_OPTIONS)
             }).catch(() => { })
         }
     }, [slug])
@@ -383,7 +305,7 @@ export default function ProblemDetail() {
             const key = `aioj_draft_${problem?.id || slug}_${lang}`
             const saved = localStorage.getItem(key)
             // deferred a microtask: draft still lands pre-paint (react-hooks/set-state-in-effect)
-            queueMicrotask(() => setCode(saved || TEMPLATE_CODE[lang] || ''))
+            queueMicrotask(() => setCode(saved || languageTemplate(lang)))
         }
     }, [slug, problem?.id, lang])
 

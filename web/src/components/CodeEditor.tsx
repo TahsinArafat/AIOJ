@@ -39,10 +39,20 @@ const THEME_OPTIONS: { value: EditorSettings['theme']; label: string }[] = [
   { value: 'hc-black', label: 'High Contrast' },
 ]
 
+/**
+ * Judge key → Monaco language id.
+ *
+ * The explicit entries used to name languages that do not exist
+ * (`cpp-gcc-64`, `cpp-clang-64`, `c-gcc`); only the prefix fallbacks in
+ * `mapLanguage` kept highlighting correct, so the table was misleading. The
+ * keys here now match `lang/*.yaml` and `lib/languages.ts`.
+ */
 const MONACO_LANG_MAP: Record<string, string> = {
-  'cpp-gcc-64': 'cpp',
-  'cpp-clang-64': 'cpp',
-  'c-gcc': 'c',
+  'cpp-gpp-64': 'cpp',
+  'cpp-gpp-32': 'cpp',
+  'cpp-clang': 'cpp',
+  'c-gcc-64': 'c',
+  'c-gcc-32': 'c',
   'csharp': 'csharp',
   'python': 'python',
   'pypy': 'python',
@@ -126,12 +136,14 @@ function Toolbar({
   )
 
   return (
-    <div className="relative flex items-center gap-2 border-b border-hairline bg-surface-2 px-3 py-1.5 text-xs">
+    <div className="relative flex items-center gap-1 border-b border-hairline bg-surface-2 px-2 py-1 text-xs">
       <button
         onClick={() =>
           update('wordWrap', settings.wordWrap === 'on' ? 'off' : 'on')
         }
-        className="flex items-center gap-1 rounded px-1.5 py-0.5 transition-colors hover:bg-surface-3"
+        type="button"
+        aria-pressed={settings.wordWrap === 'on'}
+        className="flex h-8 items-center gap-1 rounded px-2 transition-colors hover:bg-surface-3"
         title="Toggle word wrap"
       >
         <WrapText size={14} />
@@ -142,7 +154,9 @@ function Toolbar({
 
       <button
         onClick={() => update('minimap', !settings.minimap)}
-        className="flex items-center gap-1 rounded px-1.5 py-0.5 transition-colors hover:bg-surface-3"
+        type="button"
+        aria-pressed={settings.minimap}
+        className="flex h-8 items-center gap-1 rounded px-2 transition-colors hover:bg-surface-3"
         title="Toggle minimap"
       >
         {settings.minimap ? <Eye size={14} /> : <EyeOff size={14} />}
@@ -153,7 +167,10 @@ function Toolbar({
 
       <button
         onClick={() => setOpen(!open)}
-        className="ml-auto rounded p-1 transition-colors hover:bg-surface-3"
+        type="button"
+        aria-label="Editor settings"
+        aria-expanded={open}
+        className="ml-auto flex h-8 w-8 items-center justify-center rounded transition-colors hover:bg-surface-3"
         title="Editor settings"
       >
         <Settings size={14} className="text-muted" />
@@ -166,7 +183,7 @@ function Toolbar({
             <select
               value={settings.fontSize}
               onChange={(e) => update('fontSize', Number(e.target.value))}
-              className="rounded border border-hairline-strong bg-surface px-1.5 py-0.5 text-ink focus:outline-none focus:ring-1 focus-visible:outline-[var(--ring)]"
+              className="h-7 rounded border border-hairline-strong bg-surface px-1.5 text-ink focus:border-brand focus:outline-none"
             >
               {FONT_SIZES.map((s) => (
                 <option key={s} value={s}>{s}</option>
@@ -179,7 +196,7 @@ function Toolbar({
             <select
               value={settings.tabSize}
               onChange={(e) => update('tabSize', Number(e.target.value))}
-              className="rounded border border-hairline-strong bg-surface px-1.5 py-0.5 text-ink focus:outline-none focus:ring-1 focus-visible:outline-[var(--ring)]"
+              className="h-7 rounded border border-hairline-strong bg-surface px-1.5 text-ink focus:border-brand focus:outline-none"
             >
               {TAB_SIZES.map((s) => (
                 <option key={s} value={s}>{s}</option>
@@ -194,7 +211,7 @@ function Toolbar({
               onChange={(e) =>
                 update('theme', e.target.value as EditorSettings['theme'])
               }
-              className="rounded border border-hairline-strong bg-surface px-1.5 py-0.5 text-ink focus:outline-none focus:ring-1 focus-visible:outline-[var(--ring)]"
+              className="h-7 rounded border border-hairline-strong bg-surface px-1.5 text-ink focus:border-brand focus:outline-none"
             >
               {THEME_OPTIONS.map((t) => (
                 <option key={t.value} value={t.value}>{t.label}</option>

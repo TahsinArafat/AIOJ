@@ -55,7 +55,11 @@ test('shows a login prompt when there is no valid token', () => {
 
     renderProfile()
 
-    expect(screen.getByText('Please log in to view your profile.')).toBeInTheDocument()
+    // The signed-out state now carries a heading and real actions instead of a
+    // dead-end sentence, so assert on what the user can actually do.
+    expect(screen.getByRole('heading', { name: 'Profile' })).toBeInTheDocument()
+    expect(screen.getByText('You need to be signed in to view your profile.')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute('href', '/login')
 })
 
 test('loads pending invites when the tab is opened', async () => {

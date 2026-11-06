@@ -4,6 +4,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkMath from 'remark-math'
 import remarkGfm from 'remark-gfm'
 import { EmptyState } from '../components/EmptyState'
+import { LANGUAGE_OPTIONS } from '../lib/languages'
 import rehypeKatex from 'rehype-katex'
 import 'katex/dist/katex.min.css'
 import { api, getAccessToken } from '../lib/api'
@@ -44,16 +45,6 @@ function isPdfUrl(url: string | undefined | null): boolean {
     return lower.endsWith('.pdf') || lower.includes('/problem.pdf')
 }
 
-const LANGS = [
-    { value: 'cpp-gpp-64', label: 'GNU G++17 7.3.0 (64 bit)' },
-    { value: 'cpp-gpp-32', label: 'GNU G++14 6.4.0 (32 bit)' },
-    { value: 'c-gcc-64', label: 'GNU GCC C11 9.2.0 (64 bit)' },
-    { value: 'python', label: 'Python 3.8.10' },
-    { value: 'java', label: 'Java 11.0.6' },
-    { value: 'rust', label: 'Rust 1.75.0' },
-    { value: 'nodejs', label: 'Node.js 18.16.1' },
-    { value: 'csharp', label: 'Mono C# 6.12.0' },
-]
 
 const TEMPLATE_CODE: Record<string, string> = {
     'cpp-gpp-64': `#include <iostream>\nusing namespace std;\n\nint main() {\n    // Your code here\n    \n    return 0;\n}`,
@@ -972,7 +963,7 @@ export default function ContestProblem() {
                                     onChange={e => setLanguage(e.target.value)}
                                     className="border border-hairline-strong rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)]"
                                 >
-                                    {LANGS.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
+                                    {LANGUAGE_OPTIONS.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
                                 </select>
                                 <div className="flex gap-2">
                                     <button

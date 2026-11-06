@@ -20,4 +20,13 @@ export default defineConfig({
             '@': path.resolve(__dirname, './src'),
         },
     },
+    // `src/lib/languages.test.ts` reads `lang/*.yaml` from the repo root to
+    // check that the frontend language registry matches the judge's real
+    // configs. Those files live one level above the Vite root, which Vite
+    // denies by default ("Denied ID .../lang/*.yaml").
+    server: {
+        fs: {
+            allow: [path.resolve(__dirname, '..')],
+        },
+    },
 })

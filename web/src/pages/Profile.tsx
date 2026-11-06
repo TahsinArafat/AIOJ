@@ -6,6 +6,7 @@ import { api, getAccessToken, clearTokens, signOut } from '../lib/api'
 import RatingBadge from '../components/RatingBadge'
 import SetterApplication from '../components/SetterApplication'
 import { useToast } from '../components/Toast'
+import { buttonClass } from '../components/ui/buttonStyles'
 
 function decodeUser() {
     const token = getAccessToken()
@@ -348,7 +349,20 @@ export default function Profile() {
     const user = decodeUser()
     const [activeTab, setActiveTab] = useState<Tab>('Edit Profile')
 
-    if (!user) return <div className="text-center py-20 text-muted-soft">Please log in to view your profile.</div>
+    // Signed-out state: it previously said "please log in" with no way to do
+    // so, and had no page heading at all.
+    if (!user) {
+        return (
+            <div className="mx-auto max-w-md py-20 text-center">
+                <h1 className="text-2xl font-semibold tracking-tight text-ink">Profile</h1>
+                <p className="mt-2 text-sm text-muted">You need to be signed in to view your profile.</p>
+                <div className="mt-5 flex justify-center gap-2">
+                    <Link to="/login" className={buttonClass()}>Sign in</Link>
+                    <Link to="/register" className={buttonClass({ variant: 'secondary' })}>Create an account</Link>
+                </div>
+            </div>
+        )
+    }
 
     const renderTab = () => {
         switch (activeTab) {

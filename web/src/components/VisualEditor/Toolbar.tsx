@@ -1,9 +1,54 @@
 import { Editor } from '@tiptap/react'
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import MathDialog from './MathDialog'
 
 interface ToolbarProps {
   editor: Editor
+}
+
+/**
+ * One button in the formatting toolbar.
+ *
+ * The active/inactive styling was repeated verbatim on all eleven buttons, so
+ * a change to the "active" treatment had to be made eleven times and had
+ * already drifted (`bg-blue-100 dark:bg-blue-900/30` had no token equivalent
+ * and the math button had no active state at all). `aria-pressed` is what
+ * actually tells assistive tech that Bold is on — the colour alone did not.
+ */
+function ToolButton({
+  onClick,
+  active = false,
+  disabled = false,
+  title,
+  className = '',
+  children,
+}: {
+  onClick: () => void
+  active?: boolean
+  disabled?: boolean
+  title: string
+  className?: string
+  children: ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      aria-label={title}
+      aria-pressed={active}
+      className={`rounded px-2 py-1 text-sm transition-colors disabled:opacity-40 disabled:hover:bg-transparent ${
+        active ? 'bg-brand-soft font-medium text-brand' : 'text-ink-soft hover:bg-surface-3'
+      } ${className}`}
+    >
+      {children}
+    </button>
+  )
+}
+
+function Divider() {
+  return <div className="mx-1 h-6 w-px self-center bg-hairline" aria-hidden="true" />
 }
 
 export default function Toolbar({ editor }: ToolbarProps) {
@@ -20,115 +65,108 @@ export default function Toolbar({ editor }: ToolbarProps) {
 
   return (
     <>
-      <div className="flex flex-wrap gap-1 p-2 border-b border-hairline bg-surface-2">
-        <button
+      <div role="toolbar" aria-label="Formatting" className="flex flex-wrap items-center gap-1 border-b border-hairline bg-surface-2 p-2">
+        <ToolButton
           onClick={() => editor.chain().focus().toggleBold().run()}
-          className={`px-2 py-1 rounded text-sm font-bold ${editor.isActive('bold') ? 'bg-blue-100 dark:bg-blue-900/30 text-brand' : 'hover:bg-surface-3'}`}
+          active={editor.isActive('bold')}
           title="Bold"
+          className="font-bold"
         >
           B
-        </button>
-        <button
+        </ToolButton>
+        <ToolButton
           onClick={() => editor.chain().focus().toggleItalic().run()}
-          className={`px-2 py-1 rounded text-sm italic ${editor.isActive('italic') ? 'bg-blue-100 dark:bg-blue-900/30 text-brand' : 'hover:bg-surface-3'}`}
+          active={editor.isActive('italic')}
           title="Italic"
+          className="italic"
         >
           I
-        </button>
-        <button
+        </ToolButton>
+        <ToolButton
           onClick={() => editor.chain().focus().toggleStrike().run()}
-          className={`px-2 py-1 rounded text-sm line-through ${editor.isActive('strike') ? 'bg-blue-100 dark:bg-blue-900/30 text-brand' : 'hover:bg-surface-3'}`}
+          active={editor.isActive('strike')}
           title="Strikethrough"
+          className="line-through"
         >
           S
-        </button>
+        </ToolButton>
 
-        <div className="w-px h-6 bg-hairline-strong mx-1 self-center" />
+        <Divider />
 
-        <button
-          onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-          className={`px-2 py-1 rounded text-sm font-bold ${editor.isActive('heading', { level: 1 }) ? 'bg-blue-100 dark:bg-blue-900/30 text-brand' : 'hover:bg-surface-3'}`}
-          title="Heading 1"
-        >
-          H1
-        </button>
-        <button
-          onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-          className={`px-2 py-1 rounded text-sm font-bold ${editor.isActive('heading', { level: 2 }) ? 'bg-blue-100 dark:bg-blue-900/30 text-brand' : 'hover:bg-surface-3'}`}
-          title="Heading 2"
-        >
-          H2
-        </button>
-        <button
-          onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
-          className={`px-2 py-1 rounded text-sm font-bold ${editor.isActive('heading', { level: 3 }) ? 'bg-blue-100 dark:bg-blue-900/30 text-brand' : 'hover:bg-surface-3'}`}
-          title="Heading 3"
-        >
-          H3
-        </button>
+        {[1, 2, 3].map(level => (
+          <ToolButton
+            key={level}
+            onClick={() => editor.chain().focus().toggleHeading({ level: level as 1 | 2 | 3 }).run()}
+            active={editor.isActive('heading', { level })}
+            title={`Heading ${level}`}
+            className="font-bold"
+          >
+            H{level}
+          </ToolButton>
+        ))}
 
-        <div className="w-px h-6 bg-hairline-strong mx-1 self-center" />
+        <Divider />
 
-        <button
+        <ToolButton
           onClick={() => editor.chain().focus().toggleBulletList().run()}
-          className={`px-2 py-1 rounded text-sm ${editor.isActive('bulletList') ? 'bg-blue-100 dark:bg-blue-900/30 text-brand' : 'hover:bg-surface-3'}`}
-          title="Bullet List"
+          active={editor.isActive('bulletList')}
+          title="Bullet list"
         >
           •
-        </button>
-        <button
+        </ToolButton>
+        <ToolButton
           onClick={() => editor.chain().focus().toggleOrderedList().run()}
-          className={`px-2 py-1 rounded text-sm ${editor.isActive('orderedList') ? 'bg-blue-100 dark:bg-blue-900/30 text-brand' : 'hover:bg-surface-3'}`}
-          title="Numbered List"
+          active={editor.isActive('orderedList')}
+          title="Numbered list"
         >
           1.
-        </button>
+        </ToolButton>
 
-        <div className="w-px h-6 bg-hairline-strong mx-1 self-center" />
+        <Divider />
 
-        <button
+        <ToolButton
           onClick={() => editor.chain().focus().toggleCode().run()}
-          className={`px-2 py-1 rounded text-sm font-mono ${editor.isActive('code') ? 'bg-blue-100 dark:bg-blue-900/30 text-brand' : 'hover:bg-surface-3'}`}
-          title="Inline Code"
+          active={editor.isActive('code')}
+          title="Inline code"
+          className="font-mono"
         >
           {'</>'}
-        </button>
-        <button
+        </ToolButton>
+        <ToolButton
           onClick={() => editor.chain().focus().toggleCodeBlock().run()}
-          className={`px-2 py-1 rounded text-sm font-mono ${editor.isActive('codeBlock') ? 'bg-blue-100 dark:bg-blue-900/30 text-brand' : 'hover:bg-surface-3'}`}
-          title="Code Block"
+          active={editor.isActive('codeBlock')}
+          title="Code block"
+          className="font-mono"
         >
           {'{ }'}
-        </button>
+        </ToolButton>
 
-        <div className="w-px h-6 bg-hairline-strong mx-1 self-center" />
+        <Divider />
 
-        <button
+        <ToolButton
           onClick={() => setShowMathDialog(true)}
-          className="px-2 py-1 rounded text-sm font-bold hover:bg-surface-3 text-brand"
-          title="Insert Math"
+          title="Insert math"
+          className="font-bold text-brand"
         >
           ∑
-        </button>
+        </ToolButton>
 
         <div className="flex-1" />
 
-        <button
+        <ToolButton
           onClick={() => editor.chain().focus().undo().run()}
           disabled={!editor.can().undo()}
-          className="px-2 py-1 rounded text-sm hover:bg-surface-3 disabled:opacity-50"
           title="Undo"
         >
           ↶
-        </button>
-        <button
+        </ToolButton>
+        <ToolButton
           onClick={() => editor.chain().focus().redo().run()}
           disabled={!editor.can().redo()}
-          className="px-2 py-1 rounded text-sm hover:bg-surface-3 disabled:opacity-50"
           title="Redo"
         >
           ↷
-        </button>
+        </ToolButton>
       </div>
 
       {showMathDialog && (
