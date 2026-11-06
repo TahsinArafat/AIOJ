@@ -149,22 +149,35 @@ AIOJ is a monolith with a clear separation between the API server and dedicated 
 cp .env.example .env
 ```
 
-Edit `.env` and set strong secrets:
+Five values are mandatory — `docker compose` refuses to start without them, so
+a known default can never reach a running stack. Generate them in one go:
 
-```env
-DB_PASSWORD=<long-random-password>
-JWT_SECRET=<long-random-string>
+```bash
+cat > .env <<EOF
+AIOJ_ENV=development
+DB_PASSWORD=$(openssl rand -hex 32)
+JWT_SECRET=$(openssl rand -hex 32)
+REDIS_PASSWORD=$(openssl rand -hex 32)
+GRAFANA_ADMIN_PASSWORD=$(openssl rand -hex 32)
+METRICS_TOKEN=$(openssl rand -hex 32)
+EOF
 ```
 
-Generate a secret with `openssl rand -hex 32`.
-
-`JWT_SECRET` is mandatory and validated at startup: the backend refuses to boot
-with an empty, shorter-than-32-byte, or published-default secret, because anyone
-who knows the signing key can forge an admin token.
+| Variable | Why it is required |
+|----------|--------------------|
+| `JWT_SECRET` | Signs access and refresh tokens. Validated at startup: empty, shorter than 32 bytes, or a published default aborts boot — anyone with the key can forge an admin token. |
+| `DB_PASSWORD` | PostgreSQL superuser password. The database is no longer published on a host port. |
+| `REDIS_PASSWORD` | Redis holds the judge queue; it runs with `requirepass`. |
+| `GRAFANA_ADMIN_PASSWORD` | Grafana no longer allows anonymous viewers. |
+| `METRICS_TOKEN` | `/metrics` is authenticated; Prometheus scrapes with this token. |
 
 `AIOJ_ENV` selects the profile. It defaults to `production`; set
-`AIOJ_ENV=development` for a local checkout (this enables the
-`/api/dev/mail` inspector and only warns about weak secrets).
+`AIOJ_ENV=development` for a local checkout — that enables the
+`/api/dev/mail` inspector, only warns about weak secrets, and allows the seeder
+to use its built-in demo password.
+
+`.env` is git-ignored. `.env.example` lists every variable with a placeholder;
+copy from it if you prefer to fill values by hand.
 
 ### 2. Start the stack
 
@@ -184,7 +197,9 @@ Wait a few seconds for PostgreSQL and the judge sandbox to initialize. The backe
 |----------|----------|
 | `admin`  | `admin_secret` |
 
-> **Change the admin password immediately** after first login (Profile → Change Password).
+> This credential is public, so the account is flagged `must_change_password`:
+> the first login lands on the profile page and the session can reach nothing
+> else until the password is changed. Change it before exposing the instance.
 
 ### Service ports (local)
 
@@ -192,7 +207,7 @@ Wait a few seconds for PostgreSQL and the judge sandbox to initialize. The backe
 |---------|------|---------|
 | Frontend (nginx) | 80 | React SPA |
 | Backend (Go) | 8080 | REST API + WebSocket |
-| Prometheus | 127.0.0.1:9090 | Metrics |
+| Prometheus | 127.0.0.1:9090 | Query UI (scrapes `/metrics` with `METRICS_TOKEN`) |
 | Grafana | 127.0.0.1:3000 | Dashboards (login required) |
 
 PostgreSQL (5432), Redis (6379) and go-judge (5050) are **not published** by
@@ -254,6 +269,10 @@ Configuration is layered: **`config.yaml`** provides defaults, and environment v
 | `AIOJ_ENV` | `production` \| `development` (dev enables `/api/dev/mail` and relaxes secret checks) | `production` |
 | `JWT_SECRET` | Signs access/refresh tokens — **required**, ≥32 bytes, no published defaults | none |
 | `TRUSTED_PROXIES` | CIDRs allowed to set `X-Forwarded-For`; empty disables header trust | loopback + RFC1918 |
+| `METRICS_TOKEN` | Bearer token Prometheus uses to scrape `/metrics`; empty → admin tokens only | none |
+| `REDIS_PASSWORD` | Redis `requirepass`; also accepted inline as `redis://:pass@host` | none |
+| `SUBMIT_RATE_LIMIT_RPS` / `_BURST` | Per-user submission budget | `0.5` / `5` |
+| `RUN_RATE_LIMIT_RPS` / `_BURST` | Per-user `/api/submissions/run` budget | `0.2` / `3` |
 | `CSRF_SECRET` | CSRF token signing | falls back to JWT secret |
 | `JUDGE_ENDPOINT` | go-judge base URL | `http://localhost:5050` |
 | `JUDGE_CONCURRENCY` | Parallel judge workers | `4` |
