@@ -7,3 +7,8 @@ scrape_configs:
     static_configs:
       - targets: ['backend:8080']
     metrics_path: '/metrics'
+    # /metrics is authenticated. Prometheus expands ${METRICS_TOKEN} at load
+    # time (--config.expand-env), and the backend is given the same value.
+    authorization:
+      type: Bearer
+      credentials: '${METRICS_TOKEN}'

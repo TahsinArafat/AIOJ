@@ -26,6 +26,10 @@ type Claims struct {
 	Role     string `json:"role"`
 	// Type must equal TokenTypeAccess for the token to authorize a request.
 	Type string `json:"typ"`
+	// MustChangePassword is set while the account still has a seeded or
+	// admin-reset password. AuthMiddleware restricts such a session to the
+	// endpoints needed to set a new one.
+	MustChangePassword bool `json:"pwd_change,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -40,11 +44,19 @@ func NewJWTManager(secret string, accessTTL, refreshTTL time.Duration) *JWTManag
 }
 
 func (m *JWTManager) GenerateAccessToken(userID, username, role string) (string, error) {
+	return m.GenerateAccessTokenWithState(userID, username, role, false)
+}
+
+// GenerateAccessTokenWithState issues a session token that also carries the
+// account's password-change requirement, so middleware can enforce it without a
+// database round trip on every request.
+func (m *JWTManager) GenerateAccessTokenWithState(userID, username, role string, mustChangePassword bool) (string, error) {
 	claims := Claims{
-		UserID:   userID,
-		Username: username,
-		Role:     role,
-		Type:     TokenTypeAccess,
+		UserID:             userID,
+		Username:           username,
+		Role:               role,
+		Type:               TokenTypeAccess,
+		MustChangePassword: mustChangePassword,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(m.accessTTL)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),

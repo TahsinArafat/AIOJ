@@ -66,6 +66,7 @@ services:
       # backend also validates this at startup and refuses weak values.
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env (openssl rand -hex 32)}
       AIOJ_ENV: ${AIOJ_ENV:-production}
+      METRICS_TOKEN: ${METRICS_TOKEN:?METRICS_TOKEN must be set in .env}
       LANG_DIR: /app/lang
       REDIS_URL: ${REDIS_URL:-redis:6379}
       REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
@@ -140,9 +141,13 @@ services:
     ports:
       # Loopback only: metrics expose usernames, endpoints and traffic shape.
       - "127.0.0.1:9090:9090"
+    environment:
+      # Scrapes authenticate with this token (see prometheus.yml).
+      METRICS_TOKEN: ${METRICS_TOKEN:?METRICS_TOKEN must be set in .env}
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
+      - '--config.expand-env'
     restart: unless-stopped
 
   grafana:

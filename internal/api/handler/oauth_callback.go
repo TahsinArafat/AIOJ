@@ -129,7 +129,7 @@ func itoa(n int) string {
 }
 
 func (h *OAuthCallbackHandler) issue(w http.ResponseWriter, r *http.Request, u *model.User) {
-	access, _ := h.JWT.GenerateAccessToken(u.ID, u.Username, u.Role)
+	access, _ := h.JWT.GenerateAccessTokenWithState(u.ID, u.Username, u.Role, u.MustChangePassword)
 	raw, hashed := h.JWT.GenerateRefreshToken()
 	_ = h.Refresh.Create(r.Context(), u.ID, hashed, time.Now().Add(h.JWT.RefreshTTL()))
 

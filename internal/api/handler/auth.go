@@ -194,7 +194,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	accessToken, err := h.jwt.GenerateAccessToken(dbUser.ID, dbUser.Username, dbUser.Role)
+	accessToken, err := h.jwt.GenerateAccessTokenWithState(dbUser.ID, dbUser.Username, dbUser.Role, dbUser.MustChangePassword)
 	if err != nil {
 		http.Error(w, "failed to generate tokens", http.StatusInternalServerError)
 		return
@@ -408,7 +408,7 @@ func (h *AuthHandler) maybe2FAChallenge(w http.ResponseWriter, r *http.Request, 
 }
 
 func (h *AuthHandler) tokenResp(ctx context.Context, user *model.User) *model.AuthResponse {
-	access, err := h.jwt.GenerateAccessToken(user.ID, user.Username, user.Role)
+	access, err := h.jwt.GenerateAccessTokenWithState(user.ID, user.Username, user.Role, user.MustChangePassword)
 	if err != nil {
 		slog.Error("generate access token failed", "user_id", user.ID, "error", err)
 	}

@@ -176,7 +176,7 @@ func (h *TwoFactorVerifyHandler) issue(w http.ResponseWriter, r *http.Request, u
 		http.Error(w, "user not found", http.StatusInternalServerError)
 		return
 	}
-	access, _ := h.JWT.GenerateAccessToken(u.ID, u.Username, u.Role)
+	access, _ := h.JWT.GenerateAccessTokenWithState(u.ID, u.Username, u.Role, u.MustChangePassword)
 	raw, hashed := h.JWT.GenerateRefreshToken()
 	_ = h.Refresh.Create(r.Context(), u.ID, hashed, time.Now().Add(h.JWT.RefreshTTL()))
 	respondJSON(w, http.StatusOK, &model.AuthResponse{

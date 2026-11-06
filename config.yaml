@@ -4,6 +4,7 @@ environment: "development"
 server:
   host: "0.0.0.0"
   port: 8080
+  metrics_token: ""   # METRICS_TOKEN; /metrics accepts admin tokens when empty
 database:
   host: "localhost"
   port: 5432

@@ -190,7 +190,7 @@ func (h *OnsiteBatchHandler) LoginAsTeam(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	accessToken, err := h.jwtManager.GenerateAccessToken(dbUser.ID, dbUser.Username, dbUser.Role)
+	accessToken, err := h.jwtManager.GenerateAccessTokenWithState(dbUser.ID, dbUser.Username, dbUser.Role, dbUser.MustChangePassword)
 	if err != nil {
 		http.Error(w, "failed to generate tokens", http.StatusInternalServerError)
 		return

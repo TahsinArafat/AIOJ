@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { TeamInvite, GroupInvite } from '../types/community'
 import { errorMessage } from '../lib/errors'
 import { Link, useNavigate } from 'react-router-dom'
-import { api, getAccessToken, clearTokens } from '../lib/api'
+import { api, getAccessToken, clearTokens, signOut } from '../lib/api'
 import RatingBadge from '../components/RatingBadge'
 import SetterApplication from '../components/SetterApplication'
 import { useToast } from '../components/Toast'
@@ -127,6 +127,7 @@ const [profile, setProfile] = useState<ProfileData | null>(null)
 }
 
 function ChangePasswordTab() {
+    const navigate = useNavigate()
     const [currentPassword, setCurrentPassword] = useState('')
     const [newPassword, setNewPassword] = useState('')
     const [confirmPassword, setConfirmPassword] = useState('')
@@ -139,18 +140,25 @@ function ChangePasswordTab() {
             setMessage('Passwords do not match')
             return
         }
-        if (newPassword.length < 6) {
-            setMessage('New password must be at least 6 characters')
+        // Mirrors auth.ValidatePasswordStrength; the server enforces it anyway,
+        // but a 6-character minimum here only produced a confusing 400.
+        if (newPassword.length < 12) {
+            setMessage('New password must be at least 12 characters')
             return
         }
         setSaving(true)
         setMessage('')
         try {
             await api.users.updatePassword({ current_password: currentPassword, new_password: newPassword })
-            setMessage('Password updated!')
+            // The server revoked every refresh token for this account, and the
+            // current access token still carries the must-change flag, so the
+            // only coherent next step is signing in again.
+            setMessage('Password updated! Please sign in again.')
             setCurrentPassword('')
             setNewPassword('')
             setConfirmPassword('')
+            await signOut()
+            navigate('/login')
         } catch (e) {
             setMessage('Error: ' + errorMessage(e))
         } finally {

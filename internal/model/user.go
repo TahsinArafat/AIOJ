@@ -3,14 +3,18 @@ package model
 import "time"
 
 type User struct {
-	ID           string    `json:"id"`
-	Username     string    `json:"username"`
-	Email        string    `json:"email,omitempty"`
-	PasswordHash string    `json:"-"`
-	Role         string    `json:"role"`
-	IsBot        bool      `json:"is_bot"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	ID           string `json:"id"`
+	Username     string `json:"username"`
+	Email        string `json:"email,omitempty"`
+	PasswordHash string `json:"-"`
+	Role         string `json:"role"`
+	IsBot        bool   `json:"is_bot"`
+	// MustChangePassword marks an account still holding a seeded or
+	// admin-issued password. Its sessions may only reach the endpoints needed
+	// to set a new one.
+	MustChangePassword bool      `json:"must_change_password,omitempty"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
 }
 
 type UserProfile struct {

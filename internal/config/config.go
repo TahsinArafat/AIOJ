@@ -117,6 +117,9 @@ type MailConfig struct {
 type ServerConfig struct {
 	Host string `yaml:"host"`
 	Port int    `yaml:"port"`
+	// MetricsToken authenticates Prometheus scrapes of /metrics (METRICS_TOKEN).
+	// When empty only an admin access token may scrape.
+	MetricsToken string `yaml:"metrics_token"`
 }
 
 type DatabaseConfig struct {
@@ -218,6 +221,9 @@ func Load(path string) (*Config, error) {
 	}
 	if v := os.Getenv("SERVER_PORT"); v != "" {
 		cfg.Server.Port = atoi(v)
+	}
+	if v := os.Getenv("METRICS_TOKEN"); v != "" {
+		cfg.Server.MetricsToken = v
 	}
 	if v := os.Getenv("DB_HOST"); v != "" {
 		cfg.Database.Host = v

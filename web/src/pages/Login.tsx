@@ -26,7 +26,10 @@ export default function Login() {
                 return
             }
             setTokens(d.access_token, d.refresh_token)
-            nav('/')
+            // The seeded admin (and any admin-issued password) is locked to the
+            // profile endpoints until it is changed; sending it to "/" would
+            // only produce 403s.
+            nav(d.user?.must_change_password ? '/profile' : '/')
         } catch (e: unknown) {
             setErr(e instanceof Error ? e.message : 'Login failed')
         } finally {
@@ -41,7 +44,7 @@ export default function Login() {
         try {
             const d = await api.auth.verify2FA(challenge, code)
             setTokens(d.access_token, d.refresh_token)
-            nav('/')
+            nav(d.user?.must_change_password ? '/profile' : '/')
         } catch (e: unknown) {
             setErr(e instanceof Error ? e.message : 'Invalid code')
         } finally {

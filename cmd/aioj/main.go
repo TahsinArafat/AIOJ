@@ -605,6 +605,7 @@ func main() {
 		AIModel:        aiModelH,
 		AIGeneration:   aiGenerationH,
 		AIEnabled:      cfg.AI.Enabled,
+		MetricsToken:   cfg.Server.MetricsToken,
 	}, jwtManager)
 
 	srv := &http.Server{

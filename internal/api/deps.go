@@ -88,4 +88,7 @@ type Deps struct {
 	UsersDeletion *handler.UsersDeletionHandler
 	CSRFSecret    string
 	AIEnabled     bool
+	// MetricsToken guards /metrics. Empty means only an admin access token can
+	// scrape it (anonymous scraping is never allowed).
+	MetricsToken string
 }

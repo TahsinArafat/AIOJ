@@ -172,7 +172,23 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
 
     if (!res.ok) {
         const text = await res.text()
-        throw new Error(text || `HTTP ${res.status}`)
+        // Error bodies are usually JSON ({"error": "...", "code": "..."}); surface
+        // the message rather than the raw JSON blob, and keep the code so callers
+        // can react to password_change_required.
+        let message = text
+        let code = ''
+        try {
+            const parsed = JSON.parse(text)
+            if (parsed && typeof parsed === 'object') {
+                message = parsed.error || parsed.message || text
+                code = parsed.code || ''
+            }
+        } catch {
+            // Plain-text error: keep it as-is.
+        }
+        const err = new Error(message || `HTTP ${res.status}`)
+        if (code) (err as Error & { code?: string }).code = code
+        throw err
     }
     const contentType = res.headers.get('content-type') || ''
     if (res.status === 204 || contentType.includes('text/plain')) {

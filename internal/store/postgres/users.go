@@ -49,8 +49,9 @@ func (s *UserStore) GetByID(ctx context.Context, id string) (*model.User, error)
 func (s *UserStore) GetByUsername(ctx context.Context, username string) (*model.User, error) {
 	var u model.User
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id,username,email,password_hash,role,is_bot,created_at,updated_at FROM users WHERE LOWER(username)=LOWER($1)`,
-		username).Scan(&u.ID, &u.Username, &u.Email, &u.PasswordHash, &u.Role, &u.IsBot, &u.CreatedAt, &u.UpdatedAt)
+		`SELECT id,username,email,password_hash,role,is_bot,must_change_password,created_at,updated_at FROM users WHERE LOWER(username)=LOWER($1)`,
+		username).Scan(&u.ID, &u.Username, &u.Email, &u.PasswordHash, &u.Role, &u.IsBot,
+		&u.MustChangePassword, &u.CreatedAt, &u.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -67,8 +68,9 @@ func (s *UserStore) GetByEmail(ctx context.Context, email string) (*model.User, 
 func (s *UserStore) getBy(ctx context.Context, field, value string) (*model.User, error) {
 	var u model.User
 	err := s.db.QueryRowContext(ctx,
-		fmt.Sprintf(`SELECT id,username,email,password_hash,role,is_bot,created_at,updated_at FROM users WHERE %s=$1`, field),
-		value).Scan(&u.ID, &u.Username, &u.Email, &u.PasswordHash, &u.Role, &u.IsBot, &u.CreatedAt, &u.UpdatedAt)
+		fmt.Sprintf(`SELECT id,username,email,password_hash,role,is_bot,must_change_password,created_at,updated_at FROM users WHERE %s=$1`, field),
+		value).Scan(&u.ID, &u.Username, &u.Email, &u.PasswordHash, &u.Role, &u.IsBot,
+		&u.MustChangePassword, &u.CreatedAt, &u.UpdatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -229,8 +231,12 @@ func (s *UserStore) UpdateRole(ctx context.Context, id, role string) error {
 	return err
 }
 
+// UpdatePassword also clears the mandatory-change flag: setting a new password
+// is exactly what that flag was waiting for.
 func (s *UserStore) UpdatePassword(ctx context.Context, id, passwordHash string) error {
-	_, err := s.db.ExecContext(ctx, "UPDATE users SET password_hash=$1, updated_at=NOW() WHERE id=$2", passwordHash, id)
+	_, err := s.db.ExecContext(ctx,
+		"UPDATE users SET password_hash=$1, must_change_password=FALSE, updated_at=NOW() WHERE id=$2",
+		passwordHash, id)
 	return err
 }
 

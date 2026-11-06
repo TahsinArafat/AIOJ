@@ -69,13 +69,15 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 		chiMiddleware.RequestID,
 		middleware.RealIPFromEnv(),
 		middleware.CSRF(d.CSRFSecret),
-		middleware.RateLimit(rl, "/api/health", "/api/ws", "/metrics"),
+		middleware.RateLimit(rl, "/api/health", "/api/ws"),
 		middleware.Logging,
 		middleware.SentryRecover,
 		chiMiddleware.Recoverer,
 	)
 
-	r.Get("/metrics", promhttp.Handler().ServeHTTP)
+	// Metrics expose endpoint inventory, usernames in labels and traffic shape.
+	// Prometheus scrapes with METRICS_TOKEN; an admin access token also works.
+	r.With(middleware.MetricsAuth(d.MetricsToken, jwtManager)).Get("/metrics", promhttp.Handler().ServeHTTP)
 
 	if d.Health != nil {
 		r.Get("/api/health", d.Health.Health)
@@ -342,7 +344,10 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 	})
 
 	r.Route("/api/admin", func(r chi.Router) {
-		r.Use(middleware.AuthMiddleware(jwtManager))
+		// A backup download is a plain browser navigation (an <a download>), which
+		// cannot set an Authorization header. This is the only route group that
+		// accepts ?token=; everywhere else it would leak into access logs.
+		r.Use(middleware.AuthMiddleware(jwtManager, "/api/admin/backups/"))
 		r.Use(middleware.RequireRole("admin"))
 		if d.AuditLog != nil {
 			am := &middleware.AuditRecorder{Store: d.AuditLog.Audit}

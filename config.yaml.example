@@ -4,6 +4,7 @@ environment: "production"
 server:
   host: "0.0.0.0"
   port: 8080
+  metrics_token: ""           # override with METRICS_TOKEN; /metrics is admin-only when empty
 database:
   host: "localhost"
   port: 5432

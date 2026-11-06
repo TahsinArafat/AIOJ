@@ -1241,6 +1241,9 @@ export interface User {
     email?: string
     role: string
     is_bot: boolean
+    /** Account still holds a seeded/admin-issued password; only the profile and
+     *  password endpoints are reachable until it is changed. */
+    must_change_password?: boolean
     created_at: string
     updated_at: string
 }
