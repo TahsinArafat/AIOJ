@@ -375,23 +375,10 @@ func (h *AuthHandler) ResendVerification(w http.ResponseWriter, r *http.Request)
 // maybe2FAChallenge returns true and writes a challenge response when the
 // user has TOTP 2FA enabled. Returns false when tokens should be issued.
 func (h *AuthHandler) maybe2FAChallenge(w http.ResponseWriter, r *http.Request, user *model.User) bool {
-	if h.twoFA == nil || user == nil {
+	if user == nil {
 		return false
 	}
-	secret, err := h.twoFA.Get(r.Context(), user.ID)
-	if err != nil || secret == nil || !secret.Enabled {
-		return false
-	}
-	chal, err := h.jwt.GenerateChallengeToken(user.ID, uuid.NewString(), 5*time.Minute)
-	if err != nil {
-		http.Error(w, "failed to generate challenge", http.StatusInternalServerError)
-		return true
-	}
-	respondJSON(w, http.StatusOK, model.AuthResponse{
-		Requires2FA: true,
-		ChallengeID: chal,
-	})
-	return true
+	return writeTwoFAChallenge(r.Context(), w, h.jwt, h.twoFA, user.ID)
 }
 
 func (h *AuthHandler) tokenResp(ctx context.Context, user *model.User) *model.AuthResponse {

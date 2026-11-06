@@ -19,15 +19,17 @@ type OnsiteBatchHandler struct {
 	onsiteStore  store.OnsiteUserStore
 	userStore    store.UserStore
 	refreshToks  store.RefreshTokenStore
+	twoFA        store.TOTPSecretStore
 	jwtManager   *auth.JWTManager
 }
 
-func NewOnsiteBatchHandler(cs store.ContestStore, os store.OnsiteUserStore, us store.UserStore, rt store.RefreshTokenStore, jwtManager *auth.JWTManager) *OnsiteBatchHandler {
+func NewOnsiteBatchHandler(cs store.ContestStore, os store.OnsiteUserStore, us store.UserStore, rt store.RefreshTokenStore, twoFA store.TOTPSecretStore, jwtManager *auth.JWTManager) *OnsiteBatchHandler {
 	return &OnsiteBatchHandler{
 		contestStore: cs,
 		onsiteStore:  os,
 		userStore:    us,
 		refreshToks:  rt,
+		twoFA:        twoFA,
 		jwtManager:   jwtManager,
 	}
 }
@@ -180,6 +182,12 @@ func (h *OnsiteBatchHandler) LoginAsTeam(w http.ResponseWriter, r *http.Request)
 			return
 		}
 		_ = h.onsiteStore.AutoRegister(r.Context(), user.ContestID, dbUser.ID)
+	}
+
+	// This is a login: a linked account may have TOTP enabled, and skipping the
+	// second factor here would hand out a session for the password alone.
+	if writeTwoFAChallenge(r.Context(), w, h.jwtManager, h.twoFA, dbUser.ID) {
+		return
 	}
 
 	accessToken, err := h.jwtManager.GenerateAccessToken(dbUser.ID, dbUser.Username, dbUser.Role)

@@ -328,7 +328,9 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 		r.Delete("/users/{userId}", onsiteBatchH.DeleteUser)
 	})
 
-	r.Post("/api/contests/{id}/onsite/login", onsiteBatchH.LoginAsTeam)
+	// A public password login: it needs the same brute-force budget as
+	// /api/auth/login.
+	r.With(rl.StrictAuth).Post("/api/contests/{id}/onsite/login", onsiteBatchH.LoginAsTeam)
 
 	r.Route("/api/vjudge", func(r chi.Router) {
 		r.Use(middleware.AuthMiddleware(jwtManager))
