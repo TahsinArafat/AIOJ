@@ -7,6 +7,7 @@ import RatingBadge from '../components/RatingBadge'
 import SetterApplication from '../components/SetterApplication'
 import { useToast } from '../components/Toast'
 import { buttonClass } from '../components/ui/buttonStyles'
+import { Field, Input } from '../components/ui/Field'
 
 function decodeUser() {
     const token = getAccessToken()
@@ -90,18 +91,32 @@ const [profile, setProfile] = useState<ProfileData | null>(null)
 
     return (
         <div className="space-y-4">
-            {fields.map(f => (
-                <div key={f.key}>
-                    <label className="block text-sm font-medium text-ink-soft mb-1">{f.label}</label>
-                    {f.type === 'textarea' ? (
-                        <textarea rows={3} value={profile?.[f.key] || ''} onChange={e => handleChange(f.key, e.target.value)}
-                            className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)] dark:bg-gray-700 dark:border-gray-600" />
-                    ) : (
-                        <input type={f.type} value={profile?.[f.key] || ''} onChange={e => handleChange(f.key, e.target.value)}
-                            className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)] dark:bg-gray-700 dark:border-gray-600" />
-                    )}
-                </div>
-            ))}
+            {fields.map(f => {
+                // Each control gets an id so its <label> is actually attached to
+                // it: without `htmlFor`, clicking the label did not focus the
+                // field and a screen reader announced an unnamed text box.
+                const fieldId = `profile-${f.key}`
+                return (
+                    <Field key={f.key} label={f.label} htmlFor={fieldId}>
+                        {f.type === 'textarea' ? (
+                            <textarea
+                                id={fieldId}
+                                rows={3}
+                                value={profile?.[f.key] || ''}
+                                onChange={e => handleChange(f.key, e.target.value)}
+                                className="w-full rounded-lg border border-hairline-strong bg-surface px-3 py-2 text-sm text-ink transition-colors hover:border-muted-soft focus:border-brand focus:outline-none"
+                            />
+                        ) : (
+                            <Input
+                                id={fieldId}
+                                type={f.type}
+                                value={profile?.[f.key] || ''}
+                                onChange={e => handleChange(f.key, e.target.value)}
+                            />
+                        )}
+                    </Field>
+                )
+            })}
             <div className="flex items-center gap-6">
                 <label className="flex items-center gap-2 text-sm">
                     <input type="checkbox" checked={profile?.show_email ?? false}
@@ -169,21 +184,36 @@ function ChangePasswordTab() {
 
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-                <label className="block text-sm font-medium text-ink-soft mb-1">Current Password</label>
-                <input type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} required
-                    className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)] dark:bg-gray-700 dark:border-gray-600" />
-            </div>
-            <div>
-                <label className="block text-sm font-medium text-ink-soft mb-1">New Password</label>
-                <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} required
-                    className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)] dark:bg-gray-700 dark:border-gray-600" />
-            </div>
-            <div>
-                <label className="block text-sm font-medium text-ink-soft mb-1">Confirm New Password</label>
-                <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required
-                    className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)] dark:bg-gray-700 dark:border-gray-600" />
-            </div>
+            <Field label="Current password" htmlFor="pw-current">
+                <Input
+                    id="pw-current"
+                    type="password"
+                    autoComplete="current-password"
+                    value={currentPassword}
+                    onChange={e => setCurrentPassword(e.target.value)}
+                    required
+                />
+            </Field>
+            <Field label="New password" htmlFor="pw-new">
+                <Input
+                    id="pw-new"
+                    type="password"
+                    autoComplete="new-password"
+                    value={newPassword}
+                    onChange={e => setNewPassword(e.target.value)}
+                    required
+                />
+            </Field>
+            <Field label="Confirm new password" htmlFor="pw-confirm">
+                <Input
+                    id="pw-confirm"
+                    type="password"
+                    autoComplete="new-password"
+                    value={confirmPassword}
+                    onChange={e => setConfirmPassword(e.target.value)}
+                    required
+                />
+            </Field>
             {message && (
                 <p className={`text-sm ${message.startsWith('Error') ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>{message}</p>
             )}
@@ -509,21 +539,19 @@ function DeleteAccountSection() {
 
     return (
         <div className="space-y-3 max-w-md">
-            <div>
-                <label className="block text-sm font-medium text-ink-soft mb-1">
-                    Current password{' '}
-                    <span className="text-muted-soft font-normal">
-                        (leave blank if you signed up with OAuth only)
-                    </span>
-                </label>
-                <input
+            <Field
+                label="Current password"
+                htmlFor="delete-account-password"
+                hint="Leave blank if you signed up with OAuth only."
+            >
+                <Input
+                    id="delete-account-password"
                     type="password"
                     value={password}
                     onChange={e => setPassword(e.target.value)}
-                    className="w-full border border-hairline-strong rounded px-3 py-2 bg-surface text-sm"
                     autoComplete="current-password"
                 />
-            </div>
+            </Field>
             <label className="flex items-start gap-2 text-sm text-ink-soft">
                 <input
                     type="checkbox"

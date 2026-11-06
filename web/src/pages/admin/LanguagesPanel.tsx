@@ -330,7 +330,7 @@ export default function LanguagesPanel() {
 
             {/* Detected Tools Panel */}
             {showDetect && detected && (
-                <div className="border border-green-200 dark:border-green-800 rounded-lg bg-green-50 dark:bg-green-900/20/30 p-6 space-y-4">
+                <div className="rounded-lg border border-ok/30 bg-ok/8 p-6 space-y-4">
                     <div className="flex items-center justify-between">
                         <h3 className="font-semibold text-ink flex items-center gap-2"><Cpu size={16} /> Detected Compilers & Interpreters</h3>
                         <button onClick={() => setShowDetect(false)} className="text-muted-soft hover:text-ink cursor-pointer"><X size={16} /></button>
@@ -378,7 +378,7 @@ export default function LanguagesPanel() {
 
             {/* Templates Panel */}
             {showTemplates && (
-                <div className="border border-purple-200 rounded-lg bg-purple-50 dark:bg-purple-900/20/30 p-6 space-y-4">
+                <div className="rounded-lg border border-violet-500/30 bg-violet-500/8 p-6 space-y-4">
                     <div className="flex items-center justify-between">
                         <h3 className="font-semibold text-ink flex items-center gap-2"><Zap size={16} /> Language Templates</h3>
                         <button onClick={() => setShowTemplates(false)} className="text-muted-soft hover:text-ink cursor-pointer"><X size={16} /></button>

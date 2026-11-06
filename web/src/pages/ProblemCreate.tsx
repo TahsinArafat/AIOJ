@@ -52,56 +52,56 @@ export default function ProblemCreate() {
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                     <div>
-                        <label className="block text-sm font-medium text-ink-soft mb-1">Slug</label>
-                        <input required value={form.slug} onChange={e => {
+                        <label htmlFor="problem-slug" className="block text-sm font-medium text-ink-soft mb-1">Slug</label>
+                        <input id="problem-slug" required value={form.slug} onChange={e => {
                             setForm(p => ({...p, slug: e.target.value}))
                             setTouchedSlug(true)
                         }}
                             className="w-full border border-hairline-strong rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)]" />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-ink-soft mb-1">Title</label>
-                        <input required value={form.title} onChange={e => handleTitleChange(e.target.value)}
+                        <label htmlFor="problem-title" className="block text-sm font-medium text-ink-soft mb-1">Title</label>
+                        <input id="problem-title" required value={form.title} onChange={e => handleTitleChange(e.target.value)}
                             className="w-full border border-hairline-strong rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)]" />
                     </div>
                 </div>
                 <div>
-                    <label className="block text-sm font-medium text-ink-soft mb-1">Description</label>
-                    <textarea required rows={6} value={form.description} onChange={e => setForm(p => ({...p, description: e.target.value}))}
+                    <label htmlFor="problem-description" className="block text-sm font-medium text-ink-soft mb-1">Description</label>
+                    <textarea id="problem-description" required rows={6} value={form.description} onChange={e => setForm(p => ({...p, description: e.target.value}))}
                         className="w-full border border-hairline-strong rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)]" />
                 </div>
                 <div className="grid grid-cols-3 gap-4">
                     <div>
-                        <label className="block text-sm font-medium text-ink-soft mb-1">Difficulty</label>
-                        <select value={form.difficulty} onChange={e => setForm(p => ({...p, difficulty: e.target.value}))}
+                        <label htmlFor="problem-difficulty" className="block text-sm font-medium text-ink-soft mb-1">Difficulty</label>
+                        <select id="problem-difficulty" value={form.difficulty} onChange={e => setForm(p => ({...p, difficulty: e.target.value}))}
                             className="w-full border border-hairline-strong rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)]">
                             <option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option>
                         </select>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-ink-soft mb-1">Time Limit (ms)</label>
-                        <input type="number" value={form.time_limit} onChange={e => setForm(p => ({...p, time_limit: +e.target.value}))}
+                        <label htmlFor="problem-time-limit-ms" className="block text-sm font-medium text-ink-soft mb-1">Time Limit (ms)</label>
+                        <input id="problem-time-limit-ms" type="number" value={form.time_limit} onChange={e => setForm(p => ({...p, time_limit: +e.target.value}))}
                             className="w-full border border-hairline-strong rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)]" />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-ink-soft mb-1">Memory Limit (KB)</label>
-                        <input type="number" value={form.memory_limit} onChange={e => setForm(p => ({...p, memory_limit: +e.target.value}))}
+                        <label htmlFor="problem-memory-limit-kb" className="block text-sm font-medium text-ink-soft mb-1">Memory Limit (KB)</label>
+                        <input id="problem-memory-limit-kb" type="number" value={form.memory_limit} onChange={e => setForm(p => ({...p, memory_limit: +e.target.value}))}
                             className="w-full border border-hairline-strong rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)]" />
                     </div>
                 </div>
                 <div>
-                    <label className="block text-sm font-medium text-ink-soft mb-1">Tags (comma-separated)</label>
-                    <input value={form.tags} onChange={e => setForm(p => ({...p, tags: e.target.value}))}
+                    <label htmlFor="problem-tags-comma-separated" className="block text-sm font-medium text-ink-soft mb-1">Tags (comma-separated)</label>
+                    <input id="problem-tags-comma-separated" value={form.tags} onChange={e => setForm(p => ({...p, tags: e.target.value}))}
                         placeholder="e.g. dp, graph, math" className="w-full border border-hairline-strong rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)]" />
                 </div>
                 <div>
-                    <label className="block text-sm font-medium text-ink-soft mb-1">Input Format</label>
-                    <textarea rows={2} value={form.input_format} onChange={e => setForm(p => ({...p, input_format: e.target.value}))}
+                    <label htmlFor="problem-input-format" className="block text-sm font-medium text-ink-soft mb-1">Input Format</label>
+                    <textarea id="problem-input-format" rows={2} value={form.input_format} onChange={e => setForm(p => ({...p, input_format: e.target.value}))}
                         className="w-full border border-hairline-strong rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)]" />
                 </div>
                 <div>
-                    <label className="block text-sm font-medium text-ink-soft mb-1">Output Format</label>
-                    <textarea rows={2} value={form.output_format} onChange={e => setForm(p => ({...p, output_format: e.target.value}))}
+                    <label htmlFor="problem-output-format" className="block text-sm font-medium text-ink-soft mb-1">Output Format</label>
+                    <textarea id="problem-output-format" rows={2} value={form.output_format} onChange={e => setForm(p => ({...p, output_format: e.target.value}))}
                         className="w-full border border-hairline-strong rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)]" />
                 </div>
                 <button type="submit" disabled={submitting}

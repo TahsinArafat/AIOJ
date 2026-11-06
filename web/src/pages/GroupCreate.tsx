@@ -31,13 +31,13 @@ export default function GroupCreate() {
             <h1 className="text-2xl font-bold mb-6">Create Group</h1>
             <form onSubmit={handleSubmit} className="space-y-4 border p-6 rounded-lg bg-surface">
                 <div>
-                    <label className="block text-sm font-semibold text-ink-soft mb-1">Group Name</label>
-                    <input type="text" value={name} onChange={e => setName(e.target.value)} required
+                    <label htmlFor="group-name" className="block text-sm font-semibold text-ink-soft mb-1">Group Name</label>
+                    <input id="group-name" type="text" value={name} onChange={e => setName(e.target.value)} required
                         className="w-full border rounded px-3 py-2 text-sm" placeholder="e.g. ACM Study Group" />
                 </div>
                 <div>
-                    <label className="block text-sm font-semibold text-ink-soft mb-1">Description</label>
-                    <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3}
+                    <label htmlFor="group-description" className="block text-sm font-semibold text-ink-soft mb-1">Description</label>
+                    <textarea id="group-description" value={description} onChange={e => setDescription(e.target.value)} rows={3}
                         className="w-full border rounded px-3 py-2 text-sm" placeholder="Describe the purpose of this group..." />
                 </div>
                 <div className="flex items-center gap-2">
@@ -46,8 +46,8 @@ export default function GroupCreate() {
                     <label htmlFor="public" className="text-sm font-medium text-ink-soft">Public Group (Anyone can join)</label>
                 </div>
                 <div>
-                    <label className="block text-sm font-semibold text-ink-soft mb-1">Join Policy</label>
-                    <select value={joinPolicy} onChange={e => setJoinPolicy(e.target.value)}
+                    <label htmlFor="group-join-policy" className="block text-sm font-semibold text-ink-soft mb-1">Join Policy</label>
+                    <select id="group-join-policy" value={joinPolicy} onChange={e => setJoinPolicy(e.target.value)}
                         className="w-full border rounded px-3 py-2 text-sm bg-surface text-ink-soft">
                         <option value="auto_approve">Auto-Approve (Open via link)</option>
                         <option value="manual_approve">Manual Approve (Requires confirmation)</option>

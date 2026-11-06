@@ -78,8 +78,9 @@ export default function APISettings() {
                     <div className="border rounded-lg p-6 mb-6 bg-surface border-hairline">
                         <h2 className="font-semibold mb-3">Create New Key</h2>
                         <div className="flex gap-2">
-                            <input type="text" value={name} onChange={e => setName(e.target.value)}
-                                placeholder="Key name" className="flex-1 border rounded px-3 py-2 text-sm border-hairline-strong bg-transparent text-ink" />
+                            <input id="api-key-name" type="text" value={name} onChange={e => setName(e.target.value)}
+                                aria-label="Key name"
+                                placeholder="Key name" className="h-9 flex-1 rounded-lg border border-hairline-strong bg-surface px-3 text-sm text-ink placeholder:text-muted-soft" />
                             <button onClick={handleCreate} disabled={!name.trim()}
                                 className="bg-brand text-on-brand px-4 py-2 rounded text-sm font-medium hover:bg-brand-hover disabled:opacity-50 cursor-pointer">
                                 Create

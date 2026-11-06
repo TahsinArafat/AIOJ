@@ -34,6 +34,7 @@ export default function BlogList() {
                 <div className="flex items-center gap-4">
                     <input
                         type="text"
+                        aria-label="Filter by tag"
                         placeholder="Filter by Tag..."
                         value={tag}
                         onChange={handleTagChange}

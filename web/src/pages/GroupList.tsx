@@ -83,8 +83,8 @@ export default function GroupList() {
             {/* Join by Code */}
             {getAccessToken() && (
                 <div className="flex flex-wrap gap-2 items-center mb-6 p-3 bg-surface-2/50 border border-hairline rounded-lg">
-                    <label className="text-sm font-medium text-muted whitespace-nowrap">Join with Code:</label>
-                    <input type="text" placeholder="Enter invite code..." value={joinCode}
+                    <label htmlFor="group-join-code" className="text-sm font-medium text-muted whitespace-nowrap">Join with Code:</label>
+                    <input id="group-join-code" type="text" placeholder="Enter invite code..." value={joinCode}
                         onChange={e => setJoinCode(e.target.value)}
                         className="flex-1 min-w-[10rem] border border-hairline-strong bg-surface rounded px-3 py-2 text-sm"
                         onKeyDown={e => e.key === 'Enter' && handleJoinByCode()} />

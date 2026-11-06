@@ -65,6 +65,7 @@ function TagInput({
             <div className="flex gap-2">
                 <input
                     type="text"
+                    aria-label="Add a topic tag"
                     value={input}
                     onChange={e => setInput(e.target.value)}
                     onKeyDown={e => {
@@ -148,12 +149,13 @@ function RatingSlider({
         <div className="space-y-2">
             <input
                 type="range"
+                aria-label={`Rating target: ${value}`}
                 min={800}
                 max={3500}
                 step={100}
                 value={value}
                 onChange={e => onChange(Number(e.target.value))}
-                className="w-full accent-blue-600"
+                className="w-full accent-[var(--primary)]"
             />
             <div className="flex justify-between items-center text-sm">
                 <span className="text-muted">800</span>
@@ -407,6 +409,7 @@ export default function GenerateProblem() {
                         </p>
                         <input
                             type="number"
+                            aria-label="Test case count"
                             min={1}
                             max={100}
                             value={testCaseCount}
@@ -434,6 +437,7 @@ export default function GenerateProblem() {
                         Free-form hint to steer the model. e.g. "grid DP on N×M array", "the key insight involves modular inverses", "avoid trivial brute-force solutions".
                     </p>
                     <textarea
+                        aria-label="Additional instructions for the model"
                         value={additionalPrompt}
                         onChange={e => setAdditionalPrompt(e.target.value)}
                         rows={3}

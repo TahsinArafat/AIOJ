@@ -1003,11 +1003,11 @@ export default function ProblemDetail() {
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                         <div>
                                             <span className="block text-xs font-semibold text-muted mb-1">Standard Output (Stdout)</span>
-                                            <pre className="bg-gray-900 text-gray-100 font-mono text-xs p-3 rounded overflow-x-auto max-h-40">{customOutput.stdout || <span className="text-muted italic">No output</span>}</pre>
+                                            <pre className="bg-code text-code-ink font-mono text-xs p-3 rounded overflow-x-auto max-h-40">{customOutput.stdout || <span className="text-muted italic">No output</span>}</pre>
                                         </div>
                                         <div>
                                             <span className="block text-xs font-semibold text-muted mb-1">Standard Error (Stderr)</span>
-                                            <pre className="bg-gray-950 text-red-400 font-mono text-xs p-3 rounded overflow-x-auto max-h-40">{customOutput.stderr || <span className="text-muted italic">No stderr</span>}</pre>
+                                            <pre className="bg-code text-bad font-mono text-xs p-3 rounded overflow-x-auto max-h-40">{customOutput.stderr || <span className="text-muted italic">No stderr</span>}</pre>
                                         </div>
                                     </div>
                                 )}

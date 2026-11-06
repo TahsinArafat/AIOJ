@@ -48,11 +48,11 @@ export default function GymList() {
             </div>
 
             <div className="flex gap-4 mb-6">
-                <select value={category} onChange={e => setCategory(e.target.value)} className="border rounded px-3 py-1.5 text-sm">
+                <select aria-label="Filter gym by category" value={category} onChange={e => setCategory(e.target.value)} className="h-9 rounded-lg border border-hairline-strong bg-surface px-3 text-sm text-ink-soft">
                     {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
                 </select>
-                <input type="text" value={search} onChange={e => setSearch(e.target.value)}
-                    placeholder="Search gym..." className="border rounded px-3 py-1.5 text-sm flex-1" />
+                <input type="search" aria-label="Search gym" value={search} onChange={e => setSearch(e.target.value)}
+                    placeholder="Search gym..." className="h-9 flex-1 rounded-lg border border-hairline-strong bg-surface px-3 text-sm text-ink placeholder:text-muted-soft" />
             </div>
 
             <div className="space-y-3">
