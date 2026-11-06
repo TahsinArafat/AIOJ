@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -14,6 +15,10 @@ import (
 	"github.com/tahsinarafat/aioj/internal/queue"
 	"github.com/tahsinarafat/aioj/internal/store"
 )
+
+// drainTimeout bounds how long Stop waits for in-flight judgments to finish.
+// Beyond it the process exits anyway; the reclaimer picks the rows back up.
+const drainTimeout = 30 * time.Second
 
 type WorkerPool struct {
 	queue             queue.JudgeQueue
@@ -28,6 +33,12 @@ type WorkerPool struct {
 	probStore         store.ProblemStore
 	langLimitStore    store.LanguageLimitStore
 	balloonStore      store.BalloonStore
+
+	// wg tracks in-flight judgments so Stop can drain instead of abandoning
+	// them half-written.
+	wg     sync.WaitGroup
+	stopMu sync.Mutex
+	closed bool
 }
 
 func NewWorkerPool(q queue.JudgeQueue, exec *executor.Client, langDir string, concurrency int, subStore store.SubmissionStore, probStore store.ProblemStore, langLimitStore store.LanguageLimitStore, balloonStore store.BalloonStore) *WorkerPool {
@@ -52,13 +63,46 @@ func (wp *WorkerPool) Start(ctx context.Context) {
 		}
 		select {
 		case wp.sem <- struct{}{}:
+			wp.wg.Add(1)
 			go func(id string) {
-				defer func() { <-wp.sem }()
+				defer func() {
+					<-wp.sem
+					wp.wg.Done()
+				}()
 				wp.process(ctx, id)
 			}(subID)
 		case <-ctx.Done():
 			return
 		}
+	}
+}
+
+// Stop waits for in-flight judgments to finish, up to drainTimeout.
+//
+// Without this a deploy cancelled every running judgment mid-flight: the worker
+// then wrote a System Error verdict over a submission that was about to be
+// judged correctly. Returning early lets the process exit and the reclaimer
+// re-queue anything still marked judging.
+func (wp *WorkerPool) Stop() {
+	wp.stopMu.Lock()
+	if wp.closed {
+		wp.stopMu.Unlock()
+		return
+	}
+	wp.closed = true
+	wp.stopMu.Unlock()
+
+	done := make(chan struct{})
+	go func() {
+		wp.wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		slog.Info("judge workers drained")
+	case <-time.After(drainTimeout):
+		slog.Warn("judge workers did not drain in time; reclaimer will recover", "timeout", drainTimeout.String())
 	}
 }
 
@@ -182,6 +226,14 @@ func (wp *WorkerPool) judgeInteractiveSub(ctx context.Context, sub *model.Submis
 func (wp *WorkerPool) runAndFinalize(ctx context.Context, sub *model.Submission, claimToken string, prob *model.Problem, r runner.Runner, in runner.RunInput, compileOutput string) {
 	out, err := r.Run(ctx, in)
 	if err != nil {
+		// A cancelled context means the process is shutting down, not that the
+		// submission is broken. Leave it claimed and let the reclaimer re-queue
+		// it rather than recording a System Error over a verdict that was never
+		// computed.
+		if ctx.Err() != nil {
+			slog.Warn("judgment interrupted by shutdown; leaving it for the reclaimer", "id", sub.ID)
+			return
+		}
 		wp.finish(ctx, sub.ID, claimToken, model.StatusSE, 0, 0, 0, err.Error(), nil)
 		return
 	}

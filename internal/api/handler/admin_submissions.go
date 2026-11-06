@@ -1,13 +1,19 @@
 package handler
 
 import (
+	"context"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/tahsinarafat/aioj/internal/model"
 	"github.com/tahsinarafat/aioj/internal/store"
 	"github.com/tahsinarafat/aioj/internal/vjudge"
 )
+
+// remotePollTimeout bounds a detached remote-OJ poll. The poll is fire-and-
+// forget from the caller's point of view, so it needs its own deadline.
+const remotePollTimeout = 2 * time.Minute
 
 type AdminSubmissionHandler struct {
 	subStore  store.SubmissionStore
@@ -68,7 +74,13 @@ func (h *AdminSubmissionHandler) ForceRefresh(w http.ResponseWriter, r *http.Req
 	}
 
 	if h.vjudgeSvc != nil {
-		go h.vjudgeSvc.ForcePoll(r.Context(), prob.Source, sub.RemoteID, sub.ID)
+		go func() {
+			// Detached from the request: the handler returns immediately and its
+			// context would cancel the poll straight away.
+			ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), remotePollTimeout)
+			defer cancel()
+			h.vjudgeSvc.ForcePoll(ctx, prob.Source, sub.RemoteID, sub.ID)
+		}()
 	}
 
 	respondJSON(w, http.StatusOK, map[string]string{"status": "refreshing"})

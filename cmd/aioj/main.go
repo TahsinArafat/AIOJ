@@ -126,8 +126,12 @@ func main() {
 		quit := make(chan os.Signal, 1)
 		signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 		<-quit
-		cancel()
 		slog.Info("judge-worker shutting down")
+		cancel()
+		// Drain before returning: cancelling alone abandons in-flight judgments
+		// mid-write, and the old code recorded a System Error over them.
+		workerPool.Stop()
+		judgeQueue.Close()
 		return
 	}
 

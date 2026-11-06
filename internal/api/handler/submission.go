@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -687,7 +688,14 @@ func (h *SubmissionHandler) RecheckRemote(w http.ResponseWriter, r *http.Request
 	}
 
 	if h.vjudgeSvc != nil {
-		go h.vjudgeSvc.ForcePoll(r.Context(), prob.Source, sub.RemoteID, sub.ID)
+		go func() {
+			// The request context is cancelled the moment this handler returns, which
+			// killed the poll before it made a single HTTP call. Detach from it and
+			// impose our own deadline instead.
+			ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), remotePollTimeout)
+			defer cancel()
+			h.vjudgeSvc.ForcePoll(ctx, prob.Source, sub.RemoteID, sub.ID)
+		}()
 	}
 
 	respondJSON(w, http.StatusOK, map[string]string{"status": "refreshing"})
