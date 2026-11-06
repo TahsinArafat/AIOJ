@@ -43,18 +43,18 @@ export default function HackPanel() {
         }
     }
 
-    if (loading) return <div className="text-center py-20 text-gray-400 dark:text-gray-500">Loading hackable submissions...</div>
+    if (loading) return <div className="text-center py-20 text-muted-soft">Loading hackable submissions...</div>
 
     return (
         <div className="max-w-2xl mx-auto space-y-6">
             <div>
                 <h1 className="text-2xl font-bold">Hack Contest Solution</h1>
-                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Provide a counter-test case to challenge an accepted submission.</p>
+                <p className="text-sm text-muted mt-1">Provide a counter-test case to challenge an accepted submission.</p>
             </div>
 
-            <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6 bg-white dark:bg-gray-800 space-y-4">
+            <div className="border border-hairline rounded-lg p-6 bg-surface space-y-4">
                 <div>
-                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Select Target Submission</label>
+                    <label className="block text-sm font-semibold text-ink-soft mb-1">Select Target Submission</label>
                     <select value={selectedSub} onChange={e => setSelectedSub(e.target.value)} className="w-full border rounded px-3 py-2 text-sm">
                         <option value="">-- Select Submission --</option>
                         {submissions.map(s => (
@@ -66,7 +66,7 @@ export default function HackPanel() {
                 </div>
 
                 <div>
-                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">Counter-Test Input</label>
+                    <label className="block text-sm font-semibold text-ink-soft mb-1">Counter-Test Input</label>
                     <textarea value={testInput} onChange={e => setTestInput(e.target.value)} rows={6}
                         placeholder="Enter the test input to break the solution..." className="w-full border rounded px-3 py-2 text-sm font-mono" />
                 </div>
@@ -76,7 +76,7 @@ export default function HackPanel() {
                         className="bg-red-600 text-white px-6 py-2 rounded text-sm hover:bg-red-700 font-medium disabled:opacity-50">
                         {submitting ? 'Testing Hack...' : 'Submit Hack'}
                     </button>
-                    <button onClick={() => navigate(-1)} className="border px-6 py-2 rounded text-sm hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <button onClick={() => navigate(-1)} className="border px-6 py-2 rounded text-sm hover:bg-surface-2">
                         Cancel
                     </button>
                 </div>
@@ -87,16 +87,16 @@ export default function HackPanel() {
                     <h3 className={`font-semibold text-lg ${result.success ? 'text-green-800' : 'text-red-800'}`}>
                         {result.success ? '✓ Hack Successful!' : '✗ Hack Failed'}
                     </h3>
-                    <p className="text-sm mt-2 text-gray-700 dark:text-gray-300">Verdict: {result.status}</p>
+                    <p className="text-sm mt-2 text-ink-soft">Verdict: {result.status}</p>
                     {result.success && (
                         <div className="mt-4 grid grid-cols-2 gap-4 text-xs font-mono">
                             <div>
-                                <p className="text-gray-500 dark:text-gray-400 mb-1">Expected Output (Jury):</p>
-                                <pre className="bg-white dark:bg-gray-800 p-3 border rounded overflow-x-auto">{result.expected_output}</pre>
+                                <p className="text-muted mb-1">Expected Output (Jury):</p>
+                                <pre className="bg-surface p-3 border rounded overflow-x-auto">{result.expected_output}</pre>
                             </div>
                             <div>
-                                <p className="text-gray-500 dark:text-gray-400 mb-1">Actual Output (Defender):</p>
-                                <pre className="bg-white dark:bg-gray-800 p-3 border rounded overflow-x-auto">{result.actual_output}</pre>
+                                <p className="text-muted mb-1">Actual Output (Defender):</p>
+                                <pre className="bg-surface p-3 border rounded overflow-x-auto">{result.actual_output}</pre>
                             </div>
                         </div>
                     )}

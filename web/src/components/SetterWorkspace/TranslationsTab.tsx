@@ -114,7 +114,7 @@ export default function TranslationsTab({ problemId, defaultTitle, defaultDescri
 
   if (translatable.length === 0) {
     return (
-      <div className="p-6 text-sm text-gray-500 dark:text-gray-400">
+      <div className="p-6 text-sm text-muted">
         No translatable languages are configured.
       </div>
     )
@@ -124,7 +124,7 @@ export default function TranslationsTab({ problemId, defaultTitle, defaultDescri
     <div className="p-6 space-y-5">
       <div>
         <h2 className="text-lg font-semibold">Translations</h2>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+        <p className="text-sm text-muted mt-1">
           Provide a title and statement for each language. Solvers see the translation
           for their selected language, and fall back to the default text when none exists.
         </p>
@@ -139,8 +139,8 @@ export default function TranslationsTab({ problemId, defaultTitle, defaultDescri
             onClick={() => setActive(code)}
             className={`px-3 py-1.5 rounded text-sm border ${
               active === code
-                ? 'bg-blue-600 text-white border-blue-600'
-                : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
+                ? 'bg-brand text-on-brand border-brand'
+                : 'bg-surface text-ink-soft border-hairline-strong hover:bg-surface-2'
             }`}
           >
             {label}
@@ -150,7 +150,7 @@ export default function TranslationsTab({ problemId, defaultTitle, defaultDescri
       </div>
 
       {loading ? (
-        <div className="text-sm text-gray-500">Loading…</div>
+        <div className="text-sm text-muted">Loading…</div>
       ) : (
         <div className="space-y-4 max-w-2xl">
           <div>
@@ -160,7 +160,7 @@ export default function TranslationsTab({ problemId, defaultTitle, defaultDescri
               value={title}
               onChange={(e) => { setTitle(e.target.value); setSaved(false) }}
               placeholder={defaultTitle || 'Translated title'}
-              className="w-full border rounded px-3 py-2 text-sm bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600"
+              className="w-full border rounded px-3 py-2 text-sm bg-surface border-hairline-strong"
             />
           </div>
 
@@ -171,7 +171,7 @@ export default function TranslationsTab({ problemId, defaultTitle, defaultDescri
               onChange={(e) => { setDescription(e.target.value); setSaved(false) }}
               placeholder={defaultDescription || 'Translated statement (Markdown supported)'}
               rows={10}
-              className="w-full border rounded px-3 py-2 text-sm font-mono bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600"
+              className="w-full border rounded px-3 py-2 text-sm font-mono bg-surface border-hairline-strong"
             />
           </div>
 
@@ -187,7 +187,7 @@ export default function TranslationsTab({ problemId, defaultTitle, defaultDescri
               type="button"
               onClick={handleSave}
               disabled={saving}
-              className="px-4 py-2 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+              className="px-4 py-2 bg-brand text-on-brand rounded text-sm font-medium hover:bg-brand-hover disabled:opacity-50"
             >
               {saving ? 'Saving…' : 'Save translation'}
             </button>

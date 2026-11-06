@@ -94,8 +94,8 @@ export default function BlogDetail() {
         } catch (e) { toast.error('Delete failed: ' + (e instanceof Error ? e.message : String(e))) }
     }
 
-    if (loading) return <div className="text-center py-20 text-gray-400 dark:text-gray-500">Loading...</div>
-    if (!post) return <div className="text-center py-20 text-gray-400 dark:text-gray-500">Post not found</div>
+    if (loading) return <div className="text-center py-20 text-muted-soft">Loading...</div>
+    if (!post) return <div className="text-center py-20 text-muted-soft">Post not found</div>
 
     const userId = getUserId()
     const role = getRole()
@@ -104,7 +104,7 @@ export default function BlogDetail() {
     return (
         <div className="max-w-3xl mx-auto">
             {editing ? (
-                <div className="space-y-4 bg-white dark:bg-gray-900 p-6 rounded-lg border border-gray-200 dark:border-gray-800">
+                <div className="space-y-4 bg-surface p-6 rounded-lg border border-hairline">
                     <h2 className="text-xl font-bold">Edit Blog Post</h2>
                     <div>
                         <label className="block text-sm font-medium mb-1">Title</label>
@@ -112,7 +112,7 @@ export default function BlogDetail() {
                             type="text"
                             value={editTitle}
                             onChange={e => setEditTitle(e.target.value)}
-                            className="w-full border border-gray-300 dark:border-gray-700 bg-transparent rounded p-2 text-sm"
+                            className="w-full border border-hairline-strong bg-transparent rounded p-2 text-sm"
                         />
                     </div>
                     <div>
@@ -121,7 +121,7 @@ export default function BlogDetail() {
                             type="text"
                             value={editTags}
                             onChange={e => setEditTags(e.target.value)}
-                            className="w-full border border-gray-300 dark:border-gray-700 bg-transparent rounded p-2 text-sm"
+                            className="w-full border border-hairline-strong bg-transparent rounded p-2 text-sm"
                         />
                     </div>
                     <div>
@@ -130,12 +130,12 @@ export default function BlogDetail() {
                             value={editContent}
                             onChange={e => setEditContent(e.target.value)}
                             rows={12}
-                            className="w-full border border-gray-300 dark:border-gray-700 bg-transparent rounded p-2 text-sm font-mono"
+                            className="w-full border border-hairline-strong bg-transparent rounded p-2 text-sm font-mono"
                         />
                     </div>
                     <div className="flex gap-2 justify-end">
-                        <button onClick={() => setEditing(false)} className="px-4 py-2 border border-gray-300 dark:border-gray-700 rounded text-sm hover:bg-gray-100 dark:hover:bg-gray-800">Cancel</button>
-                        <button onClick={handleSaveEdit} className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">Save Changes</button>
+                        <button onClick={() => setEditing(false)} className="px-4 py-2 border border-hairline-strong rounded text-sm hover:bg-surface-2">Cancel</button>
+                        <button onClick={handleSaveEdit} className="px-4 py-2 bg-brand text-on-brand rounded text-sm hover:bg-brand-hover">Save Changes</button>
                     </div>
                 </div>
             ) : (
@@ -144,33 +144,33 @@ export default function BlogDetail() {
                         <h1 className="text-3xl font-bold">{post.title}</h1>
                         {canManage && (
                             <div className="flex gap-2">
-                                <button onClick={handleStartEdit} className="px-3 py-1 border border-gray-300 dark:border-gray-700 text-xs rounded hover:bg-gray-100 dark:hover:bg-gray-800">Edit</button>
+                                <button onClick={handleStartEdit} className="px-3 py-1 border border-hairline-strong text-xs rounded hover:bg-surface-2">Edit</button>
                                 <button onClick={handleDelete} className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded">Delete</button>
                             </div>
                         )}
                     </div>
-                    <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400 mb-6">
-                        <span className="font-semibold text-gray-700 dark:text-gray-300">{post.username}</span>
+                    <div className="flex items-center gap-4 text-sm text-muted mb-6">
+                        <span className="font-semibold text-ink-soft">{post.username}</span>
                         <span>{new Date(post.created_at).toLocaleDateString()}</span>
                         {post.tags && post.tags.length > 0 && (
                             <div className="flex gap-2 ml-2">
                                 {post.tags.map((tag: string) => (
-                                    <span key={tag} className="text-xs bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded font-medium">{tag}</span>
+                                    <span key={tag} className="text-xs bg-brand-soft text-brand px-2 py-0.5 rounded font-medium">{tag}</span>
                                 ))}
                             </div>
                         )}
                     </div>
-                    <div className="prose max-w-none text-gray-800 dark:text-gray-200">
+                    <div className="prose max-w-none text-ink">
                         <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
                             {post.content}
                         </ReactMarkdown>
                     </div>
 
                     {getAccessToken() && (
-                        <div className="flex items-center gap-4 mt-8 pt-4 border-t border-gray-200 dark:border-gray-800">
-                            <button onClick={() => handleVote(1)} className={`text-lg cursor-pointer ${vote === 1 ? 'text-green-600 dark:text-green-400' : 'text-gray-400 dark:text-gray-500 hover:text-green-600'}`}>▲</button>
-                            <span className="font-semibold text-gray-700 dark:text-gray-300">+{post.upvotes} / -{post.downvotes}</span>
-                            <button onClick={() => handleVote(-1)} className={`text-lg cursor-pointer ${vote === -1 ? 'text-red-600 dark:text-red-400' : 'text-gray-400 dark:text-gray-500 hover:text-red-600'}`}>▼</button>
+                        <div className="flex items-center gap-4 mt-8 pt-4 border-t border-hairline">
+                            <button onClick={() => handleVote(1)} className={`text-lg cursor-pointer ${vote === 1 ? 'text-green-600 dark:text-green-400' : 'text-muted-soft hover:text-green-600'}`}>▲</button>
+                            <span className="font-semibold text-ink-soft">+{post.upvotes} / -{post.downvotes}</span>
+                            <button onClick={() => handleVote(-1)} className={`text-lg cursor-pointer ${vote === -1 ? 'text-red-600 dark:text-red-400' : 'text-muted-soft hover:text-red-600'}`}>▼</button>
                         </div>
                     )}
                 </article>

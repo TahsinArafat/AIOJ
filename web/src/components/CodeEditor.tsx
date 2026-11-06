@@ -126,47 +126,47 @@ function Toolbar({
   )
 
   return (
-    <div className="relative flex items-center gap-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-3 py-1.5 text-xs">
+    <div className="relative flex items-center gap-2 border-b border-hairline bg-surface-2 px-3 py-1.5 text-xs">
       <button
         onClick={() =>
           update('wordWrap', settings.wordWrap === 'on' ? 'off' : 'on')
         }
-        className="flex items-center gap-1 rounded px-1.5 py-0.5 transition-colors hover:bg-gray-200 dark:hover:bg-gray-600"
+        className="flex items-center gap-1 rounded px-1.5 py-0.5 transition-colors hover:bg-surface-3"
         title="Toggle word wrap"
       >
         <WrapText size={14} />
-        <span className="text-gray-600 dark:text-gray-300">
+        <span className="text-muted">
           Wrap {settings.wordWrap === 'on' ? 'On' : 'Off'}
         </span>
       </button>
 
       <button
         onClick={() => update('minimap', !settings.minimap)}
-        className="flex items-center gap-1 rounded px-1.5 py-0.5 transition-colors hover:bg-gray-200 dark:hover:bg-gray-600"
+        className="flex items-center gap-1 rounded px-1.5 py-0.5 transition-colors hover:bg-surface-3"
         title="Toggle minimap"
       >
         {settings.minimap ? <Eye size={14} /> : <EyeOff size={14} />}
-        <span className="text-gray-600 dark:text-gray-300">
+        <span className="text-muted">
           Map {settings.minimap ? 'On' : 'Off'}
         </span>
       </button>
 
       <button
         onClick={() => setOpen(!open)}
-        className="ml-auto rounded p-1 transition-colors hover:bg-gray-200 dark:hover:bg-gray-600"
+        className="ml-auto rounded p-1 transition-colors hover:bg-surface-3"
         title="Editor settings"
       >
-        <Settings size={14} className="text-gray-500 dark:text-gray-400" />
+        <Settings size={14} className="text-muted" />
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-1 w-56 rounded border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 p-2 shadow-lg">
-          <label className="flex items-center justify-between gap-2 text-gray-500 dark:text-gray-400">
+        <div className="absolute right-0 top-full z-50 mt-1 w-56 rounded border border-hairline bg-surface p-2 shadow-lg">
+          <label className="flex items-center justify-between gap-2 text-muted">
             <span className="font-medium">Font</span>
             <select
               value={settings.fontSize}
               onChange={(e) => update('fontSize', Number(e.target.value))}
-              className="rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-1.5 py-0.5 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="rounded border border-hairline-strong bg-surface px-1.5 py-0.5 text-ink focus:outline-none focus:ring-1 focus-visible:outline-[var(--ring)]"
             >
               {FONT_SIZES.map((s) => (
                 <option key={s} value={s}>{s}</option>
@@ -174,12 +174,12 @@ function Toolbar({
             </select>
           </label>
 
-          <label className="mt-1.5 flex items-center justify-between gap-2 text-gray-500 dark:text-gray-400">
+          <label className="mt-1.5 flex items-center justify-between gap-2 text-muted">
             <span className="font-medium">Tab</span>
             <select
               value={settings.tabSize}
               onChange={(e) => update('tabSize', Number(e.target.value))}
-              className="rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-1.5 py-0.5 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="rounded border border-hairline-strong bg-surface px-1.5 py-0.5 text-ink focus:outline-none focus:ring-1 focus-visible:outline-[var(--ring)]"
             >
               {TAB_SIZES.map((s) => (
                 <option key={s} value={s}>{s}</option>
@@ -187,14 +187,14 @@ function Toolbar({
             </select>
           </label>
 
-          <label className="mt-1.5 flex items-center justify-between gap-2 text-gray-500 dark:text-gray-400">
+          <label className="mt-1.5 flex items-center justify-between gap-2 text-muted">
             <span className="font-medium">Theme</span>
             <select
               value={settings.theme}
               onChange={(e) =>
                 update('theme', e.target.value as EditorSettings['theme'])
               }
-              className="rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-1.5 py-0.5 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="rounded border border-hairline-strong bg-surface px-1.5 py-0.5 text-ink focus:outline-none focus:ring-1 focus-visible:outline-[var(--ring)]"
             >
               {THEME_OPTIONS.map((t) => (
                 <option key={t.value} value={t.value}>{t.label}</option>
@@ -259,7 +259,7 @@ export default function CodeEditor({
 
   return (
     <div
-      className="flex flex-col overflow-hidden rounded border border-gray-300 dark:border-gray-600 w-full h-full min-h-0"
+      className="flex flex-col overflow-hidden rounded border border-hairline-strong w-full h-full min-h-0"
       style={{ height }}
     >
       <Toolbar settings={settings} onSettingsChange={setSettings} />
@@ -273,7 +273,7 @@ export default function CodeEditor({
           onChange={handleChange}
           onMount={handleMount}
           loading={
-            <div className="flex items-center justify-center h-full text-sm text-gray-400">
+            <div className="flex items-center justify-center h-full text-sm text-muted-soft">
               Loading editor…
             </div>
           }

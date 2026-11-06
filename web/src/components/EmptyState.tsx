@@ -13,10 +13,10 @@ export function EmptyState({ icon, text, description }: {
     description?: string
 }) {
     return (
-        <div className="text-center py-10">
-            {icon && <div className="text-4xl mb-2">{icon}</div>}
-            <p className="text-gray-500 dark:text-gray-400 text-sm font-medium">{text}</p>
-            {description && <p className="text-gray-400 dark:text-gray-500 text-sm mt-1 max-w-md mx-auto">{description}</p>}
+        <div className="mx-auto flex max-w-md flex-col items-center px-4 py-10 text-center">
+            {icon && <div className="mb-2 text-3xl text-muted-soft">{icon}</div>}
+            <p className="text-sm font-medium text-ink">{text}</p>
+            {description && <p className="mt-1 text-sm leading-relaxed text-muted">{description}</p>}
         </div>
     )
 }

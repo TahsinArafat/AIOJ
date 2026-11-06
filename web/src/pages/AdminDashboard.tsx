@@ -61,10 +61,15 @@ export default function AdminDashboard() {
                         {tabs.map(t => (
                             <button
                                 key={t.key}
+                                type="button"
                                 onClick={() => setActiveTab(t.key)}
+                                // The active tab used to be signalled by colour alone,
+                                // which screen readers cannot see and which every
+                                // restyle broke. `aria-current` is the real contract.
+                                aria-current={activeTab === t.key ? 'page' : undefined}
                                 className={`w-auto lg:w-full shrink-0 flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors text-left whitespace-nowrap ${activeTab === t.key
-                                    ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium'
-                                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100'
+                                    ? 'bg-brand-soft text-brand font-medium'
+                                    : 'text-muted hover:bg-surface-2 hover:text-ink'
                                     }`}
                             >
                                 <t.icon className="w-4 h-4" />

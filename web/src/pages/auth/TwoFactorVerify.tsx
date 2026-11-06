@@ -41,14 +41,14 @@ export default function TwoFactorVerify() {
                     onChange={e => setCode(e.target.value)}
                     placeholder="6-digit code or backup code"
                     autoComplete="one-time-code"
-                    className="border border-gray-300 dark:border-gray-600 rounded px-2 py-1 w-full text-sm dark:bg-gray-900"
+                    className="border border-hairline-strong rounded px-2 py-1 w-full text-sm dark:bg-gray-900"
                     required
                 />
                 {error && <p className="text-red-600 text-sm">{error}</p>}
                 <button
                     type="submit"
                     disabled={busy}
-                    className="px-3 py-2 rounded bg-blue-600 text-white text-sm hover:bg-blue-700 disabled:opacity-50"
+                    className="px-3 py-2 rounded bg-brand text-on-brand text-sm hover:bg-brand-hover disabled:opacity-50"
                 >
                     {busy ? 'Verifying…' : 'Verify'}
                 </button>

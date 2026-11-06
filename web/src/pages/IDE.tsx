@@ -175,9 +175,9 @@ export default function IDE() {
             <div className="flex items-center justify-center h-full">
                 <div className="text-center space-y-4 max-w-md">
                     <AlertTriangle className="w-12 h-12 mx-auto text-yellow-500" />
-                    <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Login Required</h2>
-                    <p className="text-gray-500 dark:text-gray-400">You must be logged in to use the IDE.</p>
-                    <Link to="/login" className="inline-block bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors">
+                    <h2 className="text-xl font-bold text-ink">Login Required</h2>
+                    <p className="text-muted">You must be logged in to use the IDE.</p>
+                    <Link to="/login" className="inline-block bg-brand text-on-brand px-6 py-2 rounded-lg font-medium hover:bg-brand-hover transition-colors">
                         Log In
                     </Link>
                 </div>
@@ -188,11 +188,11 @@ export default function IDE() {
     const content = (
         <>
             {/* Header */}
-            <div className="flex items-center justify-between px-4 md:px-6 py-3 md:py-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 flex-shrink-0">
+            <div className="flex items-center justify-between px-4 md:px-6 py-3 md:py-4 border-b border-hairline bg-surface flex-shrink-0">
                 <div className="flex items-center gap-2 md:gap-4 min-w-0">
-                    <h1 className="text-lg md:text-xl font-bold text-gray-900 dark:text-gray-100 whitespace-nowrap">IDE</h1>
-                    <span className="text-xs text-gray-400 dark:text-gray-500 hidden sm:inline">|</span>
-                    <span className="text-xs text-gray-400 dark:text-gray-500 hidden sm:inline whitespace-nowrap">
+                    <h1 className="text-lg md:text-xl font-bold text-ink whitespace-nowrap">IDE</h1>
+                    <span className="text-xs text-muted-soft hidden sm:inline">|</span>
+                    <span className="text-xs text-muted-soft hidden sm:inline whitespace-nowrap">
                         Limits: {IDE_TIME_LIMIT_MS / 1000}s / {IDE_MEMORY_LIMIT_KB / 1024}MB
                     </span>
                     {cooldownRemaining > 0 && (
@@ -203,7 +203,7 @@ export default function IDE() {
                 </div>
                 <button
                     onClick={() => setIsFullscreen(!isFullscreen)}
-                    className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-500 dark:text-gray-400 cursor-pointer"
+                    className="p-2 rounded hover:bg-surface-2 transition-colors text-muted cursor-pointer"
                     title={isFullscreen ? 'Exit fullscreen (Esc)' : 'Fullscreen'}
                 >
                     {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
@@ -211,11 +211,11 @@ export default function IDE() {
             </div>
 
             {/* Toolbar */}
-            <div className="flex items-center gap-3 px-4 md:px-6 py-2 md:py-3 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+            <div className="flex items-center gap-3 px-4 md:px-6 py-2 md:py-3 bg-surface-2 border-b border-hairline flex-shrink-0">
                 <select
                     value={language}
                     onChange={e => handleLanguageChange(e.target.value)}
-                    className="border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-0 max-w-[50vw] md:max-w-none"
+                    className="border border-hairline-strong rounded px-2 py-1.5 text-sm bg-surface text-ink-soft focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)] min-w-0 max-w-[50vw] md:max-w-none"
                 >
                     {LANGS.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
                 </select>
@@ -236,19 +236,19 @@ export default function IDE() {
 
                 {/* Console Drawer — slides up from bottom, above the 56px footer */}
                 <div
-                    className={`absolute bottom-14 left-0 right-0 bg-gray-100 dark:bg-gray-950 border-t border-gray-200 dark:border-gray-700 transition-[height] duration-200 ease-in-out overflow-hidden z-20 shadow-[0_-4px_12px_rgba(0,0,0,0.15)] dark:shadow-[0_-4px_12px_rgba(0,0,0,0.4)] flex flex-col ${consoleOpen
+                    className={`absolute bottom-14 left-0 right-0 bg-surface-2 border-t border-hairline transition-[height] duration-200 ease-in-out overflow-hidden z-20 shadow-[0_-4px_12px_rgba(0,0,0,0.15)] dark:shadow-[0_-4px_12px_rgba(0,0,0,0.4)] flex flex-col ${consoleOpen
                         ? 'h-[200px] md:h-[320px]'
                         : 'h-0'
                         }`}
                 >
                     {/* Drawer Header: tabs + close */}
-                    <div className="flex items-center justify-between bg-gray-200 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 flex-shrink-0">
+                    <div className="flex items-center justify-between bg-surface-3 border-b border-hairline px-4 flex-shrink-0">
                         <div className="flex gap-4">
                             <button
                                 onClick={() => setConsoleTab('custom')}
                                 className={`px-0 py-2.5 text-[11px] font-semibold uppercase tracking-wider border-b-2 transition-colors cursor-pointer ${consoleTab === 'custom'
-                                    ? 'text-gray-900 dark:text-white border-blue-500'
-                                    : 'text-gray-500 dark:text-gray-400 border-transparent hover:text-gray-700 dark:hover:text-gray-300'
+                                    ? 'text-ink dark:text-white border-blue-500'
+                                    : 'text-muted border-transparent hover:text-ink'
                                     }`}
                             >
                                 Custom Test
@@ -256,8 +256,8 @@ export default function IDE() {
                             <button
                                 onClick={() => setConsoleTab('result')}
                                 className={`px-0 py-2.5 text-[11px] font-semibold uppercase tracking-wider border-b-2 transition-colors cursor-pointer ${consoleTab === 'result'
-                                    ? 'text-gray-900 dark:text-white border-blue-500'
-                                    : 'text-gray-500 dark:text-gray-400 border-transparent hover:text-gray-700 dark:hover:text-gray-300'
+                                    ? 'text-ink dark:text-white border-blue-500'
+                                    : 'text-muted border-transparent hover:text-ink'
                                     }`}
                             >
                                 Result
@@ -265,7 +265,7 @@ export default function IDE() {
                         </div>
                         <button
                             onClick={() => setConsoleOpen(false)}
-                            className="text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white p-2 cursor-pointer transition-colors"
+                            className="text-muted hover:text-gray-900 dark:hover:text-white p-2 cursor-pointer transition-colors"
                             title="Close console"
                         >
                             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -283,7 +283,7 @@ export default function IDE() {
                                 value={customInput}
                                 onChange={e => setCustomInput(e.target.value)}
                                 placeholder="Paste custom input here..."
-                                className="w-full h-full resize-none p-3 text-sm font-mono border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full h-full resize-none p-3 text-sm font-mono border border-hairline-strong rounded bg-surface text-ink focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)]"
                             />
                         </div>
 
@@ -302,7 +302,7 @@ export default function IDE() {
                                     return (
                                         <div className="space-y-3">
                                             {/* Stats */}
-                                            <div className="flex flex-wrap items-center gap-2 md:gap-4 text-xs text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-800 rounded p-2">
+                                            <div className="flex flex-wrap items-center gap-2 md:gap-4 text-xs text-muted bg-surface-3 rounded p-2">
                                                 <span className="flex items-center gap-1">
                                                     <Clock className="w-3.5 h-3.5" />
                                                     {typeof output.time_used === 'number' && output.time_used > 0 ? `${output.time_used}ms` : '—'}
@@ -339,7 +339,7 @@ export default function IDE() {
 
                                             {(!!output.stdout || !isError) && (
                                                 <div>
-                                                    <span className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">stdout</span>
+                                                    <span className="block text-xs font-semibold text-muted mb-1">stdout</span>
                                                     <pre className="bg-gray-900 text-green-400 text-sm p-3 rounded overflow-x-auto font-mono whitespace-pre-wrap">
                                                         {(output.stdout as string) || '(no output)'}
                                                     </pre>
@@ -358,7 +358,7 @@ export default function IDE() {
                                     )
                                 })()
                             ) : (
-                                <div className="text-center py-8 text-gray-400 dark:text-gray-500 text-sm">
+                                <div className="text-center py-8 text-muted-soft text-sm">
                                     <Play className="w-6 h-6 mx-auto mb-2 opacity-50" />
                                     <p>Click <strong>Run</strong> to see results here</p>
                                 </div>
@@ -368,11 +368,11 @@ export default function IDE() {
                 </div>
 
                 {/* Action Footer */}
-                <div className="h-14 bg-gray-100 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 flex items-center justify-end gap-2 px-4 flex-shrink-0 z-30">
+                <div className="h-14 bg-surface-3 border-t border-hairline flex items-center justify-end gap-2 px-4 flex-shrink-0 z-30">
                     <div className="flex items-center gap-2">
                         <button
                             onClick={openCustomTest}
-                            className="inline-flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium bg-gray-200 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+                            className="inline-flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium bg-surface-3 text-ink-soft border border-hairline-strong hover:bg-surface-3 transition-colors cursor-pointer"
                         >
                             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <path d="M12 20h9" />
@@ -383,7 +383,7 @@ export default function IDE() {
                         <button
                             onClick={handleRun}
                             disabled={running || !code.trim()}
-                            className="inline-flex items-center gap-2 bg-blue-600 text-white px-3 md:px-4 py-1.5 md:py-2 rounded text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors cursor-pointer whitespace-nowrap"
+                            className="inline-flex items-center gap-2 bg-brand text-on-brand px-3 md:px-4 py-1.5 md:py-2 rounded text-sm font-medium hover:bg-brand-hover disabled:opacity-50 transition-colors cursor-pointer whitespace-nowrap"
                         >
                             <Play className="w-4 h-4" />
                             {running ? 'Running...' : 'Run'}
@@ -396,7 +396,7 @@ export default function IDE() {
 
     if (isFullscreen) {
         return (
-            <div className="fixed inset-0 z-50 flex flex-col bg-white dark:bg-gray-950">
+            <div className="fixed inset-0 z-50 flex flex-col bg-canvas">
                 {content}
             </div>
         )

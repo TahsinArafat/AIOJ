@@ -52,60 +52,60 @@ export default function ProblemCreate() {
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Slug</label>
+                        <label className="block text-sm font-medium text-ink-soft mb-1">Slug</label>
                         <input required value={form.slug} onChange={e => {
                             setForm(p => ({...p, slug: e.target.value}))
                             setTouchedSlug(true)
                         }}
-                            className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400" />
+                            className="w-full border border-hairline-strong rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)]" />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Title</label>
+                        <label className="block text-sm font-medium text-ink-soft mb-1">Title</label>
                         <input required value={form.title} onChange={e => handleTitleChange(e.target.value)}
-                            className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400" />
+                            className="w-full border border-hairline-strong rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)]" />
                     </div>
                 </div>
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
+                    <label className="block text-sm font-medium text-ink-soft mb-1">Description</label>
                     <textarea required rows={6} value={form.description} onChange={e => setForm(p => ({...p, description: e.target.value}))}
-                        className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400" />
+                        className="w-full border border-hairline-strong rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)]" />
                 </div>
                 <div className="grid grid-cols-3 gap-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Difficulty</label>
+                        <label className="block text-sm font-medium text-ink-soft mb-1">Difficulty</label>
                         <select value={form.difficulty} onChange={e => setForm(p => ({...p, difficulty: e.target.value}))}
-                            className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400">
+                            className="w-full border border-hairline-strong rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)]">
                             <option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option>
                         </select>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Time Limit (ms)</label>
+                        <label className="block text-sm font-medium text-ink-soft mb-1">Time Limit (ms)</label>
                         <input type="number" value={form.time_limit} onChange={e => setForm(p => ({...p, time_limit: +e.target.value}))}
-                            className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400" />
+                            className="w-full border border-hairline-strong rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)]" />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Memory Limit (KB)</label>
+                        <label className="block text-sm font-medium text-ink-soft mb-1">Memory Limit (KB)</label>
                         <input type="number" value={form.memory_limit} onChange={e => setForm(p => ({...p, memory_limit: +e.target.value}))}
-                            className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400" />
+                            className="w-full border border-hairline-strong rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)]" />
                     </div>
                 </div>
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tags (comma-separated)</label>
+                    <label className="block text-sm font-medium text-ink-soft mb-1">Tags (comma-separated)</label>
                     <input value={form.tags} onChange={e => setForm(p => ({...p, tags: e.target.value}))}
-                        placeholder="e.g. dp, graph, math" className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400" />
+                        placeholder="e.g. dp, graph, math" className="w-full border border-hairline-strong rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)]" />
                 </div>
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Input Format</label>
+                    <label className="block text-sm font-medium text-ink-soft mb-1">Input Format</label>
                     <textarea rows={2} value={form.input_format} onChange={e => setForm(p => ({...p, input_format: e.target.value}))}
-                        className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400" />
+                        className="w-full border border-hairline-strong rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)]" />
                 </div>
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Output Format</label>
+                    <label className="block text-sm font-medium text-ink-soft mb-1">Output Format</label>
                     <textarea rows={2} value={form.output_format} onChange={e => setForm(p => ({...p, output_format: e.target.value}))}
-                        className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400" />
+                        className="w-full border border-hairline-strong rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)]" />
                 </div>
                 <button type="submit" disabled={submitting}
-                    className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 disabled:opacity-50 transition-colors">
+                    className="bg-brand text-on-brand px-6 py-2 rounded hover:bg-brand-hover disabled:opacity-50 transition-colors">
                     {submitting ? 'Creating...' : 'Create Problem'}
                 </button>
             </form>

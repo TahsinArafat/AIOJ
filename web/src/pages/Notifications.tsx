@@ -40,7 +40,7 @@ export default function Notifications() {
 
     const unreadCount = notifications.filter(n => !n.read).length
 
-    if (loading) return <div className="text-center py-20 text-gray-400 dark:text-gray-500">Loading...</div>
+    if (loading) return <div className="text-center py-20 text-muted-soft">Loading...</div>
 
     return (
         <div className="max-w-2xl mx-auto">
@@ -49,7 +49,7 @@ export default function Notifications() {
                 {unreadCount > 0 && (
                     <button
                         onClick={handleMarkAllRead}
-                        className="text-sm text-blue-600 dark:text-blue-400 hover:underline font-medium"
+                        className="text-sm text-brand hover:underline font-medium"
                     >
                         Mark all as read
                     </button>
@@ -67,19 +67,19 @@ export default function Notifications() {
                                 if (!n.read) handleMarkAsRead(n.id)
                                 if (n.link) navigate(n.link)
                             }}
-                            className={`block border border-gray-200 dark:border-gray-700 rounded-lg p-4 transition-colors ${
+                            className={`block border border-hairline rounded-lg p-4 transition-colors ${
                                 n.read
-                                    ? 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700'
-                                    : 'bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-50 dark:hover:bg-blue-900/20/80'
+                                    ? 'bg-surface hover:bg-surface-2'
+                                    : 'bg-brand-soft hover:bg-brand-soft/80'
                             } ${n.link ? 'cursor-pointer' : ''}`}
                         >
                             <div className="flex justify-between items-start">
-                                <span className="font-medium text-gray-800 dark:text-gray-200 text-sm">{n.title}</span>
-                                <span className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap ml-4">
+                                <span className="font-medium text-ink text-sm">{n.title}</span>
+                                <span className="text-xs text-muted-soft whitespace-nowrap ml-4">
                                     {new Date(n.created_at).toLocaleString()}
                                 </span>
                             </div>
-                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{n.content}</p>
+                            <p className="text-sm text-muted mt-1">{n.content}</p>
                         </div>
                     ))}
                 </div>

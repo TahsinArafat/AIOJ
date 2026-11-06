@@ -43,7 +43,7 @@ export default function RatingGraph({ history, width = 600, height = 200 }: Prop
 
   if (history.length === 0) {
     return (
-      <div className="flex items-center justify-center h-32 text-gray-400 dark:text-gray-500 text-sm">
+      <div className="flex items-center justify-center h-32 text-muted-soft text-sm">
         No contest history yet
       </div>
     )

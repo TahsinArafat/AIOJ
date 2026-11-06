@@ -30,30 +30,30 @@ export default function UsersPanel() {
         }
     }
 
-    if (loading) return <div className="text-center py-8 text-gray-400 dark:text-gray-500">Loading...</div>
+    if (loading) return <div className="text-center py-8 text-muted-soft">Loading...</div>
 
     return (
         <div>
             <h2 className="text-lg font-semibold mb-4">Users</h2>
-            <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+            <div className="border border-hairline rounded-lg overflow-hidden">
                 <table className="w-full text-sm">
-                    <thead className="bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-xs uppercase">
+                    <thead className="bg-surface-2 text-muted text-xs uppercase">
                         <tr>
                             <th className="px-4 py-3 text-left">Username</th>
                             <th className="px-4 py-3 text-left">Email</th>
                             <th className="px-4 py-3 text-left">Role</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                    <tbody className="divide-y divide-hairline">
                         {users.map(u => (
                             <tr key={u.id}>
                                 <td className="px-4 py-3 font-medium">{u.username}</td>
-                                <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{u.email}</td>
+                                <td className="px-4 py-3 text-muted">{u.email}</td>
                                 <td className="px-4 py-3">
                                     <select
                                         value={u.role}
                                         onChange={e => handleRoleChange(u.id, e.target.value)}
-                                        className="border rounded px-2 py-1 text-sm bg-gray-50 dark:bg-gray-800"
+                                        className="border rounded px-2 py-1 text-sm bg-surface-2"
                                         disabled={u.username === 'admin'}
                                     >
                                         <option value="user">User</option>
@@ -66,7 +66,7 @@ export default function UsersPanel() {
                         ))}
                         {users.length === 0 && (
                             <tr>
-                                <td colSpan={3} className="px-4 py-8 text-center text-gray-400 dark:text-gray-500">
+                                <td colSpan={3} className="px-4 py-8 text-center text-muted-soft">
                                     No users found.
                                 </td>
                             </tr>

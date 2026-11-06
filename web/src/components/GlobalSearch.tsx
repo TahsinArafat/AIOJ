@@ -137,7 +137,7 @@ export default function GlobalSearch() {
 
         return (
             <div key={type}>
-                <div className="px-3 py-1.5 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider bg-gray-50 dark:bg-gray-800">
+                <div className="px-3 py-1.5 text-xs font-semibold text-muted-soft uppercase tracking-wider bg-surface-2">
                     {title}
                 </div>
                 {items.slice(0, MAX_RESULTS_PER_GROUP).map((item, i) => {
@@ -148,12 +148,12 @@ export default function GlobalSearch() {
                             key={item.id}
                             onClick={() => handleSelect({ ...item, type })}
                             className={`px-3 py-2 text-sm cursor-pointer transition-colors ${
-                                isSelected ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300' : 'hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
+                                isSelected ? 'bg-brand-soft text-brand' : 'hover:bg-surface-2 text-ink-soft'
                             }`}
                         >
                             <div className="font-medium truncate">{item.title}</div>
                             {item.subtitle && (
-                                <div className="text-xs text-gray-400 dark:text-gray-500 truncate">{item.subtitle}</div>
+                                <div className="text-xs text-muted-soft truncate">{item.subtitle}</div>
                             )}
                         </div>
                     )
@@ -168,12 +168,12 @@ export default function GlobalSearch() {
             <div className="hidden md:block relative">
                 <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
                     {isLoading ? (
-                        <svg className="w-4 h-4 text-gray-400 dark:text-gray-500 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4 text-muted-soft animate-spin" fill="none" viewBox="0 0 24 24">
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                         </svg>
                     ) : (
-                        <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4 text-muted-soft" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                         </svg>
                     )}
@@ -186,7 +186,7 @@ export default function GlobalSearch() {
                     onFocus={() => { if (hasResults) setIsOpen(true) }}
                     onKeyDown={handleKeyDown}
                     placeholder="Search problems, users, contests..."
-                    className="w-56 pl-8 pr-3 py-1.5 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 focus:bg-white focus:border-blue-400 dark:focus:border-blue-300 focus:ring-1 focus:ring-blue-400 dark:focus:ring-blue-300 outline-none transition-all placeholder:text-gray-400"
+                    className="w-56 pl-8 pr-3 py-1.5 text-sm border border-hairline rounded-lg bg-surface-2 focus:bg-surface focus:border-blue-400 dark:focus:border-blue-300 focus:ring-1 focus:ring-blue-400 dark:focus:ring-blue-300 outline-none transition-all placeholder:text-gray-400"
                 />
             </div>
 
@@ -196,7 +196,7 @@ export default function GlobalSearch() {
                     setIsOpen(true)
                     setTimeout(() => inputRef.current?.focus(), 0)
                 }}
-                className="md:hidden p-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 focus:outline-none transition-colors"
+                className="md:hidden p-2 text-muted hover:text-ink focus:outline-none transition-colors"
             >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -205,16 +205,16 @@ export default function GlobalSearch() {
 
             {/* Mobile expanded search */}
             {isOpen && (
-                <div className="md:hidden fixed inset-x-0 top-0 z-50 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center gap-2 shadow-sm">
+                <div className="md:hidden fixed inset-x-0 top-0 z-50 bg-surface border-b border-hairline px-4 py-3 flex items-center gap-2 shadow-sm">
                     <div className="relative flex-1">
                         <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
                             {isLoading ? (
-                                <svg className="w-4 h-4 text-gray-400 dark:text-gray-500 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <svg className="w-4 h-4 text-muted-soft animate-spin" fill="none" viewBox="0 0 24 24">
                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                                 </svg>
                             ) : (
-                                <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-4 h-4 text-muted-soft" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                                 </svg>
                             )}
@@ -226,12 +226,12 @@ export default function GlobalSearch() {
                             onKeyDown={handleKeyDown}
                             placeholder="Search..."
                             autoFocus
-                            className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800 focus:bg-white focus:border-blue-400 dark:focus:border-blue-300 focus:ring-1 focus:ring-blue-400 dark:focus:ring-blue-300 outline-none transition-all"
+                            className="w-full pl-8 pr-3 py-2 text-sm border border-hairline rounded-lg bg-surface-2 focus:bg-surface focus:border-blue-400 dark:focus:border-blue-300 focus:ring-1 focus:ring-blue-400 dark:focus:ring-blue-300 outline-none transition-all"
                         />
                     </div>
                     <button
                         onClick={() => { setIsOpen(false); setQuery('') }}
-                        className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 px-2 py-1"
+                        className="text-sm text-muted hover:text-ink px-2 py-1"
                     >
                         Cancel
                     </button>
@@ -240,7 +240,7 @@ export default function GlobalSearch() {
 
             {/* Desktop dropdown results */}
             {isOpen && hasResults && (
-                <div className="hidden md:block absolute left-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 overflow-hidden max-h-80 overflow-y-auto">
+                <div className="hidden md:block absolute left-0 mt-2 w-80 bg-surface rounded-lg shadow-xl border border-hairline z-50 overflow-hidden max-h-80 overflow-y-auto">
                     {renderGroup('Problems', results!.problems, 'problem', 0)}
                     {renderGroup('Users', results!.users, 'user', results!.problems.slice(0, MAX_RESULTS_PER_GROUP).length)}
                     {renderGroup('Contests', results!.contests, 'contest', results!.problems.slice(0, MAX_RESULTS_PER_GROUP).length + results!.users.slice(0, MAX_RESULTS_PER_GROUP).length)}
@@ -249,8 +249,8 @@ export default function GlobalSearch() {
 
             {/* Desktop empty state */}
             {isOpen && results && !hasResults && query.trim() && (
-                <div className="hidden md:block absolute left-0 mt-2 w-80 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 overflow-hidden">
-                    <div className="px-4 py-6 text-center text-sm text-gray-400 dark:text-gray-500">
+                <div className="hidden md:block absolute left-0 mt-2 w-80 bg-surface rounded-lg shadow-xl border border-hairline z-50 overflow-hidden">
+                    <div className="px-4 py-6 text-center text-sm text-muted-soft">
                         No results found for "{query}"
                     </div>
                 </div>
@@ -258,7 +258,7 @@ export default function GlobalSearch() {
 
             {/* Mobile dropdown results */}
             {isOpen && hasResults && (
-                <div className="md:hidden fixed inset-x-0 top-14 z-50 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 max-h-[60vh] overflow-y-auto shadow-lg">
+                <div className="md:hidden fixed inset-x-0 top-14 z-50 bg-surface border-b border-hairline max-h-[60vh] overflow-y-auto shadow-lg">
                     {renderGroup('Problems', results!.problems, 'problem', 0)}
                     {renderGroup('Users', results!.users, 'user', results!.problems.slice(0, MAX_RESULTS_PER_GROUP).length)}
                     {renderGroup('Contests', results!.contests, 'contest', results!.problems.slice(0, MAX_RESULTS_PER_GROUP).length + results!.users.slice(0, MAX_RESULTS_PER_GROUP).length)}
@@ -267,8 +267,8 @@ export default function GlobalSearch() {
 
             {/* Mobile empty state */}
             {isOpen && results && !hasResults && query.trim() && (
-                <div className="md:hidden fixed inset-x-0 top-14 z-50 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-lg">
-                    <div className="px-4 py-6 text-center text-sm text-gray-400 dark:text-gray-500">
+                <div className="md:hidden fixed inset-x-0 top-14 z-50 bg-surface border-b border-hairline shadow-lg">
+                    <div className="px-4 py-6 text-center text-sm text-muted-soft">
                         No results found for "{query}"
                     </div>
                 </div>

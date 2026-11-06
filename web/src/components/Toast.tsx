@@ -76,7 +76,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     const styles = {
         success: 'text-green-600 dark:text-green-400',
         error: 'text-red-600 dark:text-red-400',
-        info: 'text-blue-600 dark:text-blue-400',
+        info: 'text-brand',
     }
 
     return (
@@ -91,15 +91,15 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                                 <div
                                     key={t.id}
                                     role={t.variant === 'error' ? 'alert' : 'status'}
-                                    className="pointer-events-auto flex items-start gap-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3"
+                                    className="pointer-events-auto flex items-start gap-3 bg-surface border border-hairline rounded-lg shadow-lg p-3"
                                 >
                                     <Icon className={`w-5 h-5 shrink-0 mt-0.5 ${styles[t.variant]}`} />
-                                    <span className="text-sm text-gray-800 dark:text-gray-200 break-words flex-1">{t.message}</span>
+                                    <span className="text-sm text-ink break-words flex-1">{t.message}</span>
                                     <button
                                         type="button"
                                         onClick={() => dismiss(t.id)}
                                         aria-label="Dismiss notification"
-                                        className="shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+                                        className="shrink-0 text-muted-soft hover:text-ink transition-colors"
                                     >
                                         <X className="w-4 h-4" />
                                     </button>

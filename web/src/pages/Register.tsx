@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, setTokens } from '../lib/api'
+import { AuthAlert, AuthLayout } from '../components/AuthLayout'
+import { Button } from '../components/ui/Button'
+import { Field, Input } from '../components/ui/Field'
 
 export default function Register() {
     const [form, setForm] = useState({ username: '', email: '', password: '' })
@@ -37,57 +40,74 @@ export default function Register() {
 
     if (sent) {
         return (
-            <div className="max-w-sm mx-auto mt-20 text-center">
-                <h1 className="text-2xl font-bold mb-4">Check Your Email</h1>
-                <p className="text-gray-600 dark:text-gray-400 mb-4">
-                    We sent a verification link to <strong>{form.email}</strong>.
-                    Verify your email to submit solutions.
+            <AuthLayout
+                title="Check your email"
+                subtitle={<>We sent a verification link to <strong className="font-medium text-ink">{form.email}</strong>.</>}
+                footer={<Link to="/login" className="font-medium text-brand hover:underline">Continue to sign in</Link>}
+            >
+                <p className="text-sm leading-relaxed text-muted">
+                    Verify your email address to submit solutions. You can start browsing problems right away.
                 </p>
                 {resent && (
-                    <p className="text-sm text-green-600 dark:text-green-400 mb-2">Verification email resent.</p>
+                    <p role="status" className="mt-3 text-sm text-ok">Verification email resent.</p>
                 )}
-                <button
-                    type="button"
-                    onClick={resend}
-                    className="text-blue-600 dark:text-blue-400 hover:underline text-sm"
-                >
+                <Button variant="secondary" className="mt-4 w-full" onClick={resend}>
                     Resend verification email
-                </button>
-                <p className="mt-4">
-                    <Link to="/login" className="text-blue-600 dark:text-blue-400 hover:underline">Continue to Login</Link>
-                </p>
-            </div>
+                </Button>
+            </AuthLayout>
         )
     }
 
     return (
-        <div className="max-w-sm mx-auto mt-20">
-            <h1 className="text-2xl font-bold mb-6">Register</h1>
-            {err && <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-2 rounded mb-4 text-sm">{err}</div>}
+        <AuthLayout
+            title="Create an account"
+            subtitle="Free, self-hosted, and yours to run."
+            footer={
+                <>
+                    Already have an account?{' '}
+                    <Link to="/login" className="font-medium text-brand hover:underline">Sign in</Link>
+                </>
+            }
+        >
+            {err && <AuthAlert>{err}</AuthAlert>}
             <form onSubmit={handle} className="space-y-4">
-                <div>
-                    <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Username</label>
-                    <input id="username" name="username" value={form.username} onChange={e => setForm(p => ({ ...p, username: e.target.value }))}
-                        className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400" required />
-                </div>
-                <div>
-                    <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
-                    <input id="email" name="email" type="email" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
-                        className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400" required />
-                </div>
-                <div>
-                    <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Password</label>
-                    <input id="password" name="password" type="password" value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))}
-                        className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400" required />
-                </div>
-                <button type="submit" disabled={loading}
-                    className="w-full bg-blue-600 text-white py-2 rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors">
-                    {loading ? 'Creating account...' : 'Register'}
-                </button>
+                <Field label="Username" htmlFor="username">
+                    <Input
+                        id="username"
+                        name="username"
+                        value={form.username}
+                        onChange={e => setForm(p => ({ ...p, username: e.target.value }))}
+                        autoComplete="username"
+                        required
+                    />
+                </Field>
+                <Field label="Email" htmlFor="email">
+                    <Input
+                        id="email"
+                        name="email"
+                        type="email"
+                        value={form.email}
+                        onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
+                        autoComplete="email"
+                        required
+                    />
+                </Field>
+                <Field label="Password" htmlFor="password" hint="At least 12 characters.">
+                    <Input
+                        id="password"
+                        name="password"
+                        type="password"
+                        value={form.password}
+                        onChange={e => setForm(p => ({ ...p, password: e.target.value }))}
+                        autoComplete="new-password"
+                        minLength={12}
+                        required
+                    />
+                </Field>
+                <Button type="submit" size="lg" className="w-full" disabled={loading}>
+                    {loading ? 'Creating account…' : 'Create account'}
+                </Button>
             </form>
-            <p className="text-center text-sm text-gray-500 dark:text-gray-400 mt-4">
-                Already have an account? <Link to="/login" className="text-blue-600 dark:text-blue-400 hover:underline">Login</Link>
-            </p>
-        </div>
+        </AuthLayout>
     )
 }

@@ -40,12 +40,12 @@ export default function LegalDoc({
     }
     if (md === null) {
         return (
-            <div className="max-w-3xl mx-auto mt-12 text-gray-600 dark:text-gray-400">Loading…</div>
+            <div className="max-w-3xl mx-auto mt-12 text-muted">Loading…</div>
         )
     }
     return (
         <article className="max-w-3xl mx-auto mt-8 mb-16">
-            <h1 className="text-3xl font-bold mb-6 text-gray-900 dark:text-gray-100">{title}</h1>
+            <h1 className="text-3xl font-bold mb-6 text-ink">{title}</h1>
             <div className="prose prose-sm dark:prose-invert max-w-none">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{md}</ReactMarkdown>
             </div>

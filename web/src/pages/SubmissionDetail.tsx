@@ -1,27 +1,28 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { ExternalLink, RefreshCw } from 'lucide-react'
 import { api } from '../lib/api'
 import { resolveProblemSlug, resolveProblemTitle } from '../lib/problemSlugResolver'
 import { useToast } from '../components/Toast'
+import { Badge } from '../components/ui/Badge'
+import { Button } from '../components/ui/Button'
+import { Card, CardHeader } from '../components/ui/Card'
+import { Skeleton } from '../components/ui/PageHeader'
+import { VerdictBadge } from '../components/ui/VerdictBadge'
+import { isPendingVerdict, verdictMeta } from '../components/ui/verdict'
 
-const STATUS_LABEL: Record<string, string> = {
-    ac: 'Accepted', wa: 'Wrong Answer', tle: 'Time Limit Exceeded',
-    mle: 'Memory Limit Exceeded', re: 'Runtime Error', ce: 'Compile Error',
-    pending: 'Pending', judging: 'Judging...', se: 'System Error',
-}
-
-const STATUS_COLOR: Record<string, string> = {
-    ac: 'text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800',
-    wa: 'text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800', tle: 'text-yellow-700 dark:text-yellow-300 bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-700',
-    mle: 'text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-700', re: 'text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800',
-    ce: 'text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-700',
-    pending: 'text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800', judging: 'text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800',
-    se: 'text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700',
-}
-
-const CASE_COLOR: Record<string, string> = {
-    ac: 'text-green-600 dark:text-green-400', wa: 'text-red-600 dark:text-red-400', tle: 'text-yellow-600 dark:text-yellow-400',
-    mle: 'text-orange-600 dark:text-orange-400', re: 'text-red-600 dark:text-red-400', se: 'text-gray-600 dark:text-gray-400',
+const LANGUAGE_LABEL: Record<string, string> = {
+    'cpp-gpp-64': 'C++ 20 (GCC)',
+    'cpp-gpp-32': 'C++ 20 (GCC 32)',
+    'cpp-clang': 'C++ 20 (Clang)',
+    'c-gcc': 'C 17 (GCC)',
+    python: 'Python 3',
+    pypy: 'PyPy 3',
+    java: 'Java 21',
+    rust: 'Rust 1.79',
+    nodejs: 'Node.js 22',
+    javascript: 'JavaScript',
+    csharp: 'C# 12',
 }
 
 function groupBySubtask(results: JudgeCase[]): Map<number, JudgeCase[]> {
@@ -32,6 +33,16 @@ function groupBySubtask(results: JudgeCase[]): Map<number, JudgeCase[]> {
         groups.get(id)!.push(r)
     }
     return groups
+}
+
+function formatMemory(kb?: number | null): string {
+    if (kb === undefined || kb === null) return '—'
+    return kb >= 1024 ? `${(kb / 1024).toFixed(0)} MB` : `${kb} KB`
+}
+
+function formatTime(ms?: number | null): string {
+    if (ms === undefined || ms === null) return '—'
+    return ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(2)} s`
 }
 
 interface JudgeCase { status: string; case_name?: string; subtask_id?: number; time?: number; memory?: number; score?: number; detail?: string }
@@ -108,208 +119,262 @@ export default function SubmissionDetail() {
         }
     }
 
-    if (loading) return <div className="text-center py-20 text-gray-400 dark:text-gray-500">Loading submission...</div>
-    if (!sub) return <div className="text-center py-20 text-gray-400 dark:text-gray-500">Submission not found.</div>
+    if (loading) {
+        return (
+            <div className="mx-auto w-full max-w-4xl space-y-4">
+                <Skeleton className="h-8 w-56" />
+                <Skeleton className="h-4 w-80" />
+                <Skeleton className="h-64 w-full" />
+            </div>
+        )
+    }
+
+    if (!sub) {
+        return (
+            <div className="py-20 text-center">
+                <p className="text-sm text-muted">Submission not found.</p>
+                <Link to="/submissions" className="mt-2 inline-block text-sm text-brand hover:underline">
+                    Back to my submissions
+                </Link>
+            </div>
+        )
+    }
 
     const judgeResult = sub.judge_result || []
     const totalCases = judgeResult.length
     const passedCases = judgeResult.filter(r => r.status === 'ac').length
+    const pending = isPendingVerdict(sub.status)
+    const meta = verdictMeta(sub.status)
+
+    const tabs = [
+        { key: 'overview' as const, label: 'Overview' },
+        { key: 'code' as const, label: 'Source' },
+        { key: 'tests' as const, label: totalCases > 0 ? `Test cases (${passedCases}/${totalCases})` : 'Test cases' },
+    ]
 
     return (
-        <div className="max-w-4xl mx-auto space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold">Submission {sub.id.substring(0, 8)}</h1>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                        <Link to={problemSlug ? `/problems/${problemSlug}` : '#'} className="text-blue-600 dark:text-blue-400 hover:underline">
-                            Problem {problemTitle || sub.problem_id?.substring(0, 8)}
-                        </Link>
-                        {' · '}{sub.language}
-                        {' · '}{new Date(sub.created_at).toLocaleString()}
-                    </p>
-                    {sub.remote_id && (
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-2 flex items-center gap-1.5">
-                            <span className="font-semibold text-gray-700 dark:text-gray-300">Remote OJ ID:</span>
-                            {sub.remote_url ? (
-                                <a href={sub.remote_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline font-mono font-medium">
-                                    {sub.remote_id}
-                                </a>
+        <div className="mx-auto w-full max-w-4xl space-y-5">
+            {/* ── Header ── */}
+            <header>
+                <nav aria-label="Breadcrumb" className="mb-2 flex items-center gap-1.5 text-xs text-muted">
+                    <Link to="/submissions" className="hover:text-ink">My submissions</Link>
+                    <span aria-hidden="true" className="text-hairline-strong">/</span>
+                    <span className="tnum font-mono text-muted-soft">{sub.id.slice(0, 8)}</span>
+                </nav>
+
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                        <h1 className="flex flex-wrap items-center gap-2.5 text-2xl font-semibold tracking-tight text-ink">
+                            Submission
+                            <span className="tnum font-mono text-lg text-muted">{sub.id.slice(0, 8)}</span>
+                        </h1>
+                        <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
+                            {problemSlug ? (
+                                <Link to={`/problems/${problemSlug}`} className="font-medium text-brand hover:underline">
+                                    {problemTitle || `Problem ${sub.problem_id?.slice(0, 8)}`}
+                                </Link>
                             ) : (
-                                <span className="font-mono text-gray-700 dark:text-gray-300">{sub.remote_id}</span>
+                                <span>{problemTitle || `Problem ${sub.problem_id?.slice(0, 8)}`}</span>
                             )}
+                            <span aria-hidden="true">·</span>
+                            <span>{LANGUAGE_LABEL[sub.language] || sub.language}</span>
+                            <span aria-hidden="true">·</span>
+                            <time dateTime={sub.created_at}>{new Date(sub.created_at).toLocaleString()}</time>
                         </p>
-                    )}
+                        {sub.remote_id && (
+                            <p className="mt-2 flex items-center gap-1.5 text-xs text-muted">
+                                <span className="font-medium text-ink-soft">Remote OJ id</span>
+                                {sub.remote_url ? (
+                                    <a
+                                        href={sub.remote_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1 font-mono text-brand hover:underline"
+                                    >
+                                        {sub.remote_id}
+                                        <ExternalLink className="h-3 w-3" />
+                                    </a>
+                                ) : (
+                                    <span className="font-mono text-ink-soft">{sub.remote_id}</span>
+                                )}
+                            </p>
+                        )}
+                    </div>
+
+                    <div className="flex shrink-0 flex-col items-start gap-2 sm:items-end">
+                        <VerdictBadge status={sub.status} className="px-3 py-1 text-xs" />
+                        {sub.is_remote && (
+                            <div className="flex flex-wrap gap-2">
+                                {sub.status === 'se' && (
+                                    <Button size="sm" onClick={handleRetryRemote} disabled={actionLoading}>
+                                        <RefreshCw className="h-3.5 w-3.5" />
+                                        Retry
+                                    </Button>
+                                )}
+                                {sub.remote_id && (
+                                    <Button variant="secondary" size="sm" onClick={handleRecheckRemote} disabled={actionLoading}>
+                                        Recheck status
+                                    </Button>
+                                )}
+                            </div>
+                        )}
+                    </div>
                 </div>
-                <div className="flex flex-col items-end gap-2">
-                    <span className={`px-4 py-2 rounded-lg text-sm font-bold border ${STATUS_COLOR[sub.status] || ''}`}>
-                        {STATUS_LABEL[sub.status] || sub.status}
-                    </span>
-                    {sub.is_remote && (
-                        <div className="flex gap-2">
-                            {sub.status === 'se' && (
-                                <button
-                                    onClick={handleRetryRemote}
-                                    disabled={actionLoading}
-                                    className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-xs font-semibold disabled:opacity-50 transition-colors"
-                                >
-                                    Retry Remote Submission
-                                </button>
-                            )}
-                            {sub.remote_id && (
-                                <button
-                                    onClick={handleRecheckRemote}
-                                    disabled={actionLoading}
-                                    className="bg-gray-600 hover:bg-gray-700 text-white px-3 py-1.5 rounded text-xs font-semibold disabled:opacity-50 transition-colors"
-                                >
-                                    Recheck Status
-                                </button>
-                            )}
-                        </div>
-                    )}
-                </div>
-            </div>
+            </header>
 
             {sub.status === 'ce' && sub.compile_output && (
-                <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-700 rounded-lg p-4">
-                    <h3 className="font-semibold text-purple-800 dark:text-purple-300 mb-2">Compile Error</h3>
-                    <pre className="text-sm text-purple-900 whitespace-pre-wrap font-mono bg-purple-100 dark:bg-purple-900/30/50 p-3 rounded overflow-x-auto max-h-64">
+                <Card className="border-bad/30">
+                    <CardHeader title="Compile error" description="The compiler rejected this source." />
+                    <pre className="max-h-64 overflow-auto bg-code px-5 py-4 font-mono text-xs leading-relaxed text-code-ink whitespace-pre-wrap">
                         {sub.compile_output}
                     </pre>
-                </div>
+                </Card>
             )}
 
-            <div className="flex border-b border-gray-200 dark:border-gray-700">
-                {(['overview', 'code', 'tests'] as const).map(tab => (
-                    <button key={tab} onClick={() => setActiveTab(tab)}
-                        className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px capitalize ${activeTab === tab ? 'border-blue-600 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}>
-                        {tab} {tab === 'tests' && totalCases > 0 && `(${passedCases}/${totalCases})`}
+            {/* ── Tabs ── */}
+            <div role="tablist" aria-label="Submission detail" className="flex gap-1 border-b border-hairline">
+                {tabs.map(t => (
+                    <button
+                        key={t.key}
+                        type="button"
+                        role="tab"
+                        aria-selected={activeTab === t.key}
+                        onClick={() => setActiveTab(t.key)}
+                        className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors ${activeTab === t.key
+                            ? 'border-brand text-brand'
+                            : 'border-transparent text-muted hover:text-ink'
+                            }`}
+                    >
+                        {t.label}
                     </button>
                 ))}
             </div>
 
             {activeTab === 'overview' && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Time Used</p>
-                        <p className="text-xl font-bold mt-1">
-                            {sub.status !== "pending" && sub.status !== "judging" && sub.status !== "ce" && sub.status !== "se" ? `${sub.time_used}ms` : "—"}
-                        </p>
-                    </div>
-                    <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Memory Used</p>
-                        <p className="text-xl font-bold mt-1">
-                            {sub.status !== "pending" && sub.status !== "judging" && sub.status !== "ce" && sub.status !== "se" ? `${Math.round(sub.memory_used / 1024)}MB` : "—"}
-                        </p>
-                    </div>
-                    <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Score</p>
-                        <p className="text-xl font-bold mt-1">{sub.score}</p>
-                    </div>
-                    <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Code Size</p>
-                        <p className="text-xl font-bold mt-1">{sub.code_size}B</p>
-                    </div>
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                    <Stat label="Time" value={pending || sub.status === 'ce' || sub.status === 'se' ? '—' : formatTime(sub.time_used)} />
+                    <Stat label="Memory" value={pending || sub.status === 'ce' || sub.status === 'se' ? '—' : formatMemory(sub.memory_used)} />
+                    <Stat label="Score" value={sub.score ?? '—'} />
+                    <Stat label="Code size" value={sub.code_size ? `${sub.code_size.toLocaleString()} B` : '—'} />
                 </div>
             )}
 
             {activeTab === 'code' && (
-                <div className="bg-gray-900 rounded-lg p-4 overflow-x-auto">
-                    <pre className="text-green-400 text-sm font-mono whitespace-pre-wrap">
+                <div className="overflow-hidden rounded-xl border border-code-border">
+                    <div className="flex items-center justify-between border-b border-code-border bg-code px-4 py-2">
+                        <span className="text-xs font-medium text-code-ink/70">
+                            {LANGUAGE_LABEL[sub.language] || sub.language}
+                        </span>
+                        {sub.code_size ? (
+                            <span className="tnum text-[11px] text-code-ink/50">{sub.code_size.toLocaleString()} bytes</span>
+                        ) : null}
+                    </div>
+                    <pre className="max-h-[32rem] overflow-auto bg-code px-4 py-3 font-mono text-xs leading-relaxed text-code-ink">
                         {sub.source_code || 'Source code not available.'}
                     </pre>
                 </div>
             )}
 
-            {activeTab === 'tests' && (() => {
-                if (judgeResult.length === 0) {
-                    return (
-                        <div className="space-y-3">
-                            <p className="text-gray-400 dark:text-gray-500 text-center py-8">
-                                {sub.status === 'pending' || sub.status === 'judging'
-                                    ? 'Waiting for judging results...'
-                                    : 'No test case details available.'}
-                            </p>
-                        </div>
-                    )
-                }
+            {activeTab === 'tests' && (
+                <TestCases judgeResult={judgeResult} status={sub.status} />
+            )}
 
-                const hasSubtasks = judgeResult.some(r => (r.subtask_id ?? 0) > 0)
-
-                if (hasSubtasks) {
-                    const subtaskMap = groupBySubtask(judgeResult)
-                    const subtaskIds = [...subtaskMap.keys()].filter(id => id > 0).sort((a, b) => a - b)
-
-                    return (
-                        <div className="space-y-3">
-                            {subtaskIds.map(id => {
-                                const cases = subtaskMap.get(id)!
-                                const allPassed = cases.every(c => c.status === 'ac')
-                                const earnedScore = cases.reduce((s, c) => s + (c.status === 'ac' ? (c.score ?? 0) : 0), 0)
-                                const maxScore = cases.reduce((s, c) => s + (c.score ?? 0), 0)
-
-                                return (
-                                    <div key={id} className={`rounded-lg border p-4 ${allPassed ? 'border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20/30' : 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20/30'}`}>
-                                        <div className="flex justify-between items-center mb-3">
-                                            <span className="font-semibold text-sm text-gray-700 dark:text-gray-300">Subtask {id}</span>
-                                            <span className={`text-xs font-bold px-2 py-0.5 rounded ${allPassed ? 'text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-900/30' : 'text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-900/30'}`}>
-                                                {earnedScore}/{maxScore} pts
-                                            </span>
-                                        </div>
-                                        <div className="space-y-2">
-                                            {cases.map((c, i) => (
-                                                <div key={i} className={`border rounded p-3 ${c.status === 'ac' ? 'bg-green-50 dark:bg-green-900/20/50 border-green-100 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20/50 border-red-100 dark:border-red-800'}`}>
-                                                    <div className="flex items-center justify-between mb-1">
-                                                        <span className="text-xs font-medium text-gray-600 dark:text-gray-400">{c.case_name || `Case ${i + 1}`}</span>
-                                                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${CASE_COLOR[c.status] || ''} bg-white dark:bg-gray-800`}>
-                                                            {STATUS_LABEL[c.status] || c.status}
-                                                        </span>
-                                                    </div>
-                                                    <div className="flex gap-4 text-xs text-gray-500 dark:text-gray-400">
-                                                        {c.time !== undefined && c.time !== null && <span>Time: {c.time}ms</span>}
-                                                        {c.memory !== undefined && c.memory !== null && <span>Memory: {Math.round(c.memory / 1024)}MB</span>}
-                                                        {(c.score ?? 0) > 0 && <span>Score: {c.score}pts</span>}
-                                                    </div>
-                                                    {c.detail && (
-                                                        <div className="mt-1.5 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-1.5 rounded">
-                                                            {c.detail}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )
-                            })}
-                        </div>
-                    )
-                }
-
-                // Fallback: non-subtask rendering
-                return (
-                    <div className="space-y-3">
-                        {judgeResult.map((r, i) => (
-                            <div key={i} className={`border rounded-lg p-4 ${r.status === 'ac' ? 'bg-green-50 dark:bg-green-900/20/30 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20/30 border-red-200 dark:border-red-800'}`}>
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="font-semibold text-sm">Test Case {i + 1}: {r.case_name || `#${i + 1}`}</span>
-                                    <span className={`text-xs font-bold px-2 py-0.5 rounded ${CASE_COLOR[r.status] || ''} bg-white dark:bg-gray-800`}>
-                                        {STATUS_LABEL[r.status] || r.status}
-                                    </span>
-                                </div>
-                                <div className="grid grid-cols-3 gap-4 text-xs text-gray-500 dark:text-gray-400 mb-2">
-                                    <span>Time: {r.time !== undefined && r.time !== null ? `${r.time}ms` : "—"}</span>
-                                    <span>Memory: {r.memory !== undefined && r.memory !== null ? `${Math.round(r.memory / 1024)}MB` : "—"}</span>
-                                    <span>Score: {r.score}</span>
-                                </div>
-                                {r.detail && (
-                                    <div className="mt-2 text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-2 rounded">
-                                        {r.detail}
-                                    </div>
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                )
-            })()}
+            {meta.tone === 'neutral' && sub.status === 'se' && (
+                <p className="text-xs text-muted">
+                    A system error means the judge itself failed, not your solution. Re-submitting usually resolves it.
+                </p>
+            )}
         </div>
+    )
+}
+
+function Stat({ label, value }: { label: string; value: string | number }) {
+    return (
+        <div className="rounded-xl border border-hairline bg-surface px-4 py-3">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-muted">{label}</p>
+            <p className="tnum mt-1 text-lg font-semibold text-ink">{value}</p>
+        </div>
+    )
+}
+
+function TestCases({ judgeResult, status }: { judgeResult: JudgeCase[]; status: string }) {
+    if (judgeResult.length === 0) {
+        return (
+            <div className="rounded-xl border border-hairline bg-surface px-4 py-10 text-center">
+                <p className="text-sm text-muted">
+                    {isPendingVerdict(status)
+                        ? 'Waiting for judging results…'
+                        : 'No test case details available.'}
+                </p>
+            </div>
+        )
+    }
+
+    const hasSubtasks = judgeResult.some(r => (r.subtask_id ?? 0) > 0)
+
+    if (hasSubtasks) {
+        const subtaskMap = groupBySubtask(judgeResult)
+        const subtaskIds = [...subtaskMap.keys()].filter(id => id > 0).sort((a, b) => a - b)
+
+        return (
+            <div className="space-y-3">
+                {subtaskIds.map(id => {
+                    const cases = subtaskMap.get(id)!
+                    const allPassed = cases.every(c => c.status === 'ac')
+                    const earnedScore = cases.reduce((s, c) => s + (c.status === 'ac' ? (c.score ?? 0) : 0), 0)
+                    const maxScore = cases.reduce((s, c) => s + (c.score ?? 0), 0)
+
+                    return (
+                        <Card key={id}>
+                            <CardHeader
+                                title={`Subtask ${id}`}
+                                action={
+                                    <div className="flex items-center gap-2">
+                                        <span className="tnum text-xs text-muted">{earnedScore}/{maxScore} pts</span>
+                                        <Badge tone={allPassed ? 'ok' : 'bad'}>{allPassed ? 'Passed' : 'Failed'}</Badge>
+                                    </div>
+                                }
+                            />
+                            <ul className="divide-y divide-hairline">
+                                {cases.map((c, i) => (
+                                    <CaseRow key={i} testCase={c} label={c.case_name || `Case ${i + 1}`} />
+                                ))}
+                            </ul>
+                        </Card>
+                    )
+                })}
+            </div>
+        )
+    }
+
+    return (
+        <div className="overflow-hidden rounded-xl border border-hairline bg-surface">
+            <ul className="divide-y divide-hairline">
+                {judgeResult.map((r, i) => (
+                    <CaseRow key={i} testCase={r} label={r.case_name || `Test case ${i + 1}`} showScore />
+                ))}
+            </ul>
+        </div>
+    )
+}
+
+function CaseRow({ testCase, label, showScore = false }: { testCase: JudgeCase; label: string; showScore?: boolean }) {
+    return (
+        <li className="px-4 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-sm font-medium text-ink-soft">{label}</span>
+                <VerdictBadge status={testCase.status} />
+            </div>
+            <div className="tnum mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
+                <span>Time {formatTime(testCase.time)}</span>
+                <span>Memory {formatMemory(testCase.memory)}</span>
+                {showScore && <span>Score {testCase.score ?? 0}</span>}
+            </div>
+            {testCase.detail && (
+                <p className="mt-2 rounded-lg border border-bad/25 bg-bad/10 px-2.5 py-1.5 font-mono text-xs leading-relaxed text-bad">
+                    {testCase.detail}
+                </p>
+            )}
+        </li>
     )
 }

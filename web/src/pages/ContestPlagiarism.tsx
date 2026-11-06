@@ -72,18 +72,18 @@ export default function ContestPlagiarism() {
 		return 'bg-green-500'
 	}
 
-	if (loading) return <div className="text-center py-20 text-gray-400">Loading plagiarism report...</div>
+	if (loading) return <div className="text-center py-20 text-muted-soft">Loading plagiarism report...</div>
 
 	return (
 		<div className="space-y-6">
 			<div className="flex items-center justify-between">
 				<div>
 					<h1 className="text-2xl font-bold">Plagiarism Report</h1>
-					<p className="text-gray-500 text-sm">Review suspicious submission pairs and flag cases.</p>
+					<p className="text-muted text-sm">Review suspicious submission pairs and flag cases.</p>
 				</div>
 				{isAdmin && (
 					<button onClick={handleRunCheck} disabled={checking || report?.status === 'running'}
-						className="bg-blue-600 text-white px-4 py-2 rounded text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 transition-colors">
+						className="bg-brand text-on-brand px-4 py-2 rounded text-sm font-semibold hover:bg-brand-hover disabled:opacity-50 transition-colors">
 						{checking || report?.status === 'running' ? 'Checking...' : 'Run Plagiarism Check'}
 					</button>
 				)}
@@ -97,17 +97,17 @@ export default function ContestPlagiarism() {
 						{ label: 'Total Pairs', value: report.total_pairs },
 						{ label: 'Flagged Pairs', value: pairs.filter((p) => p.status === 'flagged').length },
 					].map(s => (
-						<div key={s.label} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-3 text-center">
-							<div className="text-xs text-gray-500 uppercase mb-1">{s.label}</div>
-							<div className={`font-bold text-lg ${s.cls || 'text-gray-900 dark:text-gray-100'}`}>{s.value}</div>
+						<div key={s.label} className="bg-surface border border-hairline rounded-lg px-4 py-3 text-center">
+							<div className="text-xs text-muted uppercase mb-1">{s.label}</div>
+							<div className={`font-bold text-lg ${s.cls || 'text-ink'}`}>{s.value}</div>
 						</div>
 					))}
 				</div>
 			)}
 
-			<div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+			<div className="bg-surface border border-hairline rounded-lg overflow-hidden">
 				<table className="w-full text-sm">
-					<thead className="bg-gray-50 text-gray-500 text-xs font-medium border-b">
+					<thead className="bg-surface-2 text-muted text-xs font-medium border-b">
 						<tr>
 							<th className="px-4 py-3 text-left">Users</th>
 							<th className="px-4 py-3 text-left">Problem</th>
@@ -117,28 +117,28 @@ export default function ContestPlagiarism() {
 							<th className="px-4 py-3 text-center">Actions</th>
 						</tr>
 					</thead>
-					<tbody className="divide-y divide-gray-100">
+					<tbody className="divide-y divide-hairline">
 						{pairs.map((p) => (
-							<tr key={p.id} className="hover:bg-gray-50">
+							<tr key={p.id} className="hover:bg-surface-2">
 								<td className="px-4 py-3 font-mono text-xs">
-									<span className="font-semibold text-gray-900 dark:text-gray-100">{p.user_a_username}</span>
-									<span className="text-gray-400 mx-1">↔</span>
-									<span className="font-semibold text-gray-900 dark:text-gray-100">{p.user_b_username}</span>
-									<div className="text-gray-400 mt-0.5">{p.submission_a_lang} / {p.submission_b_lang}</div>
+									<span className="font-semibold text-ink">{p.user_a_username}</span>
+									<span className="text-muted-soft mx-1">↔</span>
+									<span className="font-semibold text-ink">{p.user_b_username}</span>
+									<div className="text-muted-soft mt-0.5">{p.submission_a_lang} / {p.submission_b_lang}</div>
 								</td>
-								<td className="px-4 py-3 text-xs text-gray-700">{p.problem_title}</td>
+								<td className="px-4 py-3 text-xs text-ink-soft">{p.problem_title}</td>
 								<td className="px-4 py-3 text-center">
 									<div className="flex items-center gap-2 justify-center">
-										<div className="w-20 bg-gray-200 rounded-full h-2">
+										<div className="w-20 bg-surface-3 rounded-full h-2">
 											<div className={`h-2 rounded-full ${similarityColor(p.similarity ?? 0)}`} style={{ width: `${(p.similarity ?? 0) * 100}%` }}></div>
 										</div>
 										<span className="text-xs font-semibold">{((p.similarity ?? 0) * 100).toFixed(0)}%</span>
 									</div>
 								</td>
-								<td className="px-4 py-3 text-center text-gray-500 text-xs">{p.matched_lines}</td>
+								<td className="px-4 py-3 text-center text-muted text-xs">{p.matched_lines}</td>
 								<td className="px-4 py-3 text-center">
 									<span className={`px-2 py-0.5 rounded text-xs font-medium ${p.status === 'flagged' ? 'bg-red-100 text-red-700' :
-										p.status === 'ignored' ? 'bg-gray-100 text-gray-500' : 'bg-yellow-100 text-yellow-700'
+										p.status === 'ignored' ? 'bg-surface-3 text-muted' : 'bg-yellow-100 text-yellow-700'
 										}`}>
 										{p.status}
 									</span>
@@ -149,7 +149,7 @@ export default function ContestPlagiarism() {
 											<button onClick={() => handleFlag(p.id)} className="text-xs bg-red-50 text-red-600 px-2 py-1 rounded hover:bg-red-100 border border-red-100 font-medium">
 												Flag
 											</button>
-											<button onClick={() => handleIgnore(p.id)} className="text-xs bg-gray-50 text-gray-600 px-2 py-1 rounded hover:bg-gray-100 border border-gray-200 dark:border-gray-700 font-medium">
+											<button onClick={() => handleIgnore(p.id)} className="text-xs bg-surface-2 text-muted px-2 py-1 rounded hover:bg-surface-2 border border-hairline font-medium">
 												Ignore
 											</button>
 										</>

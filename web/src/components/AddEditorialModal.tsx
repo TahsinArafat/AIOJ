@@ -13,10 +13,10 @@ export default function AddEditorialModal({ problemId, isUserAdmin, isOpen, onCl
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 overflow-y-auto">
-      <div className="relative w-full max-w-2xl bg-white dark:bg-gray-800 rounded-lg shadow-lg max-h-[90vh] overflow-y-auto p-6">
+      <div className="relative w-full max-w-2xl bg-surface rounded-lg shadow-lg max-h-[90vh] overflow-y-auto p-6">
         <div className="flex justify-between items-center border-b pb-3 mb-4">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 font-medium">Add Editorial</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+          <h3 className="text-lg font-semibold text-ink font-medium">Add Editorial</h3>
+          <button onClick={onClose} className="text-muted-soft hover:text-ink">
             ✕
           </button>
         </div>

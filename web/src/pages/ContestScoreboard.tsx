@@ -217,7 +217,7 @@ export default function ContestScoreboard() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-gray-500 text-lg">Loading scoreboard...</div>
+        <div className="text-muted text-lg">Loading scoreboard...</div>
       </div>
     );
   }
@@ -226,7 +226,7 @@ export default function ContestScoreboard() {
     return (
       <div className="max-w-2xl mx-auto mt-16 text-center">
         <div className="text-red-500 text-lg mb-4">{error || 'Scoreboard not found'}</div>
-        <Link to={`/contests/${id}`} className="text-blue-600 hover:underline">
+        <Link to={`/contests/${id}`} className="text-brand hover:underline">
           &larr; Back to contest
         </Link>
       </div>
@@ -247,19 +247,19 @@ export default function ContestScoreboard() {
       <div className="mb-3 flex items-center justify-between">
         <Link
           to={`/contests/${id}`}
-          className="text-blue-600 hover:text-blue-800 hover:underline text-sm font-medium"
+          className="text-brand hover:underline text-sm font-medium"
         >
           &larr; {contest.title || 'Back to contest'}
         </Link>
 
         {/* Judge/Public view toggle — only visible to admins/judges */}
         {canSeeJudge && (
-          <div className="inline-flex items-center rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden text-sm">
+          <div className="inline-flex items-center rounded-lg border border-hairline bg-surface shadow-sm overflow-hidden text-sm">
             <button
               onClick={() => setViewMode('judge')}
               className={`flex items-center gap-1.5 px-3 py-1.5 font-medium transition-colors ${viewMode === 'judge'
-                ? 'bg-blue-600 text-white'
-                : 'text-gray-600 hover:bg-gray-50'
+                ? 'bg-brand text-on-brand'
+                : 'text-muted hover:bg-surface-2'
                 }`}
             >
               <Eye className="w-3.5 h-3.5" />
@@ -268,8 +268,8 @@ export default function ContestScoreboard() {
             <button
               onClick={() => setViewMode('public')}
               className={`flex items-center gap-1.5 px-3 py-1.5 font-medium transition-colors ${viewMode === 'public'
-                ? 'bg-blue-600 text-white'
-                : 'text-gray-600 hover:bg-gray-50'
+                ? 'bg-brand text-on-brand'
+                : 'text-muted hover:bg-surface-2'
                 }`}
             >
               <EyeOff className="w-3.5 h-3.5" />
@@ -281,19 +281,19 @@ export default function ContestScoreboard() {
 
       {/* Frozen / Judge banners */}
       {frozen && viewMode === 'public' && canSeeJudge && (
-        <div className="mb-3 px-4 py-2.5 rounded border text-sm font-medium bg-amber-50 border-amber-300 text-amber-800 flex items-center gap-2">
+        <div className="mb-3 px-4 py-2.5 rounded border text-sm font-medium bg-warn/10 border-warn/40 text-warn flex items-center gap-2">
           <AlertTriangle className="w-4 h-4 flex-shrink-0" />
           Viewing public standings — frozen submissions are hidden. Switch to Judge View to see real-time data.
         </div>
       )}
       {frozen && !canSeeJudge && (
-        <div className="mb-3 px-4 py-2.5 rounded border text-sm font-medium bg-amber-50 border-amber-300 text-amber-800 flex items-center gap-2">
+        <div className="mb-3 px-4 py-2.5 rounded border text-sm font-medium bg-warn/10 border-warn/40 text-warn flex items-center gap-2">
           <AlertTriangle className="w-4 h-4 flex-shrink-0" />
           The scoreboard is frozen. New submissions will not be visible until the contest ends.
         </div>
       )}
       {viewMode === 'judge' && canSeeJudge && (
-        <div className="mb-3 px-4 py-2.5 rounded border text-sm font-medium bg-blue-50 border-blue-300 text-blue-800 flex items-center gap-2">
+        <div className="mb-3 px-4 py-2.5 rounded border text-sm font-medium bg-brand-soft border-brand/40 text-brand flex items-center gap-2">
           <Eye className="w-4 h-4 flex-shrink-0" />
           Judge view — you are seeing real-time data including pending submissions.
           {frozen && ' The scoreboard is frozen for regular users.'}
@@ -306,21 +306,21 @@ export default function ContestScoreboard() {
           <button
             onClick={handleRateContest}
             disabled={ratingLoading}
-            className="px-4 py-1.5 text-sm font-medium rounded bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 transition-colors"
+            className="px-4 py-1.5 text-sm font-medium rounded bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50 transition-colors"
           >
             {ratingLoading ? 'Calculating...' : contest.rating_calculated ? 'Recalculate Ratings' : 'Rate This Contest'}
           </button>
           {ratingMsg && (
-            <span className="text-sm text-gray-600">{ratingMsg}</span>
+            <span className="text-sm text-muted">{ratingMsg}</span>
           )}
         </div>
       )}
 
       {/* Scoreboard table */}
-      <div className="overflow-x-auto bg-white border border-gray-300 rounded-lg shadow-md">
+      <div className="overflow-x-auto bg-surface border border-hairline-strong rounded-lg shadow-md">
         <table className="w-full border-collapse text-sm" style={{ minWidth: 600 + problemIndices.length * 72 }}>
           <thead>
-            <tr className="bg-gray-900 text-white">
+            <tr className="bg-code text-code-ink">
               <th className="px-3 py-2.5 text-center font-bold w-10">#</th>
               <th className="px-4 py-2.5 text-left font-bold min-w-[140px]">{data?.contest.is_team_contest ? 'Team' : 'Participant'}</th>
               <th className="px-3 py-2.5 text-center font-bold w-12">Solved</th>
@@ -334,14 +334,14 @@ export default function ContestScoreboard() {
                   <th key={idx} className="px-2 py-2.5 text-center font-bold w-[72px]">
                     <div className="text-sm">{idx}</div>
                     {pm?.title && (
-                      <div className="text-[11px] font-normal text-gray-500 dark:text-gray-400 truncate max-w-[68px]" title={pm.title}>{pm.title}</div>
+                      <div className="text-[11px] font-normal text-muted truncate max-w-[68px]" title={pm.title}>{pm.title}</div>
                     )}
                   </th>
                 );
               })}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200">
+          <tbody className="divide-y divide-hairline">
             {entries.length === 0 ? (
               <tr>
                 <td
@@ -352,7 +352,7 @@ export default function ContestScoreboard() {
                 </td>
               </tr>
             ) : (
-              entries.map((entry, idx) => {
+              entries.map((entry) => {
                 const isMe = entry.user_id === userId
                 const medal = entry.rank === 1 ? 'gold' : entry.rank === 2 ? 'silver' : entry.rank === 3 ? 'bronze' : null
                 const ratingDelta = ratings.get(entry.user_id);
@@ -367,25 +367,25 @@ export default function ContestScoreboard() {
                 return (
                   <tr
                     key={entry.user_id}
-                    className={`transition-colors ${isMe ? 'bg-blue-50 hover:bg-blue-100' : idx % 2 === 0 ? 'bg-white hover:bg-gray-50' : 'bg-gray-50 hover:bg-gray-100'}`}
+                    className={`transition-colors ${isMe ? 'bg-brand-soft' : ''}`}
                   >
                     {/* Rank */}
                     <td className="px-3 py-2.5 text-center">
                       {medal ? (
                         <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-sm font-black ${medal === 'gold' ? 'bg-yellow-400 text-yellow-900' :
-                          medal === 'silver' ? 'bg-gray-300 text-gray-800' :
+                          medal === 'silver' ? 'bg-gray-300 text-ink' :
                             'bg-amber-600 text-white'
                           }`}>{entry.rank}</span>
                       ) : (
-                        <span className="text-sm font-bold text-gray-600">{entry.rank}</span>
+                        <span className="text-sm font-bold text-muted">{entry.rank}</span>
                       )}
                     </td>
 
                     {/* Username */}
-                    <td className={`px-4 py-2.5 font-semibold ${isMe ? 'text-blue-700' : 'text-gray-800'}`}>
+                    <td className={`px-4 py-2.5 font-semibold ${isMe ? 'text-brand' : 'text-ink'}`}>
                       <div className="flex items-center gap-1.5 min-w-0">
                         <Link
-                          to={`/profile/${entry.username}`}
+                          to={`/user/${entry.username}`}
                           className="font-medium truncate hover:underline"
                         >
                           {entry.username}
@@ -395,17 +395,17 @@ export default function ContestScoreboard() {
                             <RatingBadge rating={entry.rating} size="sm" />
                           </span>
                         )}
-                        {isMe && <span className="text-[11px] bg-blue-200 text-blue-700 px-1.5 py-0.5 rounded font-bold flex-shrink-0">YOU</span>}
+                        {isMe && <span className="text-[11px] bg-brand text-on-brand px-1.5 py-0.5 rounded font-bold flex-shrink-0">YOU</span>}
                       </div>
                     </td>
 
                     {/* Solved */}
                     <td className="px-3 py-2.5 text-center">
-                      <span className="text-lg font-black text-gray-900">{oi ? entry.total_score : entry.total_solved}</span>
+                      <span className="text-lg font-black text-ink">{oi ? entry.total_score : entry.total_solved}</span>
                     </td>
 
                     {/* Penalty */}
-                    <td className="px-3 py-2.5 text-center font-mono text-gray-500 text-xs">
+                    <td className="px-3 py-2.5 text-center font-mono text-muted text-xs">
                       {penaltyStr}
                     </td>
 
@@ -414,13 +414,13 @@ export default function ContestScoreboard() {
                       <td className="px-3 py-2.5 text-center">
                         {ratingDelta ? (
                           <span className="inline-flex items-center gap-1 text-xs font-medium">
-                            <span className="text-gray-500">{ratingDelta.new_rating}</span>
-                            <span className={ratingDelta.rating_change > 0 ? 'text-green-600' : ratingDelta.rating_change < 0 ? 'text-red-600' : 'text-gray-400'}>
+                            <span className="text-muted">{ratingDelta.new_rating}</span>
+                            <span className={ratingDelta.rating_change > 0 ? 'text-ok' : ratingDelta.rating_change < 0 ? 'text-bad' : 'text-muted-soft'}>
                               {ratingDelta.rating_change > 0 ? '+' : ''}{ratingDelta.rating_change}
                             </span>
                           </span>
                         ) : (
-                          <span className="text-gray-400 text-xs font-medium">—</span>
+                          <span className="text-muted-soft text-xs font-medium">—</span>
                         )}
                       </td>
                     )}
@@ -429,7 +429,7 @@ export default function ContestScoreboard() {
                     {problemIndices.map((idx) => {
                       const cell = entry.problems[idx];
                       if (!cell) {
-                        return <td key={idx} className="px-1 py-2.5 text-center"><span className="text-gray-400 font-medium">—</span></td>;
+                        return <td key={idx} className="px-1 py-2.5 text-center"><span className="text-muted-soft font-medium">—</span></td>;
                       }
 
                       const isFirst = firstSolves.has(`${entry.user_id}::${idx}`);
@@ -440,9 +440,9 @@ export default function ContestScoreboard() {
                         const attemptStr = cell.attempts <= 1 ? '+' : `+${cell.attempts - 1}`
                         return (
                           <td key={idx} className="px-1 py-2.5 text-center" title={`Solved in ${timeMin}m, ${cell.attempts} attempt(s)`}>
-                            <div className={`inline-flex flex-col items-center justify-center rounded-md px-2 py-1 min-w-[48px] ${isFirst ? 'bg-emerald-500 text-white shadow-sm' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}`}>
+                            <div className={`inline-flex flex-col items-center justify-center rounded-md px-2 py-1 min-w-[48px] ${isFirst ? 'bg-emerald-500 text-white shadow-sm' : 'bg-ok/12 text-ok border border-ok/30'}`}>
                               <span className="text-xs font-black leading-none">{oi ? cell.score : attemptStr}</span>
-                              <span className={`text-[10px] font-mono leading-none mt-0.5 ${isFirst ? 'text-white/70' : 'text-emerald-600/70'}`}>{timeMin}m</span>
+                              <span className={`text-[10px] font-mono leading-none mt-0.5 ${isFirst ? 'text-white/70' : 'text-ok/70'}`}>{timeMin}m</span>
                             </div>
                           </td>
                         );
@@ -451,7 +451,7 @@ export default function ContestScoreboard() {
                       if (cell.pending > 0) {
                         return (
                           <td key={idx} className="px-1 py-2.5 text-center" title={`${cell.pending} pending submission(s)`}>
-                            <div className="inline-flex flex-col items-center justify-center bg-sky-50 text-sky-700 border border-sky-200 rounded-md px-2 py-1 min-w-[48px]">
+                            <div className="inline-flex flex-col items-center justify-center bg-brand-soft text-brand border border-brand/30 rounded-md px-2 py-1 min-w-[48px]">
                               <span className="text-xs font-black leading-none">?</span>
                               <span className="text-[10px] font-mono leading-none mt-0.5">{cell.pending}</span>
                             </div>
@@ -462,14 +462,14 @@ export default function ContestScoreboard() {
                       if (cell.attempts > 0) {
                         return (
                           <td key={idx} className="px-1 py-2.5 text-center" title={`${cell.attempts} failed attempt(s)`}>
-                            <div className="inline-flex items-center justify-center bg-rose-50 text-rose-600 border border-rose-200 rounded-md px-2 py-1 min-w-[48px]">
+                            <div className="inline-flex items-center justify-center bg-bad/12 text-bad border border-bad/30 rounded-md px-2 py-1 min-w-[48px]">
                               <span className="text-xs font-black">-{cell.attempts}</span>
                             </div>
                           </td>
                         );
                       }
 
-                      return <td key={idx} className="px-1 py-2.5 text-center"><span className="text-gray-400 font-medium">—</span></td>;
+                      return <td key={idx} className="px-1 py-2.5 text-center"><span className="text-muted-soft font-medium">—</span></td>;
                     })}
                   </tr>
                 );
@@ -480,7 +480,7 @@ export default function ContestScoreboard() {
       </div>
 
       {/* Footer info */}
-      <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-gray-500">
+      <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-muted">
         <span>
           {pagination?.total ?? entries.length} participant{(pagination?.total ?? entries.length) !== 1 ? 's' : ''}
         </span>
@@ -489,15 +489,15 @@ export default function ContestScoreboard() {
           First solver
         </span>
         <span className="flex items-center gap-1">
-          <span className="inline-block w-3 h-3 rounded-sm bg-green-100 border border-green-300"></span>
+          <span className="inline-block w-3 h-3 rounded-sm bg-ok/12 border border-ok/30"></span>
           Solved
         </span>
         <span className="flex items-center gap-1">
-          <span className="inline-block w-3 h-3 rounded-sm bg-red-100 border border-red-300"></span>
+          <span className="inline-block w-3 h-3 rounded-sm bg-bad/12 border border-bad/30"></span>
           Failed
         </span>
         <span className="flex items-center gap-1">
-          <span className="inline-block w-3 h-3 rounded-sm bg-blue-100 border border-blue-300"></span>
+          <span className="inline-block w-3 h-3 rounded-sm bg-brand-soft border border-brand/30"></span>
           Pending
         </span>
       </div>
@@ -526,7 +526,7 @@ export default function ContestScoreboard() {
             <button
               onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
               disabled={page <= 1}
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-sm font-medium rounded-md border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-sm font-medium rounded-md border border-hairline bg-surface text-muted hover:bg-surface-2 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               <ChevronLeft className="w-4 h-4" />
               Prev
@@ -535,14 +535,14 @@ export default function ContestScoreboard() {
             {/* Page numbers */}
             {pages.map((p, i) =>
               p === 'ellipsis' ? (
-                <span key={`e${i}`} className="px-2 py-1.5 text-sm text-gray-400">...</span>
+                <span key={`e${i}`} className="px-2 py-1.5 text-sm text-muted-soft">...</span>
               ) : (
                 <button
                   key={p}
                   onClick={() => setCurrentPage(p)}
                   className={`min-w-[36px] px-2 py-1.5 text-sm font-medium rounded-md border transition-colors ${p === page
-                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                    : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                    ? 'bg-brand text-on-brand border-brand shadow-sm'
+                    : 'bg-surface text-muted border-hairline hover:bg-surface-2'
                     }`}
                 >
                   {p}
@@ -554,7 +554,7 @@ export default function ContestScoreboard() {
             <button
               onClick={() => setCurrentPage(p => Math.min(total_pages, p + 1))}
               disabled={page >= total_pages}
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-sm font-medium rounded-md border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-sm font-medium rounded-md border border-hairline bg-surface text-muted hover:bg-surface-2 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               Next
               <ChevronRight className="w-4 h-4" />

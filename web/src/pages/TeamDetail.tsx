@@ -170,8 +170,8 @@ const [team, setTeam] = useState<TeamInfo | null>(null)
         finally { setActing(null) }
     }
 
-    if (loading) return <div className="text-center py-20 text-gray-400 dark:text-gray-500">Loading team details...</div>
-    if (!team) return <div className="text-center py-20 text-gray-400 dark:text-gray-500">Team not found</div>
+    if (loading) return <div className="text-center py-20 text-muted-soft">Loading team details...</div>
+    if (!team) return <div className="text-center py-20 text-muted-soft">Team not found</div>
 
     const globalRole = getRole()
     const canManage = currentUserRole === 'owner' || currentUserRole === 'captain' || globalRole === 'admin'
@@ -181,17 +181,17 @@ const [team, setTeam] = useState<TeamInfo | null>(null)
     return (
         <div className="space-y-6">
             {editing ? (
-                <div className="space-y-4 bg-white dark:bg-gray-900 p-6 rounded-lg border border-gray-200 dark:border-gray-800">
+                <div className="space-y-4 bg-surface p-6 rounded-lg border border-hairline">
                     <h2 className="text-xl font-bold">Edit Team</h2>
                     <div>
                         <label className="block text-sm font-medium mb-1">Team Name</label>
                         <input type="text" value={editName} onChange={e => setEditName(e.target.value)}
-                            className="w-full border border-gray-300 dark:border-gray-700 bg-transparent rounded p-2 text-sm text-gray-800 dark:text-gray-200" />
+                            className="w-full border border-hairline-strong bg-transparent rounded p-2 text-sm text-ink" />
                     </div>
                     <div>
                         <label className="block text-sm font-medium mb-1">Description</label>
                         <textarea value={editDescription} onChange={e => setEditDescription(e.target.value)} rows={3}
-                            className="w-full border border-gray-300 dark:border-gray-700 bg-transparent rounded p-2 text-sm text-gray-800 dark:text-gray-200" />
+                            className="w-full border border-hairline-strong bg-transparent rounded p-2 text-sm text-ink" />
                     </div>
                     <div className="flex items-center gap-2">
                         <input type="checkbox" id="editIsPublic" checked={editIsPublic}
@@ -200,9 +200,9 @@ const [team, setTeam] = useState<TeamInfo | null>(null)
                     </div>
                     <div className="flex gap-2 justify-end">
                         <button onClick={() => setEditing(false)}
-                            className="px-4 py-2 border border-gray-300 dark:border-gray-700 rounded text-sm hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer">Cancel</button>
+                            className="px-4 py-2 border border-hairline-strong rounded text-sm hover:bg-surface-2 cursor-pointer">Cancel</button>
                         <button onClick={handleSaveEdit}
-                            className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 cursor-pointer">Save</button>
+                            className="px-4 py-2 bg-brand text-on-brand rounded text-sm hover:bg-brand-hover cursor-pointer">Save</button>
                     </div>
                 </div>
             ) : (
@@ -220,7 +220,7 @@ const [team, setTeam] = useState<TeamInfo | null>(null)
                                     {team.is_public ? 'Public' : 'Private'}
                                 </span>
                             </div>
-                            <p className="text-gray-600 dark:text-gray-400 mt-2">{team.description || 'No description provided.'}</p>
+                            <p className="text-muted mt-2">{team.description || 'No description provided.'}</p>
                         </div>
                         <div className="flex items-center gap-4">
                             <RatingBadge rating={team.rating ?? 1500} showTitle />
@@ -229,7 +229,7 @@ const [team, setTeam] = useState<TeamInfo | null>(null)
                                     {canManage && (
                                         <>
                                             <button onClick={handleStartEdit}
-                                                className="px-4 py-2 border border-gray-300 dark:border-gray-700 rounded text-sm hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer">
+                                                className="px-4 py-2 border border-hairline-strong rounded text-sm hover:bg-surface-2 cursor-pointer">
                                                 Edit
                                             </button>
                                             {canDelete && (
@@ -247,12 +247,12 @@ const [team, setTeam] = useState<TeamInfo | null>(null)
                                         </button>
                                     ) : team.is_public ? (
                                         <button onClick={handleJoin}
-                                            className="px-4 py-2 rounded text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors cursor-pointer">
+                                            className="px-4 py-2 rounded text-sm font-medium bg-brand text-on-brand hover:bg-brand-hover transition-colors cursor-pointer">
                                             Join Team
                                         </button>
                                     ) : (
                                         <button onClick={handleRequestJoin}
-                                            className="px-4 py-2 rounded text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 transition-colors cursor-pointer">
+                                            className="px-4 py-2 rounded text-sm font-medium bg-brand text-on-brand hover:bg-brand-hover transition-colors cursor-pointer">
                                             Request to Join
                                         </button>
                                     )}
@@ -263,12 +263,12 @@ const [team, setTeam] = useState<TeamInfo | null>(null)
 
                     {/* Stats */}
                     <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-                            <p className="text-sm text-gray-500 dark:text-gray-400">Max Rating</p>
+                        <div className="bg-surface-2 p-4 rounded-lg">
+                            <p className="text-sm text-muted">Max Rating</p>
                             <p className="text-xl font-bold mt-1">{team.max_rating ?? 1500}</p>
                         </div>
-                        <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-                            <p className="text-sm text-gray-500 dark:text-gray-400">Contest Count</p>
+                        <div className="bg-surface-2 p-4 rounded-lg">
+                            <p className="text-sm text-muted">Contest Count</p>
                             <p className="text-xl font-bold mt-1">{team.contest_count ?? 0}</p>
                         </div>
                     </div>
@@ -282,7 +282,7 @@ const [team, setTeam] = useState<TeamInfo | null>(null)
                                     setShowPending(!showPending)
                                     if (!showPending) fetchPending()
                                 }}
-                                    className="text-sm text-blue-600 dark:text-blue-400 hover:underline cursor-pointer">
+                                    className="text-sm text-brand hover:underline cursor-pointer">
                                     {showPending ? 'Hide Requests' : 'Pending Requests'}
                                 </button>
                             )}
@@ -290,30 +290,30 @@ const [team, setTeam] = useState<TeamInfo | null>(null)
 
                         {/* Pending Requests Panel */}
                         {showPending && canManage && (
-                            <div className="mb-4 space-y-3 bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-                                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Invite Member</h3>
+                            <div className="mb-4 space-y-3 bg-surface-2/50 border border-hairline rounded-lg p-4">
+                                <h3 className="text-sm font-semibold text-ink-soft">Invite Member</h3>
                                 <div className="flex gap-2">
                                     <input type="text" placeholder="Username..." value={inviteUsername}
                                         onChange={e => setInviteUsername(e.target.value)}
-                                        className="flex-1 border border-gray-300 dark:border-gray-700 bg-transparent rounded p-2 text-sm" />
+                                        className="flex-1 border border-hairline-strong bg-transparent rounded p-2 text-sm" />
                                     <button onClick={handleInvite} disabled={inviting || !inviteUsername.trim()}
-                                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm font-medium disabled:opacity-50 cursor-pointer">
+                                        className="bg-brand hover:bg-brand-hover text-on-brand px-4 py-2 rounded text-sm font-medium disabled:opacity-50 cursor-pointer">
                                         {inviting ? '...' : 'Invite'}
                                     </button>
                                 </div>
 
                                 {pendingMembers.length > 0 && (
-                                    <div className="border-t border-gray-200 dark:border-gray-700 pt-3">
-                                        <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2">Join Requests &amp; Invitations</h4>
+                                    <div className="border-t border-hairline pt-3">
+                                        <h4 className="text-xs font-semibold text-muted uppercase mb-2">Join Requests &amp; Invitations</h4>
                                         <div className="space-y-2">
                                             {pendingMembers.map((pm: TeamMember) => (
-                                                <div key={pm.user_id} className="flex items-center justify-between bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded px-3 py-2">
+                                                <div key={pm.user_id} className="flex items-center justify-between bg-surface border border-hairline rounded px-3 py-2">
                                                     <div className="flex items-center gap-2">
                                                         <span className="text-sm font-medium">{pm.username || pm.user_id}</span>
                                                         <span className={`text-xs px-1.5 py-0.5 rounded ${
                                                             pm.role === 'requested'
                                                                 ? 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300'
-                                                                : 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
+                                                                : 'bg-brand-soft text-brand'
                                                         }`}>
                                                             {pm.role === 'requested' ? 'Join Request' : 'Invited'}
                                                         </span>
@@ -349,11 +349,11 @@ const [team, setTeam] = useState<TeamInfo | null>(null)
                         )}
 
                         {/* Members List */}
-                        <div className="border rounded-lg divide-y bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+                        <div className="border rounded-lg divide-y bg-surface border-hairline">
                             {activeMembers.map((m, i) => (
                                 <div key={i} className="px-4 py-3 flex justify-between items-center text-sm">
-                                    <span className="font-medium text-gray-800 dark:text-gray-200">{m.username || m.user_id}</span>
-                                    <span className="text-xs text-gray-400 dark:text-gray-500 uppercase font-medium">{m.role}</span>
+                                    <span className="font-medium text-ink">{m.username || m.user_id}</span>
+                                    <span className="text-xs text-muted-soft uppercase font-medium">{m.role}</span>
                                 </div>
                             ))}
                             {activeMembers.length === 0 && (

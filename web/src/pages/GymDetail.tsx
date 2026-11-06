@@ -35,7 +35,7 @@ export default function GymDetail() {
         } catch (e) { toast.error('Failed: ' + (e instanceof Error ? e.message : String(e))) }
     }
 
-    if (loading) return <div className="text-center py-20 text-gray-400 dark:text-gray-500">Loading...</div>
+    if (loading) return <div className="text-center py-20 text-muted-soft">Loading...</div>
     if (!gym) {
         return (
             <div className="py-16">
@@ -48,34 +48,34 @@ export default function GymDetail() {
         <div className="space-y-6">
             <div>
                 <h1 className="text-2xl font-bold">{gym.contest_title}</h1>
-                <p className="text-gray-600 dark:text-gray-400 mt-2">{gym.description || 'No description provided.'}</p>
+                <p className="text-muted mt-2">{gym.description || 'No description provided.'}</p>
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Category</p>
+                <div className="bg-surface-2 p-4 rounded-lg">
+                    <p className="text-sm text-muted">Category</p>
                     <p className="font-medium capitalize mt-1">{gym.category}</p>
                 </div>
                 {gym.difficulty_rating && (
-                    <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Difficulty</p>
+                    <div className="bg-surface-2 p-4 rounded-lg">
+                        <p className="text-sm text-muted">Difficulty</p>
                         <p className="font-medium font-mono mt-1">{gym.difficulty_rating}</p>
                     </div>
                 )}
-                <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Solves</p>
+                <div className="bg-surface-2 p-4 rounded-lg">
+                    <p className="text-sm text-muted">Solves</p>
                     <p className="font-medium mt-1">{gym.solve_count} users</p>
                 </div>
                 {gym.country && (
-                    <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-                        <p className="text-sm text-gray-500 dark:text-gray-400">Country</p>
+                    <div className="bg-surface-2 p-4 rounded-lg">
+                        <p className="text-sm text-muted">Country</p>
                         <p className="font-medium mt-1">{gym.country}</p>
                     </div>
                 )}
             </div>
 
             <div className="flex gap-4">
-                <Link to={`/contests/${contestSlug({ slug: gym.contest_slug, display_id: gym.contest_display_id, id: gym.contest_id })}`} className="bg-blue-600 text-white px-6 py-2 rounded text-sm hover:bg-blue-700 font-medium">
+                <Link to={`/contests/${contestSlug({ slug: gym.contest_slug, display_id: gym.contest_display_id, id: gym.contest_id })}`} className="bg-brand text-on-brand px-6 py-2 rounded text-sm hover:bg-brand-hover font-medium">
                     Enter Contest
                 </Link>
                 {getAccessToken() && !solved && (

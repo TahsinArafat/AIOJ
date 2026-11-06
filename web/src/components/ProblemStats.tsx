@@ -19,7 +19,7 @@ export default function ProblemStats({ problemId }: ProblemStatsProps) {
             .finally(() => setLoading(false))
     }, [problemId])
 
-    if (loading) return <div className="text-sm text-gray-500 dark:text-gray-400">Loading statistics...</div>
+    if (loading) return <div className="text-sm text-muted">Loading statistics...</div>
     if (!stats) {
         return (
             <EmptyState
@@ -34,22 +34,22 @@ export default function ProblemStats({ problemId }: ProblemStatsProps) {
     return (
         <div className="space-y-6">
             <div className="grid grid-cols-2 gap-4">
-                <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Submissions</p>
+                <div className="bg-surface-2 p-4 rounded-lg">
+                    <p className="text-sm text-muted">Submissions</p>
                     <p className="text-2xl font-bold mt-1">{stats.total_submissions}</p>
                 </div>
-                <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Accepted</p>
+                <div className="bg-surface-2 p-4 rounded-lg">
+                    <p className="text-sm text-muted">Accepted</p>
                     <p className="text-2xl font-bold mt-1 text-green-600 dark:text-green-400">{stats.accepted_submissions}</p>
                 </div>
-                <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Acceptance Rate</p>
-                    <p className="text-2xl font-bold mt-1 text-blue-600 dark:text-blue-400">
+                <div className="bg-surface-2 p-4 rounded-lg">
+                    <p className="text-sm text-muted">Acceptance Rate</p>
+                    <p className="text-2xl font-bold mt-1 text-brand">
                         {stats.acceptance_rate ? stats.acceptance_rate.toFixed(1) : '0.0'}%
                     </p>
                 </div>
-                <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Avg Attempts (AC)</p>
+                <div className="bg-surface-2 p-4 rounded-lg">
+                    <p className="text-sm text-muted">Avg Attempts (AC)</p>
                     <p className="text-2xl font-bold mt-1">
                         {stats.average_attempts ? stats.average_attempts.toFixed(1) : '0.0'}
                     </p>
@@ -57,18 +57,18 @@ export default function ProblemStats({ problemId }: ProblemStatsProps) {
             </div>
 
             <div>
-                <h3 className="font-semibold text-sm text-gray-700 dark:text-gray-300 uppercase tracking-wide mb-3">Languages Used</h3>
+                <h3 className="font-semibold text-sm text-ink-soft uppercase tracking-wide mb-3">Languages Used</h3>
                 {total === 0 ? (
                     <EmptyState text="No language data yet" description="The language breakdown fills in as people submit solutions." />
                 ) : (
                     <div className="space-y-2">
                         {Object.entries(stats.language_distribution || {}).map(([lang, count]) => (
                             <div key={lang} className="flex items-center text-sm">
-                                <span className="w-24 text-gray-600 dark:text-gray-400 font-medium truncate">{lang}</span>
-                                <div className="flex-1 bg-gray-100 dark:bg-gray-700 h-4 rounded-full overflow-hidden mx-3">
-                                    <div className="bg-blue-600 h-full rounded-full" style={{ width: `${(count / total) * 100}%` }} />
+                                <span className="w-24 text-muted font-medium truncate">{lang}</span>
+                                <div className="flex-1 bg-surface-3 h-4 rounded-full overflow-hidden mx-3">
+                                    <div className="bg-brand h-full rounded-full" style={{ width: `${(count / total) * 100}%` }} />
                                 </div>
-                                <span className="text-gray-500 dark:text-gray-400 w-12 text-right">{count} ({((count / total) * 100).toFixed(0)}%)</span>
+                                <span className="text-muted w-12 text-right">{count} ({((count / total) * 100).toFixed(0)}%)</span>
                             </div>
                         ))}
                     </div>

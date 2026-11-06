@@ -252,21 +252,21 @@ export default function ContestCreate() {
             'very easy': 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20',
             'very hard': 'text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-900/30',
         }
-        return map[(d || '').toLowerCase()] || 'text-gray-500 bg-gray-50 dark:bg-gray-900/20'
+        return map[(d || '').toLowerCase()] || 'text-muted bg-surface-2/20'
     }
 
     const sectionLabel = (text: string) => (
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100 uppercase tracking-wide mb-3">{text}</h3>
+        <h3 className="text-sm font-semibold text-ink uppercase tracking-wide mb-3">{text}</h3>
     )
 
-    const inputCls = "w-full border border-gray-300 dark:border-gray-700 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-    const labelCls = "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+    const inputCls = "w-full border border-hairline-strong rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)] focus:border-brand transition"
+    const labelCls = "block text-sm font-medium text-ink-soft mb-1"
 
     return (
         <div className="max-w-3xl mx-auto pb-12">
             <div className="mb-8">
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Create Contest</h1>
-                <p className="text-sm text-gray-500 mt-1">Set up a new competitive programming contest.</p>
+                <h1 className="text-2xl font-bold text-ink">Create Contest</h1>
+                <p className="text-sm text-muted mt-1">Set up a new competitive programming contest.</p>
             </div>
 
             {error && (
@@ -281,7 +281,7 @@ export default function ContestCreate() {
             <form onSubmit={handleSubmit} className="space-y-8">
 
                 {/* ── Basic Info ── */}
-                <section className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6">
+                <section className="bg-surface border border-hairline rounded-lg p-6">
                     {sectionLabel('Basic Information')}
                     <div className="space-y-4">
                         <div>
@@ -299,7 +299,7 @@ export default function ContestCreate() {
                         <div>
                             <label className={labelCls}>URL Slug</label>
                             <div className="flex items-center gap-0">
-                                <span className="inline-flex items-center px-3 py-2 rounded-l-md border border-r-0 border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/20 text-gray-500 text-sm">
+                                <span className="inline-flex items-center px-3 py-2 rounded-l-md border border-r-0 border-hairline-strong bg-surface-2/20 text-muted text-sm">
                                     /contests/
                                 </span>
                                 <input
@@ -307,7 +307,7 @@ export default function ContestCreate() {
                                     onChange={e => { setSlug(e.target.value); setSlugEdited(true) }}
                                     placeholder="auto-generated-from-title"
                                     pattern="[a-z0-9\-]*"
-                                    className="flex-1 border border-gray-300 dark:border-gray-700 rounded-r-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                                    className="flex-1 border border-hairline-strong rounded-r-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)] focus:border-brand transition"
                                 />
                             </div>
                         </div>
@@ -325,7 +325,7 @@ export default function ContestCreate() {
                 </section>
 
                 {/* ── Schedule ── */}
-                <section className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6">
+                <section className="bg-surface border border-hairline rounded-lg p-6">
                     {sectionLabel('Schedule')}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div>
@@ -363,14 +363,14 @@ export default function ContestCreate() {
                         </div>
                     </div>
                     {durationMinutes !== null && (
-                        <p className="mt-2 text-xs text-gray-500">
-                            Duration: <span className="font-medium text-gray-700 dark:text-gray-300">{formatDuration(durationMinutes)}</span>
+                        <p className="mt-2 text-xs text-muted">
+                            Duration: <span className="font-medium text-ink-soft">{formatDuration(durationMinutes)}</span>
                         </p>
                     )}
                 </section>
 
                 {/* ── Format ── */}
-                <section className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6">
+                <section className="bg-surface border border-hairline rounded-lg p-6">
                     {sectionLabel('Format & Division')}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div>
@@ -380,7 +380,7 @@ export default function ContestCreate() {
                                     <option key={o.value} value={o.value}>{o.label}</option>
                                 ))}
                             </select>
-                            <p className="mt-1 text-xs text-gray-400">
+                            <p className="mt-1 text-xs text-muted-soft">
                                 {FORMAT_OPTIONS.find(o => o.value === format)?.desc}
                             </p>
                         </div>
@@ -466,9 +466,9 @@ export default function ContestCreate() {
                                 </div>
                             </div>
                             {selectedProblems.length > 0 && (
-                                <p className="text-xs text-gray-500">
+                                <p className="text-xs text-muted">
                                     Initial scores (auto):{' '}
-                                    <span className="font-mono text-gray-700 dark:text-gray-300">
+                                    <span className="font-mono text-ink-soft">
                                         [{generateCFScores(selectedProblems.length).join(', ')}]
                                     </span>
                                 </p>
@@ -478,7 +478,7 @@ export default function ContestCreate() {
                 </section>
 
                 {/* ── Problem Selection ── */}
-                <section className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6">
+                <section className="bg-surface border border-hairline rounded-lg p-6">
                     {sectionLabel('Problems')}
                     <div className="relative" ref={searchRef}>
                         <label className={labelCls}>Search &amp; Add Problems</label>
@@ -499,17 +499,17 @@ export default function ContestCreate() {
                         </div>
 
                         {showDropdown && searchResults.length > 0 && (
-                            <div className="absolute z-20 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                            <div className="absolute z-20 w-full mt-1 bg-surface border border-hairline rounded-lg shadow-lg max-h-60 overflow-y-auto">
                                 {searchResults.map(p => (
                                     <button
                                         key={p.id}
                                         type="button"
                                         onClick={() => addProblem(p)}
-                                        className="w-full text-left px-4 py-2.5 hover:bg-blue-50 flex items-center justify-between gap-2 border-b border-gray-100 dark:border-gray-800 last:border-0 transition"
+                                        className="w-full text-left px-4 py-2.5 hover:bg-blue-50 flex items-center justify-between gap-2 border-b border-hairline last:border-0 transition"
                                     >
                                         <div className="min-w-0">
-                                            <span className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate block">{p.title}</span>
-                                            <span className="text-xs text-gray-400">{p.slug}</span>
+                                            <span className="text-sm font-medium text-ink truncate block">{p.title}</span>
+                                            <span className="text-xs text-muted-soft">{p.slug}</span>
                                         </div>
                                         {p.difficulty && (
                                             <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${difficultyColor(p.difficulty)}`}>
@@ -521,7 +521,7 @@ export default function ContestCreate() {
                             </div>
                         )}
                         {showDropdown && searchQuery.trim() && searchResults.length === 0 && !searchLoading && (
-                            <div className="absolute z-20 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg px-4 py-3 text-sm text-gray-400">
+                            <div className="absolute z-20 w-full mt-1 bg-surface border border-hairline rounded-lg shadow-lg px-4 py-3 text-sm text-muted-soft">
                                 No problems found.
                             </div>
                         )}
@@ -529,27 +529,27 @@ export default function ContestCreate() {
 
                     {/* Selected problems list */}
                     {selectedProblems.length > 0 && (
-                        <div className="mt-4 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                        <div className="mt-4 border border-hairline rounded-lg overflow-hidden">
                             <table className="w-full text-sm">
                                 <thead>
-                                    <tr className="bg-gray-50 dark:bg-gray-900/20 text-left">
-                                        <th className="px-4 py-2 font-medium text-gray-500 w-12">#</th>
-                                        <th className="px-4 py-2 font-medium text-gray-500">Problem</th>
-                                        <th className="px-4 py-2 font-medium text-gray-500 w-24">Difficulty</th>
-                                        <th className="px-4 py-2 font-medium text-gray-500 w-24 text-right">Actions</th>
+                                    <tr className="bg-surface-2/20 text-left">
+                                        <th className="px-4 py-2 font-medium text-muted w-12">#</th>
+                                        <th className="px-4 py-2 font-medium text-muted">Problem</th>
+                                        <th className="px-4 py-2 font-medium text-muted w-24">Difficulty</th>
+                                        <th className="px-4 py-2 font-medium text-muted w-24 text-right">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {selectedProblems.map((p, i) => (
-                                        <tr key={p.id} className="border-t border-gray-100 dark:border-gray-800 hover:bg-gray-50">
+                                        <tr key={p.id} className="border-t border-hairline hover:bg-surface-2">
                                             <td className="px-4 py-2.5">
-                                                <span className="inline-flex items-center justify-center w-6 h-6 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-bold text-xs">
+                                                <span className="inline-flex items-center justify-center w-6 h-6 rounded bg-blue-100 dark:bg-blue-900/30 text-brand font-bold text-xs">
                                                     {PROBLEM_LETTERS[i] || (i + 1)}
                                                 </span>
                                             </td>
                                             <td className="px-4 py-2.5">
-                                                <span className="font-medium text-gray-900 dark:text-gray-100">{p.title}</span>
-                                                <span className="text-gray-400 ml-2 text-xs">{p.slug}</span>
+                                                <span className="font-medium text-ink">{p.title}</span>
+                                                <span className="text-muted-soft ml-2 text-xs">{p.slug}</span>
                                             </td>
                                             <td className="px-4 py-2.5">
                                                 {p.difficulty && (
@@ -564,7 +564,7 @@ export default function ContestCreate() {
                                                         type="button"
                                                         onClick={() => moveProblem(i, -1)}
                                                         disabled={i === 0}
-                                                        className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                                                        className="p-1 text-muted-soft hover:text-ink disabled:opacity-30 disabled:cursor-not-allowed"
                                                         title="Move up"
                                                     >
                                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
@@ -573,7 +573,7 @@ export default function ContestCreate() {
                                                         type="button"
                                                         onClick={() => moveProblem(i, 1)}
                                                         disabled={i === selectedProblems.length - 1}
-                                                        className="p-1 text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                                                        className="p-1 text-muted-soft hover:text-ink disabled:opacity-30 disabled:cursor-not-allowed"
                                                         title="Move down"
                                                     >
                                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
@@ -581,7 +581,7 @@ export default function ContestCreate() {
                                                     <button
                                                         type="button"
                                                         onClick={() => removeProblem(i)}
-                                                        className="p-1 text-gray-400 hover:text-red-500"
+                                                        className="p-1 text-muted-soft hover:text-red-500"
                                                         title="Remove"
                                                     >
                                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -595,14 +595,14 @@ export default function ContestCreate() {
                         </div>
                     )}
                     {selectedProblems.length === 0 && (
-                        <p className="mt-3 text-sm text-gray-400 text-center py-4">
+                        <p className="mt-3 text-sm text-muted-soft text-center py-4">
                             No problems added yet. Search above to add problems.
                         </p>
                     )}
                 </section>
 
                 {/* ── Options ── */}
-                <section className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6">
+                <section className="bg-surface border border-hairline rounded-lg p-6">
                     {sectionLabel('Options')}
                     <div className="space-y-4">
                         <div className="flex items-center gap-6">
@@ -611,18 +611,18 @@ export default function ContestCreate() {
                                     type="checkbox"
                                     checked={pdfEnabled}
                                     onChange={e => setPdfEnabled(e.target.checked)}
-                                    className="rounded border-gray-300 dark:border-gray-700 text-blue-600 dark:text-blue-400 focus:ring-blue-500"
+                                    className="rounded border-hairline-strong text-brand focus-visible:outline-[var(--ring)]"
                                 />
-                                <span className="text-sm text-gray-700 dark:text-gray-300">Enable PDF statements</span>
+                                <span className="text-sm text-ink-soft">Enable PDF statements</span>
                             </label>
                             <label className="flex items-center gap-2 cursor-pointer">
                                 <input
                                     type="checkbox"
                                     checked={statementHidden}
                                     onChange={e => setStatementHidden(e.target.checked)}
-                                    className="rounded border-gray-300 dark:border-gray-700 text-blue-600 dark:text-blue-400 focus:ring-blue-500"
+                                    className="rounded border-hairline-strong text-brand focus-visible:outline-[var(--ring)]"
                                 />
-                                <span className="text-sm text-gray-700 dark:text-gray-300">Hide statements (onsite mode)</span>
+                                <span className="text-sm text-ink-soft">Hide statements (onsite mode)</span>
                             </label>
                         </div>
                         <div className="max-w-sm">
@@ -643,14 +643,14 @@ export default function ContestCreate() {
                     <button
                         type="button"
                         onClick={() => nav(-1)}
-                        className="px-5 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 transition"
+                        className="px-5 py-2.5 text-sm font-medium text-ink-soft bg-surface border border-hairline-strong rounded-lg hover:bg-surface-2 transition"
                     >
                         Cancel
                     </button>
                     <button
                         type="submit"
                         disabled={submitting}
-                        className="px-6 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-2"
+                        className="px-6 py-2.5 text-sm font-medium text-on-brand bg-brand rounded-lg hover:bg-brand-hover disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-2"
                     >
                         {submitting && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
                         {submitting ? 'Creating...' : 'Create Contest'}

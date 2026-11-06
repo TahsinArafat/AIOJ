@@ -1,12 +1,19 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
+import { SlidersHorizontal, X } from 'lucide-react'
 import { api } from '../lib/api'
 import { EmptyState } from '../components/EmptyState'
+import { Badge, type BadgeTone } from '../components/ui/Badge'
+import { Button } from '../components/ui/Button'
+import { Card } from '../components/ui/Card'
+import { Input, Select } from '../components/ui/Field'
+import { PageHeader } from '../components/ui/PageHeader'
+import { Table, TableShell, Td, Th, THead, Tr } from '../components/ui/Table'
 
-const difficultyColor: Record<string, string> = {
-    easy: 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20',
-    medium: 'text-yellow-700 dark:text-yellow-300 bg-yellow-50 dark:bg-yellow-900/20',
-    hard: 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20',
+const DIFFICULTY_TONE: Record<string, BadgeTone> = {
+    easy: 'ok',
+    medium: 'warn',
+    hard: 'bad',
 }
 
 const platforms = [
@@ -21,19 +28,19 @@ const platforms = [
 
 const difficulties = [
     { value: '', label: 'All Difficulties' },
-    { value: 'easy', label: 'Easy', color: 'text-green-600 dark:text-green-400' },
-    { value: 'medium', label: 'Medium', color: 'text-yellow-600 dark:text-yellow-400' },
-    { value: 'hard', label: 'Hard', color: 'text-red-600 dark:text-red-400' },
+    { value: 'easy', label: 'Easy' },
+    { value: 'medium', label: 'Medium' },
+    { value: 'hard', label: 'Hard' },
 ]
 
 const ratings = [
     { value: '', label: 'All Ratings' },
-    { value: '800-1199', label: '800-1199 (Novice-Apprentice)' },
-    { value: '1200-1599', label: '1200-1599 (Adept-Elite)' },
-    { value: '1600-1899', label: '1600-1899 (Elite-Champion)' },
-    { value: '1900-2099', label: '1900-2099 (Master)' },
-    { value: '2100-2399', label: '2100-2399 (Grandmaster-Titan)' },
-    { value: '2400+', label: '2400+ (Immortal+)' },
+    { value: '800-1199', label: '800–1199' },
+    { value: '1200-1599', label: '1200–1599' },
+    { value: '1600-1899', label: '1600–1899' },
+    { value: '1900-2099', label: '1900–2099' },
+    { value: '2100-2399', label: '2100–2399' },
+    { value: '2400+', label: '2400+' },
 ]
 
 const sortOptions = [
@@ -44,7 +51,22 @@ const sortOptions = [
     { value: 'title_asc', label: 'Title A-Z' },
 ]
 
+const PLATFORM_LABEL: Record<string, string> = {
+    local: 'AIOJ',
+    codeforces: 'Codeforces',
+    atcoder: 'AtCoder',
+    cses: 'CSES',
+    toph: 'Toph',
+    qoj: 'QOJ',
+}
+
 interface ProblemRow { title?: string; slug?: string; difficulty?: string; source?: string; tags?: string[]; accepted_count?: number; submission_count?: number }
+
+function acceptance(p: ProblemRow): string {
+    const total = p.submission_count || 0
+    if (!total) return '—'
+    return `${Math.round(((p.accepted_count || 0) / total) * 100)}%`
+}
 
 export default function ProblemList() {
     const [problems, setProblems] = useState<ProblemRow[]>([])
@@ -103,270 +125,323 @@ export default function ProblemList() {
 
     const hasActiveFilters = difficulty || selectedTags.length > 0 || search || source || rating || sortBy !== 'newest'
 
-    const filterSidebar = () => (
-        <div className="w-64 flex-shrink-0 space-y-6">
-            {/* Search */}
+    const filterPanel = () => (
+        <div className="space-y-5">
             <div>
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Search</h3>
-                <input type="text" value={search} onChange={e => setSearch(e.target.value)}
-                    placeholder="Search problems..." className="w-full border rounded-lg px-3 py-2 text-sm" />
+                <FilterLabel>Search</FilterLabel>
+                <Input
+                    type="search"
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    placeholder="Search problems…"
+                    aria-label="Search problems"
+                />
             </div>
 
-            {/* Platform */}
             <div>
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Platform</h3>
-                <div className="space-y-1">
+                <FilterLabel>Platform</FilterLabel>
+                <div className="space-y-0.5">
                     {platforms.map(p => (
-                        <button key={p.value} onClick={() => setSource(p.value)}
-                            className={`w-full text-left px-3 py-1.5 rounded text-sm ${source === p.value ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
+                        <FilterOption key={p.value} active={source === p.value} onClick={() => setSource(p.value)}>
                             {p.label}
-                        </button>
+                        </FilterOption>
                     ))}
                 </div>
             </div>
 
-            {/* Difficulty */}
             <div>
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Difficulty</h3>
-                <div className="space-y-1">
+                <FilterLabel>Difficulty</FilterLabel>
+                <div className="space-y-0.5">
                     {difficulties.map(d => (
-                        <button key={d.value} onClick={() => setDifficulty(d.value)}
-                            className={`w-full text-left px-3 py-1.5 rounded text-sm ${d.color || ''} ${difficulty === d.value ? 'bg-blue-50 dark:bg-blue-900/20 font-medium' : 'hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
+                        <FilterOption key={d.value} active={difficulty === d.value} onClick={() => setDifficulty(d.value)}>
                             {d.label}
-                        </button>
+                        </FilterOption>
                     ))}
                 </div>
             </div>
 
-            {/* Rating */}
             <div>
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Rating</h3>
-                <div className="space-y-1">
+                <FilterLabel>Rating</FilterLabel>
+                <div className="space-y-0.5">
                     {ratings.map(r => (
-                        <button key={r.value} onClick={() => setRating(r.value)}
-                            className={`w-full text-left px-3 py-1.5 rounded text-sm ${rating === r.value ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 font-medium' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
+                        <FilterOption key={r.value} active={rating === r.value} onClick={() => setRating(r.value)}>
                             {r.label}
-                        </button>
+                        </FilterOption>
                     ))}
                 </div>
             </div>
 
-            {/* Tags */}
             {availableTags.length > 0 && (
                 <div>
-                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Tags</h3>
+                    <FilterLabel>Tags</FilterLabel>
                     <div className="flex flex-wrap gap-1.5">
-                        {availableTags.map(tag => (
-                            <button key={tag} onClick={() => toggleTag(tag)}
-                                className={`px-2 py-1 rounded text-xs ${selectedTags.includes(tag) ? 'bg-blue-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'}`}>
-                                {tag}
-                            </button>
-                        ))}
+                        {availableTags.map(tag => {
+                            const active = selectedTags.includes(tag)
+                            return (
+                                <button
+                                    key={tag}
+                                    type="button"
+                                    onClick={() => toggleTag(tag)}
+                                    aria-pressed={active}
+                                    className={`rounded-md px-2 py-1 text-xs transition-colors ${active
+                                        ? 'bg-brand text-on-brand'
+                                        : 'bg-surface-3 text-ink-soft hover:bg-hairline'
+                                        }`}
+                                >
+                                    {tag}
+                                </button>
+                            )
+                        })}
                     </div>
                 </div>
             )}
 
-            {/* Sort */}
             <div>
-                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Sort By</h3>
-                <select value={sortBy} onChange={e => setSortBy(e.target.value)}
-                    className="w-full border rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800">
+                <FilterLabel>Sort by</FilterLabel>
+                <Select value={sortBy} onChange={e => setSortBy(e.target.value)} aria-label="Sort problems">
                     {sortOptions.map(s => (
                         <option key={s.value} value={s.value}>{s.label}</option>
                     ))}
-                </select>
+                </Select>
             </div>
 
-            {/* Clear Filters */}
             {hasActiveFilters && (
-                <button onClick={clearFilters}
-                    className="w-full text-sm text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 px-3 py-2 border border-red-200 dark:border-red-800 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20">
-                    Clear All Filters
-                </button>
+                <Button variant="ghost" size="sm" className="w-full text-bad hover:bg-bad/10" onClick={clearFilters}>
+                    Clear all filters
+                </Button>
             )}
         </div>
     )
 
     return (
         <div>
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
-                <div>
-                    <h1 className="text-2xl font-bold">Problems</h1>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{total} problems found</p>
-                </div>
-                <button onClick={() => setShowMobileFilters(!showMobileFilters)}
-                    className="md:hidden inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
-                    Filters
-                </button>
-            </div>
+            <PageHeader
+                title="Problems"
+                description={`${total.toLocaleString()} problems across ${platforms.length - 1} platforms`}
+                actions={
+                    <Button
+                        variant="secondary"
+                        className="lg:hidden"
+                        onClick={() => setShowMobileFilters(true)}
+                    >
+                        <SlidersHorizontal className="h-4 w-4" />
+                        Filters
+                    </Button>
+                }
+            />
 
             {/* Active filter chips */}
             {hasActiveFilters && (
-                <div className="flex flex-wrap gap-2 mb-4">
-                    {source && (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded text-xs">
-                            {platforms.find(p => p.value === source)?.label}
-                            <button onClick={() => setSource('')} className="text-blue-500 dark:text-blue-400 hover:text-blue-700">×</button>
-                        </span>
-                    )}
-                    {difficulty && (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded text-xs">
-                            {difficulties.find(d => d.value === difficulty)?.label}
-                            <button onClick={() => setDifficulty('')} className="text-blue-500 dark:text-blue-400 hover:text-blue-700">×</button>
-                        </span>
-                    )}
-                    {rating && (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded text-xs">
-                            Rating: {rating}
-                            <button onClick={() => setRating('')} className="text-blue-500 dark:text-blue-400 hover:text-blue-700">×</button>
-                        </span>
-                    )}
-                    {search && (
-                        <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded text-xs">
-                            "{search}"
-                            <button onClick={() => setSearch('')} className="text-blue-500 dark:text-blue-400 hover:text-blue-700">×</button>
-                        </span>
-                    )}
-                    {selectedTags.map(tag => (
-                        <span key={tag} className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded text-xs">
-                            {tag}
-                            <button onClick={() => toggleTag(tag)} className="text-blue-500 dark:text-blue-400 hover:text-blue-700">×</button>
-                        </span>
-                    ))}
-                    <button onClick={clearFilters} className="text-xs text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300">Clear all</button>
+                <div className="mb-4 flex flex-wrap items-center gap-1.5">
+                    {source && <Chip label={PLATFORM_LABEL[source] || source} onClear={() => setSource('')} />}
+                    {difficulty && <Chip label={difficulty} onClear={() => setDifficulty('')} />}
+                    {rating && <Chip label={`Rating ${rating}`} onClear={() => setRating('')} />}
+                    {search && <Chip label={`“${search}”`} onClear={() => setSearch('')} />}
+                    {selectedTags.map(tag => <Chip key={tag} label={tag} onClear={() => toggleTag(tag)} />)}
+                    <button
+                        type="button"
+                        onClick={clearFilters}
+                        className="ml-1 text-xs font-medium text-muted transition-colors hover:text-ink"
+                    >
+                        Clear all
+                    </button>
                 </div>
             )}
 
             <div className="flex gap-6">
                 {/* Sidebar */}
-                <div className="hidden md:block">
-                    {filterSidebar()}
-                </div>
+                <aside className="hidden w-56 shrink-0 lg:block">
+                    <div className="sticky top-20">
+                        <Card className="p-4">{filterPanel()}</Card>
+                    </div>
+                </aside>
 
-                {/* Mobile filter overlay */}
+                {/* Mobile filter drawer */}
                 {showMobileFilters && (
-                    <div className="md:hidden fixed inset-0 z-50 bg-black/50" onClick={() => setShowMobileFilters(false)}>
-                        <div className="absolute right-0 top-0 h-full w-80 bg-white dark:bg-gray-800 p-4 overflow-y-auto" onClick={e => e.stopPropagation()}>
-                            <div className="flex justify-between items-center mb-4">
-                                <h2 className="font-semibold">Filters</h2>
-                                <button onClick={() => setShowMobileFilters(false)} className="text-gray-500 dark:text-gray-400">✕</button>
+                    <div
+                        className="fixed inset-0 z-50 flex justify-end bg-black/50 lg:hidden"
+                        onClick={() => setShowMobileFilters(false)}
+                    >
+                        <div
+                            role="dialog"
+                            aria-modal="true"
+                            aria-label="Filters"
+                            className="h-full w-[min(20rem,88vw)] overflow-y-auto border-l border-hairline bg-surface p-4"
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <div className="mb-4 flex items-center justify-between">
+                                <h2 className="text-sm font-semibold text-ink">Filters</h2>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowMobileFilters(false)}
+                                    aria-label="Close filters"
+                                    className="flex h-9 w-9 items-center justify-center rounded-lg text-muted hover:bg-surface-2 hover:text-ink"
+                                >
+                                    <X className="h-4 w-4" />
+                                </button>
                             </div>
-                            {filterSidebar()}
+                            {filterPanel()}
                         </div>
                     </div>
                 )}
 
-                {/* Problem table - Desktop */}
-                <div className="flex-1 min-w-0">
-                    <div className="hidden md:block border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-                        <table className="w-full text-sm">
-                            <thead className="bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-xs uppercase">
-                                <tr>
-                                    <th className="px-4 py-3 text-left">Title</th>
-                                    <th className="px-4 py-3 text-left">Platform</th>
-                                    <th className="px-4 py-3 text-left">Difficulty</th>
-                                    <th className="px-4 py-3 text-left">Tags</th>
-                                    <th className="px-4 py-3 text-right">Solved</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                                {problems.map(p => (
-                                    <tr key={p.slug} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                                        <td className="px-4 py-3">
-                                            <Link to={`/problems/${p.slug}`} className="font-medium text-blue-600 dark:text-blue-400 hover:underline">
-                                                {p.title}
-                                            </Link>
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${p.source === 'codeforces' ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300' :
-                                                p.source === 'atcoder' ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300' :
-                                                    p.source === 'cses' ? 'bg-cyan-50 text-cyan-700' :
-                                                        p.source === 'toph' ? 'bg-pink-50 dark:bg-pink-900/20 text-pink-700' :
-                                                            p.source === 'qoj' ? 'bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300' :
-                                                                'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
-                                                }`}>
-                                                {p.source === 'local' || !p.source ? 'AIOJ' : p.source?.charAt(0).toUpperCase() + p.source?.slice(1)}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${difficultyColor[p.difficulty || ''] || ''}`}>
-                                                {p.difficulty}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs max-w-xs truncate">
-                                            {p.tags?.join(', ') || '—'}
-                                        </td>
-                                        <td className="px-4 py-3 text-right text-gray-500 dark:text-gray-400 text-xs">
-                                            {p.accepted_count}/{p.submission_count}
-                                        </td>
+                {/* Results */}
+                <div className="min-w-0 flex-1">
+                    <div className="hidden md:block">
+                        <TableShell>
+                            <Table>
+                                <THead>
+                                    <tr>
+                                        <Th>Problem</Th>
+                                        <Th className="w-32">Platform</Th>
+                                        <Th className="w-28">Difficulty</Th>
+                                        <Th>Tags</Th>
+                                        <Th className="w-44 text-right">Acceptance</Th>
                                     </tr>
-                                ))}
-                                {problems.length === 0 && (
-                                    <tr><td colSpan={5} className="px-4 py-4"><EmptyState text="No problems found" description="Try a different search or filter — problem sets sync in from judges." /></td></tr>
-                                )}
-                            </tbody>
-                        </table>
+                                </THead>
+                                <tbody>
+                                    {problems.map(p => (
+                                        <Tr key={p.slug}>
+                                            <Td>
+                                                <Link
+                                                    to={`/problems/${p.slug}`}
+                                                    className="font-medium text-ink transition-colors hover:text-brand"
+                                                >
+                                                    {p.title}
+                                                </Link>
+                                            </Td>
+                                            <Td>
+                                                <Badge tone="neutral">{PLATFORM_LABEL[p.source || 'local'] || p.source}</Badge>
+                                            </Td>
+                                            <Td>
+                                                {p.difficulty ? (
+                                                    <Badge tone={DIFFICULTY_TONE[p.difficulty] || 'neutral'}>{p.difficulty}</Badge>
+                                                ) : (
+                                                    <span className="text-muted-soft">—</span>
+                                                )}
+                                            </Td>
+                                            <Td className="max-w-[18rem]">
+                                                <span className="line-clamp-1 text-xs text-muted">
+                                                    {p.tags?.join(', ') || '—'}
+                                                </span>
+                                            </Td>
+                                            <Td className="whitespace-nowrap text-right">
+                                                <span className="tnum text-xs text-muted">
+                                                    <span className="font-medium text-ink-soft">{acceptance(p)}</span>
+                                                    <span aria-hidden="true" className="mx-1 text-hairline-strong">·</span>
+                                                    {p.accepted_count}/{p.submission_count}
+                                                </span>
+                                            </Td>
+                                        </Tr>
+                                    ))}
+                                    {problems.length === 0 && (
+                                        <tr>
+                                            <td colSpan={5}>
+                                                <EmptyState
+                                                    text="No problems found"
+                                                    description="Try a different search or filter — problem sets sync in from judges."
+                                                />
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </Table>
+                        </TableShell>
                     </div>
 
-                    {/* Problem cards - Mobile */}
-                    <div className="md:hidden space-y-3">
+                    {/* Mobile cards */}
+                    <div className="space-y-2.5 md:hidden">
                         {problems.map(p => (
-                            <div key={p.slug} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                            <Card key={p.slug} className="p-4">
                                 <Link to={`/problems/${p.slug}`} className="block">
-                                    <h3 className="font-medium text-blue-600 dark:text-blue-400 hover:underline mb-2">
-                                        {p.title}
-                                    </h3>
+                                    <h3 className="text-sm font-medium text-ink">{p.title}</h3>
                                 </Link>
-                                <div className="flex flex-wrap items-center gap-2 mb-2">
-                                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${p.source === 'codeforces' ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300' :
-                                        p.source === 'atcoder' ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300' :
-                                            p.source === 'cses' ? 'bg-cyan-50 text-cyan-700' :
-                                                p.source === 'toph' ? 'bg-pink-50 dark:bg-pink-900/20 text-pink-700' :
-                                                    p.source === 'qoj' ? 'bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300' :
-                                                        'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
-                                        }`}>
-                                        {p.source === 'local' || !p.source ? 'AIOJ' : p.source?.charAt(0).toUpperCase() + p.source?.slice(1)}
-                                    </span>
-                                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${difficultyColor[p.difficulty || ''] || ''}`}>
-                                        {p.difficulty}
-                                    </span>
-                                    <span className="text-xs text-gray-500 dark:text-gray-400 ml-auto">
-                                        {p.accepted_count}/{p.submission_count} solved
+                                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                                    <Badge tone="neutral">{PLATFORM_LABEL[p.source || 'local'] || p.source}</Badge>
+                                    {p.difficulty && <Badge tone={DIFFICULTY_TONE[p.difficulty] || 'neutral'}>{p.difficulty}</Badge>}
+                                    <span className="tnum ml-auto text-xs text-muted">
+                                        {p.accepted_count}/{p.submission_count}
                                     </span>
                                 </div>
                                 {p.tags && p.tags.length > 0 && (
-                                    <div className="flex flex-wrap gap-1.5">
-                                        {p.tags.slice(0, 3).map((tag: string) => (
-                                            <span key={tag} className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded text-xs">
-                                                {tag}
-                                            </span>
-                                        ))}
-                                        {p.tags.length > 3 && (
-                                            <span className="px-1.5 py-0.5 text-gray-400 dark:text-gray-500 text-xs">
-                                                +{p.tags.length - 3} more
-                                            </span>
-                                        )}
-                                    </div>
+                                    <p className="mt-2 line-clamp-1 text-xs text-muted">{p.tags.join(' · ')}</p>
                                 )}
-                            </div>
+                            </Card>
                         ))}
                         {problems.length === 0 && (
-                            <div className="px-4 py-4"><EmptyState text="No problems found" description="Try a different search or filter — problem sets sync in from judges." /></div>
+                            <Card>
+                                <EmptyState
+                                    text="No problems found"
+                                    description="Try a different search or filter — problem sets sync in from judges."
+                                />
+                            </Card>
                         )}
                     </div>
 
                     {/* Pagination */}
-                    <div className="flex items-center justify-between mt-4 text-sm text-gray-500 dark:text-gray-400">
-                        <span>{total} problems</span>
+                    <nav aria-label="Pagination" className="mt-4 flex items-center justify-between text-xs text-muted">
+                        <span className="tnum">
+                            {total === 0
+                                ? 'No results'
+                                : `${offset + 1}–${Math.min(offset + limit, total)} of ${total.toLocaleString()}`}
+                        </span>
                         <div className="flex gap-2">
-                            <button onClick={() => setOffset(Math.max(0, offset - limit))} disabled={offset === 0}
-                                className="px-3 py-1 border rounded disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-700">Prev</button>
-                            <button onClick={() => setOffset(offset + limit)} disabled={offset + limit >= total}
-                                className="px-3 py-1 border rounded disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-700">Next</button>
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => setOffset(Math.max(0, offset - limit))}
+                                disabled={offset === 0}
+                            >
+                                Previous
+                            </Button>
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => setOffset(offset + limit)}
+                                disabled={offset + limit >= total}
+                            >
+                                Next
+                            </Button>
                         </div>
-                    </div>
+                    </nav>
                 </div>
             </div>
         </div>
+    )
+}
+
+function FilterLabel({ children }: { children: React.ReactNode }) {
+    return <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted">{children}</h3>
+}
+
+function FilterOption({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            aria-pressed={active}
+            className={`w-full rounded-md px-2 py-1.5 text-left text-sm transition-colors ${active
+                ? 'bg-brand-soft font-medium text-brand'
+                : 'text-ink-soft hover:bg-surface-2 hover:text-ink'
+                }`}
+        >
+            {children}
+        </button>
+    )
+}
+
+function Chip({ label, onClear }: { label: string; onClear: () => void }) {
+    return (
+        <span className="inline-flex items-center gap-1 rounded-md bg-brand-soft py-0.5 pl-2 pr-1 text-xs text-brand">
+            {label}
+            <button
+                type="button"
+                onClick={onClear}
+                aria-label={`Remove ${label} filter`}
+                className="rounded p-0.5 transition-colors hover:bg-brand/15"
+            >
+                <X className="h-3 w-3" />
+            </button>
+        </span>
     )
 }

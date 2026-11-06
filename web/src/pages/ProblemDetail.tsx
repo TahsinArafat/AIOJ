@@ -11,9 +11,11 @@ import CodeEditor from '../components/CodeEditor'
 import AddEditorialModal from '../components/AddEditorialModal'
 import CommentSection from '../components/CommentSection'
 import { EmptyState } from '../components/EmptyState'
-import { Download, Copy, Check } from 'lucide-react'
+import { Download, Copy, Check, Timer, MemoryStick, type LucideIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '../components/Toast'
+import { Badge, type BadgeTone } from '../components/ui/Badge'
+import { Skeleton } from '../components/ui/PageHeader'
 
 function useIsDesktop(breakpoint = 768) {
     const [isDesktop, setIsDesktop] = useState(
@@ -63,7 +65,7 @@ function CopyButton({ text }: { text: string }) {
     return (
         <button
             onClick={handleCopy}
-            className="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors px-2 py-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 cursor-pointer"
+            className="text-xs text-muted hover:text-ink transition-colors px-2 py-1 rounded hover:bg-surface-3 cursor-pointer"
             title="Copy to clipboard"
         >
             {copied ? <><Check className="w-3.5 h-3.5" /> Copied</> : <><Copy className="w-3.5 h-3.5" /> Copy</>}
@@ -168,8 +170,8 @@ const STATUS_COLORS: Record<string, string> = {
     mle: 'text-orange-600 dark:text-orange-400', MLE: 'text-orange-600 dark:text-orange-400',
     re: 'text-red-700 dark:text-red-300', RE: 'text-red-700 dark:text-red-300',
     ce: 'text-purple-600 dark:text-purple-400', CE: 'text-purple-600 dark:text-purple-400',
-    pending: 'text-blue-500 dark:text-blue-400', judging: 'text-blue-600 dark:text-blue-400',
-    se: 'text-gray-600 dark:text-gray-400', SE: 'text-gray-600 dark:text-gray-400',
+    pending: 'text-blue-500 dark:text-blue-400', judging: 'text-brand',
+    se: 'text-muted', SE: 'text-muted',
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -181,6 +183,37 @@ const STATUS_LABELS: Record<string, string> = {
     ce: 'Compile Error', CE: 'Compile Error',
     pending: 'Pending', judging: 'Judging...',
     se: 'System Error', SE: 'System Error',
+}
+
+const DIFFICULTY_TONE: Record<string, BadgeTone> = {
+    easy: 'ok',
+    medium: 'warn',
+    hard: 'bad',
+}
+
+/** One statement sub-section: heading plus KaTeX/GFM-rendered body. */
+function StatementSection({ title, body }: { title: string; body: string }) {
+    return (
+        <section>
+            <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted">{title}</h3>
+            <div className="prose prose-sm max-w-none text-[14px] leading-[1.65] text-ink-soft">
+                <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+                    {body}
+                </ReactMarkdown>
+            </div>
+        </section>
+    )
+}
+
+/** A limit chip: icon, label and value on one line. */
+function Limit({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
+    return (
+        <span className="flex items-center gap-1.5">
+            <Icon className="h-3.5 w-3.5 text-muted-soft" aria-hidden="true" />
+            <span className="text-muted">{label}</span>
+            <span className="tnum font-medium text-ink">{value}</span>
+        </span>
+    )
 }
 
 interface ProblemTranslation { language: string; title?: string | null; description?: string | null }
@@ -502,18 +535,26 @@ export default function ProblemDetail() {
     const canExport = role === 'admin' || role === 'setter'
 
     if (!problem) {
-        return <div className="text-center py-20 text-gray-400 dark:text-gray-500">Loading...</div>
+        // A skeleton that matches the real layout, so the page does not jump
+        // when the statement lands.
+        return (
+            <div className="space-y-4 py-6">
+                <Skeleton className="h-7 w-64" />
+                <Skeleton className="h-4 w-96 max-w-full" />
+                <Skeleton className="h-64 w-full" />
+            </div>
+        )
     }
 
     return (
         <div ref={containerRef} className="flex flex-col h-full select-none md:flex-row" style={{ cursor: dragging ? 'col-resize' : undefined }}>
             {/* Mobile tab bar */}
-            <div className="flex md:hidden border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex-shrink-0">
+            <div className="flex md:hidden border-b border-hairline bg-surface flex-shrink-0">
                 <button
                     onClick={() => setMobileTab('problem')}
                     className={`flex-1 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${mobileTab === 'problem'
-                        ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                        : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                        ? 'border-brand text-brand'
+                        : 'border-transparent text-muted hover:text-ink'
                         }`}
                 >
                     Problem
@@ -521,8 +562,8 @@ export default function ProblemDetail() {
                 <button
                     onClick={() => setMobileTab('code')}
                     className={`flex-1 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${mobileTab === 'code'
-                        ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                        : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                        ? 'border-brand text-brand'
+                        : 'border-transparent text-muted hover:text-ink'
                         }`}
                 >
                     Code
@@ -535,50 +576,40 @@ export default function ProblemDetail() {
                 style={isDesktop ? { width: `${splitPos}%`, minWidth: '20%' } : { flex: 1 }}
             >
                 <div>
-                    <h1 className="text-2xl font-bold">
+                    <h1 className="flex flex-wrap items-center gap-2 text-xl font-semibold tracking-tight text-ink sm:text-2xl">
                         {translation?.title || problem.title}
                         {translation?.title && (
-                            <span
-                                title={`Translated to ${i18n.language}`}
-                                className="inline-flex items-center ml-2 px-2 py-0.5 text-xs font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 rounded align-middle"
-                            >
+                            <Badge tone="ok" label={`Translated to ${i18n.language}`}>
                                 {i18n.language.toUpperCase()}
-                            </span>
+                            </Badge>
                         )}
-                        {problem.interactive && (
-                            <span className="inline-flex items-center ml-2 px-2 py-0.5 text-xs font-semibold bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 rounded align-middle">
-                                Interactive
-                            </span>
-                        )}
-                        {problem.problem_type === 'output' && (
-                            <span className="inline-flex items-center ml-2 px-2 py-0.5 text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 rounded align-middle">
-                                Output-Only
-                            </span>
-                        )}
-                        {problem.scoring_mode === 'partial' && (
-                            <span className="inline-flex items-center ml-2 px-2 py-0.5 text-xs font-semibold bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded align-middle">
-                                Partial Scoring
-                            </span>
-                        )}
+                        {problem.interactive && <Badge tone="accent">Interactive</Badge>}
+                        {problem.problem_type === 'output' && <Badge tone="warn">Output-only</Badge>}
+                        {problem.scoring_mode === 'partial' && <Badge tone="brand">Partial scoring</Badge>}
                     </h1>
-                    <div className="mt-3 pb-3 border-b border-gray-200 dark:border-gray-700 flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-xs text-gray-500 dark:text-gray-400">
-                        <span className="flex items-center gap-1.5">
-                            <span className="text-gray-700 dark:text-gray-300 font-semibold">Time:</span>
-                            <span className="text-gray-900 dark:text-gray-100 font-semibold">{(problem.time_limit / 1000).toFixed(1)} sec</span>
-                        </span>
-                        <span className="text-gray-300 dark:text-gray-600">·</span>
-                        <span className="flex items-center gap-1.5">
-                            <span className="text-gray-700 dark:text-gray-300 font-semibold">Memory:</span>
-                            <span className="text-gray-900 dark:text-gray-100 font-semibold">{Math.round(problem.memory_limit / 1024)} MB</span>
-                        </span>
-                        <span className="text-gray-300 dark:text-gray-600">·</span>
-                        <span className="flex items-center gap-1.5">
-                            <span className="text-gray-700 dark:text-gray-300 font-semibold">Difficulty:</span>
-                            <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wider ${problem.difficulty === 'easy' ? 'bg-green-100 dark:bg-green-900/30 text-green-800' :
-                                problem.difficulty === 'hard' ? 'bg-red-100 dark:bg-red-900/30 text-red-800' :
-                                    'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800'
-                                }`}>{problem.difficulty}</span>
-                        </span>
+                    {/* Limits are the first thing a competitor looks for, so they
+                        get a fixed-order strip. The difficulty pill used a fixed
+                        `text-green-800` with no dark variant, which was dark green
+                        on a dark tint — unreadable on the dark canvas. */}
+                    <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-hairline pb-3 text-xs">
+                        <Limit icon={Timer} label="Time" value={`${(problem.time_limit / 1000).toFixed(1)} s`} />
+                        <Limit icon={MemoryStick} label="Memory" value={`${Math.round(problem.memory_limit / 1024)} MB`} />
+                        {problem.difficulty && (
+                            <span className="flex items-center gap-1.5">
+                                <span className="text-muted">Difficulty</span>
+                                <Badge tone={DIFFICULTY_TONE[problem.difficulty] || 'neutral'} className="uppercase tracking-wider">
+                                    {problem.difficulty}
+                                </Badge>
+                            </span>
+                        )}
+                        {problem.tags && problem.tags.length > 0 && (
+                            <span className="flex flex-wrap items-center gap-1.5">
+                                <span className="text-muted">Tags</span>
+                                {problem.tags.map(tag => (
+                                    <Badge key={tag} tone="neutral">{tag}</Badge>
+                                ))}
+                            </span>
+                        )}
                     </div>
                     {canExport && (
                         <div className="mt-2">
@@ -600,7 +631,7 @@ export default function ProblemDetail() {
                                         toast.error('Export failed: ' + (e instanceof Error ? e.message : String(e)))
                                     }
                                 }}
-                                className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
+                                className="inline-flex items-center px-4 py-2 border border-hairline-strong rounded-md shadow-sm text-sm font-medium text-ink-soft bg-surface hover:bg-surface-2 cursor-pointer"
                             >
                                 Export (FPS ZIP)
                             </button>
@@ -608,48 +639,56 @@ export default function ProblemDetail() {
                     )}
                 </div>
 
-                <div className="flex overflow-x-auto border-b border-gray-200 dark:border-gray-700 flex-shrink-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                    <button onClick={() => setTab('statement')} className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px whitespace-nowrap ${tab === 'statement' ? 'border-blue-600 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}>
-                        Statement
-                    </button>
-                    <button onClick={() => setTab('stats')} className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px whitespace-nowrap ${tab === 'stats' ? 'border-blue-600 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}>
-                        Statistics
-                    </button>
-                    <button onClick={() => setTab('editorials')} className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px whitespace-nowrap ${tab === 'editorials' ? 'border-blue-600 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}>
-                        Editorials
-                    </button>
-                    {getAccessToken() && (
-                        <button onClick={() => setTab('submissions')} className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px whitespace-nowrap ${tab === 'submissions' ? 'border-blue-600 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}>
-                            My Submissions
+                <div
+                    role="tablist"
+                    aria-label="Problem detail"
+                    className="flex shrink-0 overflow-x-auto border-b border-hairline [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+                >
+                    {([
+                        { key: 'statement' as const, label: 'Statement' },
+                        { key: 'stats' as const, label: 'Statistics' },
+                        { key: 'editorials' as const, label: 'Editorials' },
+                        ...(getAccessToken() ? [{ key: 'submissions' as const, label: 'My Submissions' }] : []),
+                        { key: 'more' as const, label: 'More' },
+                    ]).map(t => (
+                        <button
+                            key={t.key}
+                            type="button"
+                            role="tab"
+                            aria-selected={tab === t.key}
+                            onClick={() => setTab(t.key)}
+                            className={`-mb-px whitespace-nowrap border-b-2 px-3.5 py-2 text-sm font-medium transition-colors sm:px-4 ${tab === t.key
+                                ? 'border-brand text-brand'
+                                : 'border-transparent text-muted hover:text-ink'
+                                }`}
+                        >
+                            {t.label}
                         </button>
-                    )}
-                    <button onClick={() => setTab('more')} className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px whitespace-nowrap ${tab === 'more' ? 'border-blue-600 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}>
-                        More
-                    </button>
+                    ))}
                 </div>
 
                 {tab === 'statement' ? (
                     <div className="space-y-5 pb-8 px-4 py-6 md:px-8 md:py-8">
                         {isPdfUrl(effectiveDescription) ? (
                             <div className="space-y-3">
-                                <h3 className="font-semibold text-sm text-gray-700 dark:text-gray-300 uppercase tracking-wide">PDF Problem Statement</h3>
+                                <h3 className="font-semibold text-sm text-ink-soft uppercase tracking-wide">PDF Problem Statement</h3>
                                 <a
                                     href={effectiveDescription}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
+                                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-brand bg-brand-soft border border-blue-200 dark:border-blue-800 rounded-lg hover:bg-brand-soft transition-colors"
                                 >
                                     <Download className="w-4 h-4" />
                                     Download PDF
                                 </a>
                                 <iframe
                                     src={effectiveDescription}
-                                    className="w-full h-[800px] border-0 rounded-lg shadow-sm bg-white"
+                                    className="w-full h-[800px] border-0 rounded-lg shadow-sm bg-surface"
                                     title="Problem Statement"
                                 />
                             </div>
                         ) : (
-                            <div className="prose prose-sm max-w-none text-gray-800 dark:text-gray-200 text-[14px] leading-[1.6]">
+                            <div className="prose prose-sm max-w-none text-ink text-[14px] leading-[1.6]">
                                 <ReactMarkdown
                                     remarkPlugins={[remarkGfm, remarkMath]}
                                     rehypePlugins={[rehypeKatex]}
@@ -660,7 +699,7 @@ export default function ProblemDetail() {
                                             if (isBlock) {
                                                 return <code className={className}>{children}</code>
                                             }
-                                            return <code className="bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded text-sm font-mono">{children}</code>
+                                            return <code className="bg-surface-3 px-1.5 py-0.5 rounded text-sm font-mono">{children}</code>
                                         }
                                     }}
                                 >
@@ -669,57 +708,38 @@ export default function ProblemDetail() {
                             </div>
                         )}
                         {problem.input_format && (
-                            <div>
-                                <h3 className="font-semibold text-sm text-gray-700 dark:text-gray-300 uppercase tracking-wide mb-1">Input Format</h3>
-                                <div className="prose prose-sm max-w-none text-gray-700 dark:text-gray-300 text-[14px] leading-[1.6]">
-                                    <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
-                                        {problem.input_format}
-                                    </ReactMarkdown>
-                                </div>
-                            </div>
+                            <StatementSection title="Input format" body={problem.input_format} />
                         )}
                         {problem.output_format && (
-                            <div>
-                                <h3 className="font-semibold text-sm text-gray-700 dark:text-gray-300 uppercase tracking-wide mb-1">Output Format</h3>
-                                <div className="prose prose-sm max-w-none text-gray-700 dark:text-gray-300 text-[14px] leading-[1.6]">
-                                    <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
-                                        {problem.output_format}
-                                    </ReactMarkdown>
-                                </div>
-                            </div>
+                            <StatementSection title="Output format" body={problem.output_format} />
                         )}
+                        {/* This block is `problem.hint`, not the constraints — it used to
+                            render under a "Constraints" heading and mislead readers. */}
                         {problem.hint && (
-                            <div>
-                                <h3 className="font-semibold text-sm text-gray-700 dark:text-gray-300 uppercase tracking-wide mb-1">Constraints</h3>
-                                <div className="prose prose-sm max-w-none text-gray-700 dark:text-gray-300 text-[14px] leading-[1.6]">
-                                    <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
-                                        {problem.hint}
-                                    </ReactMarkdown>
-                                </div>
-                            </div>
+                            <StatementSection title="Notes" body={problem.hint} />
                         )}
                         {problem.sample_cases && problem.sample_cases.length > 0 && problem.sample_cases.map((sc, i) => (
                             <div key={i}>
-                                <h3 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Sample {i + 1}</h3>
-                                <div className="border border-gray-200 dark:border-gray-700 rounded-md overflow-hidden mb-4">
+                                <h3 className="text-xs font-semibold text-muted uppercase tracking-wide mb-2">Sample {i + 1}</h3>
+                                <div className="border border-hairline rounded-md overflow-hidden mb-4">
                                     <div className="grid grid-cols-1 md:grid-cols-2">
-                                        <div className="border-b md:border-b-0 md:border-r border-gray-200 dark:border-gray-700">
-                                            <div className="bg-gray-50 dark:bg-gray-800 px-3 py-2 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-                                                <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">Standard Input</span>
+                                        <div className="border-b md:border-b-0 md:border-r border-hairline">
+                                            <div className="bg-surface-2 px-3 py-2 border-b border-hairline flex items-center justify-between">
+                                                <span className="text-xs font-semibold text-muted">Standard Input</span>
                                                 <CopyButton text={sc.input} />
                                             </div>
-                                            <pre className="p-3 font-mono text-[13px] text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-all">{sc.input}</pre>
+                                            <pre className="p-3 font-mono text-[13px] text-ink whitespace-pre-wrap break-all">{sc.input}</pre>
                                         </div>
                                         <div>
-                                            <div className="bg-gray-50 dark:bg-gray-800 px-3 py-2 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-                                                <span className="text-xs font-semibold text-gray-600 dark:text-gray-400">Standard Output</span>
+                                            <div className="bg-surface-2 px-3 py-2 border-b border-hairline flex items-center justify-between">
+                                                <span className="text-xs font-semibold text-muted">Standard Output</span>
                                                 <CopyButton text={sc.output} />
                                             </div>
-                                            <pre className="p-3 font-mono text-[13px] text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-all">{sc.output}</pre>
+                                            <pre className="p-3 font-mono text-[13px] text-ink whitespace-pre-wrap break-all">{sc.output}</pre>
                                         </div>
                                     </div>
                                 </div>
-                                {sc.explanation && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{sc.explanation}</p>}
+                                {sc.explanation && <p className="text-xs text-muted mt-1">{sc.explanation}</p>}
                             </div>
                         ))}
                     </div>
@@ -743,13 +763,13 @@ export default function ProblemDetail() {
                         )}
                         {problem.tags && problem.tags.length > 0 && (
                             <div>
-                                <h3 className="font-semibold text-gray-800 dark:text-gray-200 mb-3">Tags</h3>
+                                <h3 className="font-semibold text-ink mb-3">Tags</h3>
                                 <div className="flex flex-wrap gap-2">
                                     {problem.tags.map((tag: string) => (
                                         <Link
                                             key={tag}
                                             to={`/problems?tag=${tag}`}
-                                            className="bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-300 px-3 py-1.5 rounded transition-colors"
+                                            className="bg-surface-3 hover:bg-surface-3 border border-hairline text-sm text-ink-soft px-3 py-1.5 rounded transition-colors"
                                         >
                                             {tag}
                                         </Link>
@@ -759,14 +779,14 @@ export default function ProblemDetail() {
                         )}
                         {problem.source && (
                             <div>
-                                <h3 className="font-semibold text-gray-800 dark:text-gray-200 mb-2">Source / Author</h3>
-                                <div className="text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-4 py-2 rounded-lg inline-block">
+                                <h3 className="font-semibold text-ink mb-2">Source / Author</h3>
+                                <div className="text-sm text-ink-soft bg-surface-2 border border-hairline px-4 py-2 rounded-lg inline-block">
                                     {problem.source}
                                 </div>
                             </div>
                         )}
                         {(!problem.tags?.length && !problem.source && !problem.interactive && problem.scoring_mode !== 'partial') && (
-                            <p className="text-gray-500 dark:text-gray-400 text-sm py-4">No additional information available for this problem.</p>
+                            <p className="text-muted text-sm py-4">No additional information available for this problem.</p>
                         )}
                         <CommentSection parentType="problem" parentId={problem.id} />
                     </div>
@@ -782,7 +802,7 @@ export default function ProblemDetail() {
                                     <div className="flex justify-end">
                                         <button
                                             onClick={() => setIsAddModalOpen(true)}
-                                            className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-sm font-medium"
+                                            className="bg-brand hover:bg-brand-hover text-on-brand px-3 py-1.5 rounded text-sm font-medium"
                                         >
                                             Add Editorial
                                         </button>
@@ -795,12 +815,12 @@ export default function ProblemDetail() {
                             <EmptyState text="No editorials yet for this problem" description="Published write-ups from other solvers will appear here." />
                         ) : (
                             editorials.map(e => (
-                                <Link key={e.id} to={`/editorials/${e.id}`} className="block border rounded p-4 hover:bg-gray-50 dark:hover:bg-gray-700">
+                                <Link key={e.id} to={`/editorials/${e.id}`} className="block border rounded p-4 hover:bg-surface-2">
                                     <div className="flex items-center gap-2 mb-1">
                                         {e.is_official && <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-2 py-0.5 rounded font-medium">Official</span>}
                                         <h4 className="font-medium">{e.title}</h4>
                                     </div>
-                                    <div className="flex gap-4 text-xs text-gray-400 dark:text-gray-500">
+                                    <div className="flex gap-4 text-xs text-muted-soft">
                                         <span>{e.username}</span>
                                         {e.time_complexity && <span>Time: {e.time_complexity}</span>}
                                         <span>{e.upvotes} upvotes</span>
@@ -823,13 +843,13 @@ export default function ProblemDetail() {
                 ) : (
                     <div className="space-y-4">
                         {loadingSubs ? (
-                            <div className="text-center py-8 text-gray-400 dark:text-gray-500">Loading submissions...</div>
+                            <div className="text-center py-8 text-muted-soft">Loading submissions...</div>
                         ) : mySubs.length === 0 ? (
                             <EmptyState text="No submissions yet for this problem" description="Submit a solution to start your attempt record." />
                         ) : (
-                            <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-x-auto">
+                            <div className="border border-hairline rounded-lg overflow-x-auto">
                                 <table className="w-full text-sm">
-                                    <thead className="bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-xs uppercase">
+                                    <thead className="bg-surface-2 text-muted text-xs uppercase">
                                         <tr>
                                             <th className="px-4 py-2 text-left">ID</th>
                                             <th className="px-4 py-2 text-left">Language</th>
@@ -838,15 +858,15 @@ export default function ProblemDetail() {
                                             <th className="px-4 py-2 text-left">Memory</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                                    <tbody className="divide-y divide-hairline">
                                         {mySubs.map(s => (
-                                            <tr key={s.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                                            <tr key={s.id} className="hover:bg-surface-2">
                                                 <td className="px-4 py-2 font-mono text-xs">
-                                                    <Link to={`/submissions/${s.id}`} className="text-blue-600 dark:text-blue-400 hover:underline">
+                                                    <Link to={`/submissions/${s.id}`} className="text-brand hover:underline">
                                                         {s.id?.substring(0, 8)}...
                                                     </Link>
                                                 </td>
-                                                <td className="px-4 py-2 text-gray-500 dark:text-gray-400">{s.language}</td>
+                                                <td className="px-4 py-2 text-muted">{s.language}</td>
                                                 <td className="px-4 py-2 font-semibold">
                                                     <span className={`px-2 py-0.5 rounded text-xs font-medium ${s.status === 'ac' ? 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20' :
                                                         s.status === 'wa' ? 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20' :
@@ -854,9 +874,9 @@ export default function ProblemDetail() {
                                                                 s.status === 'mle' ? 'text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20' :
                                                                     s.status === 're' ? 'text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/20' :
                                                                         s.status === 'ce' ? 'text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20' :
-                                                                            s.status === 'pending' ? 'text-blue-500 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20' :
-                                                                                s.status === 'judging' ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20' :
-                                                                                    'text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800'
+                                                                            s.status === 'pending' ? 'text-blue-500 dark:text-blue-400 bg-brand-soft' :
+                                                                                s.status === 'judging' ? 'text-brand bg-brand-soft' :
+                                                                                    'text-muted bg-surface-2'
                                                         }`}>
                                                         {s.status === 'ac' ? 'Accepted' :
                                                             s.status === 'wa' ? 'Wrong Answer' :
@@ -869,8 +889,8 @@ export default function ProblemDetail() {
                                                                                         s.status}
                                                     </span>
                                                 </td>
-                                                <td className="px-4 py-2 text-gray-500 dark:text-gray-400">{s.time_used > 0 ? `${s.time_used}ms` : '—'}</td>
-                                                <td className="px-4 py-2 text-gray-500 dark:text-gray-400">{s.memory_used > 0 ? `${Math.round(s.memory_used / 1024)}MB` : '—'}</td>
+                                                <td className="px-4 py-2 text-muted">{s.time_used > 0 ? `${s.time_used}ms` : '—'}</td>
+                                                <td className="px-4 py-2 text-muted">{s.memory_used > 0 ? `${Math.round(s.memory_used / 1024)}MB` : '—'}</td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -884,13 +904,13 @@ export default function ProblemDetail() {
             {/* Divider */}
             <div
                 onMouseDown={handleMouseDown}
-                className={`hidden md:flex w-3 flex-shrink-0 cursor-col-resize group transition-colors relative ${dragging ? 'bg-blue-500' : 'bg-gray-200 dark:bg-gray-700 hover:bg-blue-500'}`}
+                className={`hidden md:flex w-3 flex-shrink-0 cursor-col-resize group transition-colors relative ${dragging ? 'bg-blue-500' : 'bg-surface-3 hover:bg-blue-500'}`}
             >
                 {/* Grip dots indicator */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
-                    <span className="w-1 h-1 rounded-full bg-gray-400 dark:bg-gray-500 group-hover:bg-white/70 transition-colors" />
-                    <span className="w-1 h-1 rounded-full bg-gray-400 dark:bg-gray-500 group-hover:bg-white/70 transition-colors" />
-                    <span className="w-1 h-1 rounded-full bg-gray-400 dark:bg-gray-500 group-hover:bg-white/70 transition-colors" />
+                    <span className="w-1 h-1 rounded-full bg-muted-soft group-hover:bg-white/70 transition-colors" />
+                    <span className="w-1 h-1 rounded-full bg-muted-soft group-hover:bg-white/70 transition-colors" />
+                    <span className="w-1 h-1 rounded-full bg-muted-soft group-hover:bg-white/70 transition-colors" />
                 </div>
             </div>
 
@@ -903,7 +923,7 @@ export default function ProblemDetail() {
                     <select
                         value={lang}
                         onChange={e => setLang(e.target.value)}
-                        className="border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 w-full sm:w-auto"
+                        className="border border-hairline-strong rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)] w-full sm:w-auto"
                     >
                         {languages.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
                     </select>
@@ -912,7 +932,7 @@ export default function ProblemDetail() {
                             onClick={testWithSamples}
                             disabled={runningSamples || !code.trim() || problem?.source !== 'local'}
                             title={problem?.source !== 'local' ? 'Test Samples is only available for local problems' : undefined}
-                            className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors cursor-pointer"
+                            className="bg-brand text-on-brand px-3 py-1.5 rounded text-sm font-medium hover:bg-brand-hover disabled:opacity-50 transition-colors cursor-pointer"
                         >
                             {runningSamples ? 'Testing...' : 'Test Samples'}
                         </button>
@@ -932,13 +952,13 @@ export default function ProblemDetail() {
                     height={isDesktop ? "400px" : "250px"}
                 />
                 {result && (
-                    <div className="border border-gray-200 dark:border-gray-700 rounded p-3 text-sm">
+                    <div className="border border-hairline rounded p-3 text-sm">
                         <div className="flex justify-between items-center">
                             <span className={`font-semibold ${STATUS_COLORS[result.status] || ''}`}>
                                 {STATUS_LABELS[result.status] || result.status}
                             </span>
                             {result.time_used > 0 && (
-                                <span className="text-gray-500 dark:text-gray-400 text-xs">
+                                <span className="text-muted text-xs">
                                     {result.time_used}ms / {Math.round(result.memory_used / 1024)}MB
                                 </span>
                             )}
@@ -951,9 +971,9 @@ export default function ProblemDetail() {
 
                 {/* Sample Test Results */}
                 {sampleResults.length > 0 && (
-                    <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800 shadow-sm">
-                        <div className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center justify-between">
-                            <span className="font-semibold text-sm text-gray-700 dark:text-gray-300">Sample Test Results</span>
+                    <div className="border border-hairline rounded-lg overflow-hidden bg-surface shadow-sm">
+                        <div className="bg-surface-2 border-b border-hairline px-4 py-3 flex items-center justify-between">
+                            <span className="font-semibold text-sm text-ink-soft">Sample Test Results</span>
                             <span className={`text-xs font-medium px-2 py-0.5 rounded ${sampleResults.every(r => r.passed) ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' :
                                 sampleResults.some(r => r.passed) ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300' :
                                     'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
@@ -961,14 +981,14 @@ export default function ProblemDetail() {
                                 {sampleResults.filter(r => r.passed).length}/{sampleResults.length} Passed
                             </span>
                         </div>
-                        <div className="divide-y divide-gray-100 dark:divide-gray-700">
+                        <div className="divide-y divide-hairline">
                             {sampleResults.map((r) => (
                                 <div key={r.index} className="p-4">
                                     <div className="flex items-center justify-between mb-2">
-                                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Sample {r.index}</span>
+                                        <span className="text-sm font-medium text-ink-soft">Sample {r.index}</span>
                                         <div className="flex items-center gap-2">
                                             {r.time > 0 && (
-                                                <span className="text-xs text-gray-500 dark:text-gray-400">{r.time}ms</span>
+                                                <span className="text-xs text-muted">{r.time}ms</span>
                                             )}
                                             <span className={`text-xs font-medium px-2 py-0.5 rounded ${r.passed ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
                                                 }`}>
@@ -976,17 +996,17 @@ export default function ProblemDetail() {
                                             </span>
                                         </div>
                                     </div>
-                                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-2 font-mono bg-gray-50 dark:bg-gray-800 rounded p-2 overflow-x-auto">
+                                    <div className="text-xs text-muted mb-2 font-mono bg-surface-2 rounded p-2 overflow-x-auto">
                                         Input: {r.input.substring(0, 100)}{r.input.length > 100 ? '...' : ''}
                                     </div>
                                     {!r.passed && (
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                                             <div>
-                                                <span className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Expected</span>
+                                                <span className="block text-xs font-semibold text-muted mb-1">Expected</span>
                                                 <pre className="bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 font-mono text-xs p-2 rounded overflow-x-auto max-h-24 border border-green-100">{r.expected || '(empty)'}</pre>
                                             </div>
                                             <div>
-                                                <span className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Actual</span>
+                                                <span className="block text-xs font-semibold text-muted mb-1">Actual</span>
                                                 <pre className="bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 font-mono text-xs p-2 rounded overflow-x-auto max-h-24 border border-red-100">{r.actual || '(empty)'}</pre>
                                             </div>
                                         </div>
@@ -1004,32 +1024,32 @@ export default function ProblemDetail() {
                 )}
 
                 {/* Custom Scratchpad */}
-                <div className="mt-4 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800 shadow-sm">
-                    <div className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center justify-between">
-                        <span className="font-semibold text-sm text-gray-700 dark:text-gray-300">Custom Stdin / Scratchpad</span>
+                <div className="mt-4 border border-hairline rounded-lg overflow-hidden bg-surface shadow-sm">
+                    <div className="bg-surface-2 border-b border-hairline px-4 py-3 flex items-center justify-between">
+                        <span className="font-semibold text-sm text-ink-soft">Custom Stdin / Scratchpad</span>
                         <button
                             onClick={runCustomCode}
                             disabled={runningCustom || !code.trim() || problem?.source !== 'local'}
                             title={problem?.source !== 'local' ? 'Custom run is only available for local problems' : undefined}
-                            className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-1.5 rounded disabled:opacity-50 transition-colors cursor-pointer"
+                            className="bg-brand hover:bg-brand-hover text-on-brand text-xs font-semibold px-3 py-1.5 rounded disabled:opacity-50 transition-colors cursor-pointer"
                         >
                             {runningCustom ? 'Running...' : 'Run Code'}
                         </button>
                     </div>
                     <div className="p-4 space-y-4">
                         <div>
-                            <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">Custom Input (Stdin)</label>
+                            <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">Custom Input (Stdin)</label>
                             <textarea
                                 value={customInput}
                                 onChange={(e) => setCustomInput(e.target.value)}
                                 rows={4}
                                 placeholder="Enter input values here..."
-                                className="w-full font-mono text-xs border border-gray-300 dark:border-gray-600 rounded p-2.5 bg-gray-50 dark:bg-gray-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors"
+                                className="w-full font-mono text-xs border border-hairline-strong rounded p-2.5 bg-surface-2 focus:bg-surface focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)] transition-colors"
                             />
                         </div>
 
                         {customOutput && (
-                            <div className="space-y-3 pt-2 border-t border-gray-100 dark:border-gray-700">
+                            <div className="space-y-3 pt-2 border-t border-hairline">
                                 <div className="flex items-center justify-between text-xs">
                                     <span className={`font-semibold uppercase tracking-wider ${customOutput.status === 'success' ? 'text-green-600 dark:text-green-400' :
                                         customOutput.status === 'ce' ? 'text-purple-600 dark:text-purple-400' : 'text-red-600 dark:text-red-400'
@@ -1044,7 +1064,7 @@ export default function ProblemDetail() {
                                         }
                                     </span>
                                     {customOutput.time_used > 0 && (
-                                        <span className="text-gray-500 dark:text-gray-400 font-mono">
+                                        <span className="text-muted font-mono">
                                             {customOutput.time_used}ms / {Math.round(customOutput.memory_used / 1024)}MB
                                         </span>
                                     )}
@@ -1060,12 +1080,12 @@ export default function ProblemDetail() {
                                 {customOutput.status !== 'ce' && (
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                         <div>
-                                            <span className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Standard Output (Stdout)</span>
-                                            <pre className="bg-gray-900 text-gray-100 font-mono text-xs p-3 rounded overflow-x-auto max-h-40">{customOutput.stdout || <span className="text-gray-500 dark:text-gray-400 italic">No output</span>}</pre>
+                                            <span className="block text-xs font-semibold text-muted mb-1">Standard Output (Stdout)</span>
+                                            <pre className="bg-gray-900 text-gray-100 font-mono text-xs p-3 rounded overflow-x-auto max-h-40">{customOutput.stdout || <span className="text-muted italic">No output</span>}</pre>
                                         </div>
                                         <div>
-                                            <span className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Standard Error (Stderr)</span>
-                                            <pre className="bg-gray-950 text-red-400 font-mono text-xs p-3 rounded overflow-x-auto max-h-40">{customOutput.stderr || <span className="text-gray-600 dark:text-gray-400 italic">No stderr</span>}</pre>
+                                            <span className="block text-xs font-semibold text-muted mb-1">Standard Error (Stderr)</span>
+                                            <pre className="bg-gray-950 text-red-400 font-mono text-xs p-3 rounded overflow-x-auto max-h-40">{customOutput.stderr || <span className="text-muted italic">No stderr</span>}</pre>
                                         </div>
                                     </div>
                                 )}

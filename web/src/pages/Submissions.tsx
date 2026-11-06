@@ -2,85 +2,157 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
 import { EmptyState } from '../components/EmptyState'
+import { Button } from '../components/ui/Button'
+import { PageHeader, Skeleton } from '../components/ui/PageHeader'
+import { Table, TableShell, Td, Th, THead, Tr } from '../components/ui/Table'
+import { VerdictBadge } from '../components/ui/VerdictBadge'
+import { isPendingVerdict } from '../components/ui/verdict'
 
-const STATUS_COLORS: Record<string, string> = {
-    ac: 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20', wa: 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20', tle: 'text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20',
-    mle: 'text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20', re: 'text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/20', ce: 'text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20',
-    pending: 'text-blue-500 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20', judging: 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20', se: 'text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800',
+interface SubRow {
+    id: string
+    language?: string
+    status: string
+    time_used?: number
+    memory_used: number
+    created_at?: string
 }
 
-const STATUS_LABEL: Record<string, string> = {
-    ac: 'Accepted', wa: 'Wrong Answer', tle: 'Time Limit Exceeded',
-    mle: 'Memory Limit Exceeded', re: 'Runtime Error', ce: 'Compile Error',
-    pending: 'Pending', judging: 'Judging...', se: 'System Error',
+/** Machine language keys (`cpp-gpp-64`) are not user-facing names. */
+const LANGUAGE_LABEL: Record<string, string> = {
+    'cpp-gpp-64': 'C++ 20 (GCC)',
+    'cpp-gpp-32': 'C++ 20 (GCC 32)',
+    'cpp-clang': 'C++ 20 (Clang)',
+    'c-gcc': 'C 17 (GCC)',
+    python: 'Python 3',
+    pypy: 'PyPy 3',
+    java: 'Java 21',
+    rust: 'Rust 1.79',
+    nodejs: 'Node.js 22',
+    javascript: 'JavaScript',
+    csharp: 'C# 12',
 }
 
-interface SubRow { id: string; language?: string; status: string; time_used?: number; memory_used: number }
+function formatTime(ms?: number): string {
+    if (!ms || ms <= 0) return '—'
+    return ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(2)} s`
+}
+
+function formatMemory(kb: number): string {
+    if (!kb || kb <= 0) return '—'
+    return kb >= 1024 ? `${(kb / 1024).toFixed(0)} MB` : `${kb} KB`
+}
 
 export default function Submissions() {
     const [subs, setSubs] = useState<SubRow[]>([])
     const [total, setTotal] = useState(0)
     const [offset, setOffset] = useState(0)
+    const [loading, setLoading] = useState(true)
     const limit = 20
 
     useEffect(() => {
+        let cancelled = false
         api.submissions.list(offset, limit).then(d => {
+            if (cancelled) return
             setSubs(d.data || [])
             setTotal(d.total || 0)
-        }).catch(console.error)
+        }).catch(() => {
+            if (!cancelled) setSubs([])
+        }).finally(() => {
+            if (!cancelled) setLoading(false)
+        })
+        return () => { cancelled = true }
     }, [offset])
 
     return (
         <div>
-            <h1 className="text-2xl font-bold mb-4">My Submissions</h1>
-            <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-                <table className="w-full text-sm">
-                    <thead className="bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-xs uppercase">
-                        <tr>
-                            <th className="px-4 py-3 text-left">ID</th>
-                            <th className="px-4 py-3 text-left">Language</th>
-                            <th className="px-4 py-3 text-left">Verdict</th>
-                            <th className="px-4 py-3 text-left">Time</th>
-                            <th className="px-4 py-3 text-left">Memory</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                        {subs.map(s => (
-                            <tr key={s.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                                <td className="px-4 py-3 font-mono text-xs">
-                                    <Link to={`/submissions/${s.id}`} className="text-blue-600 dark:text-blue-400 hover:underline">
-                                        {s.id?.substring(0, 8)}...
-                                    </Link>
-                                </td>
-                                <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{s.language}</td>
-                                <td className="px-4 py-3 font-semibold">
-                                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[s.status] || ''}`}>
-                                        {STATUS_LABEL[s.status] || s.status}
-                                    </span>
-                                </td>
-                                <td className="px-4 py-3 text-gray-500 dark:text-gray-400">
-                                    {s.status !== "pending" && s.status !== "judging" && s.status !== "ce" && s.status !== "se" ? `${s.time_used}ms` : "—"}
-                                </td>
-                                <td className="px-4 py-3 text-gray-500 dark:text-gray-400">
-                                    {s.status !== "pending" && s.status !== "judging" && s.status !== "ce" && s.status !== "se" ? `${Math.round(s.memory_used / 1024)}MB` : "—"}
-                                </td>
-                            </tr>
-                        ))}
-                        {subs.length === 0 && (
-                            <tr><td colSpan={5} className="text-gray-400 dark:text-gray-500"><EmptyState text="No submissions yet" description="Submissions appear here as soon as solutions are judged." /></td></tr>
-                        )}
-                    </tbody>
-                </table>
-            </div>
-            <div className="flex justify-between mt-4 text-sm text-gray-500 dark:text-gray-400">
-                <span>{total} submissions</span>
-                <div className="flex gap-2">
-                    <button onClick={() => setOffset(Math.max(0, offset - limit))} disabled={offset === 0}
-                        className="px-3 py-1 border rounded disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-700">Prev</button>
-                    <button onClick={() => setOffset(offset + limit)} disabled={offset + limit >= total}
-                        className="px-3 py-1 border rounded disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-700">Next</button>
+            <PageHeader
+                title="My Submissions"
+                description={total > 0 ? `${total.toLocaleString()} submissions on record` : 'Your judged solutions'}
+            />
+
+            {loading && subs.length === 0 ? (
+                <div className="space-y-2">
+                    {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-11 w-full" />)}
                 </div>
-            </div>
+            ) : subs.length === 0 ? (
+                <div className="rounded-xl border border-hairline bg-surface">
+                    <EmptyState
+                        text="No submissions yet"
+                        description="Submissions appear here as soon as solutions are judged."
+                    />
+                </div>
+            ) : (
+                <TableShell>
+                    <Table>
+                        <THead>
+                            <tr>
+                                <Th className="w-24">ID</Th>
+                                <Th>Language</Th>
+                                <Th className="w-44">Verdict</Th>
+                                <Th className="hidden text-right sm:table-cell">Time</Th>
+                                <Th className="hidden text-right md:table-cell">Memory</Th>
+                                <Th className="hidden w-24 text-right lg:table-cell">Submitted</Th>
+                            </tr>
+                        </THead>
+                        <tbody>
+                            {subs.map(s => {
+                                const pending = isPendingVerdict(s.status)
+                                return (
+                                    <Tr key={s.id}>
+                                        <Td>
+                                            <Link
+                                                to={`/submissions/${s.id}`}
+                                                className="tnum font-mono text-xs text-brand hover:underline"
+                                            >
+                                                {s.id?.slice(0, 8)}
+                                            </Link>
+                                        </Td>
+                                        <Td className="text-xs text-ink-soft">
+                                            {LANGUAGE_LABEL[s.language || ''] || s.language || '—'}
+                                        </Td>
+                                        <Td>
+                                            <VerdictBadge status={s.status} />
+                                        </Td>
+                                        <Td className="tnum hidden text-right text-xs text-muted sm:table-cell">
+                                            {pending || s.status === 'ce' ? '—' : formatTime(s.time_used)}
+                                        </Td>
+                                        <Td className="tnum hidden text-right text-xs text-muted md:table-cell">
+                                            {pending || s.status === 'ce' ? '—' : formatMemory(s.memory_used)}
+                                        </Td>
+                                        <Td className="hidden text-right text-xs text-muted-soft lg:table-cell">
+                                            {s.created_at ? new Date(s.created_at).toLocaleDateString() : '—'}
+                                        </Td>
+                                    </Tr>
+                                )
+                            })}
+                        </tbody>
+                    </Table>
+                </TableShell>
+            )}
+
+            <nav aria-label="Pagination" className="mt-4 flex items-center justify-between text-xs text-muted">
+                <span className="tnum">
+                    {total === 0 ? 'No results' : `${offset + 1}–${Math.min(offset + limit, total)} of ${total.toLocaleString()}`}
+                </span>
+                <div className="flex gap-2">
+                    <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setOffset(Math.max(0, offset - limit))}
+                        disabled={offset === 0}
+                    >
+                        Previous
+                    </Button>
+                    <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setOffset(offset + limit)}
+                        disabled={offset + limit >= total}
+                    >
+                        Next
+                    </Button>
+                </div>
+            </nav>
         </div>
     )
 }

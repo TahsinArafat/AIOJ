@@ -352,34 +352,34 @@ const [problem, setProblem] = useState<LoadedProblem | null>(null)
           <button
             type="button"
             onClick={() => loadProblem()}
-            className="bg-blue-600 text-white px-4 py-2 rounded text-sm font-semibold hover:bg-blue-700 transition-colors cursor-pointer"
+            className="bg-brand text-on-brand px-4 py-2 rounded text-sm font-semibold hover:bg-brand-hover transition-colors cursor-pointer"
           >
             Retry
           </button>
         </div>
       )
     }
-    return <div className="text-center py-20 text-gray-400 dark:text-gray-500">Loading problem workspace...</div>
+    return <div className="text-center py-20 text-muted-soft">Loading problem workspace...</div>
   }
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-700 pb-4">
+      <div className="flex items-center justify-between border-b border-hairline pb-4">
         <div>
-          <span className="text-xs text-gray-400 dark:text-gray-500 uppercase tracking-wider font-semibold">Polygon Workspace</span>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{problem.title as string}</h1>
+          <span className="text-xs text-muted-soft uppercase tracking-wider font-semibold">Polygon Workspace</span>
+          <h1 className="text-2xl font-bold text-ink">{problem.title as string}</h1>
         </div>
         <div className="flex gap-3">
           <Link
             to={`/problems/${problem.slug as string}`}
-            className="border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 px-4 py-2 rounded text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            className="border border-hairline-strong text-ink-soft px-4 py-2 rounded text-sm hover:bg-surface-2 transition-colors"
           >
             View Public
           </Link>
           <Link
             to="/setter"
-            className="bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 px-4 py-2 rounded text-sm hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+            className="bg-surface-3 border border-hairline text-ink-soft px-4 py-2 rounded text-sm hover:bg-surface-3 transition-colors"
           >
             Back to Setter Workspace
           </Link>
@@ -403,61 +403,61 @@ const [problem, setProblem] = useState<LoadedProblem | null>(null)
           horizontally so every tab stays reachable. */}
       <div className="flex flex-col lg:flex-row gap-6 items-start">
         {/* Tabs Sidebar */}
-        <div className="w-full lg:w-56 lg:shrink-0 flex lg:flex-col flex-row overflow-x-auto lg:overflow-hidden border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-sm">
+        <div className="w-full lg:w-56 lg:shrink-0 flex lg:flex-col flex-row overflow-x-auto lg:overflow-hidden border border-hairline rounded-lg bg-surface text-sm">
           <button
             onClick={() => setActiveTab('statement')}
-            className={`px-4 py-3 text-left shrink-0 whitespace-nowrap border-r lg:border-r-0 lg:border-b border-gray-100 dark:border-gray-700 font-medium ${activeTab === 'statement' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-l-4 border-l-blue-600' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-black dark:hover:text-white'}`}
+            className={`px-4 py-3 text-left shrink-0 whitespace-nowrap border-r lg:border-r-0 lg:border-b border-hairline font-medium ${activeTab === 'statement' ? 'bg-brand-soft text-brand border-l-4 border-l-blue-600' : 'text-muted hover:bg-surface-2 hover:text-ink dark:hover:text-white'}`}
           >
             Statement & Details
           </button>
           <button
             onClick={() => setActiveTab('testcases')}
-            className={`px-4 py-3 text-left shrink-0 whitespace-nowrap border-r lg:border-r-0 lg:border-b border-gray-100 dark:border-gray-700 font-medium ${activeTab === 'testcases' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-l-4 border-l-blue-600' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-black dark:hover:text-white'}`}
+            className={`px-4 py-3 text-left shrink-0 whitespace-nowrap border-r lg:border-r-0 lg:border-b border-hairline font-medium ${activeTab === 'testcases' ? 'bg-brand-soft text-brand border-l-4 border-l-blue-600' : 'text-muted hover:bg-surface-2 hover:text-ink dark:hover:text-white'}`}
           >
             Test Cases / Data
           </button>
           <button
             onClick={() => setActiveTab('checker')}
-            className={`px-4 py-3 text-left shrink-0 whitespace-nowrap border-r lg:border-r-0 lg:border-b border-gray-100 dark:border-gray-700 font-medium ${activeTab === 'checker' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-l-4 border-l-blue-600' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-black dark:hover:text-white'}`}
+            className={`px-4 py-3 text-left shrink-0 whitespace-nowrap border-r lg:border-r-0 lg:border-b border-hairline font-medium ${activeTab === 'checker' ? 'bg-brand-soft text-brand border-l-4 border-l-blue-600' : 'text-muted hover:bg-surface-2 hover:text-ink dark:hover:text-white'}`}
           >
             Checker / Special Judge
           </button>
           <button
             onClick={() => setActiveTab('permissions')}
-            className={`px-4 py-3 text-left shrink-0 whitespace-nowrap border-r lg:border-r-0 lg:border-b border-gray-100 dark:border-gray-700 font-medium ${activeTab === 'permissions' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-l-4 border-l-blue-600' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-black dark:hover:text-white'}`}
+            className={`px-4 py-3 text-left shrink-0 whitespace-nowrap border-r lg:border-r-0 lg:border-b border-hairline font-medium ${activeTab === 'permissions' ? 'bg-brand-soft text-brand border-l-4 border-l-blue-600' : 'text-muted hover:bg-surface-2 hover:text-ink dark:hover:text-white'}`}
           >
             Collaborators
           </button>
           <button
             onClick={() => setActiveTab('settings')}
-            className={`px-4 py-3 text-left shrink-0 whitespace-nowrap border-r lg:border-r-0 lg:border-b border-gray-100 dark:border-gray-700 font-medium ${activeTab === 'settings' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-l-4 border-l-blue-600' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-black dark:hover:text-white'}`}
+            className={`px-4 py-3 text-left shrink-0 whitespace-nowrap border-r lg:border-r-0 lg:border-b border-hairline font-medium ${activeTab === 'settings' ? 'bg-brand-soft text-brand border-l-4 border-l-blue-600' : 'text-muted hover:bg-surface-2 hover:text-ink dark:hover:text-white'}`}
           >
             Workspace Settings
           </button>
           <button
             onClick={() => setActiveTab('editorial')}
-            className={`px-4 py-3 text-left shrink-0 whitespace-nowrap font-medium ${activeTab === 'editorial' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-l-4 border-l-blue-600' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-black dark:hover:text-white'}`}
+            className={`px-4 py-3 text-left shrink-0 whitespace-nowrap font-medium ${activeTab === 'editorial' ? 'bg-brand-soft text-brand border-l-4 border-l-blue-600' : 'text-muted hover:bg-surface-2 hover:text-ink dark:hover:text-white'}`}
           >
             Editorials
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('translations')}
-            className={`px-4 py-3 text-left shrink-0 whitespace-nowrap font-medium ${activeTab === 'translations' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-l-4 border-l-blue-600' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-black dark:hover:text-white'}`}
+            className={`px-4 py-3 text-left shrink-0 whitespace-nowrap font-medium ${activeTab === 'translations' ? 'bg-brand-soft text-brand border-l-4 border-l-blue-600' : 'text-muted hover:bg-surface-2 hover:text-ink dark:hover:text-white'}`}
           >
             Translations
           </button>
           {(role === 'admin' || role === 'setter') && <button
             type="button"
             onClick={() => setActiveTab('ai')}
-            className={`px-4 py-3 text-left shrink-0 whitespace-nowrap font-medium ${activeTab === 'ai' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-l-4 border-l-blue-600' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-black dark:hover:text-white'}`}
+            className={`px-4 py-3 text-left shrink-0 whitespace-nowrap font-medium ${activeTab === 'ai' ? 'bg-brand-soft text-brand border-l-4 border-l-blue-600' : 'text-muted hover:bg-surface-2 hover:text-ink dark:hover:text-white'}`}
           >
             AI Studio
           </button>}
         </div>
 
         {/* Tab Content Panels */}
-        <div className="flex-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 min-h-[500px]">
+        <div className="flex-1 bg-surface border border-hairline rounded-lg p-6 min-h-[500px]">
           {activeTab === 'statement' && (
             <StatementTab
               formState={formState}

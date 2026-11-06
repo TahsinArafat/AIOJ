@@ -53,7 +53,7 @@ export default function CountryFlag({ country, withName = false, className = '' 
     <span className={`inline-flex items-center gap-1 ${className}`} title={country}>
       {emoji && <span aria-hidden="true">{emoji}</span>}
       {withName && <span>{country}</span>}
-      {!emoji && !withName && <span className="text-xs text-gray-500">{country}</span>}
+      {!emoji && !withName && <span className="text-xs text-muted">{country}</span>}
     </span>
   )
 }

@@ -91,16 +91,16 @@ export default function SystemSettingsPanel() {
         groups.get(group)!.push(s)
     })
 
-    if (loading) return <div className="text-center py-8 text-gray-400 dark:text-gray-500">Loading settings...</div>
+    if (loading) return <div className="text-center py-8 text-muted-soft">Loading settings...</div>
 
     return (
         <div>
             <div className="flex items-center justify-between mb-6">
                 <div>
                     <h2 className="text-lg font-semibold">System Settings</h2>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Configure platform-wide settings and VJudge behavior</p>
+                    <p className="text-sm text-muted mt-1">Configure platform-wide settings and VJudge behavior</p>
                 </div>
-                <button onClick={loadSettings} className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100">
+                <button onClick={loadSettings} className="flex items-center gap-1.5 text-sm text-muted hover:text-ink">
                     <RefreshCw className="w-4 h-4" /> Refresh
                 </button>
             </div>
@@ -110,12 +110,12 @@ export default function SystemSettingsPanel() {
                     const firstKey = groupSettings[0].key
                     const icon = getGroupIcon(firstKey)
                     return (
-                        <div key={groupName} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-                            <div className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center gap-2">
+                        <div key={groupName} className="bg-surface border border-hairline rounded-lg overflow-hidden">
+                            <div className="bg-surface-2 border-b border-hairline px-4 py-3 flex items-center gap-2">
                                 <span>{icon}</span>
-                                <h3 className="font-semibold text-sm text-gray-700 dark:text-gray-300">{groupName}</h3>
+                                <h3 className="font-semibold text-sm text-ink-soft">{groupName}</h3>
                             </div>
-                            <div className="divide-y divide-gray-100 dark:divide-gray-700">
+                            <div className="divide-y divide-hairline">
                                 {groupSettings.map(s => {
                                     const meta = getMeta(s.key)
                                     const localVal = localValues[s.key] ?? s.value
@@ -124,18 +124,18 @@ export default function SystemSettingsPanel() {
                                     return (
                                         <div key={s.key} className="px-4 py-3 flex items-center gap-4">
                                             <div className="flex-1 min-w-0">
-                                                <div className="text-sm font-medium text-gray-900 dark:text-gray-100">{meta.label}</div>
-                                                <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{s.description}</div>
+                                                <div className="text-sm font-medium text-ink">{meta.label}</div>
+                                                <div className="text-xs text-muted mt-0.5">{s.description}</div>
                                             </div>
                                             <div className="flex items-center gap-3 flex-shrink-0">
                                                 {meta.type === 'boolean' ? (
                                                     <button
                                                         onClick={() => updateLocal(s.key, !localVal)}
                                                         className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                                                            localVal ? 'bg-blue-600' : 'bg-gray-300'
+                                                            localVal ? 'bg-brand' : 'bg-gray-300'
                                                         }`}
                                                     >
-                                                        <span className={`inline-block h-4 w-4 rounded-full bg-white dark:bg-gray-800 transition-transform ${
+                                                        <span className={`inline-block h-4 w-4 rounded-full bg-surface transition-transform ${
                                                             localVal ? 'translate-x-6' : 'translate-x-1'
                                                         }`} />
                                                     </button>
@@ -143,7 +143,7 @@ export default function SystemSettingsPanel() {
                                                     <select
                                                         value={String(localVal)}
                                                         onChange={e => updateLocal(s.key, e.target.value)}
-                                                        className="border rounded px-2 py-1.5 text-sm bg-white dark:bg-gray-800 w-48"
+                                                        className="border rounded px-2 py-1.5 text-sm bg-surface w-48"
                                                     >
                                                         {meta.options?.map(opt => (
                                                             <option key={opt} value={opt}>{opt}</option>
@@ -168,7 +168,7 @@ export default function SystemSettingsPanel() {
                                                     <button
                                                         onClick={() => handleSave(s.key)}
                                                         disabled={savingKey === s.key}
-                                                        className="flex items-center gap-1 bg-blue-600 text-white px-3 py-1.5 rounded text-xs hover:bg-blue-700 disabled:opacity-50"
+                                                        className="flex items-center gap-1 bg-brand text-on-brand px-3 py-1.5 rounded text-xs hover:bg-brand-hover disabled:opacity-50"
                                                     >
                                                         <Save className="w-3 h-3" />
                                                         {savingKey === s.key ? 'Saving...' : 'Save'}
@@ -183,7 +183,7 @@ export default function SystemSettingsPanel() {
                     )
                 })}
                 {settings.length === 0 && (
-                    <div className="text-center py-8 text-gray-400 dark:text-gray-500">No system settings configured.</div>
+                    <div className="text-center py-8 text-muted-soft">No system settings configured.</div>
                 )}
             </div>
         </div>

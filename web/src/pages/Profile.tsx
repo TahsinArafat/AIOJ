@@ -74,7 +74,7 @@ const [profile, setProfile] = useState<ProfileData | null>(null)
         }
     }
 
-    if (loading) return <p className="text-gray-400 dark:text-gray-500 text-sm">Loading...</p>
+    if (loading) return <p className="text-muted-soft text-sm">Loading...</p>
 
     const fields = [
         { key: 'first_name', label: 'First Name', type: 'text' },
@@ -91,13 +91,13 @@ const [profile, setProfile] = useState<ProfileData | null>(null)
         <div className="space-y-4">
             {fields.map(f => (
                 <div key={f.key}>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{f.label}</label>
+                    <label className="block text-sm font-medium text-ink-soft mb-1">{f.label}</label>
                     {f.type === 'textarea' ? (
                         <textarea rows={3} value={profile?.[f.key] || ''} onChange={e => handleChange(f.key, e.target.value)}
-                            className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 dark:bg-gray-700 dark:border-gray-600" />
+                            className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)] dark:bg-gray-700 dark:border-gray-600" />
                     ) : (
                         <input type={f.type} value={profile?.[f.key] || ''} onChange={e => handleChange(f.key, e.target.value)}
-                            className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 dark:bg-gray-700 dark:border-gray-600" />
+                            className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)] dark:bg-gray-700 dark:border-gray-600" />
                     )}
                 </div>
             ))}
@@ -105,13 +105,13 @@ const [profile, setProfile] = useState<ProfileData | null>(null)
                 <label className="flex items-center gap-2 text-sm">
                     <input type="checkbox" checked={profile?.show_email ?? false}
                         onChange={e => handleChange('show_email', e.target.checked)}
-                        className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500" />
+                        className="rounded border-hairline-strong text-brand focus-visible:outline-[var(--ring)]" />
                     Show email on profile
                 </label>
                 <label className="flex items-center gap-2 text-sm">
                     <input type="checkbox" checked={profile?.show_tags ?? true}
                         onChange={e => handleChange('show_tags', e.target.checked)}
-                        className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500" />
+                        className="rounded border-hairline-strong text-brand focus-visible:outline-[var(--ring)]" />
                     Show problem tags
                 </label>
             </div>
@@ -119,7 +119,7 @@ const [profile, setProfile] = useState<ProfileData | null>(null)
                 <p className={`text-sm ${message.startsWith('Error') ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>{message}</p>
             )}
             <button onClick={handleSave} disabled={saving}
-                className="bg-blue-600 text-white px-5 py-2 rounded text-sm hover:bg-blue-700 disabled:opacity-50 transition-colors">
+                className="bg-brand text-on-brand px-5 py-2 rounded text-sm hover:bg-brand-hover disabled:opacity-50 transition-colors">
                 {saving ? 'Saving...' : 'Save Changes'}
             </button>
         </div>
@@ -169,25 +169,25 @@ function ChangePasswordTab() {
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Current Password</label>
+                <label className="block text-sm font-medium text-ink-soft mb-1">Current Password</label>
                 <input type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} required
-                    className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 dark:bg-gray-700 dark:border-gray-600" />
+                    className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)] dark:bg-gray-700 dark:border-gray-600" />
             </div>
             <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">New Password</label>
+                <label className="block text-sm font-medium text-ink-soft mb-1">New Password</label>
                 <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} required
-                    className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 dark:bg-gray-700 dark:border-gray-600" />
+                    className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)] dark:bg-gray-700 dark:border-gray-600" />
             </div>
             <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Confirm New Password</label>
+                <label className="block text-sm font-medium text-ink-soft mb-1">Confirm New Password</label>
                 <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required
-                    className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 dark:bg-gray-700 dark:border-gray-600" />
+                    className="w-full border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)] dark:bg-gray-700 dark:border-gray-600" />
             </div>
             {message && (
                 <p className={`text-sm ${message.startsWith('Error') ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>{message}</p>
             )}
             <button type="submit" disabled={saving || !currentPassword || !newPassword}
-                className="bg-blue-600 text-white px-5 py-2 rounded text-sm hover:bg-blue-700 disabled:opacity-50 transition-colors">
+                className="bg-brand text-on-brand px-5 py-2 rounded text-sm hover:bg-brand-hover disabled:opacity-50 transition-colors">
                 {saving ? 'Updating...' : 'Update Password'}
             </button>
         </form>
@@ -230,7 +230,7 @@ function PendingInvitesTab({ userId }: { userId: string }) {
         }
     }
 
-    if (loading) return <p className="text-gray-400 dark:text-gray-500 text-sm">Loading...</p>
+    if (loading) return <p className="text-muted-soft text-sm">Loading...</p>
 
     const teamInvites = invites.teams.filter(i => i.role === 'invited')
     const groupInvites = invites.groups.filter(i => i.role === 'invited')
@@ -240,18 +240,18 @@ function PendingInvitesTab({ userId }: { userId: string }) {
     return (
         <div className="space-y-6">
             {teamInvites.length === 0 && groupInvites.length === 0 && teamRequests.length === 0 && groupRequests.length === 0 ? (
-                <p className="text-gray-400 dark:text-gray-500 text-sm">No pending invites or requests.</p>
+                <p className="text-muted-soft text-sm">No pending invites or requests.</p>
             ) : (
                 <>
                     {teamInvites.length > 0 && (
                         <div>
-                            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Team Invitations</h3>
+                            <h3 className="text-sm font-semibold text-ink-soft mb-2">Team Invitations</h3>
                             <div className="space-y-2">
                                 {teamInvites.map(inv => (
-                                    <div key={inv.team_id} className="flex items-center justify-between bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded px-4 py-3">
+                                    <div key={inv.team_id} className="flex items-center justify-between bg-surface-2/50 border border-hairline rounded px-4 py-3">
                                         <div>
-                                            <Link to={`/teams/${inv.team_id}`} className="font-medium text-sm text-blue-600 dark:text-blue-400 hover:underline">{inv.team_name}</Link>
-                                            <p className="text-xs text-gray-400 dark:text-gray-500">Invited to join</p>
+                                            <Link to={`/teams/${inv.team_id}`} className="font-medium text-sm text-brand hover:underline">{inv.team_name}</Link>
+                                            <p className="text-xs text-muted-soft">Invited to join</p>
                                         </div>
                                         <div className="flex gap-2">
                                             <button onClick={() => handleRespond('team', inv.team_id, userId, 'accept')}
@@ -272,13 +272,13 @@ function PendingInvitesTab({ userId }: { userId: string }) {
                     )}
                     {groupInvites.length > 0 && (
                         <div>
-                            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Group Invitations</h3>
+                            <h3 className="text-sm font-semibold text-ink-soft mb-2">Group Invitations</h3>
                             <div className="space-y-2">
                                 {groupInvites.map(inv => (
-                                    <div key={inv.group_id} className="flex items-center justify-between bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded px-4 py-3">
+                                    <div key={inv.group_id} className="flex items-center justify-between bg-surface-2/50 border border-hairline rounded px-4 py-3">
                                         <div>
-                                            <Link to={`/groups/${inv.group_id}`} className="font-medium text-sm text-blue-600 dark:text-blue-400 hover:underline">{inv.group_name}</Link>
-                                            <p className="text-xs text-gray-400 dark:text-gray-500">Invited to join</p>
+                                            <Link to={`/groups/${inv.group_id}`} className="font-medium text-sm text-brand hover:underline">{inv.group_name}</Link>
+                                            <p className="text-xs text-muted-soft">Invited to join</p>
                                         </div>
                                         <div className="flex gap-2">
                                             <button onClick={() => handleRespond('group', inv.group_id, userId, 'accept')}
@@ -299,12 +299,12 @@ function PendingInvitesTab({ userId }: { userId: string }) {
                     )}
                     {teamRequests.length > 0 && (
                         <div>
-                            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Pending Team Join Requests</h3>
+                            <h3 className="text-sm font-semibold text-ink-soft mb-2">Pending Team Join Requests</h3>
                             <div className="space-y-2">
                                 {teamRequests.map(req => (
-                                    <div key={req.team_id} className="flex items-center justify-between bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded px-4 py-3">
+                                    <div key={req.team_id} className="flex items-center justify-between bg-surface-2/50 border border-hairline rounded px-4 py-3">
                                         <div>
-                                            <Link to={`/teams/${req.team_id}`} className="font-medium text-sm text-blue-600 dark:text-blue-400 hover:underline">{req.team_name}</Link>
+                                            <Link to={`/teams/${req.team_id}`} className="font-medium text-sm text-brand hover:underline">{req.team_name}</Link>
                                             <p className="text-xs text-yellow-600 dark:text-yellow-400">Awaiting approval</p>
                                         </div>
                                         <button onClick={() => handleRespond('team', req.team_id, userId, 'decline')}
@@ -319,12 +319,12 @@ function PendingInvitesTab({ userId }: { userId: string }) {
                     )}
                     {groupRequests.length > 0 && (
                         <div>
-                            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Pending Group Join Requests</h3>
+                            <h3 className="text-sm font-semibold text-ink-soft mb-2">Pending Group Join Requests</h3>
                             <div className="space-y-2">
                                 {groupRequests.map(req => (
-                                    <div key={req.group_id} className="flex items-center justify-between bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded px-4 py-3">
+                                    <div key={req.group_id} className="flex items-center justify-between bg-surface-2/50 border border-hairline rounded px-4 py-3">
                                         <div>
-                                            <Link to={`/groups/${req.group_id}`} className="font-medium text-sm text-blue-600 dark:text-blue-400 hover:underline">{req.group_name}</Link>
+                                            <Link to={`/groups/${req.group_id}`} className="font-medium text-sm text-brand hover:underline">{req.group_name}</Link>
                                             <p className="text-xs text-yellow-600 dark:text-yellow-400">Awaiting approval</p>
                                         </div>
                                         <button onClick={() => handleRespond('group', req.group_id, userId, 'decline')}
@@ -348,7 +348,7 @@ export default function Profile() {
     const user = decodeUser()
     const [activeTab, setActiveTab] = useState<Tab>('Edit Profile')
 
-    if (!user) return <div className="text-center py-20 text-gray-400 dark:text-gray-500">Please log in to view your profile.</div>
+    if (!user) return <div className="text-center py-20 text-muted-soft">Please log in to view your profile.</div>
 
     const renderTab = () => {
         switch (activeTab) {
@@ -361,47 +361,47 @@ export default function Profile() {
     return (
         <div className="max-w-2xl mx-auto px-4 py-8">
             {/* User Info Card */}
-            <div className="space-y-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 mb-6">
+            <div className="space-y-4 bg-surface border border-hairline rounded-lg p-6 mb-6">
                 <h1 className="text-2xl font-bold mb-4">Profile Settings</h1>
                 <div className="grid grid-cols-2 gap-4">
                     <div>
-                        <label className="block text-sm text-gray-500 dark:text-gray-400 mb-1">Username</label>
+                        <label className="block text-sm text-muted mb-1">Username</label>
                         <p className="font-medium">{user.uname || '—'}</p>
                     </div>
                     <div>
-                        <label className="block text-sm text-gray-500 dark:text-gray-400 mb-1">Email</label>
+                        <label className="block text-sm text-muted mb-1">Email</label>
                         <p className="font-medium">{user.email || '—'}</p>
                     </div>
                     <div>
-                        <label className="block text-sm text-gray-500 dark:text-gray-400 mb-1">Role</label>
+                        <label className="block text-sm text-muted mb-1">Role</label>
                         <span className={`px-2 py-1 rounded text-xs font-medium ${user.role === 'admin' ? 'bg-purple-100 text-purple-800' :
-                            user.role === 'setter' ? 'bg-orange-100 text-orange-800' : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200'
+                            user.role === 'setter' ? 'bg-orange-100 text-orange-800' : 'bg-surface-3 text-ink'
                             }`}>{user.role || 'user'}</span>
                     </div>
                     <div>
-                        <label className="block text-sm text-gray-500 dark:text-gray-400 mb-1">Rating</label>
+                        <label className="block text-sm text-muted mb-1">Rating</label>
                         {user.rating ? (
                             <RatingBadge rating={user.rating} showTitle />
                         ) : (
-                            <span className="text-gray-400 dark:text-gray-500">Unrated</span>
+                            <span className="text-muted-soft">Unrated</span>
                         )}
                     </div>
                 </div>
                 {user.rating && (
                     <div>
-                        <Link to="/rating-history" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">
+                        <Link to="/rating-history" className="text-sm text-brand hover:underline">
                             View Rating History →
                         </Link>
                     </div>
                 )}
                 <div className="flex gap-4 flex-wrap">
-                    <Link to="/settings/notifications" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">
+                    <Link to="/settings/notifications" className="text-sm text-brand hover:underline">
                         Notification Preferences →
                     </Link>
-                    <Link to="/settings" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">
+                    <Link to="/settings" className="text-sm text-brand hover:underline">
                         Security Settings →
                     </Link>
-                    <Link to="/settings/api" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">
+                    <Link to="/settings/api" className="text-sm text-brand hover:underline">
                         API Keys →
                     </Link>
                     <button
@@ -420,7 +420,7 @@ export default function Profile() {
                                 toast.error(errorMessage(e) || 'Export failed')
                             }
                         }}
-                        className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                        className="text-sm text-brand hover:underline"
                     >
                         Download My Data →
                     </button>
@@ -428,13 +428,13 @@ export default function Profile() {
             </div>
 
             {/* Tabs */}
-            <div className="border-b border-gray-200 dark:border-gray-700 mb-6">
+            <div className="border-b border-hairline mb-6">
                 <nav className="flex gap-6">
                     {TABS.map(tab => (
                         <button key={tab} onClick={() => setActiveTab(tab)}
                             className={`pb-3 text-sm font-medium border-b-2 transition-colors ${activeTab === tab
-                                ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400'
-                                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                                ? 'border-brand text-brand dark:border-blue-400 dark:text-blue-400'
+                                : 'border-transparent text-muted hover:text-ink'
                                 }`}>
                             {tab}
                         </button>
@@ -443,22 +443,22 @@ export default function Profile() {
             </div>
 
             {/* Tab Content */}
-            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 mb-8">
+            <div className="bg-surface border border-hairline rounded-lg p-6 mb-8">
                 {renderTab()}
             </div>
 
             {/* Setter Application */}
             {user.role === 'user' && (
-                <section className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6">
+                <section className="bg-surface border border-hairline rounded-lg p-6">
                     <h2 className="text-lg font-semibold mb-4">Become a Problem Setter</h2>
                     <SetterApplication />
                 </section>
             )}
 
             {/* GDPR danger zone */}
-            <section className="bg-white dark:bg-gray-800 border border-red-200 dark:border-red-900 rounded-lg p-6 mt-6">
+            <section className="bg-surface border border-red-200 dark:border-red-900 rounded-lg p-6 mt-6">
                 <h2 className="text-lg font-semibold text-red-700 dark:text-red-400 mb-2">Danger Zone</h2>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                <p className="text-sm text-muted mb-4">
                     Permanently delete your account and personal data. Shared content you authored is kept with authorship cleared where required.
                     Download a copy first if you need it.
                 </p>
@@ -496,9 +496,9 @@ function DeleteAccountSection() {
     return (
         <div className="space-y-3 max-w-md">
             <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-ink-soft mb-1">
                     Current password{' '}
-                    <span className="text-gray-400 font-normal">
+                    <span className="text-muted-soft font-normal">
                         (leave blank if you signed up with OAuth only)
                     </span>
                 </label>
@@ -506,11 +506,11 @@ function DeleteAccountSection() {
                     type="password"
                     value={password}
                     onChange={e => setPassword(e.target.value)}
-                    className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 bg-white dark:bg-gray-900 text-sm"
+                    className="w-full border border-hairline-strong rounded px-3 py-2 bg-surface text-sm"
                     autoComplete="current-password"
                 />
             </div>
-            <label className="flex items-start gap-2 text-sm text-gray-700 dark:text-gray-300">
+            <label className="flex items-start gap-2 text-sm text-ink-soft">
                 <input
                     type="checkbox"
                     checked={confirm}

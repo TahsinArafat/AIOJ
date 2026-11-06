@@ -123,14 +123,14 @@ export default function VirtualContest() {
     }, [virtualStatus, completed, handleComplete])
 
     if (loading) {
-        return <div className="text-center py-20 text-gray-400">Loading...</div>
+        return <div className="text-center py-20 text-muted-soft">Loading...</div>
     }
 
     if (!getAccessToken()) {
         return (
             <div className="text-center py-20">
-                <p className="text-gray-500 mb-4">Please log in to participate in virtual contests.</p>
-                <Link to="/login" className="text-blue-600 hover:underline text-sm">Go to Login</Link>
+                <p className="text-muted mb-4">Please log in to participate in virtual contests.</p>
+                <Link to="/login" className="text-brand hover:underline text-sm">Go to Login</Link>
             </div>
         )
     }
@@ -138,12 +138,12 @@ export default function VirtualContest() {
     if (!virtualStatus?.is_active && !completed) {
         return (
             <div className="text-center py-20">
-                <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-8 max-w-md mx-auto">
-                    <h2 className="text-xl font-bold text-gray-800 mb-2">No Active Virtual Contest</h2>
-                    <p className="text-gray-500 text-sm mb-4">
-                        Go to a past contest and click <span className="font-medium text-gray-700">Start Virtual Contest</span> to begin a virtual session.
+                <div className="bg-surface border border-hairline rounded-lg shadow-sm p-8 max-w-md mx-auto">
+                    <h2 className="text-xl font-bold text-ink mb-2">No Active Virtual Contest</h2>
+                    <p className="text-muted text-sm mb-4">
+                        Go to a past contest and click <span className="font-medium text-ink-soft">Start Virtual Contest</span> to begin a virtual session.
                     </p>
-                    <Link to="/contests" className="text-blue-600 hover:underline text-sm">
+                    <Link to="/contests" className="text-brand hover:underline text-sm">
                         Browse Contests
                     </Link>
                 </div>
@@ -154,7 +154,7 @@ export default function VirtualContest() {
     if (completed) {
         return (
             <div className="text-center py-16">
-                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm p-10 max-w-lg mx-auto relative overflow-hidden">
+                <div className="bg-surface border border-hairline rounded-lg shadow-sm p-10 max-w-lg mx-auto relative overflow-hidden">
                     <div className="absolute inset-0 pointer-events-none opacity-10"
                         style={{
                             background: theme === 'dark'
@@ -163,30 +163,30 @@ export default function VirtualContest() {
                         }}
                     />
                     <div className="relative">
-                        <h2 className="text-2xl font-bold text-gray-800 mb-2">Virtual Contest Complete</h2>
-                        <p className="text-gray-500 text-sm mb-6">
+                        <h2 className="text-2xl font-bold text-ink mb-2">Virtual Contest Complete</h2>
+                        <p className="text-muted text-sm mb-6">
                             {contestData?.contest?.title || 'Your virtual contest session has ended.'}
                         </p>
                         <div className="flex justify-center gap-8 mb-6 text-sm">
                             <div>
-                                <div className="text-gray-400 uppercase text-xs tracking-wide mb-1">Elapsed</div>
-                                <div className="text-xl font-mono font-bold text-gray-700">{formatTime(elapsedSeconds)}</div>
+                                <div className="text-muted-soft uppercase text-xs tracking-wide mb-1">Elapsed</div>
+                                <div className="text-xl font-mono font-bold text-ink-soft">{formatTime(elapsedSeconds)}</div>
                             </div>
                             <div>
-                                <div className="text-gray-400 uppercase text-xs tracking-wide mb-1">Problems</div>
-                                <div className="text-xl font-mono font-bold text-gray-700">{contestData?.problems?.length || 0}</div>
+                                <div className="text-muted-soft uppercase text-xs tracking-wide mb-1">Problems</div>
+                                <div className="text-xl font-mono font-bold text-ink-soft">{contestData?.problems?.length || 0}</div>
                             </div>
                         </div>
                         <div className="flex gap-3 justify-center">
                             {contest && (
                                 <Link
                                     to={`/contests/${contestSlug(contest)}/scoreboard`}
-                                    className="text-blue-600 hover:underline text-sm"
+                                    className="text-brand hover:underline text-sm"
                                 >
                                     View Scoreboard
                                 </Link>
                             )}
-                            <Link to="/contests" className="text-gray-500 hover:underline text-sm">
+                            <Link to="/contests" className="text-muted hover:underline text-sm">
                                 Browse Contests
                             </Link>
                         </div>
@@ -208,12 +208,12 @@ export default function VirtualContest() {
                 <div>
                     <h1 className="text-2xl font-bold">Virtual Contest</h1>
                     {contest && (
-                        <p className="text-gray-500 text-sm mt-1">{contest.title}</p>
+                        <p className="text-muted text-sm mt-1">{contest.title}</p>
                     )}
                 </div>
                 <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm font-medium ${timerBg(remainingSeconds)}`}>
                     <span className={timerColor(remainingSeconds)}>{formatTime(remainingSeconds)}</span>
-                    <span className="text-gray-400 text-xs">remaining</span>
+                    <span className="text-muted-soft text-xs">remaining</span>
                 </div>
             </div>
 
@@ -223,7 +223,7 @@ export default function VirtualContest() {
                     <div className={`text-4xl font-mono font-bold tracking-wider ${timerColor(remainingSeconds)}`}>
                         {formatTime(remainingSeconds)}
                     </div>
-                    <div className="text-gray-400 text-xs uppercase tracking-widest mt-1">Time Remaining</div>
+                    <div className="text-muted-soft text-xs uppercase tracking-widest mt-1">Time Remaining</div>
                 </div>
 
                 {/* Progress bar */}
@@ -234,7 +234,7 @@ export default function VirtualContest() {
                     />
                 </div>
 
-                <div className="flex justify-between text-xs text-gray-500">
+                <div className="flex justify-between text-xs text-muted">
                     <span>Elapsed: {formatTime(elapsedSeconds)}</span>
                     <span>Total: {formatTime(totalDuration)}</span>
                 </div>
@@ -244,27 +244,27 @@ export default function VirtualContest() {
             <div>
                 <h2 className="text-lg font-semibold mb-3">Problems</h2>
                 {(problems?.length ?? 0) > 0 ? (
-                    <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+                    <div className="bg-surface border border-hairline rounded-lg shadow-sm overflow-hidden">
                         <table className="w-full text-sm">
-                            <thead className="bg-gray-50">
+                            <thead className="bg-surface-2">
                                 <tr>
-                                    <th className="px-4 py-2.5 text-left text-gray-500 text-xs uppercase tracking-wide">#</th>
-                                    <th className="px-4 py-2.5 text-left text-gray-500 text-xs uppercase tracking-wide">Problem</th>
-                                    <th className="px-4 py-2.5 text-right text-gray-500 text-xs uppercase tracking-wide">Action</th>
+                                    <th className="px-4 py-2.5 text-left text-muted text-xs uppercase tracking-wide">#</th>
+                                    <th className="px-4 py-2.5 text-left text-muted text-xs uppercase tracking-wide">Problem</th>
+                                    <th className="px-4 py-2.5 text-right text-muted text-xs uppercase tracking-wide">Action</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-100">
+                            <tbody className="divide-y divide-hairline">
                                 {problems?.map((p) => {
                                     const slug = problemSlugs.get(p.problem_id)
                                     const title = problemTitles.get(p.problem_id)
                                     return (
-                                        <tr key={p.problem_id} className="hover:bg-gray-50 transition-colors">
-                                            <td className="px-4 py-3 font-bold text-blue-600">{p.index}</td>
-                                            <td className="px-4 py-3 text-gray-800 font-medium">{title || p.problem_id}</td>
+                                        <tr key={p.problem_id} className="hover:bg-surface-2 transition-colors">
+                                            <td className="px-4 py-3 font-bold text-brand">{p.index}</td>
+                                            <td className="px-4 py-3 text-ink font-medium">{title || p.problem_id}</td>
                                             <td className="px-4 py-3 text-right">
                                                 <Link
                                                     to={slug ? `/problems/${slug}` : '#'}
-                                                    className="inline-block text-xs text-white bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded font-medium transition-colors"
+                                                    className="inline-block text-xs text-on-brand bg-brand hover:bg-brand-hover px-3 py-1.5 rounded font-medium transition-colors"
                                                 >
                                                     Submit
                                                 </Link>
@@ -276,15 +276,15 @@ export default function VirtualContest() {
                         </table>
                     </div>
                 ) : (
-                    <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-6">
+                    <div className="bg-surface border border-hairline rounded-lg shadow-sm p-6">
                         <EmptyState text="No problems found for this contest" description="Add problems from the problem pool to populate this virtual contest." />
                     </div>
                 )}
             </div>
 
             {/* Footer */}
-            <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-4 flex items-center justify-between">
-                <div className="text-sm text-gray-500">
+            <div className="bg-surface border border-hairline rounded-lg shadow-sm p-4 flex items-center justify-between">
+                <div className="text-sm text-muted">
                     Virtual contest in progress. Submissions will be judged in real-time.
                 </div>
                 <button

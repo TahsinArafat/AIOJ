@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
+import { AuthAlert, AuthLayout } from '../components/AuthLayout'
+import { Button } from '../components/ui/Button'
+import { Field, Input } from '../components/ui/Field'
 
 export default function ForgotPassword() {
     const [email, setEmail] = useState('')
@@ -27,40 +30,38 @@ export default function ForgotPassword() {
 
     if (sent) {
         return (
-            <div className="max-w-sm mx-auto mt-20 text-center">
-                <h1 className="text-2xl font-bold mb-4">Check Your Email</h1>
-                <p className="text-gray-600 dark:text-gray-400 mb-6">{msg}</p>
-                <Link to="/login" className="text-blue-600 dark:text-blue-400 hover:underline">Back to Login</Link>
-            </div>
+            <AuthLayout
+                title="Check your email"
+                subtitle="If that address belongs to an account, a reset link is on its way."
+                footer={<Link to="/login" className="font-medium text-brand hover:underline">Back to sign in</Link>}
+            >
+                <p className="text-sm leading-relaxed text-muted">{msg}</p>
+            </AuthLayout>
         )
     }
 
     return (
-        <div className="max-w-sm mx-auto mt-20">
-            <h1 className="text-2xl font-bold mb-6">Forgot Password</h1>
-            {err && <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-2 rounded mb-4 text-sm">{err}</div>}
+        <AuthLayout
+            title="Reset your password"
+            subtitle="We'll email you a link to choose a new password."
+            footer={<Link to="/login" className="font-medium text-brand hover:underline">Back to sign in</Link>}
+        >
+            {err && <AuthAlert>{err}</AuthAlert>}
             <form onSubmit={handle} className="space-y-4">
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
-                    <input
+                <Field label="Email" htmlFor="email">
+                    <Input
+                        id="email"
                         type="email"
                         value={email}
                         onChange={e => setEmail(e.target.value)}
-                        className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                        autoComplete="email"
                         required
                     />
-                </div>
-                <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full bg-blue-600 text-white py-2 rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                >
-                    {loading ? 'Sending...' : 'Send Reset Link'}
-                </button>
+                </Field>
+                <Button type="submit" size="lg" className="w-full" disabled={loading}>
+                    {loading ? 'Sending…' : 'Send reset link'}
+                </Button>
             </form>
-            <p className="text-center text-sm text-gray-500 dark:text-gray-400 mt-4">
-                Remember your password? <Link to="/login" className="text-blue-600 dark:text-blue-400 hover:underline">Login</Link>
-            </p>
-        </div>
+        </AuthLayout>
     )
 }

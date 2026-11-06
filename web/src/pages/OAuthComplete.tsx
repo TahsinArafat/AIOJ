@@ -21,7 +21,7 @@ export default function OAuthComplete() {
     }, [nav])
 
     return (
-        <div className="max-w-sm mx-auto mt-20 text-center text-sm text-gray-600 dark:text-gray-300">
+        <div className="max-w-sm mx-auto mt-20 text-center text-sm text-muted">
             Completing sign-in…
         </div>
     )

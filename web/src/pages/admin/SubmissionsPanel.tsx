@@ -63,21 +63,21 @@ export default function SubmissionsPanel() {
             <div className="flex items-center justify-between mb-4">
                 <div>
                     <h2 className="text-lg font-semibold">Pending Remote Submissions</h2>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    <p className="text-sm text-muted mt-1">
                         Submissions waiting for remote OJ verdict. Auto-polls every 5s.
                     </p>
                 </div>
-                <button onClick={loadSubs} className="flex items-center gap-1.5 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-3 py-1.5 rounded text-sm hover:bg-gray-200 dark:hover:bg-gray-600">
+                <button onClick={loadSubs} className="flex items-center gap-1.5 bg-surface-3 text-ink-soft px-3 py-1.5 rounded text-sm hover:bg-surface-3">
                     <RefreshCw className="w-4 h-4" /> Refresh
                 </button>
             </div>
 
             {loading ? (
-                <div className="text-center py-8 text-gray-400 dark:text-gray-500">Loading...</div>
+                <div className="text-center py-8 text-muted-soft">Loading...</div>
             ) : (
-                <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                <div className="border border-hairline rounded-lg overflow-hidden">
                     <table className="w-full text-sm">
-                        <thead className="bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-xs uppercase">
+                        <thead className="bg-surface-2 text-muted text-xs uppercase">
                             <tr>
                                 <th className="px-4 py-3 text-left">Submission</th>
                                 <th className="px-4 py-3 text-left">Remote ID</th>
@@ -86,7 +86,7 @@ export default function SubmissionsPanel() {
                                 <th className="px-4 py-3 text-right">Actions</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                        <tbody className="divide-y divide-hairline">
                             {subs.map(s => (
                                 <tr key={s.id}>
                                     <td className="px-4 py-3 font-mono text-xs">{s.id.slice(0, 8)}...</td>
@@ -94,7 +94,7 @@ export default function SubmissionsPanel() {
                                         {s.platform === 'codeforces' ? (
                                             <a href={`https://codeforces.com/submissions/${s.bot_slug}?submissionId=${s.remote_id}`}
                                                target="_blank" rel="noopener noreferrer"
-                                               className="text-blue-600 dark:text-blue-400 hover:underline">
+                                               className="text-brand hover:underline">
                                                 {s.remote_id}
                                             </a>
                                         ) : s.platform === 'atcoder' ? (
@@ -102,25 +102,25 @@ export default function SubmissionsPanel() {
                                                 ? `https://atcoder.jp/contests/${s.remote_id.split('/')[0]}/submissions/${s.remote_id.split('/')[1]}`
                                                 : `https://atcoder.jp/contests/abc300/submissions/me`}
                                                target="_blank" rel="noopener noreferrer"
-                                               className="text-blue-600 dark:text-blue-400 hover:underline">
+                                               className="text-brand hover:underline">
                                                 {s.remote_id}
                                             </a>
                                         ) : s.platform === 'cses' ? (
                                             <a href={`https://cses.fi/problemset/result/${s.remote_id}/`}
                                                target="_blank" rel="noopener noreferrer"
-                                               className="text-blue-600 dark:text-blue-400 hover:underline">
+                                               className="text-brand hover:underline">
                                                 {s.remote_id}
                                             </a>
                                         ) : s.platform === 'toph' ? (
                                             <a href={`https://toph.co/s/${s.remote_id}`}
                                                target="_blank" rel="noopener noreferrer"
-                                               className="text-blue-600 dark:text-blue-400 hover:underline">
+                                               className="text-brand hover:underline">
                                                 {s.remote_id}
                                             </a>
                                         ) : s.platform === 'qoj' ? (
                                             <a href={`https://qoj.ac/submission/${s.remote_id}`}
                                                target="_blank" rel="noopener noreferrer"
-                                               className="text-blue-600 dark:text-blue-400 hover:underline">
+                                               className="text-brand hover:underline">
                                                 {s.remote_id}
                                             </a>
                                         ) : (
@@ -137,7 +137,7 @@ export default function SubmissionsPanel() {
                                         <div className="flex justify-end gap-2">
                                             <button onClick={() => refresh(s.id)}
                                                 disabled={refreshing.has(s.id)}
-                                                className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 disabled:opacity-50"
+                                                className="text-brand hover:text-brand disabled:opacity-50"
                                                 title="Force poll verdict now">
                                                 <RefreshCw className={`w-4 h-4 ${refreshing.has(s.id) ? 'animate-spin' : ''}`} />
                                             </button>
@@ -151,7 +151,7 @@ export default function SubmissionsPanel() {
                                 </tr>
                             ))}
                             {subs.length === 0 && (
-                                <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400 dark:text-gray-500">No pending remote submissions</td></tr>
+                                <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-soft">No pending remote submissions</td></tr>
                             )}
                         </tbody>
                     </table>

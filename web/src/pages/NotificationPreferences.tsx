@@ -67,7 +67,7 @@ export default function NotificationPreferences() {
         }
     }
 
-    if (loading) return <div className="text-center py-20 text-gray-400 dark:text-gray-500">Loading preferences...</div>
+    if (loading) return <div className="text-center py-20 text-muted-soft">Loading preferences...</div>
 
     const emailKeys = Object.keys(prefs).filter(k => k.startsWith('email_')) as (keyof NotificationPrefs)[]
     const pushKeys = Object.keys(prefs).filter(k => k.startsWith('push_')) as (keyof NotificationPrefs)[]
@@ -77,20 +77,20 @@ export default function NotificationPreferences() {
             <h1 className="text-2xl font-bold mb-6">Notification Preferences</h1>
 
             {/* Email Notifications */}
-            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 mb-6">
+            <div className="bg-surface border border-hairline rounded-lg p-6 mb-6">
                 <h2 className="text-lg font-semibold mb-4">Email Notifications</h2>
                 <div className="space-y-4">
                     {emailKeys.map(key => (
                         <label key={key} className="flex items-center justify-between cursor-pointer">
-                            <span className="text-sm text-gray-700 dark:text-gray-300">{PREF_LABELS[key]}</span>
+                            <span className="text-sm text-ink-soft">{PREF_LABELS[key]}</span>
                             <button
                                 type="button"
                                 role="switch"
                                 aria-checked={prefs[key]}
                                 onClick={() => handleToggle(key)}
-                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${prefs[key] ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-700'}`}
+                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${prefs[key] ? 'bg-brand' : 'bg-surface-3'}`}
                             >
-                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white dark:bg-gray-800 transition-transform ${prefs[key] ? 'translate-x-6' : 'translate-x-1'}`} />
+                                <span className={`inline-block h-4 w-4 transform rounded-full bg-surface transition-transform ${prefs[key] ? 'translate-x-6' : 'translate-x-1'}`} />
                             </button>
                         </label>
                     ))}
@@ -98,20 +98,20 @@ export default function NotificationPreferences() {
             </div>
 
             {/* Push Notifications */}
-            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 mb-6">
+            <div className="bg-surface border border-hairline rounded-lg p-6 mb-6">
                 <h2 className="text-lg font-semibold mb-4">Push Notifications</h2>
                 <div className="space-y-4">
                     {pushKeys.map(key => (
                         <label key={key} className="flex items-center justify-between cursor-pointer">
-                            <span className="text-sm text-gray-700 dark:text-gray-300">{PREF_LABELS[key]}</span>
+                            <span className="text-sm text-ink-soft">{PREF_LABELS[key]}</span>
                             <button
                                 type="button"
                                 role="switch"
                                 aria-checked={prefs[key]}
                                 onClick={() => handleToggle(key)}
-                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${prefs[key] ? 'bg-blue-600' : 'bg-gray-200 dark:bg-gray-700'}`}
+                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${prefs[key] ? 'bg-brand' : 'bg-surface-3'}`}
                             >
-                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white dark:bg-gray-800 transition-transform ${prefs[key] ? 'translate-x-6' : 'translate-x-1'}`} />
+                                <span className={`inline-block h-4 w-4 transform rounded-full bg-surface transition-transform ${prefs[key] ? 'translate-x-6' : 'translate-x-1'}`} />
                             </button>
                         </label>
                     ))}
@@ -123,7 +123,7 @@ export default function NotificationPreferences() {
                 <button
                     onClick={handleSave}
                     disabled={saving}
-                    className="bg-blue-600 text-white px-6 py-2 rounded text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                    className="bg-brand text-on-brand px-6 py-2 rounded text-sm font-medium hover:bg-brand-hover disabled:opacity-50 transition-colors"
                 >
                     {saving ? 'Saving...' : 'Save Preferences'}
                 </button>

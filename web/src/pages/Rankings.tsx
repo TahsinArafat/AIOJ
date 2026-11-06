@@ -4,12 +4,10 @@ import { api } from '../lib/api'
 import RatingBadge from '../components/RatingBadge'
 import CountryFlag from '../components/CountryFlag'
 import { EmptyState } from '../components/EmptyState'
-
-const RANK_STYLES: Record<number, string> = {
-    1: 'text-amber-700 bg-amber-50 font-bold',
-    2: 'text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 font-bold',
-    3: 'text-orange-700 dark:text-orange-300 bg-orange-50 dark:bg-orange-900/20 font-bold',
-}
+import { Button } from '../components/ui/Button'
+import { Input, Select } from '../components/ui/Field'
+import { PageHeader, Skeleton } from '../components/ui/PageHeader'
+import { Table, TableShell, Td, Th, THead, Tr } from '../components/ui/Table'
 
 const MEDALS: Record<number, string> = {
     1: '\u{1F947}',
@@ -86,109 +84,125 @@ export default function Rankings() {
     }
 
     const hasMore = users.length < total
+    const filtered = Boolean(country || organization)
+    const initialLoading = loading && users.length === 0
 
     return (
         <div>
-            <h1 className="text-2xl font-bold mb-4">Rankings</h1>
+            <PageHeader
+                title="Rankings"
+                description={total > 0 ? `${total.toLocaleString()} rated users` : 'Standings by rating'}
+            />
 
             {/* Filter Bar */}
-            <div className="flex flex-wrap gap-3 mb-4">
-                <select
+            <div className="mb-4 flex flex-wrap items-center gap-2">
+                <Select
                     value={country || 'All Countries'}
                     onChange={e => handleCountryChange(e.target.value)}
-                    className="border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                    aria-label="Filter by country"
+                    className="w-auto min-w-[11rem]"
                 >
                     {COUNTRIES.map(c => (
                         <option key={c} value={c}>{c}</option>
                     ))}
-                </select>
-                <input
-                    type="text"
-                    placeholder="Filter by organization..."
+                </Select>
+                <Input
+                    type="search"
+                    placeholder="Filter by organization…"
                     value={organization}
                     onChange={e => handleOrgChange(e.target.value)}
-                    className="border border-gray-200 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 min-w-[180px]"
+                    aria-label="Filter by organization"
+                    className="w-auto min-w-[12rem]"
                 />
-                {(country || organization) && (
-                    <button
+                {filtered && (
+                    <Button
+                        variant="ghost"
+                        size="sm"
                         onClick={() => { setCountry(''); setOrganization(''); setOffset(0); }}
-                        className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
                     >
                         Clear filters
-                    </button>
+                    </Button>
                 )}
             </div>
 
-            <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                        <thead className="bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-xs uppercase">
+            {initialLoading ? (
+                <div className="space-y-2">
+                    {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
+                </div>
+            ) : users.length === 0 ? (
+                <div className="rounded-xl border border-hairline bg-surface">
+                    <EmptyState
+                        text="No rankings yet"
+                        description="Standings fill in as users solve problems and compete in contests."
+                    />
+                </div>
+            ) : (
+                <TableShell>
+                    <Table>
+                        <THead>
                             <tr>
-                                <th className="px-4 py-3 text-left w-16">Rank</th>
-                                <th className="px-4 py-3 text-left">Username</th>
-                                <th className="px-4 py-3 text-right">Rating</th>
-                                <th className="px-4 py-3 text-right">Change</th>
-                                <th className="px-4 py-3 text-right">Contests</th>
+                                <Th className="w-20">Rank</Th>
+                                <Th>User</Th>
+                                <Th className="text-right">Rating</Th>
+                                <Th className="text-right">Change</Th>
+                                <Th className="hidden text-right sm:table-cell">Contests</Th>
                             </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                        </THead>
+                        <tbody>
                             {users.map((u, i) => {
                                 const rank = offset + i + 1
-                                const rankStyle = RANK_STYLES[rank] || ''
+                                const medal = MEDALS[rank]
                                 return (
-                                    <tr key={u.username} className={`hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${rankStyle}`}>
-                                        <td className="px-4 py-3 text-center">
-                                            {MEDALS[rank] || rank}
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <Link to={`/user/${u.username}`} className="font-medium text-blue-600 dark:text-blue-400 hover:underline">
-                                                {u.username}
-                                            </Link>
-                                            {u.country ? (
-                                                <span className="ml-2 text-xs align-middle">
-                                                    <CountryFlag country={u.country} />
-                                                </span>
-                                            ) : null}
-                                        </td>
-                                        <td className="px-4 py-3 text-right">
+                                    <Tr key={u.username}>
+                                        <Td>
+                                            {medal ? (
+                                                <span className="text-base" aria-label={`Rank ${rank}`}>{medal}</span>
+                                            ) : (
+                                                <span className="tnum text-xs text-muted">{rank}</span>
+                                            )}
+                                        </Td>
+                                        <Td>
+                                            <div className="flex items-center gap-2">
+                                                <Link
+                                                    to={`/user/${u.username}`}
+                                                    className="font-medium text-ink transition-colors hover:text-brand"
+                                                >
+                                                    {u.username}
+                                                </Link>
+                                                {u.country ? <CountryFlag country={u.country} /> : null}
+                                            </div>
+                                        </Td>
+                                        <Td className="text-right">
                                             <RatingBadge rating={u.rating} size="sm" />
-                                        </td>
-                                        <td className="px-4 py-3 text-right">
-                                            <span className={u.rating_change >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
+                                        </Td>
+                                        <Td className="text-right">
+                                            <span className={`tnum text-xs font-medium ${u.rating_change >= 0 ? 'text-ok' : 'text-bad'}`}>
                                                 {u.rating_change >= 0 ? '+' : ''}{u.rating_change}
                                             </span>
-                                        </td>
-                                        <td className="px-4 py-3 text-right text-gray-500 dark:text-gray-400">
-                                            {u.contests_played}
-                                        </td>
-                                    </tr>
+                                        </Td>
+                                        <Td className="tnum hidden text-right text-xs text-muted sm:table-cell">
+                                            {u.contests_played ?? '—'}
+                                        </Td>
+                                    </Tr>
                                 )
                             })}
-                            {users.length === 0 && !loading && (
-                                <tr><td colSpan={5} className="text-gray-400 dark:text-gray-500"><EmptyState text="No rankings yet" description="Standings fill in as users solve problems and compete in contests." /></td></tr>
-                            )}
                         </tbody>
-                    </table>
-                </div>
-            </div>
-
-            {loading && (
-                <div className="text-center py-4 text-gray-400 dark:text-gray-500">Loading...</div>
+                    </Table>
+                </TableShell>
             )}
 
             {hasMore && !loading && (
-                <div className="flex justify-center mt-4">
-                    <button
-                        onClick={handleLoadMore}
-                        className="px-6 py-2 border border-gray-300 dark:border-gray-600 rounded text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                    >
-                        Load More
-                    </button>
+                <div className="mt-4 flex justify-center">
+                    <Button variant="secondary" onClick={handleLoadMore}>Load more</Button>
                 </div>
             )}
 
+            {loading && users.length > 0 && (
+                <p className="mt-3 text-center text-xs text-muted">Loading…</p>
+            )}
+
             {total > 0 && (
-                <p className="text-sm text-gray-400 dark:text-gray-500 mt-3 text-center">{users.length} of {total} users</p>
+                <p className="tnum mt-3 text-center text-xs text-muted-soft">{users.length} of {total} users</p>
             )}
         </div>
     )

@@ -101,10 +101,10 @@ function getStatus(start: string, end: string, freeze?: string): ContestStatus {
 
 function StatusBadge({ status }: { status: ContestStatus }) {
     const map: Record<ContestStatus, { label: string; cls: string; dot: string }> = {
-        upcoming: { label: 'Before start', cls: 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-700', dot: 'bg-blue-50 dark:bg-blue-900/200' },
+        upcoming: { label: 'Before start', cls: 'bg-brand-soft text-brand border-blue-200 dark:border-blue-700', dot: 'bg-brand-soft0' },
         running: { label: 'Running', cls: 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border-green-200 dark:border-green-700', dot: 'bg-green-50 dark:bg-green-900/200 animate-pulse' },
         frozen: { label: 'Running (frozen)', cls: 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-700', dot: 'bg-amber-50 dark:bg-amber-900/200' },
-        ended: { label: 'Finished', cls: 'bg-gray-100 dark:bg-gray-900/30 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700', dot: 'bg-gray-400' },
+        ended: { label: 'Finished', cls: 'bg-surface-3/30 text-muted border-hairline', dot: 'bg-gray-400' },
     }
     const m = map[status]
     return (
@@ -123,7 +123,7 @@ function FormatBadge({ format }: { format?: string }) {
         cf: 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-700',
     }
     return (
-        <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded border uppercase ${cls[format] || 'bg-gray-50 dark:bg-gray-900/20 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700'}`}>
+        <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded border uppercase ${cls[format] || 'bg-surface-2/20 text-muted border-hairline'}`}>
             {format}
         </span>
     )
@@ -136,7 +136,7 @@ function TypeBadge({ type }: { type?: string }) {
         open: 'bg-teal-50 text-teal-700 border-teal-200',
     }
     return (
-        <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded border capitalize ${cls[type] || 'bg-gray-50 dark:bg-gray-900/20 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-700'}`}>
+        <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded border capitalize ${cls[type] || 'bg-surface-2/20 text-muted border-hairline'}`}>
             {type}
         </span>
     )
@@ -182,7 +182,7 @@ function RunningTimer({ start, end }: { start: string; end: string }) {
         <div className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl px-6 py-4 shadow-lg">
             <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                    <span className="w-2 h-2 rounded-full bg-surface animate-pulse" />
                     <span className="text-sm font-medium opacity-90">Contest is running</span>
                 </div>
                 <span className="text-sm opacity-75">Elapsed: {formatDuration(elapsed)}</span>
@@ -191,7 +191,7 @@ function RunningTimer({ start, end }: { start: string; end: string }) {
                 {formatCountdown(remaining)} <span className="text-base font-normal opacity-70">remaining</span>
             </div>
             <div className="w-full bg-white/20 rounded-full h-2">
-                <div className="bg-white rounded-full h-2 transition-all duration-1000" style={{ width: `${progress}%` }} />
+                <div className="bg-surface rounded-full h-2 transition-all duration-1000" style={{ width: `${progress}%` }} />
             </div>
         </div>
     )
@@ -213,13 +213,13 @@ const SIDEBAR_ICONS: Record<string, React.ReactNode> = {
 function SidebarBox({ title, icon, children, accent }: {
     title: string; icon: string; children: React.ReactNode; accent?: string
 }) {
-    const borderCls = accent === 'purple' ? 'border-purple-200 dark:border-purple-700' : accent === 'green' ? 'border-green-200 dark:border-green-700' : accent === 'amber' ? 'border-amber-200 dark:border-amber-700' : 'border-gray-200 dark:border-gray-700'
-    const headerCls = accent === 'purple' ? 'bg-purple-50 dark:bg-purple-900/20' : accent === 'green' ? 'bg-green-50 dark:bg-green-900/20' : accent === 'amber' ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-gray-50 dark:bg-gray-900/20'
+    const borderCls = accent === 'purple' ? 'border-purple-200 dark:border-purple-700' : accent === 'green' ? 'border-green-200 dark:border-green-700' : accent === 'amber' ? 'border-amber-200 dark:border-amber-700' : 'border-hairline'
+    const headerCls = accent === 'purple' ? 'bg-purple-50 dark:bg-purple-900/20' : accent === 'green' ? 'bg-green-50 dark:bg-green-900/20' : accent === 'amber' ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-surface-2/20'
     const iconNode = SIDEBAR_ICONS[icon]
     return (
-        <div className={`bg-white dark:bg-gray-800 border ${borderCls} rounded-xl shadow-sm overflow-hidden`}>
+        <div className={`bg-surface border ${borderCls} rounded-xl shadow-sm overflow-hidden`}>
             <div className={`px-4 py-2.5 ${headerCls} border-b ${borderCls}`}>
-                <h3 className="text-xs font-bold text-gray-600 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                <h3 className="text-xs font-bold text-muted uppercase tracking-wider flex items-center gap-1.5">
                     {iconNode}{title}
                 </h3>
             </div>
@@ -475,8 +475,8 @@ export default function ContestDetail() {
         } catch (e) { toast.error(e instanceof Error ? e.message : String(e)) }
     }
 
-    if (loading) return <div className="text-center py-20 text-gray-500 dark:text-gray-400">Loading...</div>
-    if (!contest) return <div className="text-center py-20 text-gray-500 dark:text-gray-400">Contest not found</div>
+    if (loading) return <div className="text-center py-20 text-muted">Loading...</div>
+    if (!contest) return <div className="text-center py-20 text-muted">Contest not found</div>
 
     const status = getStatus(contest.start_time, contest.end_time, contest.freeze_time ?? undefined)
     const isUpcoming = status === 'upcoming'
@@ -491,7 +491,7 @@ export default function ContestDetail() {
                 {/* flex-wrap: the title plus four badges is 526px of
                     min-content, which overflowed a 390px phone. */}
                 <div className="flex flex-wrap items-center gap-3 mb-2">
-                    <h1 className="text-3xl font-extrabold text-gray-900 dark:text-gray-100">{contest.title}</h1>
+                    <h1 className="text-3xl font-extrabold text-ink">{contest.title}</h1>
                     <StatusBadge status={status} />
                     {contest.format && <FormatBadge format={contest.format} />}
                     {contest.type && <TypeBadge type={contest.type} />}
@@ -515,7 +515,7 @@ export default function ContestDetail() {
             {/* overflow-x-auto: five tabs (with unread badges) are 623px of
                 min-content, so without a scroller they pushed the document to
                 663px on a 390px phone. */}
-            <div className="border-b border-gray-200 dark:border-gray-700 mb-6 overflow-x-auto">
+            <div className="border-b border-hairline mb-6 overflow-x-auto">
                 <nav className="flex gap-6 min-w-max">
                     {([
                         { key: 'problems', label: 'Problems', icon: 'problems' },
@@ -535,8 +535,8 @@ export default function ContestDetail() {
                                 }
                             }}
                             className={`pb-3 text-sm font-semibold transition-colors flex items-center gap-1.5 ${activeTab === tab.key
-                                ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600'
-                                : 'text-gray-500 hover:text-gray-700 border-b-2 border-transparent'
+                                ? 'text-brand border-b-2 border-brand'
+                                : 'text-muted hover:text-gray-700 border-b-2 border-transparent'
                                 }`}
                         >
                             {tab.icon === 'problems' && <FileText className="w-4 h-4" />}
@@ -559,37 +559,37 @@ export default function ContestDetail() {
                 <div className={activeTab === 'standings' || activeTab === 'submissions' ? '' : 'flex-1 min-w-0'}>
                     {activeTab === 'problems' && (
                         <div>
-                            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">Problems</h2>
+                            <h2 className="text-xl font-bold text-ink mb-4">Problems</h2>
                             {problems.length === 0 ? (
-                                <EmptyState icon={<FileText className="w-12 h-12 text-gray-700 dark:text-gray-300" />} text="No problems added yet" description="Contest organizers haven't published problems for this contest yet." />
+                                <EmptyState icon={<FileText className="w-12 h-12 text-ink-soft" />} text="No problems added yet" description="Contest organizers haven't published problems for this contest yet." />
                             ) : (
-                                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm overflow-hidden">
+                                <div className="bg-surface border border-hairline rounded-xl shadow-sm overflow-hidden">
                                     <table className="w-full text-sm">
                                         <thead>
-                                            <tr className="bg-gray-50 dark:bg-gray-900/20 border-b border-gray-200 dark:border-gray-700">
-                                                <th className="text-left px-4 py-3 font-semibold text-gray-600 dark:text-gray-400">#</th>
-                                                <th className="text-left px-4 py-3 font-semibold text-gray-600 dark:text-gray-400">Problem</th>
-                                                <th className="text-right px-4 py-3 font-semibold text-gray-600 dark:text-gray-400">Score</th>
-                                                <th className="text-center px-4 py-3 font-semibold text-gray-600 dark:text-gray-400">Action</th>
+                                            <tr className="bg-surface-2/20 border-b border-hairline">
+                                                <th className="text-left px-4 py-3 font-semibold text-muted">#</th>
+                                                <th className="text-left px-4 py-3 font-semibold text-muted">Problem</th>
+                                                <th className="text-right px-4 py-3 font-semibold text-muted">Score</th>
+                                                <th className="text-center px-4 py-3 font-semibold text-muted">Action</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {problems.map((p, i) => (
-                                                <tr key={p.problem_id} className="border-b border-gray-100 dark:border-gray-800 last:border-0 hover:bg-gray-50 transition-colors">
-                                                    <td className="px-4 py-3 font-mono font-bold text-gray-500">{p.index || String.fromCharCode(65 + i)}</td>
+                                                <tr key={p.problem_id} className="border-b border-hairline last:border-0 hover:bg-surface-2 transition-colors">
+                                                    <td className="px-4 py-3 font-mono font-bold text-muted">{p.index || String.fromCharCode(65 + i)}</td>
                                                     <td className="px-4 py-3">
                                                         <Link
                                                             to={`/contests/${id}/problem/${p.index || String.fromCharCode(65 + i)}`}
-                                                            className="text-blue-600 dark:text-blue-400 hover:text-blue-800 hover:underline font-medium"
+                                                            className="text-brand hover:text-blue-800 hover:underline font-medium"
                                                         >
                                                             {p.title || `Problem ${p.index || String.fromCharCode(65 + i)}`}
                                                         </Link>
                                                     </td>
-                                                    <td className="px-4 py-3 text-right font-mono text-gray-700 dark:text-gray-300">{p.score ?? 100}</td>
+                                                    <td className="px-4 py-3 text-right font-mono text-ink-soft">{p.score ?? 100}</td>
                                                     <td className="px-4 py-3 text-center">
                                                         <Link
                                                             to={`/contests/${id}/problem/${p.index || String.fromCharCode(65 + i)}`}
-                                                            className="inline-block px-3 py-1 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+                                                            className="inline-block px-3 py-1 bg-brand text-on-brand text-xs font-semibold rounded-lg hover:bg-brand-hover transition-colors"
                                                         >
                                                             Solve
                                                         </Link>
@@ -606,7 +606,7 @@ export default function ContestDetail() {
                     {activeTab === 'standings' && (
                         <div>
                             <div className="flex items-center justify-between mb-4">
-                                <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                                <h2 className="text-xl font-bold text-ink flex items-center gap-2">
                                     <Trophy className="w-5 h-5" /> Standings
                                 </h2>
                                 <div className="flex items-center gap-2">
@@ -619,7 +619,7 @@ export default function ContestDetail() {
                                         href={`/contests/${id}/scoreboard`}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 border border-gray-200 dark:border-gray-700 rounded-full hover:border-blue-300 dark:hover:border-blue-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                                        className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-muted hover:text-brand border border-hairline rounded-full hover:border-blue-300 dark:hover:border-blue-700 hover:bg-surface-2 transition-colors"
                                     >
                                         <ExternalLink className="w-3 h-3" />
                                         Full Scoreboard
@@ -627,14 +627,14 @@ export default function ContestDetail() {
                                 </div>
                             </div>
                             {standings.length === 0 ? (
-                                <div className="text-center py-16 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl">
-                                    <EmptyState icon={<Trophy className="w-12 h-12 text-gray-600 dark:text-gray-400" />} text="No submissions yet" description="Standings will appear once participants start solving" />
+                                <div className="text-center py-16 bg-surface border border-hairline rounded-xl">
+                                    <EmptyState icon={<Trophy className="w-12 h-12 text-muted" />} text="No submissions yet" description="Standings will appear once participants start solving" />
                                 </div>
                             ) : (
-                                <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-md overflow-x-auto">
+                                <div className="bg-surface border border-hairline rounded-xl shadow-md overflow-x-auto">
                                     <table className="w-full text-sm">
                                         <thead>
-                                            <tr className="bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-b border-gray-200 dark:border-gray-700">
+                                            <tr className="bg-surface-2 text-ink border-b border-hairline">
                                                 <th className="text-center px-3 py-3 font-bold text-xs uppercase tracking-wider w-16">Rank</th>
                                                 <th className="text-left px-4 py-3 font-bold text-xs uppercase tracking-wider min-w-[180px]">Team</th>
                                                 <th className="text-center px-3 py-3 font-bold text-xs uppercase tracking-wider w-20">
@@ -645,13 +645,13 @@ export default function ContestDetail() {
                                                     <th key={i} className="text-center px-1 py-3 font-bold text-xs uppercase tracking-wider w-16">
                                                         <div className="flex flex-col items-center">
                                                             <span className="text-base">{String.fromCharCode(65 + i)}</span>
-                                                            {p.title && <span className="text-[11px] text-gray-500 dark:text-gray-400 font-normal normal-case truncate max-w-[60px]" title={p.title}>{p.title}</span>}
+                                                            {p.title && <span className="text-[11px] text-muted font-normal normal-case truncate max-w-[60px]" title={p.title}>{p.title}</span>}
                                                         </div>
                                                     </th>
                                                 ))}
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                                        <tbody className="divide-y divide-hairline">
                                             {(standingsProblems.length > 0 ? standingsProblems : problems).length > 0 && standings.map((row, idx) => {
                                                 const probList = standingsProblems.length > 0 ? standingsProblems : problems
                                                 const isMe = row.user_id === userId
@@ -663,25 +663,25 @@ export default function ContestDetail() {
                                                 const ps = sec % 60
                                                 const penaltyStr = ph > 0 ? `${ph}:${String(pm).padStart(2, '0')}:${String(ps).padStart(2, '0')}` : `${pm}:${String(ps).padStart(2, '0')}`
                                                 return (
-                                                    <tr key={row.user_id || idx} className={`transition-colors ${isMe ? 'bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30' : idx % 2 === 0 ? 'bg-white dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-800' : 'bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
+                                                    <tr key={row.user_id || idx} className={`transition-colors ${isMe ? 'bg-brand-soft hover:bg-blue-100 dark:hover:bg-blue-900/30' : idx % 2 === 0 ? 'bg-surface hover:bg-surface-2' : 'bg-surface-2/50 hover:bg-surface-2'}`}>
                                                         <td className="text-center px-3 py-2.5">
                                                             {medal ? (
                                                                 <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-sm font-black border ${medal === 'gold' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 border-yellow-300 dark:border-yellow-700' :
-                                                                    medal === 'silver' ? 'bg-gray-200 dark:bg-gray-700/50 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600' :
+                                                                    medal === 'silver' ? 'bg-surface-3/50 text-ink-soft border-hairline-strong' :
                                                                         'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 border-orange-300 dark:border-orange-700'
                                                                     }`}>{rank}</span>
                                                             ) : (
-                                                                <span className="text-sm font-bold text-gray-500 dark:text-gray-400">{rank}</span>
+                                                                <span className="text-sm font-bold text-muted">{rank}</span>
                                                             )}
                                                         </td>
-                                                        <td className={`px-4 py-2.5 font-semibold ${isMe ? 'text-blue-700 dark:text-blue-400' : 'text-gray-800 dark:text-gray-200'}`}>
+                                                        <td className={`px-4 py-2.5 font-semibold ${isMe ? 'text-blue-700 dark:text-blue-400' : 'text-ink'}`}>
                                                             {row.username}
                                                             {isMe && <span className="ml-2 text-[11px] bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300 px-1.5 py-0.5 rounded font-bold border border-blue-200 dark:border-blue-800">YOU</span>}
                                                         </td>
                                                         <td className="text-center px-3 py-2.5">
-                                                            <span className="text-lg font-black text-gray-900 dark:text-gray-100">{row.total_solved ?? 0}</span>
+                                                            <span className="text-lg font-black text-ink">{row.total_solved ?? 0}</span>
                                                         </td>
-                                                        <td className="text-center px-3 py-2.5 font-mono text-gray-500 dark:text-gray-400 text-xs">{penaltyStr}</td>
+                                                        <td className="text-center px-3 py-2.5 font-mono text-muted text-xs">{penaltyStr}</td>
                                                         {probList.map((p, i) => {
                                                             const pidx = p.index || String.fromCharCode(65 + i)
                                                             const cell = row.problems?.[pidx] || {}
@@ -720,7 +720,7 @@ export default function ContestDetail() {
                                                                     </td>
                                                                 )
                                                             }
-                                                            return <td key={i} className="text-center px-1 py-2.5"><span className="text-gray-600 dark:text-gray-400 font-medium">-</span></td>
+                                                            return <td key={i} className="text-center px-1 py-2.5"><span className="text-muted font-medium">-</span></td>
                                                         })}
                                                     </tr>
                                                 )
@@ -732,7 +732,7 @@ export default function ContestDetail() {
                             {/* Participant count & Pagination */}
                             {standingsPagination && standingsPagination.total > 0 && (
                                 <div className="mt-3 flex flex-col items-center gap-3">
-                                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                                    <span className="text-xs text-muted">
                                         {standingsPagination.total} participant{standingsPagination.total !== 1 ? 's' : ''}
                                     </span>
                                     {standingsPagination.total_pages > 1 && (() => {
@@ -754,21 +754,21 @@ export default function ContestDetail() {
                                                 <button
                                                     onClick={() => setStandingsPage(p => Math.max(1, p - 1))}
                                                     disabled={page <= 1}
-                                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 text-sm font-medium rounded-md border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 text-sm font-medium rounded-md border border-hairline bg-surface-2 text-ink-soft hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                                                 >
                                                     <ChevronLeft className="w-4 h-4" />
                                                     Prev
                                                 </button>
                                                 {pages.map((p, i) =>
                                                     p === 'ellipsis' ? (
-                                                        <span key={`e${i}`} className="px-2 py-1.5 text-sm text-gray-500">...</span>
+                                                        <span key={`e${i}`} className="px-2 py-1.5 text-sm text-muted">...</span>
                                                     ) : (
                                                         <button
                                                             key={p}
                                                             onClick={() => setStandingsPage(p)}
                                                             className={`min-w-[36px] px-2 py-1.5 text-sm font-medium rounded-md border transition-colors ${p === page
-                                                                ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                                                                : 'bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-gray-700'
+                                                                ? 'bg-brand text-on-brand border-brand shadow-sm'
+                                                                : 'bg-surface-2 text-ink-soft border-hairline hover:bg-gray-700'
                                                                 }`}
                                                         >
                                                             {p}
@@ -778,7 +778,7 @@ export default function ContestDetail() {
                                                 <button
                                                     onClick={() => setStandingsPage(p => Math.min(total_pages, p + 1))}
                                                     disabled={page >= total_pages}
-                                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 text-sm font-medium rounded-md border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 text-sm font-medium rounded-md border border-hairline bg-surface-2 text-ink-soft hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                                                 >
                                                     Next
                                                     <ChevronRight className="w-4 h-4" />
@@ -794,20 +794,20 @@ export default function ContestDetail() {
                     {activeTab === 'submissions' && (
                         <div>
                             <div className="flex items-center justify-between mb-4">
-                                <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                                <h2 className="text-xl font-bold text-ink flex items-center gap-2">
                                     <Send className="w-5 h-5" /> Submissions
                                 </h2>
                                 {getAccessToken() && (
-                                    <div className="flex items-center bg-gray-100 dark:bg-gray-900/30 rounded-lg p-0.5">
+                                    <div className="flex items-center bg-surface-3/30 rounded-lg p-0.5">
                                         <button
                                             onClick={() => { setSubmissionsMine(true); setSubmissionsOffset(0) }}
-                                            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${submissionsMine ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                                            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${submissionsMine ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-gray-700'}`}
                                         >
                                             <Eye className="w-3.5 h-3.5" /> My Submissions
                                         </button>
                                         <button
                                             onClick={() => { setSubmissionsMine(false); setSubmissionsOffset(0) }}
-                                            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${!submissionsMine ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                                            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${!submissionsMine ? 'bg-surface text-ink shadow-sm' : 'text-muted hover:text-gray-700'}`}
                                         >
                                             <EyeOff className="w-3.5 h-3.5" /> All Submissions
                                         </button>
@@ -817,19 +817,19 @@ export default function ContestDetail() {
 
                             {status === 'frozen' && (
                                 <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-2">
-                                    <Clock className="w-4 h-4 text-blue-600" />
+                                    <Clock className="w-4 h-4 text-brand" />
                                     <span className="text-sm text-blue-700">Standings frozen — only submissions before freeze are shown.</span>
                                 </div>
                             )}
 
                             {/* Filter controls */}
                             {getAccessToken() && (
-                                <div className="flex flex-wrap items-center gap-3 mb-4 p-3 bg-gray-50 dark:bg-gray-900/20 border border-gray-200 dark:border-gray-700 rounded-lg">
-                                    <Filter className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                                <div className="flex flex-wrap items-center gap-3 mb-4 p-3 bg-surface-2/20 border border-hairline rounded-lg">
+                                    <Filter className="w-4 h-4 text-muted" />
                                     <select
                                         value={subFilterProblem}
                                         onChange={e => { setSubFilterProblem(e.target.value); setSubmissionsOffset(0) }}
-                                        className="text-sm border border-gray-200 dark:border-gray-700 rounded-md px-2.5 py-1.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        className="text-sm border border-hairline rounded-md px-2.5 py-1.5 bg-surface text-ink-soft focus:ring-2 focus-visible:outline-[var(--ring)] focus:border-transparent"
                                     >
                                         <option value="">All Problems</option>
                                         {problems.map((p) => (
@@ -839,7 +839,7 @@ export default function ContestDetail() {
                                     <select
                                         value={subFilterLang}
                                         onChange={e => { setSubFilterLang(e.target.value); setSubmissionsOffset(0) }}
-                                        className="text-sm border border-gray-200 dark:border-gray-700 rounded-md px-2.5 py-1.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        className="text-sm border border-hairline rounded-md px-2.5 py-1.5 bg-surface text-ink-soft focus:ring-2 focus-visible:outline-[var(--ring)] focus:border-transparent"
                                     >
                                         <option value="">All Languages</option>
                                         {Array.from(new Set(submissions.map(s => s.language).filter(Boolean))).sort().map(lang => (
@@ -849,7 +849,7 @@ export default function ContestDetail() {
                                     <select
                                         value={subFilterStatus}
                                         onChange={e => { setSubFilterStatus(e.target.value); setSubmissionsOffset(0) }}
-                                        className="text-sm border border-gray-200 dark:border-gray-700 rounded-md px-2.5 py-1.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        className="text-sm border border-hairline rounded-md px-2.5 py-1.5 bg-surface text-ink-soft focus:ring-2 focus-visible:outline-[var(--ring)] focus:border-transparent"
                                     >
                                         <option value="">All Verdicts</option>
                                         <option value="ac">Accepted</option>
@@ -867,12 +867,12 @@ export default function ContestDetail() {
                                         value={subFilterId}
                                         onChange={e => { setSubFilterId(e.target.value); setSubmissionsOffset(0) }}
                                         placeholder="Submission ID..."
-                                        className="text-sm border border-gray-200 dark:border-gray-700 rounded-md px-2.5 py-1.5 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent w-44"
+                                        className="text-sm border border-hairline rounded-md px-2.5 py-1.5 bg-surface text-ink-soft focus:ring-2 focus-visible:outline-[var(--ring)] focus:border-transparent w-44"
                                     />
                                     {(subFilterProblem || subFilterLang || subFilterStatus || subFilterId) && (
                                         <button
                                             onClick={() => { setSubFilterProblem(''); setSubFilterLang(''); setSubFilterStatus(''); setSubFilterId(''); setSubmissionsOffset(0) }}
-                                            className="text-xs text-gray-500 hover:text-red-600 font-medium"
+                                            className="text-xs text-muted hover:text-red-600 font-medium"
                                         >
                                             Clear Filters
                                         </button>
@@ -881,28 +881,28 @@ export default function ContestDetail() {
                             )}
 
                             {!getAccessToken() ? (
-                                <EmptyState icon={<Send className="w-12 h-12 text-gray-700 dark:text-gray-300" />} text="Please log in to view submissions" description="Sign in to follow this contest's submissions in real time." />
+                                <EmptyState icon={<Send className="w-12 h-12 text-ink-soft" />} text="Please log in to view submissions" description="Sign in to follow this contest's submissions in real time." />
                             ) : filteredSubmissions.length === 0 ? (
                                 <EmptyState
-                                    icon={<Send className="w-12 h-12 text-gray-700 dark:text-gray-300" />}
+                                    icon={<Send className="w-12 h-12 text-ink-soft" />}
                                     text="No submissions found"
                                     description={(subFilterProblem || subFilterLang || subFilterStatus || subFilterId) ? 'Try adjusting your filters' : undefined}
                                 />
                             ) : (
                                 <>
-                                    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm overflow-x-auto">
+                                    <div className="bg-surface border border-hairline rounded-xl shadow-sm overflow-x-auto">
                                         <table className="w-full text-sm">
                                             <thead>
-                                                <tr className="bg-gray-50 dark:bg-gray-900/20 border-b border-gray-200 dark:border-gray-700">
-                                                    <th className="text-left px-4 py-3 font-semibold text-gray-600 dark:text-gray-400">#</th>
-                                                    {(!submissionsMine || isJudge) && <th className="text-left px-4 py-3 font-semibold text-gray-600 dark:text-gray-400">User</th>}
-                                                    <th className="text-left px-4 py-3 font-semibold text-gray-600 dark:text-gray-400">Problem</th>
-                                                    <th className="text-center px-4 py-3 font-semibold text-gray-600 dark:text-gray-400">Lang</th>
-                                                    <th className="text-center px-4 py-3 font-semibold text-gray-600 dark:text-gray-400">Verdict</th>
-                                                    <th className="text-center px-4 py-3 font-semibold text-gray-600 dark:text-gray-400">Score</th>
-                                                    <th className="text-center px-4 py-3 font-semibold text-gray-600 dark:text-gray-400">Time</th>
-                                                    <th className="text-center px-4 py-3 font-semibold text-gray-600 dark:text-gray-400">Memory</th>
-                                                    <th className="text-right px-4 py-3 font-semibold text-gray-600 dark:text-gray-400">Submitted</th>
+                                                <tr className="bg-surface-2/20 border-b border-hairline">
+                                                    <th className="text-left px-4 py-3 font-semibold text-muted">#</th>
+                                                    {(!submissionsMine || isJudge) && <th className="text-left px-4 py-3 font-semibold text-muted">User</th>}
+                                                    <th className="text-left px-4 py-3 font-semibold text-muted">Problem</th>
+                                                    <th className="text-center px-4 py-3 font-semibold text-muted">Lang</th>
+                                                    <th className="text-center px-4 py-3 font-semibold text-muted">Verdict</th>
+                                                    <th className="text-center px-4 py-3 font-semibold text-muted">Score</th>
+                                                    <th className="text-center px-4 py-3 font-semibold text-muted">Time</th>
+                                                    <th className="text-center px-4 py-3 font-semibold text-muted">Memory</th>
+                                                    <th className="text-right px-4 py-3 font-semibold text-muted">Submitted</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -913,9 +913,9 @@ export default function ContestDetail() {
                                                         tle: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700',
                                                         mle: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700',
                                                         re: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-orange-300 dark:border-orange-700',
-                                                        ce: 'bg-gray-100 dark:bg-gray-900/30 text-gray-600 dark:text-gray-400 border-gray-300 dark:border-gray-700',
-                                                        pending: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700',
-                                                        judging: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700',
+                                                        ce: 'bg-surface-3/30 text-muted border-hairline-strong',
+                                                        pending: 'bg-blue-100 dark:bg-blue-900/30 text-brand border-blue-300 dark:border-blue-700',
+                                                        judging: 'bg-blue-100 dark:bg-blue-900/30 text-brand border-blue-300 dark:border-blue-700',
                                                         se: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-300 dark:border-red-700',
                                                         ie: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 border-red-300 dark:border-red-700',
                                                     }
@@ -927,28 +927,28 @@ export default function ContestDetail() {
                                                     const problem = problems.find(p => p.problem_id === s.problem_id)
                                                     const problemLabel = problem ? `${problem.index || ''} — ${problem.title}` : s.problem_id?.slice(0, 8)
                                                     const canClick = s.user_id === userId || isJudge
-                                                    const rowCls = canClick ? 'cursor-pointer hover:bg-blue-50' : 'hover:bg-gray-50'
+                                                    const rowCls = canClick ? 'cursor-pointer hover:bg-blue-50' : 'hover:bg-surface-2'
                                                     return (
                                                         <tr
                                                             key={s.id}
-                                                            className={`border-b border-gray-100 dark:border-gray-800 last:border-0 ${rowCls} transition-colors`}
+                                                            className={`border-b border-hairline last:border-0 ${rowCls} transition-colors`}
                                                             onClick={canClick ? () => window.open(`/submissions/${s.id}`, '_blank') : undefined}
                                                         >
-                                                            <td className="px-4 py-2.5 font-mono text-xs text-gray-500 dark:text-gray-400">{submissionsOffset + i + 1}</td>
-                                                            {(!submissionsMine || isJudge) && <td className="px-4 py-2.5 font-medium text-gray-800 dark:text-gray-300">{s.username || s.user_id?.slice(0, 8)}</td>}
-                                                            <td className="px-4 py-2.5 text-gray-700 dark:text-gray-300">{problemLabel}</td>
+                                                            <td className="px-4 py-2.5 font-mono text-xs text-muted">{submissionsOffset + i + 1}</td>
+                                                            {(!submissionsMine || isJudge) && <td className="px-4 py-2.5 font-medium text-ink">{s.username || s.user_id?.slice(0, 8)}</td>}
+                                                            <td className="px-4 py-2.5 text-ink-soft">{problemLabel}</td>
                                                             <td className="px-4 py-2.5 text-center">
-                                                                <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-900/30 text-gray-600 dark:text-gray-400 text-xs font-mono rounded">{s.language}</span>
+                                                                <span className="px-2 py-0.5 bg-surface-3/30 text-muted text-xs font-mono rounded">{s.language}</span>
                                                             </td>
                                                             <td className="px-4 py-2.5 text-center">
-                                                                <span className={`px-2 py-0.5 text-xs font-semibold rounded border ${verdictCls[s.status] || 'bg-gray-100 dark:bg-gray-900/30 text-gray-600 dark:text-gray-400 border-gray-300 dark:border-gray-700'}`}>
+                                                                <span className={`px-2 py-0.5 text-xs font-semibold rounded border ${verdictCls[s.status] || 'bg-surface-3/30 text-muted border-hairline-strong'}`}>
                                                                     {verdictLabel[s.status] || s.status}
                                                                 </span>
                                                             </td>
-                                                            <td className="px-4 py-2.5 text-center font-mono text-gray-700 dark:text-gray-300">{s.score ?? '-'}</td>
-                                                            <td className="px-4 py-2.5 text-center font-mono text-gray-500 text-xs">{s.time_used ? `${s.time_used}ms` : '-'}</td>
-                                                            <td className="px-4 py-2.5 text-center font-mono text-gray-500 text-xs">{s.memory_used ? `${(s.memory_used / 1024).toFixed(1)}MB` : '-'}</td>
-                                                            <td className="px-4 py-2.5 text-right text-xs text-gray-500 dark:text-gray-400" title={new Date(s.created_at).toLocaleString()}>{timeAgo(s.created_at)}</td>
+                                                            <td className="px-4 py-2.5 text-center font-mono text-ink-soft">{s.score ?? '-'}</td>
+                                                            <td className="px-4 py-2.5 text-center font-mono text-muted text-xs">{s.time_used ? `${s.time_used}ms` : '-'}</td>
+                                                            <td className="px-4 py-2.5 text-center font-mono text-muted text-xs">{s.memory_used ? `${(s.memory_used / 1024).toFixed(1)}MB` : '-'}</td>
+                                                            <td className="px-4 py-2.5 text-right text-xs text-muted" title={new Date(s.created_at).toLocaleString()}>{timeAgo(s.created_at)}</td>
                                                         </tr>
                                                     )
                                                 })}
@@ -961,19 +961,19 @@ export default function ContestDetail() {
                                             <button
                                                 onClick={() => setSubmissionsOffset(o => Math.max(0, o - submissionsLimit))}
                                                 disabled={submissionsOffset === 0}
-                                                className="px-3 py-1.5 text-sm font-medium rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                                                className="px-3 py-1.5 text-sm font-medium rounded-md border border-hairline bg-surface text-muted hover:bg-surface-2 disabled:opacity-40 disabled:cursor-not-allowed"
                                             >Prev</button>
-                                            <span className="text-sm text-gray-500">
+                                            <span className="text-sm text-muted">
                                                 {Math.floor(submissionsOffset / submissionsLimit) + 1} / {Math.ceil(submissionsTotal / submissionsLimit)}
                                             </span>
                                             <button
                                                 onClick={() => setSubmissionsOffset(o => o + submissionsLimit)}
                                                 disabled={submissionsOffset + submissionsLimit >= submissionsTotal}
-                                                className="px-3 py-1.5 text-sm font-medium rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                                                className="px-3 py-1.5 text-sm font-medium rounded-md border border-hairline bg-surface text-muted hover:bg-surface-2 disabled:opacity-40 disabled:cursor-not-allowed"
                                             >Next</button>
                                         </div>
                                     )}
-                                    <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 text-center">{submissionsTotal} submission{submissionsTotal !== 1 ? 's' : ''}</div>
+                                    <div className="mt-2 text-xs text-muted text-center">{submissionsTotal} submission{submissionsTotal !== 1 ? 's' : ''}</div>
                                 </>
                             )}
                         </div>
@@ -982,11 +982,11 @@ export default function ContestDetail() {
                     {activeTab === 'clarifications' && (
                         <div>
                             <div className="flex items-center justify-between mb-4">
-                                <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Clarifications</h2>
+                                <h2 className="text-xl font-bold text-ink">Clarifications</h2>
                                 {getAccessToken() && (
                                     <button
                                         onClick={() => setShowForm(!showForm)}
-                                        className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+                                        className="px-4 py-2 bg-brand text-on-brand text-sm font-semibold rounded-lg hover:bg-brand-hover transition-colors"
                                     >
                                         Ask Question
                                     </button>
@@ -994,35 +994,35 @@ export default function ContestDetail() {
                             </div>
 
                             {showForm && (
-                                <div className="bg-white dark:bg-gray-800 border border-blue-200 dark:border-blue-700 rounded-xl p-4 mb-4 shadow-sm">
+                                <div className="bg-surface border border-blue-200 dark:border-blue-700 rounded-xl p-4 mb-4 shadow-sm">
                                     <textarea
                                         value={question}
                                         onChange={e => setQuestion(e.target.value)}
                                         placeholder="Type your question..."
-                                        className="w-full border border-gray-200 dark:border-gray-700 rounded-lg p-3 text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        className="w-full border border-hairline rounded-lg p-3 text-sm resize-none focus:ring-2 focus-visible:outline-[var(--ring)] focus:border-transparent"
                                         rows={3}
                                     />
                                     <div className="flex gap-2 mt-3">
-                                        <button onClick={handleAsk} className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700">Submit</button>
-                                        <button onClick={() => setShowForm(false)} className="px-4 py-2 bg-gray-100 dark:bg-gray-900/30 text-gray-600 dark:text-gray-400 text-sm font-semibold rounded-lg hover:bg-gray-200">Cancel</button>
+                                        <button onClick={handleAsk} className="px-4 py-2 bg-brand text-on-brand text-sm font-semibold rounded-lg hover:bg-brand-hover">Submit</button>
+                                        <button onClick={() => setShowForm(false)} className="px-4 py-2 bg-surface-3/30 text-muted text-sm font-semibold rounded-lg hover:bg-surface-3">Cancel</button>
                                     </div>
                                 </div>
                             )}
 
                             {clarifications.length === 0 ? (
-                                <EmptyState icon={<MessageSquare className="w-12 h-12 text-gray-700 dark:text-gray-300" />} text="No clarifications yet" description="Questions from participants and official responses will appear here." />
+                                <EmptyState icon={<MessageSquare className="w-12 h-12 text-ink-soft" />} text="No clarifications yet" description="Questions from participants and official responses will appear here." />
                             ) : (
                                 <div className="space-y-3">
                                     {clarifications.map(c => (
-                                        <div key={c.id} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 shadow-sm">
+                                        <div key={c.id} className="bg-surface border border-hairline rounded-xl p-4 shadow-sm">
                                             <div className="flex items-start justify-between mb-2">
-                                                <span className="text-xs font-medium text-gray-500">{c.username || 'Anonymous'}</span>
-                                                <span className="text-xs text-gray-500 dark:text-gray-400">{new Date(c.created_at).toLocaleString()}</span>
+                                                <span className="text-xs font-medium text-muted">{c.username || 'Anonymous'}</span>
+                                                <span className="text-xs text-muted">{new Date(c.created_at).toLocaleString()}</span>
                                             </div>
-                                            <p className="text-sm text-gray-800 dark:text-gray-300 mb-2">{c.question}</p>
+                                            <p className="text-sm text-ink mb-2">{c.question}</p>
                                             {c.answer && (
-                                                <div className={`mt-2 pl-3 border-l-2 ${c.is_public ? 'border-green-400 bg-green-50 dark:bg-green-900/20' : 'border-blue-400 bg-blue-50 dark:bg-blue-900/20'} rounded-r-lg p-3`}>
-                                                    <p className="text-sm text-gray-700 dark:text-gray-300">{c.answer}</p>
+                                                <div className={`mt-2 pl-3 border-l-2 ${c.is_public ? 'border-green-400 bg-green-50 dark:bg-green-900/20' : 'border-blue-400 bg-brand-soft'} rounded-r-lg p-3`}>
+                                                    <p className="text-sm text-ink-soft">{c.answer}</p>
                                                     {c.is_public && (
                                                         <span className="inline-block text-[10px] text-green-600 dark:text-green-400 font-medium mt-1">
                                                             <Megaphone className="w-3 h-3 inline mr-0.5" />Public response
@@ -1039,7 +1039,7 @@ export default function ContestDetail() {
 
                     {activeTab === 'announcements' && (
                         <div>
-                            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2">
+                            <h2 className="text-xl font-bold text-ink mb-4 flex items-center gap-2">
                                 <Megaphone className="w-5 h-5" /> Announcements
                             </h2>
 
@@ -1054,7 +1054,7 @@ export default function ContestDetail() {
                                             onChange={e => setAnnounceText(e.target.value)}
                                             onKeyDown={e => e.key === 'Enter' && handleAnnounce()}
                                             placeholder="Write announcement for all participants..."
-                                            className="flex-1 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                                            className="flex-1 border border-hairline rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                                         />
                                         <button
                                             onClick={handleAnnounce}
@@ -1067,16 +1067,16 @@ export default function ContestDetail() {
                             )}
 
                             {announcements.length === 0 ? (
-                                <EmptyState icon={<Megaphone className="w-12 h-12 text-gray-700 dark:text-gray-300" />} text="No announcements yet" description="Announcements from judges will appear here" />
+                                <EmptyState icon={<Megaphone className="w-12 h-12 text-ink-soft" />} text="No announcements yet" description="Announcements from judges will appear here" />
                             ) : (
                                 <div className="space-y-3">
                                     {announcements.map((a, i) => (
                                         <div key={a.id} className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg p-4">
                                             <div className="flex items-start justify-between gap-3">
                                                 <div className="flex-1">
-                                                    <p className="text-gray-800 dark:text-gray-300 text-sm leading-relaxed">{a.content}</p>
-                                                    <div className="mt-2 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                                                        {a.username && <span className="font-medium text-gray-600 dark:text-gray-400">{a.username}</span>}
+                                                    <p className="text-ink text-sm leading-relaxed">{a.content}</p>
+                                                    <div className="mt-2 flex items-center gap-2 text-xs text-muted">
+                                                        {a.username && <span className="font-medium text-muted">{a.username}</span>}
                                                         <span>{new Date(a.created_at).toLocaleString()}</span>
                                                     </div>
                                                 </div>
@@ -1107,34 +1107,34 @@ export default function ContestDetail() {
                         <SidebarBox title="Contest Info" icon="info">
                             <dl className="space-y-2.5 text-sm">
                                 <div className="flex justify-between">
-                                    <dt className="text-gray-500">Start</dt>
-                                    <dd className="text-gray-800 dark:text-gray-300 font-medium text-right">{formatDateTime(contest.start_time)}</dd>
+                                    <dt className="text-muted">Start</dt>
+                                    <dd className="text-ink font-medium text-right">{formatDateTime(contest.start_time)}</dd>
                                 </div>
                                 <div className="flex justify-between">
-                                    <dt className="text-gray-500">End</dt>
-                                    <dd className="text-gray-800 dark:text-gray-300 font-medium text-right">{formatDateTime(contest.end_time)}</dd>
+                                    <dt className="text-muted">End</dt>
+                                    <dd className="text-ink font-medium text-right">{formatDateTime(contest.end_time)}</dd>
                                 </div>
                                 <div className="flex justify-between">
-                                    <dt className="text-gray-500">Duration</dt>
-                                    <dd className="text-gray-800 dark:text-gray-300 font-medium">{formatDuration(totalDuration)}</dd>
+                                    <dt className="text-muted">Duration</dt>
+                                    <dd className="text-ink font-medium">{formatDuration(totalDuration)}</dd>
                                 </div>
                                 {contest.freeze_time && (
                                     <div className="flex justify-between">
-                                        <dt className="text-gray-500">Standings freeze</dt>
-                                        <dd className="text-gray-800 dark:text-gray-300 font-medium text-right">{formatDateTime(contest.freeze_time)}</dd>
+                                        <dt className="text-muted">Standings freeze</dt>
+                                        <dd className="text-ink font-medium text-right">{formatDateTime(contest.freeze_time)}</dd>
                                     </div>
                                 )}
-                                <div className="border-t border-gray-100 dark:border-gray-800 pt-2 flex justify-between">
-                                    <dt className="text-gray-500">Format</dt>
-                                    <dd className="text-gray-800 dark:text-gray-300 font-medium uppercase">{contest.format || 'N/A'}</dd>
+                                <div className="border-t border-hairline pt-2 flex justify-between">
+                                    <dt className="text-muted">Format</dt>
+                                    <dd className="text-ink font-medium uppercase">{contest.format || 'N/A'}</dd>
                                 </div>
                                 <div className="flex justify-between">
-                                    <dt className="text-gray-500">Type</dt>
-                                    <dd className="text-gray-800 dark:text-gray-300 font-medium capitalize">{contest.type || 'Standard'}</dd>
+                                    <dt className="text-muted">Type</dt>
+                                    <dd className="text-ink font-medium capitalize">{contest.type || 'Standard'}</dd>
                                 </div>
                                 <div className="flex justify-between">
-                                    <dt className="text-gray-500">Problems</dt>
-                                    <dd className="text-gray-800 dark:text-gray-300 font-medium">{problems.length}</dd>
+                                    <dt className="text-muted">Problems</dt>
+                                    <dd className="text-ink font-medium">{problems.length}</dd>
                                 </div>
                             </dl>
                         </SidebarBox>
@@ -1144,15 +1144,15 @@ export default function ContestDetail() {
                             <SidebarBox title="Registration" icon="users">
                                 <div className="space-y-3">
                                     <div className="flex items-center justify-between text-sm">
-                                        <span className="text-gray-500">Participants</span>
-                                        <span className="font-semibold text-gray-800 dark:text-gray-300">
+                                        <span className="text-muted">Participants</span>
+                                        <span className="font-semibold text-ink">
                                             {registrationCount}{contest.max_participants ? ` / ${contest.max_participants}` : ''}
                                         </span>
                                     </div>
                                     {contest.max_participants && (
-                                        <div className="w-full bg-gray-100 dark:bg-gray-900/30 rounded-full h-1.5">
+                                        <div className="w-full bg-surface-3/30 rounded-full h-1.5">
                                             <div
-                                                className="bg-blue-50 dark:bg-blue-900/200 rounded-full h-1.5 transition-all"
+                                                className="bg-brand-soft0 rounded-full h-1.5 transition-all"
                                                 style={{ width: `${Math.min(100, (registrationCount / contest.max_participants) * 100)}%` }}
                                             />
                                         </div>
@@ -1168,7 +1168,7 @@ export default function ContestDetail() {
                                             onClick={() => registered ? handleUnregister() : handleRegister()}
                                             className={`w-full py-2 rounded-lg text-sm font-semibold transition-colors ${registered
                                                 ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 border border-red-200 dark:border-red-700'
-                                                : 'bg-blue-600 text-white hover:bg-blue-700'
+                                                : 'bg-brand text-on-brand hover:bg-brand-hover'
                                                 }`}
                                         >
                                             {registered ? 'Unregister' : 'Register Now'}
@@ -1184,7 +1184,7 @@ export default function ContestDetail() {
                                 <div className="space-y-2">
                                     <Link
                                         to={`/contests/${id}/scoreboard`}
-                                        className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 hover:underline"
+                                        className="flex items-center gap-2 text-sm text-brand hover:text-blue-800 hover:underline"
                                     >
                                         <Trophy className="w-4 h-4" /> View Full Scoreboard
                                     </Link>
@@ -1193,13 +1193,13 @@ export default function ContestDetail() {
                                             href={`/api/contests/${id}/pdf`}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 hover:underline"
+                                            className="flex items-center gap-2 text-sm text-brand hover:text-blue-800 hover:underline"
                                         >
                                             <FileDown className="w-4 h-4" /> Download PDF
                                         </a>
                                     )}
                                     {contest.upsolving_enabled && (
-                                        <span className="flex items-center gap-2 text-sm text-gray-500">
+                                        <span className="flex items-center gap-2 text-sm text-muted">
                                             <Pencil className="w-4 h-4" /> Upsolving is enabled
                                         </span>
                                     )}
@@ -1229,7 +1229,7 @@ export default function ContestDetail() {
                         {/* Educational Round Info */}
                         {contest.type === 'educational' && (
                             <SidebarBox title="Educational Round" icon="book" accent="green">
-                                <p className="text-sm text-gray-600 dark:text-gray-400">
+                                <p className="text-sm text-muted">
                                     This is an educational contest. Problems are designed for learning and practice.
                                 </p>
                             </SidebarBox>
@@ -1238,7 +1238,7 @@ export default function ContestDetail() {
                         {/* Virtual Contest */}
                         {contest.virtual_contest_enabled && (
                             <SidebarBox title="Virtual Contest" icon="game">
-                                <p className="text-sm text-gray-600 dark:text-gray-400">
+                                <p className="text-sm text-muted">
                                     Virtual contests are available. Join anytime to practice with real contest timing.
                                 </p>
                             </SidebarBox>

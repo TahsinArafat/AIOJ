@@ -155,8 +155,8 @@ export default function BackupsPanel() {
     if (loading) {
         return (
             <div className="flex items-center justify-center py-12">
-                <RefreshCw className="w-5 h-5 animate-spin text-gray-400" />
-                <span className="ml-2 text-gray-500 dark:text-gray-400">Loading backups...</span>
+                <RefreshCw className="w-5 h-5 animate-spin text-muted-soft" />
+                <span className="ml-2 text-muted">Loading backups...</span>
             </div>
         )
     }
@@ -166,13 +166,13 @@ export default function BackupsPanel() {
             <div className="flex items-center justify-between mb-6">
                 <div>
                     <h2 className="text-lg font-semibold">Backups</h2>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    <p className="text-sm text-muted mt-1">
                         Create, manage, and restore system backups
                     </p>
                 </div>
                 <button
                     onClick={loadBackups}
-                    className="flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+                    className="flex items-center gap-1.5 text-sm text-muted hover:text-ink"
                 >
                     <RefreshCw className="w-4 h-4" /> Refresh
                 </button>
@@ -189,33 +189,33 @@ export default function BackupsPanel() {
             )}
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                <div className="bg-surface border border-hairline rounded-lg p-4">
                     <div className="flex items-center gap-3 mb-3">
                         <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                            <Database className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                            <Database className="w-5 h-5 text-brand" />
                         </div>
                         <div>
                             <h3 className="font-medium text-sm">Database Backup</h3>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">PostgreSQL dump</p>
+                            <p className="text-xs text-muted">PostgreSQL dump</p>
                         </div>
                     </div>
                     <button
                         onClick={() => { setCreateType('database'); handleCreateBackup() }}
                         disabled={creating}
-                        className="w-full px-3 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                        className="w-full px-3 py-2 bg-brand text-on-brand text-sm rounded hover:bg-brand-hover disabled:opacity-50 transition-colors"
                     >
                         {creating && createType === 'database' ? 'Creating...' : 'Create Database Backup'}
                     </button>
                 </div>
 
-                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                <div className="bg-surface border border-hairline rounded-lg p-4">
                     <div className="flex items-center gap-3 mb-3">
                         <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
                             <HardDrive className="w-5 h-5 text-amber-600 dark:text-amber-400" />
                         </div>
                         <div>
                             <h3 className="font-medium text-sm">Files Backup</h3>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">Uploaded files & testcases</p>
+                            <p className="text-xs text-muted">Uploaded files & testcases</p>
                         </div>
                     </div>
                     <button
@@ -227,14 +227,14 @@ export default function BackupsPanel() {
                     </button>
                 </div>
 
-                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                <div className="bg-surface border border-hairline rounded-lg p-4">
                     <div className="flex items-center gap-3 mb-3">
                         <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg">
                             <Archive className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
                         </div>
                         <div>
                             <h3 className="font-medium text-sm">Full Backup</h3>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">Database + Files combined</p>
+                            <p className="text-xs text-muted">Database + Files combined</p>
                         </div>
                     </div>
                     <button
@@ -247,14 +247,14 @@ export default function BackupsPanel() {
                 </div>
             </div>
 
-            <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 mb-6">
+            <div className="bg-surface border border-hairline rounded-lg p-4 mb-6">
                 <div className="flex items-center gap-3">
                     <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
                         <FolderArchive className="w-5 h-5 text-purple-600 dark:text-purple-400" />
                     </div>
                     <div className="flex-1">
                         <h3 className="font-medium text-sm">Upload Backup Archive</h3>
-                        <p className="text-xs text-gray-500 dark:text-gray-400">Upload an AIOJ .tar.gz archive or database .sql dump</p>
+                        <p className="text-xs text-muted">Upload an AIOJ .tar.gz archive or database .sql dump</p>
                     </div>
                     <label className="cursor-pointer">
                         <input
@@ -272,12 +272,12 @@ export default function BackupsPanel() {
                 </div>
             </div>
 
-            <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-                <div className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
-                    <h3 className="font-semibold text-sm text-gray-700 dark:text-gray-300">Saved Backups</h3>
+            <div className="border border-hairline rounded-lg overflow-hidden">
+                <div className="bg-surface-2 border-b border-hairline px-4 py-3">
+                    <h3 className="font-semibold text-sm text-ink-soft">Saved Backups</h3>
                 </div>
                 <table className="w-full text-sm">
-                    <thead className="bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-xs uppercase">
+                    <thead className="bg-surface-2 text-muted text-xs uppercase">
                         <tr>
                             <th className="px-4 py-3 text-left">Filename</th>
                             <th className="px-4 py-3 text-left">Type</th>
@@ -286,18 +286,18 @@ export default function BackupsPanel() {
                             <th className="px-4 py-3 text-right">Actions</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                    <tbody className="divide-y divide-hairline">
                         {backups.map(b => (
-                            <tr key={b.filename} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                            <tr key={b.filename} className="hover:bg-surface-2/50">
                                 <td className="px-4 py-3 font-mono text-xs">{b.filename}</td>
                                 <td className="px-4 py-3">{getTypeBadge(b.type)}</td>
-                                <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs">{formatSize(b.size)}</td>
-                                <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs">{formatDate(b.created_at)}</td>
+                                <td className="px-4 py-3 text-muted text-xs">{formatSize(b.size)}</td>
+                                <td className="px-4 py-3 text-muted text-xs">{formatDate(b.created_at)}</td>
                                 <td className="px-4 py-3 text-right">
                                     <div className="flex justify-end gap-2">
                                         <button
                                             onClick={() => handleDownload(b)}
-                                            className="p-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors"
+                                            className="p-1.5 text-brand hover:bg-brand-soft rounded transition-colors"
                                             title="Download"
                                         >
                                             <Download className="w-4 h-4" />
@@ -322,7 +322,7 @@ export default function BackupsPanel() {
                         ))}
                         {backups.length === 0 && (
                             <tr>
-                                <td colSpan={5} className="px-4 py-12 text-center text-gray-400 dark:text-gray-500">
+                                <td colSpan={5} className="px-4 py-12 text-center text-muted-soft">
                                     <Archive className="w-8 h-8 mx-auto mb-2 opacity-50" />
                                     <p>No backups found. Create your first backup above.</p>
                                 </td>
@@ -335,7 +335,7 @@ export default function BackupsPanel() {
             {restoreModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center">
                     <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => !restoring && setRestoreModal(null)} />
-                    <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 w-full max-w-md mx-4 overflow-hidden">
+                    <div className="relative bg-surface rounded-xl shadow-2xl border border-hairline w-full max-w-md mx-4 overflow-hidden">
                         <div className="bg-red-600 px-6 py-4 flex items-center gap-3">
                             <div className="p-2 bg-white/20 rounded-lg">
                                 <AlertTriangle className="w-6 h-6 text-white" />
@@ -363,16 +363,16 @@ export default function BackupsPanel() {
                             </div>
 
                             <div className="mb-4">
-                                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                                <label className="block text-xs font-medium text-muted mb-1">
                                     Backup File
                                 </label>
-                                <div className="px-3 py-2 bg-gray-50 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 font-mono text-xs text-gray-700 dark:text-gray-300">
+                                <div className="px-3 py-2 bg-surface-2 rounded border border-hairline font-mono text-xs text-ink-soft">
                                     {restoreModal.backup.filename}
                                 </div>
                             </div>
 
                             <div className="mb-6">
-                                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                                <label className="block text-xs font-medium text-muted mb-1">
                                     Admin Password
                                 </label>
                                 <input
@@ -380,10 +380,10 @@ export default function BackupsPanel() {
                                     value={password}
                                     onChange={e => setPassword(e.target.value)}
                                     placeholder="Enter your password to confirm"
-                                    className="w-full border border-gray-300 dark:border-gray-600 rounded px-3 py-2 text-sm bg-white dark:bg-gray-900 focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none"
+                                    className="w-full border border-hairline-strong rounded px-3 py-2 text-sm bg-surface focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none"
                                     autoFocus
                                 />
-                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                <p className="text-xs text-muted mt-1">
                                     Password required to authorize this destructive operation
                                 </p>
                             </div>
@@ -392,7 +392,7 @@ export default function BackupsPanel() {
                                 <button
                                     onClick={() => setRestoreModal(null)}
                                     disabled={restoring}
-                                    className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+                                    className="px-4 py-2 text-sm text-muted hover:text-ink transition-colors"
                                 >
                                     Cancel
                                 </button>

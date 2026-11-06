@@ -24,15 +24,15 @@ export default function Practice() {
             })
     }, [])
 
-    if (loading) return <div className="text-center py-12 text-gray-500 dark:text-gray-400">Loading recommendations...</div>
+    if (loading) return <div className="text-center py-12 text-muted">Loading recommendations...</div>
     if (error) return <div className="max-w-xl mx-auto bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 p-4 rounded-md border border-red-100 dark:border-red-800 my-6">{error}</div>
 
     if (!getAccessToken()) {
         return (
             <div className="max-w-4xl mx-auto text-center py-20">
-                <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 dark:text-gray-100 mb-4">Personalized Practice</h1>
-                <p className="text-gray-600 dark:text-gray-400 mb-6">Log in to get smart problem recommendations tailored to your rating and weak areas.</p>
-                <a href="/login" className="bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors">
+                <h1 className="text-3xl font-extrabold tracking-tight text-ink mb-4">Personalized Practice</h1>
+                <p className="text-muted mb-6">Log in to get smart problem recommendations tailored to your rating and weak areas.</p>
+                <a href="/login" className="bg-brand text-on-brand px-6 py-3 rounded-lg font-medium hover:bg-brand-hover transition-colors">
                     Log In to Practice
                 </a>
             </div>
@@ -44,7 +44,7 @@ export default function Practice() {
     return (
         <div className="max-w-4xl mx-auto">
             <header className="mb-8">
-                <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 dark:text-gray-100">Personalized Practice</h1>
+                <h1 className="text-3xl font-extrabold tracking-tight text-ink">Personalized Practice</h1>
             </header>
 
             {/* Recommendation summary: counts drawn from the actual payload */}
@@ -54,26 +54,26 @@ export default function Practice() {
                     { label: 'Progression', value: rec?.progression?.length ?? 0 },
                     { label: 'Weak tags', value: rec?.weak_tags?.tags?.length ?? 0 },
                 ].map(s => (
-                    <div key={s.label} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-white dark:bg-gray-800">
-                        <dt className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">{s.label}</dt>
-                        <dd className="mt-1 text-2xl font-bold text-gray-900 dark:text-gray-100">{s.value}</dd>
+                    <div key={s.label} className="border border-hairline rounded-lg p-4 bg-surface">
+                        <dt className="text-xs uppercase tracking-wide text-muted">{s.label}</dt>
+                        <dd className="mt-1 text-2xl font-bold text-ink">{s.value}</dd>
                     </div>
                 ))}
             </dl>
 
             {/* Tabs selector */}
-            <div className="border-b border-gray-200 dark:border-gray-700 mb-6">
+            <div className="border-b border-hairline mb-6">
                 <nav className="flex gap-6">
                     <button onClick={() => setActiveTab('hybrid')}
-                        className={`pb-4 text-sm font-medium ${activeTab === 'hybrid' ? 'border-b-2 border-blue-600 text-blue-600 dark:text-blue-400 font-semibold' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}>
+                        className={`pb-4 text-sm font-medium ${activeTab === 'hybrid' ? 'border-b-2 border-brand text-brand font-semibold' : 'text-muted hover:text-ink'}`}>
                         Daily Diet (Hybrid)
                     </button>
                     <button onClick={() => setActiveTab('progression')}
-                        className={`pb-4 text-sm font-medium ${activeTab === 'progression' ? 'border-b-2 border-blue-600 text-blue-600 dark:text-blue-400 font-semibold' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}>
+                        className={`pb-4 text-sm font-medium ${activeTab === 'progression' ? 'border-b-2 border-brand text-brand font-semibold' : 'text-muted hover:text-ink'}`}>
                         Progression Ladder
                     </button>
                     <button onClick={() => setActiveTab('weak')}
-                        className={`pb-4 text-sm font-medium ${activeTab === 'weak' ? 'border-b-2 border-blue-600 text-blue-600 dark:text-blue-400 font-semibold' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'}`}>
+                        className={`pb-4 text-sm font-medium ${activeTab === 'weak' ? 'border-b-2 border-brand text-brand font-semibold' : 'text-muted hover:text-ink'}`}>
                         Targeted Tags Practice
                     </button>
                 </nav>
@@ -83,9 +83,9 @@ export default function Practice() {
             <div className="space-y-4">
                 {problems && problems.length > 0 ? (
                     problems.map(p => (
-                        <div key={p.id} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-5 hover:border-blue-300 transition-colors shadow-sm flex items-center justify-between">
+                        <div key={p.id} className="bg-surface border border-hairline rounded-lg p-5 hover:border-blue-300 transition-colors shadow-sm flex items-center justify-between">
                             <div className="space-y-1">
-                                <Link to={`/problems/${p.slug}`} className="text-lg font-bold text-gray-900 dark:text-gray-100 hover:text-blue-600 transition-colors">
+                                <Link to={`/problems/${p.slug}`} className="text-lg font-bold text-ink hover:text-brand transition-colors">
                                     {p.title}
                                 </Link>
                                 <div className="flex flex-wrap gap-2 pt-1 items-center">
@@ -96,22 +96,22 @@ export default function Practice() {
                                         {p.difficulty}
                                     </span>
                                     {p.tags && p.tags.map((t: string) => (
-                                        <span key={t} className="bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700 text-gray-600 dark:text-gray-400 px-2 py-0.5 rounded text-xs">
+                                        <span key={t} className="bg-surface-2 border border-hairline text-muted px-2 py-0.5 rounded text-xs">
                                             {t}
                                         </span>
                                     ))}
                                 </div>
                             </div>
                             <div className="text-right">
-                                <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Acceptance Rate</span>
-                                <p className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                                <span className="text-sm font-medium text-muted">Acceptance Rate</span>
+                                <p className="text-sm font-bold text-ink">
                                     {p.submission_count > 0 ? `${Math.round((p.accepted_count / p.submission_count) * 100)}%` : '0%'}
                                 </p>
                             </div>
                         </div>
                     ))
                 ) : (
-                    <div className="text-center py-12 text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-gray-800 border border-dashed rounded-lg">
+                    <div className="text-center py-12 text-muted-soft bg-surface-2 border border-dashed rounded-lg">
                         {activeTab === 'weak' ? 'Keep submitting! Submit more problems to see your weak topic areas analyzed.' : 'Excellent work! You have cleared all recommended problems in this level.'}
                     </div>
                 )}

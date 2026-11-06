@@ -209,9 +209,9 @@ export default function SetterPanel() {
 
     if (!isSetter) {
         return (
-            <div className="max-w-md mx-auto mt-10 p-6 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm">
-                <h2 className="text-xl font-bold mb-2 text-gray-900 dark:text-gray-100">Become a Problem Setter</h2>
-                <p className="text-gray-600 dark:text-gray-400 text-sm mb-6">
+            <div className="max-w-md mx-auto mt-10 p-6 bg-surface border border-hairline rounded-lg shadow-sm">
+                <h2 className="text-xl font-bold mb-2 text-ink">Become a Problem Setter</h2>
+                <p className="text-muted text-sm mb-6">
                     Problem setters can create problems and host contests on AIOJ. Request access below by providing a reason.
                 </p>
                 <SetterApplication />
@@ -227,34 +227,34 @@ export default function SetterPanel() {
                 <h1 className="text-2xl font-bold">Problem Setter Workspace</h1>
                 <div className="flex flex-wrap gap-2">
                     <Link to="/setter/contest/create" className="bg-green-600 text-white px-4 py-2 rounded text-sm hover:bg-green-700 transition-colors">+ Create Contest</Link>
-                    <Link to="/setter/create" className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 transition-colors">+ Create Problem</Link>
+                    <Link to="/setter/create" className="bg-brand text-on-brand px-4 py-2 rounded text-sm hover:bg-brand-hover transition-colors">+ Create Problem</Link>
                     <Link to="/generate/problem" className="bg-purple-600 text-white px-4 py-2 rounded text-sm hover:bg-purple-700 transition-colors flex items-center gap-1">✦ Generate with AI</Link>
                 </div>
             </div>
 
-            <div className="border-b border-gray-200 dark:border-gray-800 flex gap-4 mb-6">
+            <div className="border-b border-hairline flex gap-4 mb-6">
                 <button
                     onClick={() => setActiveTab('my-problems')}
-                    className={`pb-2 text-sm font-medium border-b-2 cursor-pointer ${activeTab === 'my-problems' ? 'border-blue-600 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    className={`pb-2 text-sm font-medium border-b-2 cursor-pointer ${activeTab === 'my-problems' ? 'border-brand text-brand' : 'border-transparent text-muted hover:text-gray-700'}`}
                 >
                     My Problems
                 </button>
                 <button
                     onClick={() => setActiveTab('my-contests')}
-                    className={`pb-2 text-sm font-medium border-b-2 cursor-pointer ${activeTab === 'my-contests' ? 'border-blue-600 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    className={`pb-2 text-sm font-medium border-b-2 cursor-pointer ${activeTab === 'my-contests' ? 'border-brand text-brand' : 'border-transparent text-muted hover:text-gray-700'}`}
                 >
                     My Contests
                 </button>
                 <button
                     onClick={() => setActiveTab('all-problems')}
-                    className={`pb-2 text-sm font-medium border-b-2 cursor-pointer ${activeTab === 'all-problems' ? 'border-blue-600 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    className={`pb-2 text-sm font-medium border-b-2 cursor-pointer ${activeTab === 'all-problems' ? 'border-brand text-brand' : 'border-transparent text-muted hover:text-gray-700'}`}
                 >
                     All Problems
                 </button>
                 {isAdmin && (
                     <button
                         onClick={() => setActiveTab('import')}
-                        className={`pb-2 text-sm font-medium border-b-2 cursor-pointer ${activeTab === 'import' ? 'border-blue-600 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                        className={`pb-2 text-sm font-medium border-b-2 cursor-pointer ${activeTab === 'import' ? 'border-brand text-brand' : 'border-transparent text-muted hover:text-gray-700'}`}
                     >
                         Import Problems
                     </button>
@@ -266,12 +266,12 @@ export default function SetterPanel() {
                     <h2 className="text-lg font-semibold mb-3">Import Problems</h2>
 
                     {/* XML/ZIP Import */}
-                    <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-5 shadow-sm">
+                    <div className="bg-surface border border-hairline rounded-lg p-5 shadow-sm">
                         <h3 className="font-semibold text-sm mb-3">Import from XML/ZIP File</h3>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+                        <p className="text-xs text-muted mb-4">
                             Upload a problem package in XML or ZIP format. The problem will be created and you'll be redirected to it.
                         </p>
-                        <label className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 cursor-pointer">
+                        <label className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-on-brand bg-brand hover:bg-brand-hover cursor-pointer">
                             Choose File (XML/ZIP)
                             <input
                                 type="file"
@@ -285,7 +285,7 @@ export default function SetterPanel() {
                     <h3 className="font-semibold text-sm mt-6 mb-3">Import from Remote Platforms</h3>
 
                     {importResults && (
-                        <div className="border rounded-lg p-4 bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 space-y-3">
+                        <div className="border rounded-lg p-4 bg-surface-2 border-hairline space-y-3">
                             <h3 className="font-semibold text-sm">Import Results</h3>
                             {importResults.success.length > 0 && (
                                 <div className="space-y-1">
@@ -308,19 +308,19 @@ export default function SetterPanel() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {/* Codeforces */}
-                        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-5 shadow-sm">
+                        <div className="bg-surface border border-hairline rounded-lg p-5 shadow-sm">
                             <h3 className="font-semibold text-sm mb-3">Import from Codeforces</h3>
                             <div className="space-y-4">
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Contest ID</label>
+                                        <label className="block text-xs font-medium text-muted mb-1">Contest ID</label>
                                         <input type="text" value={contestId} onChange={e => setContestId(e.target.value)}
-                                            placeholder="e.g. 1800" className="w-full border rounded px-3 py-2 text-sm border-gray-300 dark:border-gray-700 bg-transparent text-gray-800 dark:text-gray-200" />
+                                            placeholder="e.g. 1800" className="w-full border rounded px-3 py-2 text-sm border-hairline-strong bg-transparent text-ink" />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Problem Indices (space/comma separated for bulk)</label>
+                                        <label className="block text-xs font-medium text-muted mb-1">Problem Indices (space/comma separated for bulk)</label>
                                         <input type="text" value={problemIndex} onChange={e => setProblemIndex(e.target.value)}
-                                            placeholder="e.g. A, B, C" className="w-full border rounded px-3 py-2 text-sm border-gray-300 dark:border-gray-700 bg-transparent text-gray-800 dark:text-gray-200" />
+                                            placeholder="e.g. A, B, C" className="w-full border rounded px-3 py-2 text-sm border-hairline-strong bg-transparent text-ink" />
                                     </div>
                                 </div>
                                 <button onClick={handleImport} disabled={importing}
@@ -331,13 +331,13 @@ export default function SetterPanel() {
                         </div>
 
                         {/* CSES */}
-                        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-5 shadow-sm">
+                        <div className="bg-surface border border-hairline rounded-lg p-5 shadow-sm">
                             <h3 className="font-semibold text-sm mb-3">Import from CSES</h3>
                             <div className="space-y-4">
                                 <div>
-                                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Problem ID(s) (space/comma separated for bulk)</label>
+                                    <label className="block text-xs font-medium text-muted mb-1">Problem ID(s) (space/comma separated for bulk)</label>
                                     <input type="text" value={csesProblemId} onChange={e => setCSESProblemId(e.target.value)}
-                                        placeholder="e.g. 1068, 1069" className="w-full border rounded px-3 py-2 text-sm border-gray-300 dark:border-gray-700 bg-transparent text-gray-800 dark:text-gray-200" />
+                                        placeholder="e.g. 1068, 1069" className="w-full border rounded px-3 py-2 text-sm border-hairline-strong bg-transparent text-ink" />
                                 </div>
                                 <button onClick={handleCSESImport} disabled={importing}
                                     className="w-full bg-teal-600 text-white px-4 py-2 rounded text-sm hover:bg-teal-700 disabled:opacity-50 transition-colors cursor-pointer font-medium">
@@ -347,19 +347,19 @@ export default function SetterPanel() {
                         </div>
 
                         {/* AtCoder */}
-                        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-5 shadow-sm">
+                        <div className="bg-surface border border-hairline rounded-lg p-5 shadow-sm">
                             <h3 className="font-semibold text-sm mb-3">Import from AtCoder</h3>
                             <div className="space-y-4">
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Contest ID</label>
+                                        <label className="block text-xs font-medium text-muted mb-1">Contest ID</label>
                                         <input type="text" value={atcoderContestId} onChange={e => setAtcoderContestId(e.target.value)}
-                                            placeholder="e.g. abc300" className="w-full border rounded px-3 py-2 text-sm border-gray-300 dark:border-gray-700 bg-transparent text-gray-800 dark:text-gray-200" />
+                                            placeholder="e.g. abc300" className="w-full border rounded px-3 py-2 text-sm border-hairline-strong bg-transparent text-ink" />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Problem ID(s) (space/comma separated for bulk)</label>
+                                        <label className="block text-xs font-medium text-muted mb-1">Problem ID(s) (space/comma separated for bulk)</label>
                                         <input type="text" value={atcoderProblemId} onChange={e => setAtcoderProblemId(e.target.value)}
-                                            placeholder="e.g. abc300_a, abc300_b" className="w-full border rounded px-3 py-2 text-sm border-gray-300 dark:border-gray-700 bg-transparent text-gray-800 dark:text-gray-200" />
+                                            placeholder="e.g. abc300_a, abc300_b" className="w-full border rounded px-3 py-2 text-sm border-hairline-strong bg-transparent text-ink" />
                                     </div>
                                 </div>
                                 <button onClick={handleAtCoderImport} disabled={importing}
@@ -370,13 +370,13 @@ export default function SetterPanel() {
                         </div>
 
                         {/* Toph */}
-                        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-5 shadow-sm">
+                        <div className="bg-surface border border-hairline rounded-lg p-5 shadow-sm">
                             <h3 className="font-semibold text-sm mb-3">Import from Toph</h3>
                             <div className="space-y-4">
                                 <div>
-                                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Problem ID(s) (space/comma separated for bulk)</label>
+                                    <label className="block text-xs font-medium text-muted mb-1">Problem ID(s) (space/comma separated for bulk)</label>
                                     <input type="text" value={tophProblemId} onChange={e => setTophProblemId(e.target.value)}
-                                        placeholder="e.g. copycat, formatted-numbers" className="w-full border rounded px-3 py-2 text-sm border-gray-300 dark:border-gray-700 bg-transparent text-gray-800 dark:text-gray-200" />
+                                        placeholder="e.g. copycat, formatted-numbers" className="w-full border rounded px-3 py-2 text-sm border-hairline-strong bg-transparent text-ink" />
                                 </div>
                                 <button onClick={handleTophImport} disabled={importing}
                                     className="w-full bg-orange-600 text-white px-4 py-2 rounded text-sm hover:bg-orange-700 disabled:opacity-50 transition-colors cursor-pointer font-medium">
@@ -386,16 +386,16 @@ export default function SetterPanel() {
                         </div>
 
                         {/* QOJ */}
-                        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-5 shadow-sm">
+                        <div className="bg-surface border border-hairline rounded-lg p-5 shadow-sm">
                             <h3 className="font-semibold text-sm mb-3">Import from QOJ</h3>
                             <div className="space-y-4">
                                 <div>
-                                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Problem ID(s) (space/comma separated for bulk)</label>
+                                    <label className="block text-xs font-medium text-muted mb-1">Problem ID(s) (space/comma separated for bulk)</label>
                                     <input type="text" value={qojProblemId} onChange={e => setQojProblemId(e.target.value)}
-                                        placeholder="e.g. 1000, 1001" className="w-full border rounded px-3 py-2 text-sm border-gray-300 dark:border-gray-700 bg-transparent text-gray-800 dark:text-gray-200" />
+                                        placeholder="e.g. 1000, 1001" className="w-full border rounded px-3 py-2 text-sm border-hairline-strong bg-transparent text-ink" />
                                 </div>
                                 <button onClick={handleQOJImport} disabled={importing}
-                                    className="w-full bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 disabled:opacity-50 transition-colors cursor-pointer font-medium">
+                                    className="w-full bg-brand text-on-brand px-4 py-2 rounded text-sm hover:bg-brand-hover disabled:opacity-50 transition-colors cursor-pointer font-medium">
                                     {importing ? 'Importing...' : 'Import Problem(s)'}
                                 </button>
                             </div>
@@ -405,9 +405,9 @@ export default function SetterPanel() {
             ) : activeTab === 'my-contests' ? (
                 <section>
                     <h2 className="text-lg font-semibold mb-3">My Contests</h2>
-                    <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-900 shadow-sm">
+                    <div className="border border-hairline rounded-lg overflow-hidden bg-surface shadow-sm">
                         <table className="w-full text-sm">
-                            <thead className="bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-xs uppercase">
+                            <thead className="bg-surface-2 text-muted text-xs uppercase">
                                 <tr>
                                     <th className="px-4 py-3 text-left">Title</th>
                                     <th className="px-4 py-3 text-left">Start Time</th>
@@ -416,11 +416,11 @@ export default function SetterPanel() {
                                     <th className="px-4 py-3 text-right">Actions</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                            <tbody className="divide-y divide-hairline">
                                 {contests.map(c => (
                                     <tr key={c.id}>
                                         <td className="px-4 py-3 font-medium">{c.title}</td>
-                                        <td className="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">{new Date(c.start_time).toLocaleString()}</td>
+                                        <td className="px-4 py-3 text-xs text-muted">{new Date(c.start_time).toLocaleString()}</td>
                                         <td className="px-4 py-3 text-xs capitalize">{c.format}</td>
                                         <td className="px-4 py-3">
                                             <span className={`px-2 py-0.5 rounded text-xs font-medium ${c.visible ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-300' : 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-300'}`}>
@@ -428,9 +428,9 @@ export default function SetterPanel() {
                                             </span>
                                         </td>
                                         <td className="px-4 py-3 text-right flex gap-2 justify-end items-center">
-                                            <Link to={`/contests/${c.id}`} className="text-blue-600 dark:text-blue-400 hover:underline text-xs">View</Link>
+                                            <Link to={`/contests/${c.id}`} className="text-brand hover:underline text-xs">View</Link>
                                             <Link to={`/setter/contest/${c.id}/manage#settings`} className="bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 border border-orange-200 text-orange-700 dark:text-orange-300 px-2.5 py-1 rounded text-xs">Edit settings</Link>
-                                            <Link to={`/setter/contest/${c.id}/manage`} className="bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 border border-blue-200 text-blue-700 dark:text-blue-300 px-2.5 py-1 rounded text-xs">Manage</Link>
+                                            <Link to={`/setter/contest/${c.id}/manage`} className="bg-brand-soft hover:bg-blue-100 border border-blue-200 text-brand px-2.5 py-1 rounded text-xs">Manage</Link>
                                         </td>
                                     </tr>
                                 ))}
@@ -446,9 +446,9 @@ export default function SetterPanel() {
                     <h2 className="text-lg font-semibold mb-3">
                         {activeTab === 'my-problems' ? 'My Problems' : 'All Problems'}
                     </h2>
-                    <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-900 shadow-sm">
+                    <div className="border border-hairline rounded-lg overflow-hidden bg-surface shadow-sm">
                         <table className="w-full text-sm">
-                            <thead className="bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-xs uppercase">
+                            <thead className="bg-surface-2 text-muted text-xs uppercase">
                                 <tr>
                                     <th className="px-4 py-3 text-left">Title</th>
                                     <th className="px-4 py-3 text-left">Source</th>
@@ -456,18 +456,18 @@ export default function SetterPanel() {
                                     <th className="px-4 py-3 text-right">Actions</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                            <tbody className="divide-y divide-hairline">
                                 {problems.map(p => (
                                     <tr key={p.id}>
                                         <td className="px-4 py-3 font-medium">{p.title}</td>
-                                        <td className="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">{p.source || 'local'}</td>
+                                        <td className="px-4 py-3 text-xs text-muted">{p.source || 'local'}</td>
                                         <td className="px-4 py-3">
                                             <span className={`px-2 py-1 rounded text-xs font-medium ${p.difficulty === 'easy' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' :
                                                 p.difficulty === 'medium' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300' : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
                                                 }`}>{p.difficulty}</span>
                                         </td>
                                         <td className="px-4 py-3 text-right flex gap-2 justify-end items-center">
-                                            <Link to={`/problems/${p.slug}`} className="text-blue-600 dark:text-blue-400 hover:underline text-xs">View</Link>
+                                            <Link to={`/problems/${p.slug}`} className="text-brand hover:underline text-xs">View</Link>
                                             <Link to={`/setter/${p.slug}`} className="bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 border border-orange-200 text-orange-700 dark:text-orange-300 px-2.5 py-1 rounded text-xs">Edit</Link>
                                         </td>
                                     </tr>

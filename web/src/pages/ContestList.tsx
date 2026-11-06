@@ -1,29 +1,37 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { Link } from 'react-router-dom'
+import { Search, Trophy } from 'lucide-react'
 import { api, contestSlug } from '../lib/api'
 import DivisionBadge from '../components/DivisionBadge'
-import { useTheme } from '../context/ThemeContext'
 import { DIVISIONS, type Division } from '../lib/divisions'
+import { Badge, type BadgeTone } from '../components/ui/Badge'
+import { Button } from '../components/ui/Button'
+import { buttonClass } from '../components/ui/buttonStyles'
+import { Input } from '../components/ui/Field'
+import { PageHeader, Skeleton } from '../components/ui/PageHeader'
+import { Table, TableShell, Td, Th, THead, Tr } from '../components/ui/Table'
 
 /* ───────────────────── helpers ───────────────────── */
 
-const FORMAT_BADGES: Record<string, {
-    label: string;
-    color: string;
-    bg: string;
-    darkColor: string;
-    darkBg: string;
-}> = {
-    acm:    { label: 'ACM', color: '#6B21A8', bg: '#F3E8FF', darkColor: '#D8B4FE', darkBg: '#4C1D9530' },
-    oi:     { label: 'OI',  color: '#0C4A6E', bg: '#E0F2FE', darkColor: '#7DD3FC', darkBg: '#0C4A6E40' },
-    ioi:    { label: 'IOI', color: '#065F46', bg: '#D1FAE5', darkColor: '#6EE7B7', darkBg: '#065F4640' },
-    cf:     { label: 'CF',  color: '#9A3412', bg: '#FFF7ED', darkColor: '#FDBA74', darkBg: '#9A341240' },
-    atcoder:{ label: 'ATC', color: '#4338CA', bg: '#EDE9FE', darkColor: '#A5B4FC', darkBg: '#4338CA40' },
+const FORMAT_LABEL: Record<string, string> = {
+    acm: 'ACM',
+    oi: 'OI',
+    ioi: 'IOI',
+    cf: 'CF',
+    atcoder: 'ATC',
+}
+
+const FORMAT_TONE: Record<string, BadgeTone> = {
+    acm: 'brand',
+    oi: 'neutral',
+    ioi: 'ok',
+    cf: 'warn',
+    atcoder: 'brand',
 }
 
 function formatDate(iso: string): string {
     const d = new Date(iso)
-    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
     const mm = months[d.getMonth()]
     const dd = String(d.getDate()).padStart(2, '0')
     const yyyy = d.getFullYear()
@@ -86,31 +94,22 @@ function getContestStatus(c: { start_time: string; end_time: string }): ContestS
 /* ───────────────────── sub-components ───────────────────── */
 
 function FormatBadge({ type }: { type: string }) {
-    const { theme } = useTheme()
-    const info = FORMAT_BADGES[type?.toLowerCase()]
-    if (!info) return <span className="text-xs px-1.5 py-0.5 rounded font-medium bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 uppercase">{type || 'STD'}</span>
-    const textColor = theme === 'dark' ? info.darkColor : info.color
-    const bgColor = theme === 'dark' ? info.darkBg : info.bg
+    const key = type?.toLowerCase()
     return (
-        <span className="text-xs px-1.5 py-0.5 rounded font-medium uppercase" style={{ color: textColor, backgroundColor: bgColor }}>
-            {info.label}
-        </span>
+        <Badge tone={FORMAT_TONE[key] || 'neutral'}>
+            {FORMAT_LABEL[key] || type?.toUpperCase() || 'STD'}
+        </Badge>
     )
 }
 
 function StatusBadge({ status }: { status: ContestStatus }) {
-    const styles: Record<ContestStatus, { text: string; cls: string }> = {
-        upcoming: { text: 'Upcoming', cls: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700' },
-        running:  { text: 'Running',  cls: 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700' },
-        ended:    { text: 'Ended',    cls: 'bg-gray-50 text-gray-500 border-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:border-gray-600' },
+    const map: Record<ContestStatus, { text: string; tone: BadgeTone }> = {
+        upcoming: { text: 'Upcoming', tone: 'brand' },
+        running: { text: 'Running', tone: 'ok' },
+        ended: { text: 'Ended', tone: 'neutral' },
     }
-    const s = styles[status]
-    return (
-        <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-semibold border ${s.cls}`}>
-            {status === 'running' && <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />}
-            {s.text}
-        </span>
-    )
+    const s = map[status]
+    return <Badge tone={s.tone} dot={status === 'running'}>{s.text}</Badge>
 }
 
 function CountdownTimer({ targetIso }: { targetIso: string }) {
@@ -121,13 +120,9 @@ function CountdownTimer({ targetIso }: { targetIso: string }) {
         return () => clearInterval(id)
     }, [targetIso])
 
-    if (remaining <= 0) return <span className="text-xs text-green-600 font-semibold">Starting now</span>
+    if (remaining <= 0) return <span className="text-xs font-medium text-ok">Starting now</span>
 
-    return (
-        <span className="font-mono text-xs text-blue-600 font-semibold tracking-wide">
-            {formatCountdown(remaining)}
-        </span>
-    )
+    return <span className="tnum text-xs font-medium text-brand">{formatCountdown(remaining)}</span>
 }
 
 function ElapsedTimer({ startIso }: { startIso: string }) {
@@ -138,10 +133,15 @@ function ElapsedTimer({ startIso }: { startIso: string }) {
         return () => clearInterval(id)
     }, [startIso])
 
+    return <span className="tnum text-xs font-medium text-ok">{formatElapsed(startIso)}</span>
+}
+
+function SectionHeading({ label, count }: { label: string; count?: number }) {
     return (
-        <span className="font-mono text-xs text-green-600 font-medium tracking-wide">
-            {formatElapsed(startIso)}
-        </span>
+        <div className="mb-2.5 flex items-center gap-2">
+            <h2 className="text-sm font-semibold tracking-tight text-ink">{label}</h2>
+            {count !== undefined && count > 0 && <Badge tone="neutral">{count}</Badge>}
+        </div>
     )
 }
 
@@ -150,7 +150,6 @@ function ElapsedTimer({ startIso }: { startIso: string }) {
 const PAGE_SIZE = 30
 
 export default function ContestList() {
-    const { theme } = useTheme()
     const [contests, setContests] = useState<ContestSummary[]>([])
     const [total, setTotal] = useState(0)
     const [division, setDivision] = useState<Division | undefined>(undefined)
@@ -216,229 +215,205 @@ export default function ContestList() {
         return { upcoming: u, past: p }
     }, [contests, search])
 
+    const initialLoading = loading && contests.length === 0
+
     return (
-        <div className="max-w-6xl mx-auto px-4 py-6">
-            {/* ── Header ── */}
-            <div className="flex items-center justify-between mb-6">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Contests</h1>
-                    <p className="text-sm text-gray-500 mt-0.5">{total} contest{total !== 1 ? 's' : ''} available</p>
-                </div>
-                <Link to="/gym" className="text-sm text-blue-600 hover:text-blue-800 font-medium">
-                    Go to Gym →
-                </Link>
-            </div>
+        <div>
+            <PageHeader
+                title="Contests"
+                description={`${total} contest${total !== 1 ? 's' : ''} available`}
+                actions={
+                    <Link to="/gym" className={buttonClass({ variant: 'secondary', size: 'sm' })}>
+                        <Trophy className="h-4 w-4" />
+                        Go to Gym
+                    </Link>
+                }
+            />
 
             {/* ── Filters bar ── */}
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6">
-                {/* Division buttons */}
-                <div className="flex gap-1.5 flex-wrap">
-                    <button
-                        onClick={() => setDivision(undefined)}
-                        className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
-                            division === undefined
-                                ? 'bg-gray-900 text-white shadow-sm'
-                                : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200'
-                        }`}
-                    >
+            <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+                <div role="group" aria-label="Filter by division" className="flex flex-wrap gap-1">
+                    <DivisionButton active={division === undefined} onClick={() => setDivision(undefined)}>
                         All
-                    </button>
+                    </DivisionButton>
                     {Object.entries(DIVISIONS).map(([key, info]) => {
                         const div = Number(key) as Division
-                        const active = division === div
-                        const activeBg = theme === 'dark' && info.darkBg ? info.darkBg.replace(/30$|40$/, '60') : info.color
                         return (
-                            <button
-                                key={key}
-                                onClick={() => setDivision(div)}
-                                className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
-                                    active
-                                        ? 'text-white shadow-sm'
-                                        : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
-                                }`}
-                                style={active ? { backgroundColor: activeBg } : {}}
-                            >
+                            <DivisionButton key={key} active={division === div} onClick={() => setDivision(div)}>
                                 {info.name}
-                            </button>
+                            </DivisionButton>
                         )
                     })}
                 </div>
 
-                {/* Search */}
                 <div className="relative sm:ml-auto">
-                    <input
-                        type="text"
+                    <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-soft" />
+                    <Input
+                        type="search"
                         placeholder="Search contests..."
                         value={searchInput}
                         onChange={e => onSearchChange(e.target.value)}
-                        className="w-full sm:w-64 pl-8 pr-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500"
+                        aria-label="Search contests"
+                        className="w-full pl-8 sm:w-64"
                     />
-                    <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
                 </div>
             </div>
 
             {/* ── Current / Upcoming Contests ── */}
-            <div className="mb-10">
-                <div className="flex items-center gap-2 mb-3">
-                    <div className="w-1 h-5 rounded-full bg-blue-500" />
-                    <h2 className="text-lg font-bold text-gray-800 dark:text-gray-200">Current or Upcoming Contests</h2>
-                    {upcoming.length > 0 && (
-                        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">{upcoming.length}</span>
-                    )}
-                </div>
+            <section className="mb-10">
+                <SectionHeading label="Current or Upcoming Contests" count={upcoming.length} />
 
-                {upcoming.length === 0 && !loading ? (
-                    <div className="text-center py-12 text-gray-400 border border-dashed border-gray-200 dark:border-gray-700 rounded-lg">
-                        <svg className="w-10 h-10 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        No upcoming contests at the moment.
+                {initialLoading ? (
+                    <div className="space-y-2">
+                        <Skeleton className="h-10 w-full" />
+                        <Skeleton className="h-10 w-full" />
+                    </div>
+                ) : upcoming.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-hairline-strong px-4 py-12 text-center">
+                        <Trophy className="mx-auto mb-2 h-8 w-8 text-muted-soft" />
+                        <p className="text-sm text-muted">No upcoming contests at the moment.</p>
                     </div>
                 ) : (
-                    <div className="overflow-x-auto border border-gray-200 dark:border-gray-700 rounded-lg">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="bg-gray-50 border-b border-gray-200 dark:border-gray-700">
-                                    <th className="text-left px-4 py-2.5 font-semibold text-gray-600 dark:text-gray-400 w-8">#</th>
-                                    <th className="text-left px-4 py-2.5 font-semibold text-gray-600 dark:text-gray-400">Contest</th>
-                                    <th className="text-left px-4 py-2.5 font-semibold text-gray-600 dark:text-gray-400">Start</th>
-                                    <th className="text-left px-4 py-2.5 font-semibold text-gray-600 dark:text-gray-400">Length</th>
-                                    <th className="text-left px-4 py-2.5 font-semibold text-gray-600 dark:text-gray-400">Countdown / Elapsed</th>
-                                    <th className="text-left px-4 py-2.5 font-semibold text-gray-600 dark:text-gray-400">Status</th>
+                    <TableShell>
+                        <Table>
+                            <THead>
+                                <tr>
+                                    <Th className="w-10">#</Th>
+                                    <Th>Contest</Th>
+                                    <Th className="hidden sm:table-cell">Start</Th>
+                                    <Th className="hidden md:table-cell">Length</Th>
+                                    <Th>Countdown / Elapsed</Th>
+                                    <Th className="w-28">Status</Th>
                                 </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
+                            </THead>
+                            <tbody>
                                 {upcoming.map((c, i) => {
                                     const status = getContestStatus(c)
                                     return (
-                                        <tr key={c.id} className="hover:bg-blue-50/40 transition-colors">
-                                            <td className="px-4 py-2.5 text-gray-400 text-xs font-medium">{i + 1}</td>
-                                            <td className="px-4 py-2.5">
-                                                <div className="flex items-center gap-2 flex-wrap">
-                                                    <Link to={`/contests/${contestSlug(c)}`} className="font-semibold text-gray-900 dark:text-gray-100 hover:text-blue-600 dark:hover:text-blue-400 hover:underline">
+                                        <Tr key={c.id}>
+                                            <Td className="tnum text-xs text-muted-soft">{i + 1}</Td>
+                                            <Td>
+                                                <div className="flex flex-wrap items-center gap-1.5">
+                                                    <Link
+                                                        to={`/contests/${contestSlug(c)}`}
+                                                        className="font-medium text-ink transition-colors hover:text-brand"
+                                                    >
                                                         {c.title}
                                                     </Link>
                                                     <DivisionBadge division={(c.division ?? 0) as Division} size="sm" />
                                                     <FormatBadge type={c.type} />
                                                 </div>
-                                            </td>
-                                            <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400 whitespace-nowrap">{formatDate(c.start_time)}</td>
-                                            <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400 whitespace-nowrap font-mono text-xs">{formatDuration(c.start_time, c.end_time)}</td>
-                                            <td className="px-4 py-2.5 whitespace-nowrap">
+                                            </Td>
+                                            <Td className="hidden whitespace-nowrap text-xs text-muted sm:table-cell">
+                                                {formatDate(c.start_time)}
+                                            </Td>
+                                            <Td className="tnum hidden whitespace-nowrap text-xs text-muted md:table-cell">
+                                                {formatDuration(c.start_time, c.end_time)}
+                                            </Td>
+                                            <Td className="whitespace-nowrap">
                                                 {status === 'upcoming' && <CountdownTimer targetIso={c.start_time} />}
-                                                {status === 'running' && (
-                                                    <div className="flex flex-col gap-0.5">
-                                                        <ElapsedTimer startIso={c.start_time} />
-                                                        <span className="text-[10px] text-gray-400">elapsed</span>
-                                                    </div>
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-2.5">
+                                                {status === 'running' && <ElapsedTimer startIso={c.start_time} />}
+                                                {status === 'ended' && <span className="text-xs text-muted-soft">—</span>}
+                                            </Td>
+                                            <Td>
                                                 <StatusBadge status={status} />
-                                            </td>
-                                        </tr>
+                                            </Td>
+                                        </Tr>
                                     )
                                 })}
                             </tbody>
-                        </table>
-                    </div>
+                        </Table>
+                    </TableShell>
                 )}
-            </div>
+            </section>
 
             {/* ── Past Contests ── */}
-            <div className="mb-6">
-                <div className="flex items-center gap-2 mb-3">
-                    <div className="w-1 h-5 rounded-full bg-gray-400" />
-                    <h2 className="text-lg font-bold text-gray-800 dark:text-gray-200">Past Contests</h2>
-                    {past.length > 0 && (
-                        <span className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 px-2 py-0.5 rounded-full font-semibold">{past.length}</span>
-                    )}
-                </div>
+            <section>
+                <SectionHeading label="Past Contests" count={past.length} />
 
-                {past.length === 0 && !loading ? (
-                    <div className="text-center py-12 text-gray-400 border border-dashed border-gray-200 dark:border-gray-700 rounded-lg">
-                        No past contests found.
+                {initialLoading ? (
+                    <Skeleton className="h-10 w-full" />
+                ) : past.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-hairline-strong px-4 py-12 text-center">
+                        <p className="text-sm text-muted">No past contests found.</p>
                     </div>
                 ) : (
-                    <div className="overflow-x-auto border border-gray-200 dark:border-gray-700 rounded-lg">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="bg-gray-50 border-b border-gray-200 dark:border-gray-700">
-                                    <th className="text-left px-4 py-2.5 font-semibold text-gray-600 dark:text-gray-400 w-8">#</th>
-                                    <th className="text-left px-4 py-2.5 font-semibold text-gray-600 dark:text-gray-400">Contest</th>
-                                    <th className="text-left px-4 py-2.5 font-semibold text-gray-600 dark:text-gray-400">Start</th>
-                                    <th className="text-left px-4 py-2.5 font-semibold text-gray-600 dark:text-gray-400">Length</th>
-                                    <th className="text-left px-4 py-2.5 font-semibold text-gray-600 dark:text-gray-400">Status / Standings</th>
+                    <TableShell>
+                        <Table>
+                            <THead>
+                                <tr>
+                                    <Th className="w-10">#</Th>
+                                    <Th>Contest</Th>
+                                    <Th className="hidden sm:table-cell">Start</Th>
+                                    <Th className="hidden md:table-cell">Length</Th>
+                                    <Th className="w-48">Status / Standings</Th>
                                 </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
+                            </THead>
+                            <tbody>
                                 {past.map((c, i) => (
-                                    <tr key={c.id} className="hover:bg-gray-50/60 transition-colors">
-                                        <td className="px-4 py-2.5 text-gray-400 text-xs font-medium">{i + 1}</td>
-                                        <td className="px-4 py-2.5">
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                                <Link to={`/contests/${contestSlug(c)}`} className="font-semibold text-gray-900 dark:text-gray-100 hover:text-blue-600 hover:underline">
+                                    <Tr key={c.id}>
+                                        <Td className="tnum text-xs text-muted-soft">{i + 1}</Td>
+                                        <Td>
+                                            <div className="flex flex-wrap items-center gap-1.5">
+                                                <Link
+                                                    to={`/contests/${contestSlug(c)}`}
+                                                    className="font-medium text-ink transition-colors hover:text-brand"
+                                                >
                                                     {c.title}
                                                 </Link>
                                                 <DivisionBadge division={(c.division ?? 0) as Division} size="sm" />
                                                 <FormatBadge type={c.type} />
                                             </div>
-                                        </td>
-                                        <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400 whitespace-nowrap">{formatDate(c.start_time)}</td>
-                                        <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400 whitespace-nowrap font-mono text-xs">{formatDuration(c.start_time, c.end_time)}</td>
-                                        <td className="px-4 py-2.5">
+                                        </Td>
+                                        <Td className="hidden whitespace-nowrap text-xs text-muted sm:table-cell">
+                                            {formatDate(c.start_time)}
+                                        </Td>
+                                        <Td className="tnum hidden whitespace-nowrap text-xs text-muted md:table-cell">
+                                            {formatDuration(c.start_time, c.end_time)}
+                                        </Td>
+                                        <Td>
                                             <div className="flex items-center gap-3">
                                                 <StatusBadge status="ended" />
                                                 <Link
                                                     to={`/contests/${contestSlug(c)}/scoreboard`}
-                                                    className="text-xs text-blue-600 hover:text-blue-800 hover:underline font-medium"
+                                                    className="text-xs font-medium text-brand hover:underline"
                                                 >
-                                                    Final standings
+                                                    Standings
                                                 </Link>
                                             </div>
-                                        </td>
-                                    </tr>
+                                        </Td>
+                                    </Tr>
                                 ))}
                             </tbody>
-                        </table>
-                    </div>
+                        </Table>
+                    </TableShell>
                 )}
-            </div>
+            </section>
 
             {/* ── Load more ── */}
             {hasMore && (
-                <div className="flex justify-center mt-6">
-                    <button
-                        onClick={loadMore}
-                        disabled={loading}
-                        className="px-6 py-2 text-sm font-medium rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 transition-colors"
-                    >
-                        {loading ? (
-                            <span className="flex items-center gap-2">
-                                <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
-                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                                </svg>
-                                Loading...
-                            </span>
-                        ) : (
-                            `Load more (${offset} of ${total})`
-                        )}
-                    </button>
-                </div>
-            )}
-
-            {/* ── Loading indicator ── */}
-            {loading && contests.length === 0 && (
-                <div className="flex justify-center py-16">
-                    <svg className="animate-spin w-8 h-8 text-blue-500" viewBox="0 0 24 24" fill="none">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                    </svg>
+                <div className="mt-6 flex justify-center">
+                    <Button variant="secondary" onClick={loadMore} disabled={loading}>
+                        {loading ? 'Loading…' : `Load more (${offset} of ${total})`}
+                    </Button>
                 </div>
             )}
         </div>
+    )
+}
+
+function DivisionButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            aria-pressed={active}
+            className={`h-8 rounded-lg px-3 text-xs font-medium transition-colors ${active
+                ? 'bg-ink text-canvas'
+                : 'bg-surface-2 text-muted hover:bg-surface-3 hover:text-ink'
+                }`}
+        >
+            {children}
+        </button>
     )
 }

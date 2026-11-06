@@ -111,14 +111,14 @@ export default function ContestManage() {
         }).catch(() => nav('/contests')).finally(() => setLoading(false))
     }, [id]) // eslint-disable-line react-hooks/exhaustive-deps
 
-    if (loading) return <div className="flex items-center justify-center h-screen"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>
+    if (loading) return <div className="flex items-center justify-center h-screen"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand" /></div>
     if (!contest) return null
 
     return (
         <div className="max-w-7xl mx-auto px-4 py-6">
             {/* Header */}
             <div className="mb-6">
-                <Link to={`/contests/${id}`} className="text-sm text-blue-600 hover:underline">← {contest.title}</Link>
+                <Link to={`/contests/${id}`} className="text-sm text-brand hover:underline">← {contest.title}</Link>
                 <h1 className="text-2xl font-bold mt-1">Contest Management</h1>
             </div>
 
@@ -128,14 +128,14 @@ export default function ContestManage() {
             <div className="flex flex-col lg:flex-row gap-6">
                 {/* Sidebar */}
                 <aside className="w-full lg:w-56 lg:shrink-0">
-                    <nav className="flex lg:block overflow-x-auto lg:overflow-hidden bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl lg:sticky lg:top-4">
+                    <nav className="flex lg:block overflow-x-auto lg:overflow-hidden bg-surface border border-hairline rounded-xl lg:sticky lg:top-4">
                         {TABS.map(t => (
                             <button
                                 key={t.key}
                                 onClick={() => setTab(t.key)}
                                 className={`w-auto lg:w-full shrink-0 whitespace-nowrap flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors text-left ${tab === t.key
-                                    ? 'bg-blue-50 text-blue-700 font-medium border-l-3 border-blue-600'
-                                    : 'text-gray-600 hover:bg-gray-50 border-l-3 border-transparent'
+                                    ? 'bg-blue-50 text-blue-700 font-medium border-l-3 border-brand'
+                                    : 'text-muted hover:bg-surface-2 border-l-3 border-transparent'
                                     }`}
                             >
                                 <t.Icon className="w-4 h-4" />
@@ -144,7 +144,7 @@ export default function ContestManage() {
                         ))}
                         <Link
                             to={`/contests/${id}/problem/${problems[0]?.index || 'A'}`}
-                            className="w-auto lg:w-full shrink-0 whitespace-nowrap flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-600 hover:bg-green-50 hover:text-green-700 transition-colors border-t lg:border-t-0 border-l-3 border-transparent"
+                            className="w-auto lg:w-full shrink-0 whitespace-nowrap flex items-center gap-2.5 px-4 py-2.5 text-sm text-muted hover:bg-green-50 hover:text-green-700 transition-colors border-t lg:border-t-0 border-l-3 border-transparent"
                         >
                             <span className="text-base"><Play className="w-4 h-4" /></span>
                             Arena
@@ -268,7 +268,7 @@ export function ChallengesTab({ contestId }: { contestId: string }) {
 
     return (
         <TabShell title="Challenges" action={
-            <button onClick={() => setShowAdd(!showAdd)} className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">
+            <button onClick={() => setShowAdd(!showAdd)} className="px-3 py-1.5 bg-brand text-on-brand text-sm rounded-lg hover:bg-brand-hover">
                 + Add Problem
             </button>
         }>
@@ -277,32 +277,32 @@ export function ChallengesTab({ contestId }: { contestId: string }) {
                     <div className="flex gap-2 mb-3">
                         <input value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => e.key === 'Enter' && searchProblems()}
                             placeholder="Search problems..." className="flex-1 border rounded-lg px-3 py-1.5 text-sm" />
-                        <button onClick={searchProblems} className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg">Search</button>
+                        <button onClick={searchProblems} className="px-3 py-1.5 bg-brand text-on-brand text-sm rounded-lg">Search</button>
                     </div>
                     {allProblems.map((p) => (
                         <div key={p.id} className="flex items-center justify-between py-1.5 text-sm">
-                            <span>{p.title} <span className="text-gray-400">({p.difficulty})</span></span>
-                            <button onClick={() => addProblem(p.id)} className="text-blue-600 hover:underline text-xs font-semibold">Add</button>
+                            <span>{p.title} <span className="text-muted-soft">({p.difficulty})</span></span>
+                            <button onClick={() => addProblem(p.id)} className="text-brand hover:underline text-xs font-semibold">Add</button>
                         </div>
                     ))}
                 </div>
             )}
             <table className="w-full text-sm">
-                <thead><tr className="border-b border-gray-200 dark:border-gray-700 text-left text-xs text-gray-500 uppercase">
+                <thead><tr className="border-b border-hairline text-left text-xs text-muted uppercase">
                     <th className="py-2 pr-4 w-12">#</th><th className="py-2 pr-4">Problem</th><th className="py-2 pr-4 w-20">Score</th><th className="py-2 w-40 text-right">Actions</th>
                 </tr></thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-hairline">
                     {problems.map((p, idx) => (
-                        <tr key={p.problem_id} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
-                            <td className="py-2.5 pr-4 font-mono font-bold text-blue-600">{indexLabel(idx)}</td>
+                        <tr key={p.problem_id} className="hover:bg-surface-2/30">
+                            <td className="py-2.5 pr-4 font-mono font-bold text-brand">{indexLabel(idx)}</td>
                             <td className="py-2.5 pr-4">
                                 <div className="flex flex-col">
                                     {p.slug ? (
-                                        <Link to={`/problems/${p.slug}`} className="font-semibold text-blue-600 hover:underline">{p.title || p.problem_id}</Link>
+                                        <Link to={`/problems/${p.slug}`} className="font-semibold text-brand hover:underline">{p.title || p.problem_id}</Link>
                                     ) : (
-                                        <span className="font-semibold text-gray-800">{p.title || p.problem_id}</span>
+                                        <span className="font-semibold text-ink">{p.title || p.problem_id}</span>
                                     )}
-                                    <span className="text-xs text-gray-400 font-mono">{p.problem_id}</span>
+                                    <span className="text-xs text-muted-soft font-mono">{p.problem_id}</span>
                                 </div>
                             </td>
                             <td className="py-2.5 pr-4">{p.score ?? 100}</td>
@@ -316,7 +316,7 @@ export function ChallengesTab({ contestId }: { contestId: string }) {
                                             aria-label={`Move ${p.title || p.problem_id} up`}
                                             aria-busy={reordering}
                                             title="Move up"
-                                            className="h-10 w-10 inline-flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-800 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-30 dark:border-gray-600 dark:hover:bg-gray-700"
+                                            className="h-10 w-10 inline-flex items-center justify-center rounded-lg border border-hairline text-muted transition-colors hover:bg-surface-2 hover:text-gray-800 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-30 dark:border-gray-600 dark:hover:bg-gray-700"
                                         >
                                             {reordering ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
                                         </button>
@@ -327,7 +327,7 @@ export function ChallengesTab({ contestId }: { contestId: string }) {
                                             aria-label={`Move ${p.title || p.problem_id} down`}
                                             aria-busy={reordering}
                                             title="Move down"
-                                            className="h-10 w-10 inline-flex items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-800 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-30 dark:border-gray-600 dark:hover:bg-gray-700"
+                                            className="h-10 w-10 inline-flex items-center justify-center rounded-lg border border-hairline text-muted transition-colors hover:bg-surface-2 hover:text-gray-800 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-30 dark:border-gray-600 dark:hover:bg-gray-700"
                                         >
                                             {reordering ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowDown className="h-4 w-4" />}
                                         </button>
@@ -347,7 +347,7 @@ export function ChallengesTab({ contestId }: { contestId: string }) {
                 </tbody>
             </table>
             {problems.length === 0 && <EmptyState
-                icon={<FileText className="w-5 h-5 text-gray-400" />}
+                icon={<FileText className="w-5 h-5 text-muted-soft" />}
                 text="No problems added yet"
                 description="Use Add Problem to build the contest challenge list."
             />}
@@ -363,12 +363,12 @@ function BookletTab({ contestId }: { contestId: string }) {
         <TabShell title="Booklet">
             <div className="text-center py-10">
                 <FileDown className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-500 mb-4">Generate and download the contest problem booklet as PDF</p>
+                <p className="text-muted mb-4">Generate and download the contest problem booklet as PDF</p>
                 <a href={`/api/contests/${contestId}/pdf`} target="_blank" rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
+                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand text-on-brand rounded-lg hover:bg-brand-hover font-medium">
                     Open Booklet (Print to Save)
                 </a>
-                <p className="text-xs text-gray-400 mt-3">Opens in a new tab with print dialog for PDF export</p>
+                <p className="text-xs text-muted-soft mt-3">Opens in a new tab with print dialog for PDF export</p>
             </div>
         </TabShell>
     )
@@ -400,28 +400,28 @@ function ClarificationsTab({ contestId }: { contestId: string }) {
     return (
         <TabShell title="Clarifications">
             {items.length === 0 ? <EmptyState
-                icon={<MessageSquare className="w-5 h-5 text-gray-400" />}
+                icon={<MessageSquare className="w-5 h-5 text-muted-soft" />}
                 text="No clarifications yet"
                 description="Participant questions and your replies will appear here."
             /> : (
                 <div className="space-y-3">
                     {items.map((c) => (
-                        <div key={c.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                        <div key={c.id} className="border border-hairline rounded-lg p-4">
                             <div className="flex items-start justify-between mb-2">
                                 <div>
-                                    <span className="text-xs text-gray-400">{new Date(c.created_at).toLocaleString()}</span>
-                                    {c.problem_index && <span className="ml-2 text-xs bg-gray-100 px-1.5 py-0.5 rounded font-mono">Problem {c.problem_index}</span>}
-                                    {c.username && <span className="ml-2 text-xs text-gray-500">by {c.username}</span>}
+                                    <span className="text-xs text-muted-soft">{new Date(c.created_at).toLocaleString()}</span>
+                                    {c.problem_index && <span className="ml-2 text-xs bg-surface-3 px-1.5 py-0.5 rounded font-mono">Problem {c.problem_index}</span>}
+                                    {c.username && <span className="ml-2 text-xs text-muted">by {c.username}</span>}
                                 </div>
                                 {c.answered ? <span className="text-xs text-green-600 font-medium">Answered</span> : <span className="text-xs text-orange-500 font-medium">⏳ Pending</span>}
                             </div>
-                            <p className="text-sm text-gray-800 mb-2">{c.question}</p>
+                            <p className="text-sm text-ink mb-2">{c.question}</p>
                             {c.answer && <div className="bg-green-50 border border-green-200 rounded p-2 text-sm text-green-800 mt-2"><strong>Answer:</strong> {c.answer}</div>}
                             {!c.answered && (
                                 <div className="mt-3 flex gap-2">
                                     <input value={answer[c.id] || ''} onChange={e => setAnswer(p => ({ ...p, [c.id]: e.target.value }))}
                                         placeholder="Type answer..." className="flex-1 border rounded-lg px-3 py-1.5 text-sm" />
-                                    <label className="flex items-center gap-1 text-xs text-gray-500">
+                                    <label className="flex items-center gap-1 text-xs text-muted">
                                         <input type="checkbox" checked={publicAns[c.id] || false} onChange={e => setPublicAns(p => ({ ...p, [c.id]: e.target.checked }))} />
                                         Public
                                     </label>
@@ -453,20 +453,20 @@ function ParticipantsTab({ contestId }: { contestId: string }) {
     return (
         <TabShell title="Participants" subtitle={`${data?.count ?? participants.length} registered`}>
             {participants.length === 0 ? <EmptyState
-                icon={<Users className="w-5 h-5 text-gray-400" />}
+                icon={<Users className="w-5 h-5 text-muted-soft" />}
                 text="No participants yet"
                 description="Registered contestants will appear here."
             /> : (
                 <table className="w-full text-sm">
-                    <thead><tr className="border-b border-gray-200 dark:border-gray-700 text-left text-xs text-gray-500 uppercase">
+                    <thead><tr className="border-b border-hairline text-left text-xs text-muted uppercase">
                         <th className="py-2 pr-4">#</th><th className="py-2 pr-4">Username</th><th className="py-2">Registered</th>
                     </tr></thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="divide-y divide-hairline">
                         {participants.map((p, i) => (
-                            <tr key={p.user_id} className="hover:bg-gray-50">
-                                <td className="py-2 pr-4 text-gray-400">{i + 1}</td>
-                                <td className="py-2 pr-4"><Link to={`/user/${p.username}`} className="text-blue-600 hover:underline">{p.username}</Link></td>
-                                <td className="py-2 text-gray-500 text-xs">{new Date(p.registered_at).toLocaleString()}</td>
+                            <tr key={p.user_id} className="hover:bg-surface-2">
+                                <td className="py-2 pr-4 text-muted-soft">{i + 1}</td>
+                                <td className="py-2 pr-4"><Link to={`/user/${p.username}`} className="text-brand hover:underline">{p.username}</Link></td>
+                                <td className="py-2 text-muted text-xs">{new Date(p.registered_at).toLocaleString()}</td>
                             </tr>
                         ))}
                     </tbody>
@@ -498,26 +498,26 @@ function SubmissionsTab({ contestId }: { contestId: string }) {
     return (
         <TabShell title="Submissions" subtitle={`${items.length} total`}>
             {items.length === 0 ? <EmptyState
-                icon={<FileCode className="w-5 h-5 text-gray-400" />}
+                icon={<FileCode className="w-5 h-5 text-muted-soft" />}
                 text="No submissions yet"
                 description="Contest submissions will appear here as participants submit solutions."
             /> : (
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm">
-                        <thead><tr className="border-b border-gray-200 dark:border-gray-700 text-left text-xs text-gray-500 uppercase">
+                        <thead><tr className="border-b border-hairline text-left text-xs text-muted uppercase">
                             <th className="py-2 pr-3">ID</th><th className="py-2 pr-3">User</th><th className="py-2 pr-3">Problem</th>
                             <th className="py-2 pr-3">Lang</th><th className="py-2 pr-3">Verdict</th><th className="py-2 pr-3">Time</th><th className="py-2">When</th>
                         </tr></thead>
-                        <tbody className="divide-y divide-gray-100">
+                        <tbody className="divide-y divide-hairline">
                             {items.slice(0, 100).map((s) => (
-                                <tr key={s.id} className="hover:bg-gray-50">
-                                    <td className="py-2 pr-3"><Link to={`/submissions/${s.id}`} className="text-blue-600 hover:underline font-mono text-xs">{s.id?.slice(0, 8)}</Link></td>
+                                <tr key={s.id} className="hover:bg-surface-2">
+                                    <td className="py-2 pr-3"><Link to={`/submissions/${s.id}`} className="text-brand hover:underline font-mono text-xs">{s.id?.slice(0, 8)}</Link></td>
                                     <td className="py-2 pr-3">{s.username || s.user_id?.slice(0, 8)}</td>
                                     <td className="py-2 pr-3 font-mono text-xs">{s.problem_index || s.problem_id?.slice(0, 8)}</td>
                                     <td className="py-2 pr-3 text-xs">{s.language}</td>
                                     <td className="py-2 pr-3"><span className={`text-xs px-2 py-0.5 rounded-full font-medium ${verdictColor(s.status)}`}>{s.status}</span></td>
-                                    <td className="py-2 pr-3 text-xs text-gray-500">{s.time_ms ? `${s.time_ms}ms` : '—'}</td>
-                                    <td className="py-2 text-xs text-gray-400">{s.created_at ? new Date(s.created_at).toLocaleString() : '—'}</td>
+                                    <td className="py-2 pr-3 text-xs text-muted">{s.time_ms ? `${s.time_ms}ms` : '—'}</td>
+                                    <td className="py-2 text-xs text-muted-soft">{s.created_at ? new Date(s.created_at).toLocaleString() : '—'}</td>
                                 </tr>
                             ))}
                         </tbody>
@@ -556,13 +556,13 @@ function PrintsTab({ contestId }: { contestId: string }) {
     return (
         <TabShell title="Print Requests" subtitle={`${items.length} requests`}>
             {items.length === 0 ? <EmptyState
-                icon={<Printer className="w-5 h-5 text-gray-400" />}
+                icon={<Printer className="w-5 h-5 text-muted-soft" />}
                 text="No print requests"
                 description="Onsite print requests will appear here for review."
             /> : (
                 <div className="space-y-3">
                     {items.map((p) => (
-                        <div key={p.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                        <div key={p.id} className="border border-hairline rounded-lg p-4">
                             <div className="flex items-center justify-between mb-2">
                                 <div className="flex items-center gap-2">
                                     <span className="font-medium text-sm">{p.filename}</span>
@@ -577,8 +577,8 @@ function PrintsTab({ contestId }: { contestId: string }) {
                                     )}
                                 </div>
                             </div>
-                            <pre className="bg-gray-50 border rounded p-3 text-xs font-mono overflow-x-auto max-h-40 overflow-y-auto">{p.content}</pre>
-                            <div className="mt-2 text-xs text-gray-400">
+                            <pre className="bg-surface-2 border rounded p-3 text-xs font-mono overflow-x-auto max-h-40 overflow-y-auto">{p.content}</pre>
+                            <div className="mt-2 text-xs text-muted-soft">
                                 {p.username && <span>By {p.username} · </span>}
                                 {p.created_at && new Date(p.created_at).toLocaleString()}
                             </div>
@@ -597,7 +597,7 @@ function StandingsTab({ contestId }: { contestId: string }) {
     return (
         <TabShell title="Standings">
             <div className="text-center py-6">
-                <a href={`/contests/${contestId}/scoreboard`} className="text-blue-600 hover:underline font-medium">
+                <a href={`/contests/${contestId}/scoreboard`} className="text-brand hover:underline font-medium">
                     Open Full Scoreboard →
                 </a>
             </div>
@@ -631,26 +631,26 @@ function StatisticsTab({ contestId }: { contestId: string }) {
         <TabShell title="Statistics">
             {/* Summary Cards */}
             <div className="grid grid-cols-3 gap-4 mb-6">
-                <StatCard label="Participants" value={stats.total_participants} icon={<Users className="w-5 h-5 text-gray-400" />} />
-                <StatCard label="Submissions" value={stats.total_submissions} icon={<FileCode className="w-5 h-5 text-gray-400" />} />
+                <StatCard label="Participants" value={stats.total_participants} icon={<Users className="w-5 h-5 text-muted-soft" />} />
+                <StatCard label="Submissions" value={stats.total_submissions} icon={<FileCode className="w-5 h-5 text-muted-soft" />} />
                 <StatCard label="Accepted" value={stats.accepted_submissions} icon={<Check className="w-5 h-5 text-green-500" />} />
             </div>
 
             {/* Per-problem solve rate */}
             {stats.problems && stats.problems.length > 0 && (
                 <div className="mb-6">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-3">Problem Solve Rates</h3>
+                    <h3 className="text-sm font-semibold text-ink-soft mb-3">Problem Solve Rates</h3>
                     <div className="space-y-2">
                         {stats.problems.map((p) => (
                             <div key={p.problem_id} className="flex items-center gap-3">
-                                <span className="font-mono font-bold text-blue-600 w-8">{p.index}</span>
-                                <div className="flex-1 bg-gray-100 rounded-full h-5 overflow-hidden">
+                                <span className="font-mono font-bold text-brand w-8">{p.index}</span>
+                                <div className="flex-1 bg-surface-3 rounded-full h-5 overflow-hidden">
                                     <div className="bg-green-500 h-5 rounded-full flex items-center justify-end pr-2 text-xs text-white font-medium transition-all"
                                         style={{ width: `${Math.max(p.solve_rate, 2)}%` }}>
                                         {p.solve_rate > 10 && `${p.solve_rate}%`}
                                     </div>
                                 </div>
-                                <span className="text-xs text-gray-500 w-24 text-right">{p.accepted}/{p.total_submissions} solved</span>
+                                <span className="text-xs text-muted w-24 text-right">{p.accepted}/{p.total_submissions} solved</span>
                             </div>
                         ))}
                     </div>
@@ -660,10 +660,10 @@ function StatisticsTab({ contestId }: { contestId: string }) {
             {/* Language distribution */}
             {languagesArray.length > 0 && (
                 <div className="mb-6">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-3">Languages</h3>
+                    <h3 className="text-sm font-semibold text-ink-soft mb-3">Languages</h3>
                     <div className="flex gap-2 flex-wrap">
                         {languagesArray.map((l) => (
-                            <span key={l.language} className="text-xs bg-gray-100 px-3 py-1.5 rounded-full">
+                            <span key={l.language} className="text-xs bg-surface-3 px-3 py-1.5 rounded-full">
                                 {l.language}: <strong>{l.count}</strong>
                             </span>
                         ))}
@@ -674,7 +674,7 @@ function StatisticsTab({ contestId }: { contestId: string }) {
             {/* Verdict distribution */}
             {verdictsArray.length > 0 && (
                 <div>
-                    <h3 className="text-sm font-semibold text-gray-700 mb-3">Verdicts</h3>
+                    <h3 className="text-sm font-semibold text-ink-soft mb-3">Verdicts</h3>
                     <div className="flex gap-2 flex-wrap">
                         {verdictsArray.map((v) => {
                             const color = v.status === 'ACCEPTED' ? 'bg-green-100 text-green-800' :
@@ -690,10 +690,10 @@ function StatisticsTab({ contestId }: { contestId: string }) {
 
 function StatCard({ label, value, icon }: { label: string; value?: number | string; icon: React.ReactNode }) {
     return (
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-4 text-center">
+        <div className="bg-surface border border-hairline rounded-xl p-4 text-center">
             <div className="text-2xl mb-1">{icon}</div>
-            <div className="text-2xl font-bold text-gray-800">{value}</div>
-            <div className="text-xs text-gray-500 uppercase tracking-wider mt-1">{label}</div>
+            <div className="text-2xl font-bold text-ink">{value}</div>
+            <div className="text-xs text-muted uppercase tracking-wider mt-1">{label}</div>
         </div>
     )
 }
@@ -705,7 +705,7 @@ function PlagiarismsTab({ contestId }: { contestId: string }) {
     return (
         <TabShell title="Plagiarisms">
             <div className="text-center py-6">
-                <a href={`/contests/${contestId}/plagiarism`} className="text-blue-600 hover:underline font-medium">
+                <a href={`/contests/${contestId}/plagiarism`} className="text-brand hover:underline font-medium">
                     Open Plagiarism Checker →
                 </a>
             </div>
@@ -747,13 +747,13 @@ function BalloonsTab({ contestId }: { contestId: string }) {
             <div className="flex gap-2 mb-4">
                 {(['all', 'pending', 'dispatched'] as const).map(f => (
                     <button key={f} onClick={() => setFilter(f)}
-                        className={`px-3 py-1.5 text-xs rounded-full font-medium capitalize ${filter === f ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                        className={`px-3 py-1.5 text-xs rounded-full font-medium capitalize ${filter === f ? 'bg-brand text-on-brand' : 'bg-surface-3 text-muted hover:bg-surface-3'}`}>
                         {f} {f === 'pending' ? `(${pending})` : ''}
                     </button>
                 ))}
             </div>
             {filtered.length === 0 ? <EmptyState
-                icon={<CircleDot className="w-5 h-5 text-gray-400" />}
+                icon={<CircleDot className="w-5 h-5 text-muted-soft" />}
                 text={items.length === 0 ? 'No balloons yet' : `No ${filter} balloons`}
                 description={items.length === 0
                     ? 'Balloons will appear here as contestants submit and dispatch achievements.'
@@ -765,16 +765,16 @@ function BalloonsTab({ contestId }: { contestId: string }) {
             /> : (
                 <div className="space-y-2">
                     {filtered.map((b) => (
-                        <div key={b.id} className={`flex items-center justify-between p-3 rounded-lg border ${b.dispatched ? 'bg-gray-50 border-gray-200 dark:border-gray-700' : 'bg-white dark:bg-gray-800 border-blue-200'}`}>
+                        <div key={b.id} className={`flex items-center justify-between p-3 rounded-lg border ${b.dispatched ? 'bg-surface-2 border-hairline' : 'bg-surface border-blue-200'}`}>
                             <div className="flex items-center gap-3">
                                 <CircleDot className="w-5 h-5 text-blue-500" />
                                 <div>
                                     <div className="flex items-center gap-2">
-                                        <span className="font-mono font-bold text-blue-600">{b.problem_index}</span>
+                                        <span className="font-mono font-bold text-brand">{b.problem_index}</span>
                                         <span className="text-sm font-medium">{b.username}</span>
                                         {b.color && <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: theme === 'dark' ? b.color + '40' : b.color + '20', color: b.color }}>{b.color}</span>}
                                     </div>
-                                    <span className="text-xs text-gray-400">{new Date(b.created_at).toLocaleTimeString()}</span>
+                                    <span className="text-xs text-muted-soft">{new Date(b.created_at).toLocaleTimeString()}</span>
                                 </div>
                             </div>
                             {!b.dispatched ? (
@@ -824,10 +824,10 @@ function AnnouncementsTab({ contestId }: { contestId: string }) {
             <div className="flex gap-2 mb-4">
                 <input value={content} onChange={e => setContent(e.target.value)} onKeyDown={e => e.key === 'Enter' && create()}
                     placeholder="Write an announcement..." className="flex-1 border rounded-lg px-3 py-2 text-sm" />
-                <button onClick={create} className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">Post</button>
+                <button onClick={create} className="px-4 py-2 bg-brand text-on-brand text-sm rounded-lg hover:bg-brand-hover">Post</button>
             </div>
             {items.length === 0 ? <EmptyState
-                icon={<Megaphone className="w-5 h-5 text-gray-400" />}
+                icon={<Megaphone className="w-5 h-5 text-muted-soft" />}
                 text="No announcements yet"
                 description="Post a contest update above to notify participants."
             /> : (
@@ -835,8 +835,8 @@ function AnnouncementsTab({ contestId }: { contestId: string }) {
                     {items.map((n) => (
                         <div key={n.id} className="flex items-start justify-between p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                             <div>
-                                <p className="text-sm text-gray-800">{n.content}</p>
-                                <span className="text-xs text-gray-400">{new Date(n.created_at).toLocaleString()}</span>
+                                <p className="text-sm text-ink">{n.content}</p>
+                                <span className="text-xs text-muted-soft">{new Date(n.created_at).toLocaleString()}</span>
                             </div>
                             <button onClick={() => remove(n.id)} className="text-red-400 hover:text-red-600 text-xs ml-4">✕</button>
                         </div>
@@ -878,7 +878,7 @@ function ModeratorsTab({ contestId }: { contestId: string }) {
     const levelColor = (l: string) => {
         if (l === 'manager') return 'bg-purple-100 text-purple-700'
         if (l === 'judge') return 'bg-blue-100 text-blue-700'
-        return 'bg-gray-100 text-gray-700'
+        return 'bg-surface-3 text-ink-soft'
     }
 
     return (
@@ -890,18 +890,18 @@ function ModeratorsTab({ contestId }: { contestId: string }) {
                     <option value="manager">Manager</option>
                     <option value="tester">Tester</option>
                 </select>
-                <button onClick={add} className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">Add</button>
+                <button onClick={add} className="px-4 py-2 bg-brand text-on-brand text-sm rounded-lg hover:bg-brand-hover">Add</button>
             </div>
             {items.length === 0 ? <EmptyState
-                icon={<Shield className="w-5 h-5 text-gray-400" />}
+                icon={<Shield className="w-5 h-5 text-muted-soft" />}
                 text="No moderators added"
                 description="Use the User ID and access-level controls above to add one."
             /> : (
                 <div className="space-y-2">
                     {items.map((p) => (
-                        <div key={p.user_id} className="flex items-center justify-between p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
+                        <div key={p.user_id} className="flex items-center justify-between p-3 bg-surface border border-hairline rounded-lg">
                             <div className="flex items-center gap-3">
-                                <Link to={`/user/${p.username}`} className="font-medium text-sm text-gray-800 hover:text-blue-600">{p.username || p.user_id}</Link>
+                                <Link to={`/user/${p.username}`} className="font-medium text-sm text-ink hover:text-brand">{p.username || p.user_id}</Link>
                                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${levelColor(p.access_level)}`}>{p.access_level}</span>
                             </div>
                             <button onClick={() => remove(p.user_id)} className="text-red-400 hover:text-red-600 text-xs">Remove</button>
@@ -966,16 +966,16 @@ function OnsiteTeamsTab({ contestId }: { contestId: string }) {
         <TabShell title="Onsite Teams" subtitle={`${teams.length} generated`}>
             <div className="space-y-4 mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <h3 className="text-sm font-semibold text-blue-800">Generate Team Credentials</h3>
-                <p className="text-xs text-blue-600">Enter one team per line: <code>TeamName, Institution</code></p>
+                <p className="text-xs text-brand">Enter one team per line: <code>TeamName, Institution</code></p>
                 <textarea
                     value={teamInput}
                     onChange={e => setTeamInput(e.target.value)}
                     rows={5}
                     placeholder={"Team Alpha, MIT\nTeam Beta, Stanford\nTeam Gamma"}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono"
+                    className="w-full border border-hairline-strong rounded-lg px-3 py-2 text-sm font-mono"
                 />
                 <button onClick={generateFromText} disabled={generating || !teamInput.trim()}
-                    className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                    className="px-4 py-2 bg-brand text-on-brand text-sm rounded-lg hover:bg-brand-hover disabled:opacity-50">
                     {generating ? 'Generating...' : 'Generate Credentials'}
                 </button>
             </div>
@@ -984,13 +984,13 @@ function OnsiteTeamsTab({ contestId }: { contestId: string }) {
                 <>
                     <div className="flex justify-end mb-3">
                         <button onClick={copyAllCredentials}
-                            className="px-3 py-1.5 bg-gray-100 text-gray-700 text-xs rounded-lg hover:bg-gray-200">
+                            className="px-3 py-1.5 bg-surface-3 text-ink-soft text-xs rounded-lg hover:bg-surface-3">
                             Copy All to Clipboard
                         </button>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm">
-                            <thead><tr className="border-b border-gray-200 dark:border-gray-700 text-left text-xs text-gray-500 uppercase">
+                            <thead><tr className="border-b border-hairline text-left text-xs text-muted uppercase">
                                 <th className="py-2 pr-3">Team Name</th>
                                 <th className="py-2 pr-3">Institution</th>
                                 <th className="py-2 pr-3">Username</th>
@@ -998,11 +998,11 @@ function OnsiteTeamsTab({ contestId }: { contestId: string }) {
                                 <th className="py-2">Used</th>
                                 <th className="py-2 w-16"></th>
                             </tr></thead>
-                            <tbody className="divide-y divide-gray-100">
+                            <tbody className="divide-y divide-hairline">
                                 {teams.map((t) => (
-                                    <tr key={t.id} className="hover:bg-gray-50">
+                                    <tr key={t.id} className="hover:bg-surface-2">
                                         <td className="py-2 pr-3 font-medium">{t.team_name}</td>
-                                        <td className="py-2 pr-3 text-gray-500">{t.institution || '—'}</td>
+                                        <td className="py-2 pr-3 text-muted">{t.institution || '—'}</td>
                                         <td className="py-2 pr-3 font-mono text-xs">{t.username}</td>
                                         <td className="py-2 pr-3 font-mono text-xs">{t.password || '—'}</td>
                                         <td className="py-2">
@@ -1026,7 +1026,7 @@ function OnsiteTeamsTab({ contestId }: { contestId: string }) {
                 </>
             )}
             {teams.length === 0 && <EmptyState
-                icon={<UserPlus className="w-5 h-5 text-gray-400" />}
+                icon={<UserPlus className="w-5 h-5 text-muted-soft" />}
                 text="No team credentials generated yet"
                 description="Enter team names above, then generate credentials for the onsite contest."
             />}
@@ -1120,42 +1120,42 @@ function SettingsTab({ contestId }: { contestId: string }) {
             <div className="space-y-5">
                 {/* Title */}
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                    <label className="block text-sm font-medium text-ink-soft mb-1">Title</label>
                     <input value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))}
-                        className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+                        className="w-full border border-hairline-strong rounded-lg px-3 py-2 text-sm focus:ring-2 focus-visible:outline-[var(--ring)] focus:border-brand" />
                 </div>
 
                 {/* Description */}
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                    <label className="block text-sm font-medium text-ink-soft mb-1">Description</label>
                     <textarea value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
-                        rows={3} className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+                        rows={3} className="w-full border border-hairline-strong rounded-lg px-3 py-2 text-sm focus:ring-2 focus-visible:outline-[var(--ring)] focus:border-brand" />
                 </div>
 
                 {/* Times */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Start Time</label>
+                        <label className="block text-sm font-medium text-ink-soft mb-1">Start Time</label>
                         <input type="datetime-local" value={form.start_time} onChange={e => setForm(p => ({ ...p, start_time: e.target.value }))}
-                            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+                            className="w-full border border-hairline-strong rounded-lg px-3 py-2 text-sm focus:ring-2 focus-visible:outline-[var(--ring)] focus:border-brand" />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">End Time</label>
+                        <label className="block text-sm font-medium text-ink-soft mb-1">End Time</label>
                         <input type="datetime-local" value={form.end_time} onChange={e => setForm(p => ({ ...p, end_time: e.target.value }))}
-                            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+                            className="w-full border border-hairline-strong rounded-lg px-3 py-2 text-sm focus:ring-2 focus-visible:outline-[var(--ring)] focus:border-brand" />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Freeze Time <span className="text-gray-400">(optional)</span></label>
+                        <label className="block text-sm font-medium text-ink-soft mb-1">Freeze Time <span className="text-muted-soft">(optional)</span></label>
                         <input type="datetime-local" value={form.freeze_time} onChange={e => setForm(p => ({ ...p, freeze_time: e.target.value }))}
-                            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+                            className="w-full border border-hairline-strong rounded-lg px-3 py-2 text-sm focus:ring-2 focus-visible:outline-[var(--ring)] focus:border-brand" />
                     </div>
                 </div>
 
                 {/* Visibility Settings */}
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Visibility Mode</label>
+                    <label className="block text-sm font-medium text-ink-soft mb-1">Visibility Mode</label>
                     <select value={form.visibility} onChange={e => setForm(p => ({ ...p, visibility: e.target.value }))}
-                        className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white">
+                        className="w-full border border-hairline-strong rounded-lg px-3 py-2 text-sm focus:ring-2 focus-visible:outline-[var(--ring)] focus:border-brand bg-surface">
                         <option value="public">Public (Anyone can join)</option>
                         <option value="private">Private (Password/Invite required)</option>
                         <option value="group">Specific Group</option>
@@ -1164,18 +1164,18 @@ function SettingsTab({ contestId }: { contestId: string }) {
 
                 {form.visibility === 'private' && (
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Contest Password</label>
+                        <label className="block text-sm font-medium text-ink-soft mb-1">Contest Password</label>
                         <input value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))}
                             placeholder={form.has_password ? "•••••••• (leave blank to keep current)" : "Enter password for private access..."}
-                            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+                            className="w-full border border-hairline-strong rounded-lg px-3 py-2 text-sm focus:ring-2 focus-visible:outline-[var(--ring)] focus:border-brand" />
                     </div>
                 )}
 
                 {form.visibility === 'group' && (
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Select Restricted Group</label>
+                        <label className="block text-sm font-medium text-ink-soft mb-1">Select Restricted Group</label>
                         <select value={form.group_id} onChange={e => setForm(p => ({ ...p, group_id: e.target.value }))}
-                            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white">
+                            className="w-full border border-hairline-strong rounded-lg px-3 py-2 text-sm focus:ring-2 focus-visible:outline-[var(--ring)] focus:border-brand bg-surface">
                             <option value="">-- Choose Group --</option>
                             {groups.map(g => (
                                 <option key={g.id} value={g.id}>{g.name}</option>
@@ -1186,7 +1186,7 @@ function SettingsTab({ contestId }: { contestId: string }) {
 
                 {/* Options */}
                 <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Options</label>
+                    <label className="block text-sm font-medium text-ink-soft mb-2">Options</label>
                     <div className="grid grid-cols-2 gap-3">
                         {([
                             ['pdf_enabled', 'PDF Generation', FileText],
@@ -1194,10 +1194,10 @@ function SettingsTab({ contestId }: { contestId: string }) {
                             ['upsolving_enabled', 'Enable Upsolving', Loader2],
                             ['virtual_contest_enabled', 'Virtual Contests', Play],
                         ] as const).map(([key, label, icon]) => (
-                            <label key={key} className="flex items-center gap-2 cursor-pointer p-2 rounded-lg hover:bg-gray-50 border border-gray-100">
+                            <label key={key} className="flex items-center gap-2 cursor-pointer p-2 rounded-lg hover:bg-surface-2 border border-gray-100">
                                 <input type="checkbox" checked={form[key] as boolean}
                                     onChange={e => setForm(p => ({ ...p, [key]: e.target.checked }))}
-                                    className="rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500" />
+                                    className="rounded border-hairline-strong text-brand focus-visible:outline-[var(--ring)]" />
                                 <span className="text-sm flex items-center gap-1.5">{typeof icon === "string" ? icon : React.createElement(icon as unknown as React.ComponentType<{ className?: string }>, { className: "w-4 h-4" })} {label}</span>
                             </label>
                         ))}
@@ -1207,10 +1207,10 @@ function SettingsTab({ contestId }: { contestId: string }) {
                 {/* Save */}
                 <div className="flex gap-3 pt-2">
                     <button onClick={handleSave} disabled={saving}
-                        className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium text-sm transition-colors">
+                        className="px-6 py-2.5 bg-brand text-on-brand rounded-lg hover:bg-brand-hover disabled:opacity-50 font-medium text-sm transition-colors">
                         {saving ? 'Saving...' : 'Save Changes'}
                     </button>
-                    <Link to={`/contests/${contestId}`} className="px-4 py-2.5 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 text-sm">
+                    <Link to={`/contests/${contestId}`} className="px-4 py-2.5 bg-surface-3 text-muted rounded-lg hover:bg-surface-3 text-sm">
                         Cancel
                     </Link>
                 </div>
@@ -1224,11 +1224,11 @@ function SettingsTab({ contestId }: { contestId: string }) {
 // ═══════════════════════════════════════════════
 function TabShell({ title, subtitle, action, children }: { title: string; subtitle?: string; action?: React.ReactNode; children: React.ReactNode }) {
     return (
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
-            <div className="px-5 py-3.5 border-b border-gray-200 dark:border-gray-700 bg-gray-50 flex items-center justify-between">
+        <div className="bg-surface border border-hairline rounded-xl overflow-hidden">
+            <div className="px-5 py-3.5 border-b border-hairline bg-surface-2 flex items-center justify-between">
                 <div>
-                    <h2 className="font-semibold text-gray-800">{title}</h2>
-                    {subtitle && <p className="text-xs text-gray-400 mt-0.5">{subtitle}</p>}
+                    <h2 className="font-semibold text-ink">{title}</h2>
+                    {subtitle && <p className="text-xs text-muted-soft mt-0.5">{subtitle}</p>}
                 </div>
                 {action}
             </div>
@@ -1240,7 +1240,7 @@ function TabShell({ title, subtitle, action, children }: { title: string; subtit
 function TabLoading() {
     return (
         <div className="flex items-center justify-center py-20">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600" />
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-brand" />
         </div>
     )
 }

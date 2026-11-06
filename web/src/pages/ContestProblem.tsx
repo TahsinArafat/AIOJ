@@ -98,8 +98,8 @@ const STATUS_COLORS: Record<string, string> = {
     CE: 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300 border-purple-300 dark:border-purple-700',
     pending: 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 border-blue-300 dark:border-blue-700',
     judging: 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 border-blue-300 dark:border-blue-700',
-    se: 'bg-gray-100 dark:bg-gray-900/30 text-gray-800 dark:text-gray-300 border-gray-300 dark:border-gray-700',
-    SE: 'bg-gray-100 dark:bg-gray-900/30 text-gray-800 dark:text-gray-300 border-gray-300 dark:border-gray-700',
+    se: 'bg-surface-3/30 text-ink border-hairline-strong',
+    SE: 'bg-surface-3/30 text-ink border-hairline-strong',
 }
 
 type ContestStatus = 'upcoming' | 'running' | 'frozen' | 'ended'
@@ -175,7 +175,7 @@ function RunningTimer({ start, end }: { start: string; end: string }) {
         <div className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl px-6 py-4 shadow-lg">
             <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                    <span className="w-2 h-2 rounded-full bg-surface animate-pulse" />
                     <span className="text-sm font-medium opacity-90">Contest is running</span>
                 </div>
                 <span className="text-sm opacity-75">Elapsed: {formatDuration(elapsed)}</span>
@@ -184,7 +184,7 @@ function RunningTimer({ start, end }: { start: string; end: string }) {
                 {formatCountdown(remaining)} <span className="text-base font-normal opacity-70">remaining</span>
             </div>
             <div className="w-full bg-white/20 rounded-full h-2">
-                <div className="bg-white rounded-full h-2 transition-all duration-1000" style={{ width: `${progress}%` }} />
+                <div className="bg-surface rounded-full h-2 transition-all duration-1000" style={{ width: `${progress}%` }} />
             </div>
         </div>
     )
@@ -213,7 +213,7 @@ function CopyButton({ text }: { text: string }) {
     return (
         <button
             onClick={handleCopy}
-            className="text-xs text-gray-500 hover:text-gray-700 transition-colors px-2 py-1 rounded hover:bg-gray-200"
+            className="text-xs text-muted hover:text-gray-700 transition-colors px-2 py-1 rounded hover:bg-surface-3"
             title="Copy to clipboard"
         >
             {copied ? <><Check className="w-3.5 h-3.5" /> Copied</> : <><Copy className="w-3.5 h-3.5" /> Copy</>}
@@ -223,34 +223,34 @@ function CopyButton({ text }: { text: string }) {
 
 function SampleCase({ sample, index }: { sample: SampleCaseData; index: number }) {
     return (
-        <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-            <div className="bg-gray-50 dark:bg-gray-900/20 px-4 py-2 border-b border-gray-200 dark:border-gray-700">
-                <span className="font-semibold text-sm text-gray-700 dark:text-gray-300">Sample {index + 1}</span>
+        <div className="border border-hairline rounded-lg overflow-hidden">
+            <div className="bg-surface-2/20 px-4 py-2 border-b border-hairline">
+                <span className="font-semibold text-sm text-ink-soft">Sample {index + 1}</span>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-gray-200">
+            <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-hairline">
                 <div className="p-4">
                     <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Input</span>
+                        <span className="text-xs font-semibold text-muted uppercase tracking-wide">Input</span>
                         <CopyButton text={sample.input} />
                     </div>
-                    <pre className="bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700 text-sm p-3 rounded-md overflow-x-auto font-mono whitespace-pre-wrap">
+                    <pre className="bg-surface-2 text-ink border border-hairline text-sm p-3 rounded-md overflow-x-auto font-mono whitespace-pre-wrap">
                         {sample.input}
                     </pre>
                 </div>
                 <div className="p-4">
                     <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Output</span>
+                        <span className="text-xs font-semibold text-muted uppercase tracking-wide">Output</span>
                         <CopyButton text={sample.output || ''} />
                     </div>
-                    <pre className="bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700 text-sm p-3 rounded-md overflow-x-auto font-mono whitespace-pre-wrap">
+                    <pre className="bg-surface-2 text-ink border border-hairline text-sm p-3 rounded-md overflow-x-auto font-mono whitespace-pre-wrap">
                         {sample.output}
                     </pre>
                 </div>
             </div>
             {sample.explanation && (
-                <div className="border-t border-gray-200 dark:border-gray-700 bg-blue-50 dark:bg-blue-900/20 px-4 py-3">
-                    <div className="text-xs font-semibold text-blue-700 dark:text-blue-300 uppercase tracking-wide mb-1">Explanation</div>
-                    <div className="prose prose-sm max-w-none text-gray-700 dark:text-gray-300">
+                <div className="border-t border-hairline bg-brand-soft px-4 py-3">
+                    <div className="text-xs font-semibold text-brand uppercase tracking-wide mb-1">Explanation</div>
+                    <div className="prose prose-sm max-w-none text-ink-soft">
                         <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
                             {sample.explanation}
                         </ReactMarkdown>
@@ -274,8 +274,8 @@ function HintSection({ hint }: { hint: string }) {
                 <span className="text-amber-600 dark:text-amber-400 text-sm">{expanded ? '▲ Hide' : '▼ Show'}</span>
             </button>
             {expanded && (
-                <div className="px-4 py-3 bg-white dark:bg-gray-800 border-t border-amber-200 dark:border-amber-700">
-                    <div className="prose prose-sm max-w-none text-gray-700 dark:text-gray-300">
+                <div className="px-4 py-3 bg-surface border-t border-amber-200 dark:border-amber-700">
+                    <div className="prose prose-sm max-w-none text-ink-soft">
                         <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
                             {hint}
                         </ReactMarkdown>
@@ -303,10 +303,10 @@ function SubmissionResult({ result }: { result: SubmissionView }) {
     const isPending = result.status === 'pending' || result.status === 'judging'
     const statusKey = (result.status || result.verdict || '').toLowerCase()
     const label = STATUS_LABELS[result.status || ''] || STATUS_LABELS[statusKey] || result.status || 'Submitted'
-    const colorClass = STATUS_COLORS[result.status || ''] || STATUS_COLORS[statusKey] || 'bg-gray-100 dark:bg-gray-900/30 text-gray-800 dark:text-gray-300 border-gray-300 dark:border-gray-700'
+    const colorClass = STATUS_COLORS[result.status || ''] || STATUS_COLORS[statusKey] || 'bg-surface-3/30 text-ink border-hairline-strong'
 
     return (
-        <div className="p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg space-y-3">
+        <div className="p-4 bg-surface border border-hairline rounded-lg space-y-3">
             <div className="flex items-center justify-between">
                 <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border ${colorClass}`}>
                     {isPending && (
@@ -320,7 +320,7 @@ function SubmissionResult({ result }: { result: SubmissionView }) {
                 {result.id && (
                     <Link
                         to={`/submissions/${result.id}`}
-                        className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 hover:underline font-medium"
+                        className="text-xs text-brand hover:text-blue-800 hover:underline font-medium"
                     >
                         View Details →
                     </Link>
@@ -328,42 +328,42 @@ function SubmissionResult({ result }: { result: SubmissionView }) {
             </div>
 
             {result.id && (
-                <div className="text-xs text-gray-500">
+                <div className="text-xs text-muted">
                     <span className="font-medium">Submission ID:</span>{' '}
-                    <Link to={`/submissions/${result.id}`} className="font-mono text-blue-600 dark:text-blue-400 hover:underline">
+                    <Link to={`/submissions/${result.id}`} className="font-mono text-brand hover:underline">
                         {result.id.substring(0, 12)}
                     </Link>
                 </div>
             )}
 
-            <div className="flex flex-wrap gap-4 text-xs text-gray-600 dark:text-gray-400">
+            <div className="flex flex-wrap gap-4 text-xs text-muted">
                 {result.time_used != null && (
                     <div>
-                        <span className="font-medium text-gray-700 dark:text-gray-300">Time:</span>{' '}
+                        <span className="font-medium text-ink-soft">Time:</span>{' '}
                         {typeof result.time_used === 'number' ? `${result.time_used} ms` : result.time_used}
                     </div>
                 )}
                 {result.memory_used != null && (
                     <div>
-                        <span className="font-medium text-gray-700 dark:text-gray-300">Memory:</span>{' '}
+                        <span className="font-medium text-ink-soft">Memory:</span>{' '}
                         {typeof result.memory_used === 'number' ? `${Math.round(result.memory_used / 1024)} MB` : result.memory_used}
                     </div>
                 )}
                 {result.score != null && (
                     <div>
-                        <span className="font-medium text-gray-700 dark:text-gray-300">Score:</span> {result.score}
+                        <span className="font-medium text-ink-soft">Score:</span> {result.score}
                     </div>
                 )}
                 {result.language && (
                     <div>
-                        <span className="font-medium text-gray-700 dark:text-gray-300">Language:</span> {result.language}
+                        <span className="font-medium text-ink-soft">Language:</span> {result.language}
                     </div>
                 )}
             </div>
 
             {result.status === 'ce' && result.compile_output && (
                 <div className="mt-2">
-                    <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Compile Output:</div>
+                    <div className="text-xs font-semibold text-muted mb-1">Compile Output:</div>
                     <pre className="bg-gray-900 text-red-400 text-xs p-3 rounded-md overflow-x-auto font-mono max-h-40">
                         {result.compile_output}
                     </pre>
@@ -398,7 +398,7 @@ function MySubmissionsTab({ problemId, contestId }: { problemId: string; contest
 
     if (loading) {
         return (
-            <div className="py-8 text-center text-gray-500 text-sm">Loading submissions...</div>
+            <div className="py-8 text-center text-muted text-sm">Loading submissions...</div>
         )
     }
 
@@ -412,23 +412,23 @@ function MySubmissionsTab({ problemId, contestId }: { problemId: string; contest
         <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
                 <thead>
-                    <tr className="border-b border-gray-200 dark:border-gray-700">
-                        <th className="text-left py-2 px-3 text-gray-600 dark:text-gray-400 font-semibold">When</th>
-                        <th className="text-left py-2 px-3 text-gray-600 dark:text-gray-400 font-semibold">Verdict</th>
-                        <th className="text-left py-2 px-3 text-gray-600 dark:text-gray-400 font-semibold">Time</th>
-                        <th className="text-left py-2 px-3 text-gray-600 dark:text-gray-400 font-semibold">Memory</th>
-                        <th className="text-left py-2 px-3 text-gray-600 dark:text-gray-400 font-semibold">Lang</th>
-                        <th className="text-left py-2 px-3 text-gray-600 dark:text-gray-400 font-semibold"></th>
+                    <tr className="border-b border-hairline">
+                        <th className="text-left py-2 px-3 text-muted font-semibold">When</th>
+                        <th className="text-left py-2 px-3 text-muted font-semibold">Verdict</th>
+                        <th className="text-left py-2 px-3 text-muted font-semibold">Time</th>
+                        <th className="text-left py-2 px-3 text-muted font-semibold">Memory</th>
+                        <th className="text-left py-2 px-3 text-muted font-semibold">Lang</th>
+                        <th className="text-left py-2 px-3 text-muted font-semibold"></th>
                     </tr>
                 </thead>
                 <tbody>
                     {subs.map((s) => {
                         const statusKey = (s.status || '').toLowerCase()
                         const label = STATUS_LABELS[s.status || ''] || s.status
-                        const colorClass = STATUS_COLORS[s.status || ''] || STATUS_COLORS[statusKey] || 'bg-gray-100 dark:bg-gray-900/30 text-gray-800 dark:text-gray-300 border-gray-300 dark:border-gray-700'
+                        const colorClass = STATUS_COLORS[s.status || ''] || STATUS_COLORS[statusKey] || 'bg-surface-3/30 text-ink border-hairline-strong'
                         return (
-                            <tr key={s.id} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 transition-colors">
-                                <td className="py-2.5 px-3 text-gray-500 whitespace-nowrap">
+                            <tr key={s.id} className="border-b border-hairline hover:bg-surface-2 transition-colors">
+                                <td className="py-2.5 px-3 text-muted whitespace-nowrap">
                                     {s.created_at ? new Date(s.created_at).toLocaleString() : '—'}
                                 </td>
                                 <td className="py-2.5 px-3">
@@ -436,19 +436,19 @@ function MySubmissionsTab({ problemId, contestId }: { problemId: string; contest
                                         {label}
                                     </span>
                                 </td>
-                                <td className="py-2.5 px-3 text-gray-600 dark:text-gray-400 font-mono whitespace-nowrap">
+                                <td className="py-2.5 px-3 text-muted font-mono whitespace-nowrap">
                                     {s.time_used != null ? `${s.time_used} ms` : '—'}
                                 </td>
-                                <td className="py-2.5 px-3 text-gray-600 dark:text-gray-400 font-mono whitespace-nowrap">
+                                <td className="py-2.5 px-3 text-muted font-mono whitespace-nowrap">
                                     {s.memory_used != null ? `${Math.round(s.memory_used / 1024)} MB` : '—'}
                                 </td>
-                                <td className="py-2.5 px-3 text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                                <td className="py-2.5 px-3 text-muted whitespace-nowrap">
                                     {s.language || '—'}
                                 </td>
                                 <td className="py-2.5 px-3">
                                     <Link
                                         to={`/submissions/${s.id}`}
-                                        className="text-blue-600 dark:text-blue-400 hover:underline text-xs font-medium"
+                                        className="text-brand hover:underline text-xs font-medium"
                                     >
                                         View
                                     </Link>
@@ -711,7 +711,7 @@ export default function ContestProblem() {
     if (loading) {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
-                <div className="flex items-center gap-3 text-gray-500">
+                <div className="flex items-center gap-3 text-muted">
                     <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
@@ -727,7 +727,7 @@ export default function ContestProblem() {
         return (
             <div className="max-w-2xl mx-auto py-20 text-center space-y-4">
                 <div className="text-red-500 text-lg font-medium">{error}</div>
-                <Link to={`/contests/${contestId}`} className="text-blue-600 dark:text-blue-400 hover:underline text-sm">
+                <Link to={`/contests/${contestId}`} className="text-brand hover:underline text-sm">
                     ← Back to Contest
                 </Link>
             </div>
@@ -738,8 +738,8 @@ export default function ContestProblem() {
     if (!problem) {
         return (
             <div className="max-w-2xl mx-auto py-20 text-center space-y-4">
-                <div className="text-gray-500 text-lg">Problem not found</div>
-                <Link to={`/contests/${contestId}`} className="text-blue-600 dark:text-blue-400 hover:underline text-sm">
+                <div className="text-muted text-lg">Problem not found</div>
+                <Link to={`/contests/${contestId}`} className="text-brand hover:underline text-sm">
                     ← Back to Contest
                 </Link>
             </div>
@@ -773,11 +773,11 @@ export default function ContestProblem() {
             )}
 
             {statementHidden && (
-                <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-300 dark:border-blue-700 rounded-lg flex items-start gap-3">
-                    <span className="text-blue-600 dark:text-blue-400 mt-0.5"><ClipboardList className="w-5 h-5" /></span>
+                <div className="mb-6 p-4 bg-brand-soft border border-blue-300 dark:border-blue-700 rounded-lg flex items-start gap-3">
+                    <span className="text-brand mt-0.5"><ClipboardList className="w-5 h-5" /></span>
                     <div>
                         <p className="text-blue-800 dark:text-blue-300 font-medium text-sm">Problem statement is hidden</p>
-                        <p className="text-blue-700 dark:text-blue-300 text-sm mt-1">
+                        <p className="text-brand text-sm mt-1">
                             The full problem statement is only available in printed form. Please refer to your printed problem set.
                             Sample cases are shown below for reference.
                         </p>
@@ -786,11 +786,11 @@ export default function ContestProblem() {
             )}
 
             {!canSubmit && !upsolvingDisabled && isLoggedIn && (
-                <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-900/20 border border-gray-300 dark:border-gray-700 rounded-lg flex items-start gap-3">
-                    <span className="text-gray-500 text-lg mt-0.5">🚫</span>
+                <div className="mb-6 p-4 bg-surface-2/20 border border-hairline-strong rounded-lg flex items-start gap-3">
+                    <span className="text-muted text-lg mt-0.5">🚫</span>
                     <div>
-                        <p className="text-gray-700 dark:text-gray-300 font-medium text-sm">Submissions are closed</p>
-                        <p className="text-gray-600 dark:text-gray-400 text-sm mt-1">You cannot submit to this problem at this time.</p>
+                        <p className="text-ink-soft font-medium text-sm">Submissions are closed</p>
+                        <p className="text-muted text-sm mt-1">You cannot submit to this problem at this time.</p>
                     </div>
                 </div>
             )}
@@ -802,25 +802,25 @@ export default function ContestProblem() {
                     {/* Back link */}
                     <Link
                         to={`/contests/${contestId}`}
-                        className="text-blue-600 dark:text-blue-400 hover:text-blue-800 hover:underline text-sm font-medium transition-colors"
+                        className="text-brand hover:text-blue-800 hover:underline text-sm font-medium transition-colors"
                     >
                         ← {contest?.title || 'Contest'}
                     </Link>
                     {/* Title with problem letter badge */}
                     <div className="flex items-center gap-3 mt-3">
-                        <span className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-blue-600 text-white font-bold text-lg flex-shrink-0">
+                        <span className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-brand text-on-brand font-bold text-lg flex-shrink-0">
                             {index?.toUpperCase()}
                         </span>
-                        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 leading-tight">{problem.title}</h1>
+                        <h1 className="text-2xl font-bold text-ink leading-tight">{problem.title}</h1>
                     </div>
                     {/* Metadata bar */}
-                    <div className="flex flex-wrap items-center gap-4 mt-3 text-sm text-gray-600 dark:text-gray-400">
+                    <div className="flex flex-wrap items-center gap-4 mt-3 text-sm text-muted">
                         <span className="flex items-center gap-1.5">
-                            <span className="font-semibold text-gray-700 dark:text-gray-300">Time Limit:</span> {problem.time_limit} ms
+                            <span className="font-semibold text-ink-soft">Time Limit:</span> {problem.time_limit} ms
                         </span>
                         <span className="text-gray-300">|</span>
                         <span className="flex items-center gap-1.5">
-                            <span className="font-semibold text-gray-700 dark:text-gray-300">Memory Limit:</span> {Math.round(problem.memory_limit / 1024)} MB
+                            <span className="font-semibold text-ink-soft">Memory Limit:</span> {Math.round(problem.memory_limit / 1024)} MB
                         </span>
                         {problem.interactive && (
                             <>
@@ -848,12 +848,12 @@ export default function ContestProblem() {
                         )}
                     </div>
                     {/* Tabs */}
-                    <div className="flex border-b border-gray-200 dark:border-gray-700 mb-6">
+                    <div className="flex border-b border-hairline mb-6">
                         <button
                             onClick={() => setTab('statement')}
                             className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${tab === 'statement'
-                                ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                ? 'border-brand text-brand'
+                                : 'border-transparent text-muted hover:text-gray-700 hover:border-gray-300'
                                 }`}
                         >
                             Statement
@@ -862,8 +862,8 @@ export default function ContestProblem() {
                             <button
                                 onClick={() => setTab('submissions')}
                                 className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${tab === 'submissions'
-                                    ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                    ? 'border-brand text-brand'
+                                    : 'border-transparent text-muted hover:text-gray-700 hover:border-gray-300'
                                     }`}
                             >
                                 My Submissions
@@ -878,24 +878,24 @@ export default function ContestProblem() {
                                 <>
                                     {isPdfUrl(problem.description) ? (
                                         <div className="space-y-3">
-                                            <h3 className="font-semibold text-sm text-gray-700 dark:text-gray-300 uppercase tracking-wide">PDF Problem Statement</h3>
+                                            <h3 className="font-semibold text-sm text-ink-soft uppercase tracking-wide">PDF Problem Statement</h3>
                                             <a
                                                 href={problem.description}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
+                                                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-brand bg-brand-soft border border-blue-200 dark:border-blue-800 rounded-lg hover:bg-brand-soft transition-colors"
                                             >
                                                 <Download className="w-4 h-4" />
                                                 Download PDF
                                             </a>
                                             <iframe
                                                 src={problem.description}
-                                                className="w-full h-[800px] border-0 rounded-lg shadow-sm bg-white"
+                                                className="w-full h-[800px] border-0 rounded-lg shadow-sm bg-surface"
                                                 title="Problem Statement"
                                             />
                                         </div>
                                     ) : (
-                                        <div className="prose prose-sm max-w-none text-gray-800 dark:text-gray-300 leading-relaxed">
+                                        <div className="prose prose-sm max-w-none text-ink leading-relaxed">
                                             <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
                                                 {problem.description}
                                             </ReactMarkdown>
@@ -904,8 +904,8 @@ export default function ContestProblem() {
 
                                     {problem.input_format && (
                                         <div>
-                                            <h3 className="font-semibold text-sm text-gray-700 dark:text-gray-300 uppercase tracking-wide mb-2">Input Format</h3>
-                                            <div className="prose prose-sm max-w-none text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900/20 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                                            <h3 className="font-semibold text-sm text-ink-soft uppercase tracking-wide mb-2">Input Format</h3>
+                                            <div className="prose prose-sm max-w-none text-ink-soft bg-surface-2/20 rounded-lg p-4 border border-hairline">
                                                 <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
                                                     {problem.input_format}
                                                 </ReactMarkdown>
@@ -915,8 +915,8 @@ export default function ContestProblem() {
 
                                     {problem.output_format && (
                                         <div>
-                                            <h3 className="font-semibold text-sm text-gray-700 dark:text-gray-300 uppercase tracking-wide mb-2">Output Format</h3>
-                                            <div className="prose prose-sm max-w-none text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900/20 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                                            <h3 className="font-semibold text-sm text-ink-soft uppercase tracking-wide mb-2">Output Format</h3>
+                                            <div className="prose prose-sm max-w-none text-ink-soft bg-surface-2/20 rounded-lg p-4 border border-hairline">
                                                 <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
                                                     {problem.output_format}
                                                 </ReactMarkdown>
@@ -929,7 +929,7 @@ export default function ContestProblem() {
                             {/* Sample cases - always show even with hidden statement */}
                             {problem.sample_cases && problem.sample_cases.length > 0 && (
                                 <div>
-                                    <h3 className="font-semibold text-sm text-gray-700 dark:text-gray-300 uppercase tracking-wide mb-3">Sample Cases</h3>
+                                    <h3 className="font-semibold text-sm text-ink-soft uppercase tracking-wide mb-3">Sample Cases</h3>
                                     <div className="space-y-4">
                                         {problem.sample_cases.map((sample: SampleCaseData, i: number) => (
                                             <SampleCase key={i} sample={sample} index={i} />
@@ -952,13 +952,13 @@ export default function ContestProblem() {
                 {/* DIVIDER */}
                 <div
                     onMouseDown={handleMouseDown}
-                    className={`w-3 flex-shrink-0 cursor-col-resize group transition-colors relative ${dragging ? 'bg-blue-500' : 'bg-gray-200 dark:bg-gray-700 hover:bg-blue-500'}`}
+                    className={`w-3 flex-shrink-0 cursor-col-resize group transition-colors relative ${dragging ? 'bg-blue-500' : 'bg-surface-3 hover:bg-blue-500'}`}
                 >
                     {/* Grip dots indicator */}
                     <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
-                        <span className="w-1 h-1 rounded-full bg-gray-400 dark:bg-gray-500 group-hover:bg-white/70 transition-colors" />
-                        <span className="w-1 h-1 rounded-full bg-gray-400 dark:bg-gray-500 group-hover:bg-white/70 transition-colors" />
-                        <span className="w-1 h-1 rounded-full bg-gray-400 dark:bg-gray-500 group-hover:bg-white/70 transition-colors" />
+                        <span className="w-1 h-1 rounded-full bg-muted-soft group-hover:bg-white/70 transition-colors" />
+                        <span className="w-1 h-1 rounded-full bg-muted-soft group-hover:bg-white/70 transition-colors" />
+                        <span className="w-1 h-1 rounded-full bg-muted-soft group-hover:bg-white/70 transition-colors" />
                     </div>
                 </div>
 
@@ -970,7 +970,7 @@ export default function ContestProblem() {
                                 <select
                                     value={language}
                                     onChange={e => setLanguage(e.target.value)}
-                                    className="border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                                    className="border border-hairline-strong rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)]"
                                 >
                                     {LANGS.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
                                 </select>
@@ -979,7 +979,7 @@ export default function ContestProblem() {
                                         onClick={testWithSamples}
                                         disabled={runningSamples || !code.trim() || problem?.source !== 'local'}
                                         title={problem?.source !== 'local' ? 'Test Samples is only available for local problems' : undefined}
-                                        className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors cursor-pointer"
+                                        className="bg-brand text-on-brand px-3 py-1.5 rounded text-sm font-medium hover:bg-brand-hover disabled:opacity-50 transition-colors cursor-pointer"
                                     >
                                         {runningSamples ? 'Testing...' : 'Test Samples'}
                                     </button>
@@ -1002,9 +1002,9 @@ export default function ContestProblem() {
                             {result && <SubmissionResult result={result} />}
 
                             {sampleResults.length > 0 && (
-                                <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800 shadow-sm">
-                                    <div className="bg-gray-50 dark:bg-gray-855 border-b border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center justify-between">
-                                        <span className="font-semibold text-sm text-gray-700 dark:text-gray-300">Sample Test Results</span>
+                                <div className="border border-hairline rounded-lg overflow-hidden bg-surface shadow-sm">
+                                    <div className="bg-surface-2 border-b border-hairline px-4 py-3 flex items-center justify-between">
+                                        <span className="font-semibold text-sm text-ink-soft">Sample Test Results</span>
                                         <span className={`text-xs font-medium px-2 py-0.5 rounded ${sampleResults.every(r => r.passed) ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' :
                                             sampleResults.some(r => r.passed) ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300' :
                                                 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
@@ -1012,14 +1012,14 @@ export default function ContestProblem() {
                                             {sampleResults.filter(r => r.passed).length}/{sampleResults.length} Passed
                                         </span>
                                     </div>
-                                    <div className="divide-y divide-gray-100 dark:divide-gray-700">
+                                    <div className="divide-y divide-hairline">
                                         {sampleResults.map((r) => (
                                             <div key={r.index} className="p-4">
                                                 <div className="flex items-center justify-between mb-2">
-                                                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Sample {r.index}</span>
+                                                    <span className="text-sm font-medium text-ink-soft">Sample {r.index}</span>
                                                     <div className="flex items-center gap-2">
                                                         {(r.time ?? 0) > 0 && (
-                                                            <span className="text-xs text-gray-500 dark:text-gray-400">{r.time}ms</span>
+                                                            <span className="text-xs text-muted">{r.time}ms</span>
                                                         )}
                                                         <span className={`text-xs font-medium px-2 py-0.5 rounded ${r.passed ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
                                                             }`}>
@@ -1027,17 +1027,17 @@ export default function ContestProblem() {
                                                         </span>
                                                     </div>
                                                 </div>
-                                                <div className="text-xs text-gray-500 dark:text-gray-400 mb-2 font-mono bg-gray-50 dark:bg-gray-800 rounded p-2 overflow-x-auto">
+                                                <div className="text-xs text-muted mb-2 font-mono bg-surface-2 rounded p-2 overflow-x-auto">
                                                     Input: {r.input.substring(0, 100)}{r.input.length > 100 ? '...' : ''}
                                                 </div>
                                                 {!r.passed && (
                                                     <div className="grid grid-cols-2 gap-2">
                                                         <div>
-                                                            <span className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Expected</span>
+                                                            <span className="block text-xs font-semibold text-muted mb-1">Expected</span>
                                                             <pre className="bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 font-mono text-xs p-2 rounded overflow-x-auto max-h-24 border border-green-100">{r.expected || '(empty)'}</pre>
                                                         </div>
                                                         <div>
-                                                            <span className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Actual</span>
+                                                            <span className="block text-xs font-semibold text-muted mb-1">Actual</span>
                                                             <pre className="bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 font-mono text-xs p-2 rounded overflow-x-auto max-h-24 border border-red-100">{r.actual || '(empty)'}</pre>
                                                         </div>
                                                     </div>
@@ -1054,32 +1054,32 @@ export default function ContestProblem() {
                                 </div>
                             )}
 
-                            <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800 shadow-sm">
-                                <div className="bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3 flex items-center justify-between">
-                                    <span className="font-semibold text-sm text-gray-700 dark:text-gray-300">Custom Stdin / Scratchpad</span>
+                            <div className="border border-hairline rounded-lg overflow-hidden bg-surface shadow-sm">
+                                <div className="bg-surface-2 border-b border-hairline px-4 py-3 flex items-center justify-between">
+                                    <span className="font-semibold text-sm text-ink-soft">Custom Stdin / Scratchpad</span>
                                     <button
                                         onClick={runCustomCode}
                                         disabled={runningCustom || !code.trim() || problem?.source !== 'local'}
                                         title={problem?.source !== 'local' ? 'Custom run is only available for local problems' : undefined}
-                                        className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-1.5 rounded disabled:opacity-50 transition-colors cursor-pointer"
+                                        className="bg-brand hover:bg-brand-hover text-on-brand text-xs font-semibold px-3 py-1.5 rounded disabled:opacity-50 transition-colors cursor-pointer"
                                     >
                                         {runningCustom ? 'Running...' : 'Run Code'}
                                     </button>
                                 </div>
                                 <div className="p-4 space-y-4">
                                     <div>
-                                        <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">Custom Input (Stdin)</label>
+                                        <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">Custom Input (Stdin)</label>
                                         <textarea
                                             value={customInput}
                                             onChange={(e) => setCustomInput(e.target.value)}
                                             rows={4}
                                             placeholder="Enter input values here..."
-                                            className="w-full font-mono text-xs border border-gray-300 dark:border-gray-600 rounded p-2.5 bg-gray-50 dark:bg-gray-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors"
+                                            className="w-full font-mono text-xs border border-hairline-strong rounded p-2.5 bg-surface-2 focus:bg-surface focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)] transition-colors"
                                         />
                                     </div>
 
                                     {customOutput && (
-                                        <div className="space-y-3 pt-2 border-t border-gray-100 dark:border-gray-700">
+                                        <div className="space-y-3 pt-2 border-t border-hairline">
                                             <div className="flex items-center justify-between text-xs">
                                                 <span className={`font-semibold uppercase tracking-wider ${customOutput.status === 'success' ? 'text-green-600 dark:text-green-400' :
                                                     customOutput.status === 'ce' ? 'text-purple-600 dark:text-purple-400' : 'text-red-600 dark:text-red-400'
@@ -1094,7 +1094,7 @@ export default function ContestProblem() {
                                                     }
                                                 </span>
                                                 {(customOutput.time_used ?? 0) > 0 && (
-                                                    <span className="text-gray-500 dark:text-gray-400 font-mono">
+                                                    <span className="text-muted font-mono">
                                                         {customOutput.time_used}ms / {Math.round((customOutput.memory_used ?? 0) / 1024)}MB
                                                     </span>
                                                 )}
@@ -1110,12 +1110,12 @@ export default function ContestProblem() {
                                             {customOutput.status !== 'ce' && (
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                                     <div>
-                                                        <span className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Standard Output (Stdout)</span>
-                                                        <pre className="bg-gray-900 text-gray-100 font-mono text-xs p-3 rounded overflow-x-auto max-h-40">{customOutput.stdout || <span className="text-gray-500 dark:text-gray-400 italic">No output</span>}</pre>
+                                                        <span className="block text-xs font-semibold text-muted mb-1">Standard Output (Stdout)</span>
+                                                        <pre className="bg-gray-900 text-gray-100 font-mono text-xs p-3 rounded overflow-x-auto max-h-40">{customOutput.stdout || <span className="text-muted italic">No output</span>}</pre>
                                                     </div>
                                                     <div>
-                                                        <span className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Standard Error (Stderr)</span>
-                                                        <pre className="bg-gray-950 text-red-400 font-mono text-xs p-3 rounded overflow-x-auto max-h-40">{customOutput.stderr || <span className="text-gray-600 dark:text-gray-400 italic">No stderr</span>}</pre>
+                                                        <span className="block text-xs font-semibold text-muted mb-1">Standard Error (Stderr)</span>
+                                                        <pre className="bg-gray-950 text-red-400 font-mono text-xs p-3 rounded overflow-x-auto max-h-40">{customOutput.stderr || <span className="text-muted italic">No stderr</span>}</pre>
                                                     </div>
                                                 </div>
                                             )}
@@ -1125,22 +1125,22 @@ export default function ContestProblem() {
                             </div>
                         </>
                     ) : !isLoggedIn ? (
-                        <div className="p-5 bg-gray-50 dark:bg-gray-900/20 border border-gray-200 dark:border-gray-700 rounded-lg text-center">
-                            <h3 className="font-semibold text-gray-800 dark:text-gray-300 mb-2">Login Required</h3>
-                            <p className="text-gray-600 dark:text-gray-400 text-sm mb-3">
+                        <div className="p-5 bg-surface-2/20 border border-hairline rounded-lg text-center">
+                            <h3 className="font-semibold text-ink mb-2">Login Required</h3>
+                            <p className="text-muted text-sm mb-3">
                                 Please login to submit a solution.
                             </p>
                             <Link
                                 to="/login"
-                                className="inline-block px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                                className="inline-block px-4 py-2 bg-brand text-on-brand text-sm font-medium rounded-lg hover:bg-brand-hover transition-colors"
                             >
                                 Login
                             </Link>
                         </div>
                     ) : !canSubmit ? (
-                        <div className="p-5 bg-gray-50 dark:bg-gray-900/20 border border-gray-200 dark:border-gray-700 rounded-lg text-center">
-                            <h3 className="font-semibold text-gray-800 dark:text-gray-300 mb-2">Submissions Closed</h3>
-                            <p className="text-gray-600 dark:text-gray-400 text-sm">
+                        <div className="p-5 bg-surface-2/20 border border-hairline rounded-lg text-center">
+                            <h3 className="font-semibold text-ink mb-2">Submissions Closed</h3>
+                            <p className="text-muted text-sm">
                                 {upsolvingDisabled
                                     ? 'Upsolving is disabled for this contest.'
                                     : 'Submissions are not allowed for this problem.'}
@@ -1149,25 +1149,25 @@ export default function ContestProblem() {
                     ) : null}
 
                     {/* Quick links */}
-                    <div className="p-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
-                        <h4 className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-2">Quick Links</h4>
+                    <div className="p-4 bg-surface border border-hairline rounded-lg">
+                        <h4 className="text-xs font-semibold text-muted uppercase tracking-wide mb-2">Quick Links</h4>
                         <div className="space-y-1.5">
                             <Link
                                 to={`/contests/${contestId}`}
-                                className="block text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                                className="block text-sm text-brand hover:underline"
                             >
                                 ← Contest Dashboard
                             </Link>
                             <Link
                                 to={`/contests/${contestId}/scoreboard`}
-                                className="block text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                                className="block text-sm text-brand hover:underline"
                             >
                                 <BarChart3 className="w-3.5 h-3.5" /> Scoreboard
                             </Link>
                             {isLoggedIn && (
                                 <Link
                                     to={`/submissions?problem_id=${problem.id}&contest_id=${contestId}`}
-                                    className="block text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                                    className="block text-sm text-brand hover:underline"
                                 >
                                     <FileText className="w-3.5 h-3.5" /> All Submissions for this Problem
                                 </Link>

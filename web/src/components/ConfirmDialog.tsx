@@ -97,7 +97,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
                             aria-modal="true"
                             aria-labelledby="confirm-dialog-title"
                             aria-describedby="confirm-dialog-message"
-                            className="relative w-full max-w-md bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6"
+                            className="relative w-full max-w-md bg-surface rounded-lg shadow-xl p-6"
                         >
                             <div className="flex gap-3">
                                 {variant === 'danger' && (
@@ -106,10 +106,10 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
                                     </div>
                                 )}
                                 <div className="min-w-0">
-                                    <h3 id="confirm-dialog-title" className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                                    <h3 id="confirm-dialog-title" className="text-lg font-semibold text-ink">
                                         {title}
                                     </h3>
-                                    <p id="confirm-dialog-message" className="mt-2 text-sm text-gray-600 dark:text-gray-400 break-words">
+                                    <p id="confirm-dialog-message" className="mt-2 text-sm text-muted break-words">
                                         {message}
                                     </p>
                                 </div>
@@ -118,7 +118,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
                                 <button
                                     type="button"
                                     onClick={() => settle(false)}
-                                    className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                                    className="px-4 py-2 text-sm font-medium text-ink-soft border border-hairline-strong rounded hover:bg-surface-2 transition-colors"
                                 >
                                     {cancelLabel}
                                 </button>
@@ -129,7 +129,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
                                     className={`px-4 py-2 text-sm font-medium text-white rounded transition-colors ${
                                         variant === 'danger'
                                             ? 'bg-red-600 hover:bg-red-700'
-                                            : 'bg-blue-600 hover:bg-blue-700'
+                                            : 'bg-brand hover:bg-brand-hover'
                                     }`}
                                 >
                                     {confirmLabel}

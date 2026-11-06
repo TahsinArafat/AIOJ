@@ -42,7 +42,7 @@ export default function TwoFactorSetup() {
     return (
         <div className="max-w-md mx-auto p-6 space-y-4">
             <h1 className="text-xl font-semibold">{t('auth.twoFactorSetupTitle')}</h1>
-            <p className="text-sm text-gray-600 dark:text-gray-400">{t('auth.twoFactorScanQR')}</p>
+            <p className="text-sm text-muted">{t('auth.twoFactorScanQR')}</p>
             {error && (
                 <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-2 rounded text-sm">
                     {error}
@@ -63,7 +63,7 @@ export default function TwoFactorSetup() {
                     </p>
                     <Link
                         to="/profile"
-                        className="inline-block px-3 py-1.5 rounded bg-blue-600 text-white text-sm hover:bg-blue-700"
+                        className="inline-block px-3 py-1.5 rounded bg-brand text-on-brand text-sm hover:bg-brand-hover"
                     >
                         Done
                     </Link>
@@ -73,14 +73,14 @@ export default function TwoFactorSetup() {
                     type="button"
                     onClick={begin}
                     disabled={busy}
-                    className="px-3 py-2 rounded bg-blue-600 text-white text-sm hover:bg-blue-700 disabled:opacity-50"
+                    className="px-3 py-2 rounded bg-brand text-on-brand text-sm hover:bg-brand-hover disabled:opacity-50"
                 >
                     {busy ? '…' : 'Begin 2FA setup'}
                 </button>
             ) : (
                 <div className="space-y-3">
                     <p className="text-sm">Scan this URI in your authenticator app:</p>
-                    <pre className="p-2 bg-gray-100 dark:bg-gray-800 rounded text-xs break-all border border-gray-200 dark:border-gray-700">
+                    <pre className="p-2 bg-surface-3 rounded text-xs break-all border border-hairline">
                         {uri}
                     </pre>
                     <p className="text-sm">
@@ -92,13 +92,13 @@ export default function TwoFactorSetup() {
                         placeholder="6-digit code"
                         inputMode="numeric"
                         autoComplete="one-time-code"
-                        className="border border-gray-300 dark:border-gray-600 rounded px-2 py-1 w-full text-sm dark:bg-gray-900"
+                        className="border border-hairline-strong rounded px-2 py-1 w-full text-sm dark:bg-gray-900"
                     />
                     <button
                         type="button"
                         onClick={enable}
                         disabled={busy || code.length < 6}
-                        className="px-3 py-2 rounded bg-blue-600 text-white text-sm hover:bg-blue-700 disabled:opacity-50"
+                        className="px-3 py-2 rounded bg-brand text-on-brand text-sm hover:bg-brand-hover disabled:opacity-50"
                     >
                         {busy ? '…' : 'Enable 2FA'}
                     </button>

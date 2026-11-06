@@ -27,7 +27,7 @@ export default function VerifyEmail() {
 
     if (state === 'loading') {
         return (
-            <div className="max-w-sm mx-auto mt-20 text-center text-gray-600 dark:text-gray-300">
+            <div className="max-w-sm mx-auto mt-20 text-center text-muted">
                 Verifying your email…
             </div>
         )
@@ -36,10 +36,10 @@ export default function VerifyEmail() {
         return (
             <div className="max-w-sm mx-auto mt-20 text-center">
                 <h1 className="text-2xl font-bold mb-4">Email Verified</h1>
-                <p className="text-gray-600 dark:text-gray-400 mb-6">
+                <p className="text-muted mb-6">
                     Your email is verified. You can now submit solutions.
                 </p>
-                <Link to="/login" className="inline-block bg-blue-600 text-white px-5 py-2 rounded-md text-sm font-medium hover:bg-blue-700">
+                <Link to="/login" className="inline-block bg-brand text-on-brand px-5 py-2 rounded-md text-sm font-medium hover:bg-brand-hover">
                     Continue to Login
                 </Link>
             </div>
@@ -48,8 +48,8 @@ export default function VerifyEmail() {
     return (
         <div className="max-w-sm mx-auto mt-20 text-center">
             <h1 className="text-2xl font-bold mb-4">Verification Failed</h1>
-            <p className="text-gray-600 dark:text-gray-400 mb-6">{msg}</p>
-            <Link to="/login" className="text-blue-600 dark:text-blue-400 hover:underline">Back to Login</Link>
+            <p className="text-muted mb-6">{msg}</p>
+            <Link to="/login" className="text-brand hover:underline">Back to Login</Link>
         </div>
     )
 }

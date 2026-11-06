@@ -30,14 +30,14 @@ export default function SetterAppsPanel() {
         }
     }
 
-    if (loading) return <div className="text-center py-8 text-gray-400 dark:text-gray-500">Loading...</div>
+    if (loading) return <div className="text-center py-8 text-muted-soft">Loading...</div>
 
     return (
         <div>
             <h2 className="text-lg font-semibold mb-4">Setter Applications</h2>
-            <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+            <div className="border border-hairline rounded-lg overflow-hidden">
                 <table className="w-full text-sm">
-                    <thead className="bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-xs uppercase">
+                    <thead className="bg-surface-2 text-muted text-xs uppercase">
                         <tr>
                             <th className="px-4 py-3 text-left">Applicant</th>
                             <th className="px-4 py-3 text-left">Reason</th>
@@ -46,7 +46,7 @@ export default function SetterAppsPanel() {
                             <th className="px-4 py-3 text-right">Actions</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                    <tbody className="divide-y divide-hairline">
                         {apps.map(a => (
                             <tr key={a.user_id}>
                                 <td className="px-4 py-3 font-semibold">{a.username}</td>
@@ -59,7 +59,7 @@ export default function SetterAppsPanel() {
                                         {a.status}
                                     </span>
                                 </td>
-                                <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{new Date(a.created_at).toLocaleString()}</td>
+                                <td className="px-4 py-3 text-muted">{new Date(a.created_at).toLocaleString()}</td>
                                 <td className="px-4 py-3 text-right">
                                     {a.status === 'pending' && (
                                         <div className="flex justify-end gap-2">
@@ -72,7 +72,7 @@ export default function SetterAppsPanel() {
                         ))}
                         {apps.length === 0 && (
                             <tr>
-                                <td colSpan={5} className="px-4 py-8 text-center text-gray-400 dark:text-gray-500">
+                                <td colSpan={5} className="px-4 py-8 text-center text-muted-soft">
                                     No pending applications.
                                 </td>
                             </tr>

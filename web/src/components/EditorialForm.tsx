@@ -49,62 +49,62 @@ export default function EditorialForm({ problemId, isUserAdmin, onSuccess, onCan
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 text-sm text-gray-900 dark:text-gray-100">
+    <form onSubmit={handleSubmit} className="space-y-4 text-sm text-ink">
       {error && <div className="p-3 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 rounded border border-red-200 dark:border-red-800">{error}</div>}
       
       <div>
-        <label className="block font-medium text-gray-700 dark:text-gray-300 mb-1">Title *</label>
+        <label className="block font-medium text-ink-soft mb-1">Title *</label>
         <input
           type="text"
           value={title}
           onChange={e => setTitle(e.target.value)}
           required
-          className="w-full border rounded px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-700"
+          className="w-full border rounded px-3 py-2 bg-surface dark:border-gray-700"
           placeholder="e.g. Optimal Greedy Approach"
         />
       </div>
 
       <div>
-        <label className="block font-medium text-gray-700 dark:text-gray-300 mb-1">Approach Description</label>
+        <label className="block font-medium text-ink-soft mb-1">Approach Description</label>
         <textarea
           value={approach}
           onChange={e => setApproach(e.target.value)}
           rows={3}
-          className="w-full border rounded px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-700"
+          className="w-full border rounded px-3 py-2 bg-surface dark:border-gray-700"
           placeholder="Briefly summarize the logic/approach..."
         />
       </div>
 
       <div>
-        <label className="block font-medium text-gray-700 dark:text-gray-300 mb-1">Editorial Content (Markdown Supported) *</label>
+        <label className="block font-medium text-ink-soft mb-1">Editorial Content (Markdown Supported) *</label>
         <textarea
           value={content}
           onChange={e => setContent(e.target.value)}
           rows={6}
           required
-          className="w-full border rounded px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-700 font-mono"
+          className="w-full border rounded px-3 py-2 bg-surface dark:border-gray-700 font-mono"
           placeholder="Detailed explanation, proofs, cases..."
         />
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block font-medium text-gray-700 dark:text-gray-300 mb-1">Time Complexity</label>
+          <label className="block font-medium text-ink-soft mb-1">Time Complexity</label>
           <input
             type="text"
             value={timeComplexity}
             onChange={e => setTimeComplexity(e.target.value)}
-            className="w-full border rounded px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-700"
+            className="w-full border rounded px-3 py-2 bg-surface dark:border-gray-700"
             placeholder="e.g. O(N log N)"
           />
         </div>
         <div>
-          <label className="block font-medium text-gray-700 dark:text-gray-300 mb-1">Space Complexity</label>
+          <label className="block font-medium text-ink-soft mb-1">Space Complexity</label>
           <input
             type="text"
             value={spaceComplexity}
             onChange={e => setSpaceComplexity(e.target.value)}
-            className="w-full border rounded px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-700"
+            className="w-full border rounded px-3 py-2 bg-surface dark:border-gray-700"
             placeholder="e.g. O(N)"
           />
         </div>
@@ -112,11 +112,11 @@ export default function EditorialForm({ problemId, isUserAdmin, onSuccess, onCan
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block font-medium text-gray-700 dark:text-gray-300 mb-1">Solution Language</label>
+          <label className="block font-medium text-ink-soft mb-1">Solution Language</label>
           <select
             value={solutionLanguage}
             onChange={e => setSolutionLanguage(e.target.value)}
-            className="w-full border rounded px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-700"
+            className="w-full border rounded px-3 py-2 bg-surface dark:border-gray-700"
           >
             <option value="cpp">C++</option>
             <option value="python">Python</option>
@@ -129,12 +129,12 @@ export default function EditorialForm({ problemId, isUserAdmin, onSuccess, onCan
       </div>
 
       <div>
-        <label className="block font-medium text-gray-700 dark:text-gray-300 mb-1">Solution Code</label>
+        <label className="block font-medium text-ink-soft mb-1">Solution Code</label>
         <textarea
           value={solutionCode}
           onChange={e => setSolutionCode(e.target.value)}
           rows={6}
-          className="w-full border rounded px-3 py-2 bg-white dark:bg-gray-800 dark:border-gray-700 font-mono"
+          className="w-full border rounded px-3 py-2 bg-surface dark:border-gray-700 font-mono"
           placeholder="Paste clean solution code here..."
         />
       </div>
@@ -146,9 +146,9 @@ export default function EditorialForm({ problemId, isUserAdmin, onSuccess, onCan
             id="isOfficial"
             checked={isOfficial}
             onChange={e => setIsOfficial(e.target.checked)}
-            className="rounded border-gray-300 dark:border-gray-700"
+            className="rounded border-hairline-strong"
           />
-          <label htmlFor="isOfficial" className="font-medium text-gray-700 dark:text-gray-300">Mark as Official Editorial</label>
+          <label htmlFor="isOfficial" className="font-medium text-ink-soft">Mark as Official Editorial</label>
         </div>
       )}
 
@@ -158,7 +158,7 @@ export default function EditorialForm({ problemId, isUserAdmin, onSuccess, onCan
             type="button"
             onClick={onCancel}
             disabled={submitting}
-            className="border px-4 py-2 rounded text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+            className="border px-4 py-2 rounded text-ink-soft hover:bg-surface-2"
           >
             Cancel
           </button>
@@ -166,7 +166,7 @@ export default function EditorialForm({ problemId, isUserAdmin, onSuccess, onCan
         <button
           type="submit"
           disabled={submitting}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded font-medium disabled:opacity-50"
+          className="bg-brand hover:bg-brand-hover text-on-brand px-4 py-2 rounded font-medium disabled:opacity-50"
         >
           {submitting ? 'Submitting...' : 'Save Editorial'}
         </button>

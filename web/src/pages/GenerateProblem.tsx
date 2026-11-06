@@ -53,8 +53,8 @@ function TagInput({
                         disabled={tags.includes(s)}
                         className={`px-2 py-0.5 rounded-full text-xs border transition-colors cursor-pointer
                             ${tags.includes(s)
-                                ? 'bg-blue-100 dark:bg-blue-900 border-blue-400 text-blue-700 dark:text-blue-300 opacity-60 cursor-default'
-                                : 'border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                                ? 'bg-blue-100 dark:bg-blue-900 border-blue-400 text-brand opacity-60 cursor-default'
+                                : 'border-hairline-strong text-muted hover:bg-surface-2'}`}
                     >
                         {s}
                     </button>
@@ -74,12 +74,12 @@ function TagInput({
                         }
                     }}
                     placeholder="Type a custom tag and press Enter…"
-                    className="flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="flex-1 border border-hairline-strong rounded-lg px-3 py-2 text-sm bg-surface text-ink focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)]"
                 />
                 <button
                     type="button"
                     onClick={() => add(input)}
-                    className="px-3 py-2 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors cursor-pointer"
+                    className="px-3 py-2 bg-surface-3 border border-hairline-strong rounded-lg text-sm hover:bg-surface-3 transition-colors cursor-pointer"
                 >
                     Add
                 </button>
@@ -91,7 +91,7 @@ function TagInput({
                     {tags.map(t => (
                         <span
                             key={t}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-600 text-white rounded-full text-xs"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 bg-brand text-on-brand rounded-full text-xs"
                         >
                             {t}
                             <button
@@ -121,10 +121,10 @@ function RatingSlider({
     const bands = [800, 900, 1000, 1100, 1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900, 2000, 2100, 2200, 2300, 2400, 2500, 2600, 2700, 2800, 2900, 3000, 3200, 3500]
 
     function color(r: number) {
-        if (r < 1200) return 'text-gray-500'
+        if (r < 1200) return 'text-muted'
         if (r < 1400) return 'text-green-600 dark:text-green-400'
         if (r < 1600) return 'text-teal-600 dark:text-teal-400'
-        if (r < 1900) return 'text-blue-600 dark:text-blue-400'
+        if (r < 1900) return 'text-brand'
         if (r < 2100) return 'text-violet-600 dark:text-violet-400'
         if (r < 2300) return 'text-orange-500'
         if (r < 2400) return 'text-orange-600'
@@ -156,11 +156,11 @@ function RatingSlider({
                 className="w-full accent-blue-600"
             />
             <div className="flex justify-between items-center text-sm">
-                <span className="text-gray-500 dark:text-gray-400">800</span>
+                <span className="text-muted">800</span>
                 <span className={`font-bold text-lg ${color(value)}`}>
                     {value} — {label(value)}
                 </span>
-                <span className="text-gray-500 dark:text-gray-400">3500</span>
+                <span className="text-muted">3500</span>
             </div>
             {/* Quick-pick buttons */}
             <div className="flex flex-wrap gap-1 pt-1">
@@ -171,8 +171,8 @@ function RatingSlider({
                         onClick={() => onChange(b)}
                         className={`px-2 py-0.5 rounded text-xs border cursor-pointer transition-colors
                             ${value === b
-                                ? 'bg-blue-600 text-white border-blue-600'
-                                : 'border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
+                                ? 'bg-brand text-on-brand border-brand'
+                                : 'border-hairline-strong text-muted hover:bg-surface-2'}`}
                     >
                         {b}
                     </button>
@@ -217,7 +217,7 @@ export default function GenerateProblem() {
 
     if (!allowed) {
         return (
-            <div className="max-w-md mx-auto mt-20 text-center text-gray-500 dark:text-gray-400">
+            <div className="max-w-md mx-auto mt-20 text-center text-muted">
                 <p className="text-lg font-semibold mb-2">Access Restricted</p>
                 <p className="text-sm">Only admins and setters can generate problems.</p>
             </div>
@@ -266,10 +266,10 @@ export default function GenerateProblem() {
     return (
         <div className="max-w-3xl mx-auto py-8 px-4">
             <div className="mb-8">
-                <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-1">
+                <h1 className="text-3xl font-bold text-ink mb-1">
                     AI Problem Generator
                 </h1>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
+                <p className="text-sm text-muted">
                     Generates a complete Codeforces-style problem — statement, solution, editorial — and saves it as a <span className="font-medium text-yellow-600 dark:text-yellow-400">draft</span> for your review.
                 </p>
             </div>
@@ -281,26 +281,26 @@ export default function GenerateProblem() {
                         <span className="text-green-600 dark:text-green-400 text-xl">✓</span>
                         <p className="font-semibold text-green-700 dark:text-green-300">Problem generated successfully!</p>
                     </div>
-                    <p className="text-sm text-gray-600 dark:text-gray-300">
+                    <p className="text-sm text-muted">
                         Saved as a draft. Review it in the setter workspace and publish when ready.
                     </p>
                     <div className="flex flex-wrap gap-3">
                         <button
                             type="button"
                             onClick={() => navigate(`/setter/${result.problem_slug}`)}
-                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors cursor-pointer"
+                            className="px-4 py-2 bg-brand hover:bg-brand-hover text-on-brand rounded-lg text-sm font-medium transition-colors cursor-pointer"
                         >
                             Open in Setter Workspace →
                         </button>
                         <button
                             type="button"
                             onClick={() => { setResult(null); setTags([]); setAdditionalPrompt('') }}
-                            className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+                            className="px-4 py-2 border border-hairline-strong rounded-lg text-sm hover:bg-surface-2 transition-colors cursor-pointer"
                         >
                             Generate Another
                         </button>
                     </div>
-                    <p className="text-xs text-gray-400 dark:text-gray-500 font-mono">
+                    <p className="text-xs text-muted-soft font-mono">
                         problem_id: {result.problem_id} · slug: {result.problem_slug}
                     </p>
                 </div>
@@ -317,70 +317,70 @@ export default function GenerateProblem() {
             <form onSubmit={handleSubmit} className="space-y-7">
 
                 {/* Tags */}
-                <fieldset className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-5 shadow-sm">
-                    <legend className="px-2 text-sm font-semibold text-gray-700 dark:text-gray-300">
+                <fieldset className="bg-surface border border-hairline rounded-xl p-5 shadow-sm">
+                    <legend className="px-2 text-sm font-semibold text-ink-soft">
                         Algorithmic Topics <span className="text-red-500">*</span>
                     </legend>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                    <p className="text-xs text-muted mb-3">
                         Click chips or type custom tags. The model will weave these topics into the problem.
                     </p>
                     <TagInput tags={tags} onChange={setTags} />
                 </fieldset>
 
                 {/* Rating */}
-                <fieldset className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-5 shadow-sm">
-                    <legend className="px-2 text-sm font-semibold text-gray-700 dark:text-gray-300">
+                <fieldset className="bg-surface border border-hairline rounded-xl p-5 shadow-sm">
+                    <legend className="px-2 text-sm font-semibold text-ink-soft">
                         Difficulty Rating <span className="text-red-500">*</span>
                     </legend>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                    <p className="text-xs text-muted mb-3">
                         Codeforces-style rating. This calibrates the algorithmic depth and expected solution complexity.
                     </p>
                     <RatingSlider value={rating} onChange={setRating} />
                 </fieldset>
 
-                <fieldset className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-5 shadow-sm space-y-4">
-                    <legend className="px-2 text-sm font-semibold text-gray-700 dark:text-gray-300">Authoring Profile</legend>
+                <fieldset className="bg-surface border border-hairline rounded-xl p-5 shadow-sm space-y-4">
+                    <legend className="px-2 text-sm font-semibold text-ink-soft">Authoring Profile</legend>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <label className="text-sm text-gray-600 dark:text-gray-300">Format profile
-                            <select value={formatProfile} onChange={e => setFormatProfile(e.target.value as typeof formatProfile)} className="mt-1 w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800">
+                        <label className="text-sm text-muted">Format profile
+                            <select value={formatProfile} onChange={e => setFormatProfile(e.target.value as typeof formatProfile)} className="mt-1 w-full border rounded-lg px-3 py-2 bg-surface">
                                 <option value="general">General practice</option><option value="codeforces">Codeforces round</option><option value="icpc">ICPC onsite</option><option value="oi">OI / IOI style</option>
                             </select>
                         </label>
-                        <label className="text-sm text-gray-600 dark:text-gray-300">Event context
-                            <select value={eventContext} onChange={e => setEventContext(e.target.value as typeof eventContext)} className="mt-1 w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800">
+                        <label className="text-sm text-muted">Event context
+                            <select value={eventContext} onChange={e => setEventContext(e.target.value as typeof eventContext)} className="mt-1 w-full border rounded-lg px-3 py-2 bg-surface">
                                 <option value="practice">Practice</option><option value="online">Online contest</option><option value="onsite">Onsite contest</option>
                             </select>
                         </label>
-                        <label className="text-sm text-gray-600 dark:text-gray-300">Solver mode
-                            <select value={solverMode} onChange={e => setSolverMode(e.target.value as typeof solverMode)} className="mt-1 w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800">
+                        <label className="text-sm text-muted">Solver mode
+                            <select value={solverMode} onChange={e => setSolverMode(e.target.value as typeof solverMode)} className="mt-1 w-full border rounded-lg px-3 py-2 bg-surface">
                                 <option value="solo">Solo</option><option value="team">Team</option>
                             </select>
                         </label>
-                        {solverMode === 'team' && <label className="text-sm text-gray-600 dark:text-gray-300">Team size<input type="number" min={1} max={8} value={teamSize} onChange={e => setTeamSize(Number(e.target.value))} className="mt-1 w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800" /></label>}
-                        <label className="text-sm text-gray-600 dark:text-gray-300">Expected solve minutes<input type="number" min={1} max={360} value={expectedSolveMinutes} onChange={e => setExpectedSolveMinutes(Number(e.target.value))} className="mt-1 w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800" /></label>
-                        <label className="text-sm text-gray-600 dark:text-gray-300">Audience level<select value={audienceLevel} onChange={e => setAudienceLevel(e.target.value)} className="mt-1 w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800"><option>beginner</option><option>intermediate</option><option>advanced</option></select></label>
+                        {solverMode === 'team' && <label className="text-sm text-muted">Team size<input type="number" min={1} max={8} value={teamSize} onChange={e => setTeamSize(Number(e.target.value))} className="mt-1 w-full border rounded-lg px-3 py-2 bg-surface" /></label>}
+                        <label className="text-sm text-muted">Expected solve minutes<input type="number" min={1} max={360} value={expectedSolveMinutes} onChange={e => setExpectedSolveMinutes(Number(e.target.value))} className="mt-1 w-full border rounded-lg px-3 py-2 bg-surface" /></label>
+                        <label className="text-sm text-muted">Audience level<select value={audienceLevel} onChange={e => setAudienceLevel(e.target.value)} className="mt-1 w-full border rounded-lg px-3 py-2 bg-surface"><option>beginner</option><option>intermediate</option><option>advanced</option></select></label>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <label className="text-sm text-gray-600 dark:text-gray-300">Minimum acceptable rating<input type="number" min={800} max={3500} step={100} value={ratingMin} onChange={e => setRatingMin(Number(e.target.value))} className="mt-1 w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800" /></label>
-                        <label className="text-sm text-gray-600 dark:text-gray-300">Maximum acceptable rating<input type="number" min={800} max={3500} step={100} value={ratingMax} onChange={e => setRatingMax(Number(e.target.value))} className="mt-1 w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800" /></label>
+                        <label className="text-sm text-muted">Minimum acceptable rating<input type="number" min={800} max={3500} step={100} value={ratingMin} onChange={e => setRatingMin(Number(e.target.value))} className="mt-1 w-full border rounded-lg px-3 py-2 bg-surface" /></label>
+                        <label className="text-sm text-muted">Maximum acceptable rating<input type="number" min={800} max={3500} step={100} value={ratingMax} onChange={e => setRatingMax(Number(e.target.value))} className="mt-1 w-full border rounded-lg px-3 py-2 bg-surface" /></label>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <label className="text-sm text-gray-600 dark:text-gray-300">Insight / implementation emphasis<select value={insightEmphasis} onChange={e => setInsightEmphasis(e.target.value as typeof insightEmphasis)} className="mt-1 w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800"><option value="balanced">Balanced</option><option value="insight">Insight-heavy</option><option value="implementation">Implementation-heavy</option></select></label>
-                        <label className="text-sm text-gray-600 dark:text-gray-300">Story tone<input value={storyTone} onChange={e => setStoryTone(e.target.value)} className="mt-1 w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800" /></label>
+                        <label className="text-sm text-muted">Insight / implementation emphasis<select value={insightEmphasis} onChange={e => setInsightEmphasis(e.target.value as typeof insightEmphasis)} className="mt-1 w-full border rounded-lg px-3 py-2 bg-surface"><option value="balanced">Balanced</option><option value="insight">Insight-heavy</option><option value="implementation">Implementation-heavy</option></select></label>
+                        <label className="text-sm text-muted">Story tone<input value={storyTone} onChange={e => setStoryTone(e.target.value)} className="mt-1 w-full border rounded-lg px-3 py-2 bg-surface" /></label>
                     </div>
-                    <label className="block text-sm text-gray-600 dark:text-gray-300">Constraint guidance<textarea value={constraintGuidance} onChange={e => setConstraintGuidance(e.target.value)} rows={2} placeholder="e.g. N up to 2e5; avoid constraints that make brute force pass" className="mt-1 w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800" /></label>
+                    <label className="block text-sm text-muted">Constraint guidance<textarea value={constraintGuidance} onChange={e => setConstraintGuidance(e.target.value)} rows={2} placeholder="e.g. N up to 2e5; avoid constraints that make brute force pass" className="mt-1 w-full border rounded-lg px-3 py-2 bg-surface" /></label>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <label className="text-sm text-gray-600 dark:text-gray-300">Secondary topics<input value={secondaryTopics.join(', ')} onChange={e => setSecondaryTopics(e.target.value.split(',').map(v => v.trim()).filter(Boolean))} placeholder="e.g. arrays, math" className="mt-1 w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800" /></label>
-                        <label className="text-sm text-gray-600 dark:text-gray-300">Required techniques<input value={requiredTechniques.join(', ')} onChange={e => setRequiredTechniques(e.target.value.split(',').map(v => v.trim()).filter(Boolean))} placeholder="e.g. binary search" className="mt-1 w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800" /></label>
-                        <label className="text-sm text-gray-600 dark:text-gray-300">Forbidden techniques<input value={forbiddenTechniques.join(', ')} onChange={e => setForbiddenTechniques(e.target.value.split(',').map(v => v.trim()).filter(Boolean))} placeholder="e.g. brute force" className="mt-1 w-full border rounded-lg px-3 py-2 bg-white dark:bg-gray-800" /></label>
+                        <label className="text-sm text-muted">Secondary topics<input value={secondaryTopics.join(', ')} onChange={e => setSecondaryTopics(e.target.value.split(',').map(v => v.trim()).filter(Boolean))} placeholder="e.g. arrays, math" className="mt-1 w-full border rounded-lg px-3 py-2 bg-surface" /></label>
+                        <label className="text-sm text-muted">Required techniques<input value={requiredTechniques.join(', ')} onChange={e => setRequiredTechniques(e.target.value.split(',').map(v => v.trim()).filter(Boolean))} placeholder="e.g. binary search" className="mt-1 w-full border rounded-lg px-3 py-2 bg-surface" /></label>
+                        <label className="text-sm text-muted">Forbidden techniques<input value={forbiddenTechniques.join(', ')} onChange={e => setForbiddenTechniques(e.target.value.split(',').map(v => v.trim()).filter(Boolean))} placeholder="e.g. brute force" className="mt-1 w-full border rounded-lg px-3 py-2 bg-surface" /></label>
                     </div>
-                    <p className="text-xs text-gray-500">Target {rating} with acceptable range {ratingMin}–{ratingMax}; {solverMode === 'team' ? `team of ${teamSize}` : 'solo'} / {eventContext} / {formatProfile}.</p>
+                    <p className="text-xs text-muted">Target {rating} with acceptable range {ratingMin}–{ratingMax}; {solverMode === 'team' ? `team of ${teamSize}` : 'solo'} / {eventContext} / {formatProfile}.</p>
                 </fieldset>
 
                 {/* Problem type + test case count */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                    <fieldset className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-5 shadow-sm">
-                        <legend className="px-2 text-sm font-semibold text-gray-700 dark:text-gray-300">Problem Type</legend>
+                    <fieldset className="bg-surface border border-hairline rounded-xl p-5 shadow-sm">
+                        <legend className="px-2 text-sm font-semibold text-ink-soft">Problem Type</legend>
                         <div className="mt-2 space-y-2">
                             {PROBLEM_TYPES.map(pt => (
                                 <label key={pt} className="flex items-center gap-3 cursor-pointer">
@@ -392,7 +392,7 @@ export default function GenerateProblem() {
                                         onChange={() => setProblemType(pt)}
                                         className="accent-blue-600"
                                     />
-                                    <span className="text-sm capitalize text-gray-700 dark:text-gray-300">
+                                    <span className="text-sm capitalize text-ink-soft">
                                         {pt.replace('_', ' ')}
                                     </span>
                                 </label>
@@ -400,9 +400,9 @@ export default function GenerateProblem() {
                         </div>
                     </fieldset>
 
-                    <fieldset className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-5 shadow-sm">
-                        <legend className="px-2 text-sm font-semibold text-gray-700 dark:text-gray-300">Test Case Count</legend>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 mb-3">
+                    <fieldset className="bg-surface border border-hairline rounded-xl p-5 shadow-sm">
+                        <legend className="px-2 text-sm font-semibold text-ink-soft">Test Case Count</legend>
+                        <p className="text-xs text-muted mt-1 mb-3">
                             Number of example/hidden test cases to describe in the statement (1–100).
                         </p>
                         <input
@@ -411,7 +411,7 @@ export default function GenerateProblem() {
                             max={100}
                             value={testCaseCount}
                             onChange={e => setTestCaseCount(Math.min(100, Math.max(1, Number(e.target.value))))}
-                            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full border border-hairline-strong rounded-lg px-3 py-2 text-sm bg-surface text-ink focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)]"
                         />
                         <label className="flex items-center gap-3 mt-4 cursor-pointer">
                             <input
@@ -420,17 +420,17 @@ export default function GenerateProblem() {
                                 onChange={e => setHasSubtasks(e.target.checked)}
                                 className="accent-blue-600 w-4 h-4"
                             />
-                            <span className="text-sm text-gray-700 dark:text-gray-300">Use subtask scoring (2–4 subtasks)</span>
+                            <span className="text-sm text-ink-soft">Use subtask scoring (2–4 subtasks)</span>
                         </label>
                     </fieldset>
                 </div>
 
                 {/* Additional prompt */}
-                <fieldset className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-5 shadow-sm">
-                    <legend className="px-2 text-sm font-semibold text-gray-700 dark:text-gray-300">
-                        Additional Guidance <span className="text-gray-400 font-normal">(optional)</span>
+                <fieldset className="bg-surface border border-hairline rounded-xl p-5 shadow-sm">
+                    <legend className="px-2 text-sm font-semibold text-ink-soft">
+                        Additional Guidance <span className="text-muted-soft font-normal">(optional)</span>
                     </legend>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                    <p className="text-xs text-muted mb-3">
                         Free-form hint to steer the model. e.g. "grid DP on N×M array", "the key insight involves modular inverses", "avoid trivial brute-force solutions".
                     </p>
                     <textarea
@@ -438,7 +438,7 @@ export default function GenerateProblem() {
                         onChange={e => setAdditionalPrompt(e.target.value)}
                         rows={3}
                         placeholder="Describe any specific scenario, constraint, or insight you want the model to incorporate…"
-                        className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                        className="w-full border border-hairline-strong rounded-lg px-3 py-2 text-sm bg-surface text-ink focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)] resize-none"
                     />
                 </fieldset>
 
@@ -447,7 +447,7 @@ export default function GenerateProblem() {
                     <button
                         type="submit"
                         disabled={generating || tags.length === 0}
-                        className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-semibold text-sm transition-colors cursor-pointer flex items-center gap-2"
+                        className="px-6 py-3 bg-brand hover:bg-brand-hover disabled:opacity-50 disabled:cursor-not-allowed text-on-brand rounded-xl font-semibold text-sm transition-colors cursor-pointer flex items-center gap-2"
                     >
                         {generating ? (
                             <>
@@ -462,14 +462,14 @@ export default function GenerateProblem() {
                         )}
                     </button>
                     {generating && (
-                        <p className="text-sm text-gray-500 dark:text-gray-400 italic">
+                        <p className="text-sm text-muted italic">
                             The AI is writing the problem, solution, and editorial. This takes ~15–60 s.
                         </p>
                     )}
                 </div>
 
                 {/* Info panel */}
-                <div className="text-xs text-gray-400 dark:text-gray-500 border-t border-gray-200 dark:border-gray-700 pt-4 space-y-1">
+                <div className="text-xs text-muted-soft border-t border-hairline pt-4 space-y-1">
                     <p>• Generated problems are saved as <strong>drafts</strong> (not visible to contestants) until you publish them.</p>
                     <p>• A reference solution and editorial are generated alongside the problem statement.</p>
                     <p>• You can edit every field in the Setter Workspace after generation.</p>

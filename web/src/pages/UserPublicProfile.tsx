@@ -80,8 +80,8 @@ function StatusBadge({ status }: { status: string }) {
     tle:                 { label: 'TLE', cls: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400' },
     runtime_error:       { label: 'RE',  cls: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700' },
     re:                  { label: 'RE',  cls: 'bg-orange-100 dark:bg-orange-900/30 text-orange-700' },
-    compilation_error:   { label: 'CE',  cls: 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300' },
-    ce:                  { label: 'CE',  cls: 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300' },
+    compilation_error:   { label: 'CE',  cls: 'bg-surface-3 text-muted' },
+    ce:                  { label: 'CE',  cls: 'bg-surface-3 text-muted' },
     memory_limit_exceeded: { label: 'MLE', cls: 'bg-purple-100 dark:bg-purple-900/30 text-purple-700' },
     mle:                 { label: 'MLE', cls: 'bg-purple-100 dark:bg-purple-900/30 text-purple-700' },
   }
@@ -90,7 +90,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 function DeltaBadge({ delta }: { delta: number }) {
-  if (delta === 0) return <span className="text-gray-400">±0</span>
+  if (delta === 0) return <span className="text-muted-soft">±0</span>
   return (
     <span className={delta > 0 ? 'text-green-600 dark:text-green-400 font-semibold' : 'text-red-600 dark:text-red-400 font-semibold'}>
       {delta > 0 ? '+' : ''}{delta}
@@ -101,9 +101,9 @@ function DeltaBadge({ delta }: { delta: number }) {
 function Skeleton() {
   return (
     <div className="animate-pulse space-y-6">
-      <div className="h-32 bg-gray-200 dark:bg-gray-700 rounded-lg" />
-      <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded" />
-      <div className="h-48 bg-gray-200 dark:bg-gray-700 rounded-lg" />
+      <div className="h-32 bg-surface-3 rounded-lg" />
+      <div className="h-10 bg-surface-3 rounded" />
+      <div className="h-48 bg-surface-3 rounded-lg" />
     </div>
   )
 }
@@ -116,17 +116,17 @@ function Pagination({ page, total, limit, onChange }: { page: number; total: num
       <button
         disabled={page === 1}
         onClick={() => onChange(page - 1)}
-        className="px-3 py-1 text-sm rounded border border-gray-300 dark:border-gray-600 disabled:opacity-40 hover:bg-gray-100 dark:hover:bg-gray-700"
+        className="px-3 py-1 text-sm rounded border border-hairline-strong disabled:opacity-40 hover:bg-surface-2"
       >
         ‹ Prev
       </button>
-      <span className="text-sm text-gray-500 dark:text-gray-400">
+      <span className="text-sm text-muted">
         {page} / {pages}
       </span>
       <button
         disabled={page === pages}
         onClick={() => onChange(page + 1)}
-        className="px-3 py-1 text-sm rounded border border-gray-300 dark:border-gray-600 disabled:opacity-40 hover:bg-gray-100 dark:hover:bg-gray-700"
+        className="px-3 py-1 text-sm rounded border border-hairline-strong disabled:opacity-40 hover:bg-surface-2"
       >
         Next ›
       </button>
@@ -232,9 +232,9 @@ export default function UserPublicProfile() {
   if (notFound || !user) {
     return (
       <div className="max-w-3xl mx-auto text-center py-20">
-        <h1 className="text-2xl font-bold mb-2 text-gray-800 dark:text-gray-200">User Not Found</h1>
-        <p className="text-gray-500 dark:text-gray-400 mb-6">The user «{username}» does not exist.</p>
-        <Link to="/" className="text-blue-600 dark:text-blue-400 hover:underline">← Back to Home</Link>
+        <h1 className="text-2xl font-bold mb-2 text-ink">User Not Found</h1>
+        <p className="text-muted mb-6">The user «{username}» does not exist.</p>
+        <Link to="/" className="text-brand hover:underline">← Back to Home</Link>
       </div>
     )
   }
@@ -260,7 +260,7 @@ export default function UserPublicProfile() {
     <div className="max-w-4xl mx-auto space-y-4">
 
       {/* Header */}
-      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 shadow-sm">
+      <div className="bg-surface border border-hairline rounded-lg p-6 shadow-sm">
         <div className="flex items-start gap-5">
           <div
             className="w-20 h-20 rounded-full flex items-center justify-center text-3xl font-bold text-white flex-shrink-0"
@@ -284,31 +284,31 @@ export default function UserPublicProfile() {
               )}
             </div>
 
-            <div className="flex flex-wrap gap-x-6 gap-y-1 mt-2 text-sm text-gray-600 dark:text-gray-400">
+            <div className="flex flex-wrap gap-x-6 gap-y-1 mt-2 text-sm text-muted">
               <span>
-                <span className="text-gray-400 dark:text-gray-500 mr-1">Rating:</span>
+                <span className="text-muted-soft mr-1">Rating:</span>
                 {currentRating > 0
                   ? <RatingBadge rating={currentRating} size="md" />
-                  : <span className="text-gray-400">Unrated</span>
+                  : <span className="text-muted-soft">Unrated</span>
                 }
               </span>
               {maxRating > 0 && maxRating !== currentRating && (
                 <span>
-                  <span className="text-gray-400 dark:text-gray-500 mr-1">Max:</span>
+                  <span className="text-muted-soft mr-1">Max:</span>
                   <RatingBadge rating={maxRating} size="md" />
                 </span>
               )}
               <span>
-                <span className="text-gray-400 dark:text-gray-500 mr-1">Contests:</span>
-                <strong className="text-gray-800 dark:text-gray-200">{user.contests_played ?? ratingHistory.length}</strong>
+                <span className="text-muted-soft mr-1">Contests:</span>
+                <strong className="text-ink">{user.contests_played ?? ratingHistory.length}</strong>
               </span>
               <span>
-                <span className="text-gray-400 dark:text-gray-500 mr-1">Solved:</span>
-                <strong className="text-gray-800 dark:text-gray-200">{user.problems_solved ?? 0}</strong>
+                <span className="text-muted-soft mr-1">Solved:</span>
+                <strong className="text-ink">{user.problems_solved ?? 0}</strong>
               </span>
             </div>
 
-            <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
+            <p className="text-xs text-muted-soft mt-2">
               Member since {fmtDate(user.created_at)}
             </p>
           </div>
@@ -316,7 +316,7 @@ export default function UserPublicProfile() {
       </div>
 
       {/* Tab Bar */}
-      <div className="border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-t-lg overflow-x-auto">
+      <div className="border-b border-hairline bg-surface rounded-t-lg overflow-x-auto">
         <nav className="flex gap-0 px-2">
           {TABS.map(t => (
             <button
@@ -324,8 +324,8 @@ export default function UserPublicProfile() {
               onClick={() => setTab(t.key)}
               className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                 tab === t.key
-                  ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400'
-                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                  ? 'border-brand text-brand dark:border-blue-400 dark:text-blue-400'
+                  : 'border-transparent text-muted hover:text-ink'
               }`}
             >
               {t.label}
@@ -335,27 +335,27 @@ export default function UserPublicProfile() {
       </div>
 
       {/* Tab Content */}
-      <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-b-lg rounded-tr-lg shadow-sm">
+      <div className="bg-surface border border-hairline rounded-b-lg rounded-tr-lg shadow-sm">
 
         {/* PROFILE TAB */}
         {tab === 'profile' && (
           <div className="p-6 space-y-6">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               {[
-                { label: 'Current Rating', value: currentRating > 0 ? <RatingBadge rating={currentRating} size="lg" /> : <span className="text-gray-400 text-lg">—</span> },
-                { label: 'Max Rating',      value: maxRating > 0 ? <RatingBadge rating={maxRating} size="lg" /> : <span className="text-gray-400 text-lg">—</span> },
-                { label: 'Contests',        value: <span className="text-2xl font-bold text-gray-800 dark:text-gray-100">{ratingHistory.length}</span> },
-                { label: 'Problems Solved', value: <span className="text-2xl font-bold text-gray-800 dark:text-gray-100">{user.problems_solved ?? 0}</span> },
+                { label: 'Current Rating', value: currentRating > 0 ? <RatingBadge rating={currentRating} size="lg" /> : <span className="text-muted-soft text-lg">—</span> },
+                { label: 'Max Rating',      value: maxRating > 0 ? <RatingBadge rating={maxRating} size="lg" /> : <span className="text-muted-soft text-lg">—</span> },
+                { label: 'Contests',        value: <span className="text-2xl font-bold text-ink">{ratingHistory.length}</span> },
+                { label: 'Problems Solved', value: <span className="text-2xl font-bold text-ink">{user.problems_solved ?? 0}</span> },
               ].map(s => (
-                <div key={s.label} className="bg-gray-50 dark:bg-gray-700/50 border border-gray-100 dark:border-gray-700 rounded-lg p-4 text-center">
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">{s.label}</p>
+                <div key={s.label} className="bg-surface-2/50 border border-hairline rounded-lg p-4 text-center">
+                  <p className="text-xs text-muted mb-2">{s.label}</p>
                   {s.value}
                 </div>
               ))}
             </div>
 
             <div>
-              <h2 className="text-base font-semibold mb-3 text-gray-700 dark:text-gray-300">Rating History</h2>
+              <h2 className="text-base font-semibold mb-3 text-ink-soft">Rating History</h2>
               <RatingGraph history={ratingHistory} width={700} height={220} />
             </div>
           </div>
@@ -365,26 +365,26 @@ export default function UserPublicProfile() {
         {tab === 'contests' && (
           <div>
             {ratingHistory.length === 0 ? (
-              <p className="text-center py-12 text-gray-400 dark:text-gray-500 text-sm">No rated contests yet</p>
+              <p className="text-center py-12 text-muted-soft text-sm">No rated contests yet</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
-                      <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">#</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Date</th>
-                      <th className="px-4 py-3 text-right font-medium text-gray-500 dark:text-gray-400">Rank</th>
-                      <th className="px-4 py-3 text-right font-medium text-gray-500 dark:text-gray-400">Old</th>
-                      <th className="px-4 py-3 text-right font-medium text-gray-500 dark:text-gray-400">New</th>
-                      <th className="px-4 py-3 text-right font-medium text-gray-500 dark:text-gray-400">Change</th>
+                    <tr className="border-b border-hairline bg-surface-2/50">
+                      <th className="px-4 py-3 text-left font-medium text-muted">#</th>
+                      <th className="px-4 py-3 text-left font-medium text-muted">Date</th>
+                      <th className="px-4 py-3 text-right font-medium text-muted">Rank</th>
+                      <th className="px-4 py-3 text-right font-medium text-muted">Old</th>
+                      <th className="px-4 py-3 text-right font-medium text-muted">New</th>
+                      <th className="px-4 py-3 text-right font-medium text-muted">Change</th>
                     </tr>
                   </thead>
                   <tbody>
                     {[...ratingHistory].reverse().map((entry, i) => (
-                      <tr key={entry.id || i} className="border-t border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/40">
-                        <td className="px-4 py-2.5 text-gray-400">{ratingHistory.length - i}</td>
-                        <td className="px-4 py-2.5 text-gray-600 dark:text-gray-400">{fmtDateShort(entry.created_at)}</td>
-                        <td className="px-4 py-2.5 text-right text-gray-700 dark:text-gray-300">
+                      <tr key={entry.id || i} className="border-t border-hairline hover:bg-surface-2/40">
+                        <td className="px-4 py-2.5 text-muted-soft">{ratingHistory.length - i}</td>
+                        <td className="px-4 py-2.5 text-muted">{fmtDateShort(entry.created_at)}</td>
+                        <td className="px-4 py-2.5 text-right text-ink-soft">
                           {entry.rank ? `#${entry.rank}` : '—'}
                         </td>
                         <td className="px-4 py-2.5 text-right">
@@ -409,34 +409,34 @@ export default function UserPublicProfile() {
         {tab === 'submissions' && (
           <div>
             {subsLoading ? (
-              <div className="text-center py-12 text-gray-400 text-sm">Loading...</div>
+              <div className="text-center py-12 text-muted-soft text-sm">Loading...</div>
             ) : submissions.length === 0 ? (
-              <p className="text-center py-12 text-gray-400 dark:text-gray-500 text-sm">No submissions</p>
+              <p className="text-center py-12 text-muted-soft text-sm">No submissions</p>
             ) : (
               <>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
-                        <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Verdict</th>
-                        <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Language</th>
-                        <th className="px-4 py-3 text-right font-medium text-gray-500 dark:text-gray-400">Time</th>
-                        <th className="px-4 py-3 text-right font-medium text-gray-500 dark:text-gray-400">Memory</th>
-                        <th className="px-4 py-3 text-right font-medium text-gray-500 dark:text-gray-400">Date</th>
+                      <tr className="border-b border-hairline bg-surface-2/50">
+                        <th className="px-4 py-3 text-left font-medium text-muted">Verdict</th>
+                        <th className="px-4 py-3 text-left font-medium text-muted">Language</th>
+                        <th className="px-4 py-3 text-right font-medium text-muted">Time</th>
+                        <th className="px-4 py-3 text-right font-medium text-muted">Memory</th>
+                        <th className="px-4 py-3 text-right font-medium text-muted">Date</th>
                       </tr>
                     </thead>
                     <tbody>
                       {submissions.map(sub => (
-                        <tr key={sub.id} className="border-t border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/40">
+                        <tr key={sub.id} className="border-t border-hairline hover:bg-surface-2/40">
                           <td className="px-4 py-2.5"><StatusBadge status={sub.status} /></td>
-                          <td className="px-4 py-2.5 text-gray-500 dark:text-gray-400 font-mono text-xs">{sub.language}</td>
-                          <td className="px-4 py-2.5 text-right text-gray-500 dark:text-gray-400 font-mono text-xs">
+                          <td className="px-4 py-2.5 text-muted font-mono text-xs">{sub.language}</td>
+                          <td className="px-4 py-2.5 text-right text-muted font-mono text-xs">
                             {sub.time_used > 0 ? `${sub.time_used}ms` : '—'}
                           </td>
-                          <td className="px-4 py-2.5 text-right text-gray-500 dark:text-gray-400 font-mono text-xs">
+                          <td className="px-4 py-2.5 text-right text-muted font-mono text-xs">
                             {sub.memory_used > 0 ? `${Math.round(sub.memory_used / 1024)}KB` : '—'}
                           </td>
-                          <td className="px-4 py-2.5 text-right text-gray-500 dark:text-gray-400">{fmtDateShort(sub.created_at)}</td>
+                          <td className="px-4 py-2.5 text-right text-muted">{fmtDateShort(sub.created_at)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -452,18 +452,18 @@ export default function UserPublicProfile() {
         {tab === 'blogs' && (
           <div>
             {blogsLoading ? (
-              <div className="text-center py-12 text-gray-400 text-sm">Loading...</div>
+              <div className="text-center py-12 text-muted-soft text-sm">Loading...</div>
             ) : blogs.length === 0 ? (
               <EmptyState text="No blog posts yet" description="Posts they publish will appear in this tab." />
             ) : (
               <>
-                <div className="divide-y divide-gray-100 dark:divide-gray-700">
+                <div className="divide-y divide-hairline">
                   {blogs.map(post => (
-                    <div key={post.id} className="px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-700/40">
-                      <Link to={`/blog/${post.id}`} className="text-base font-semibold text-blue-600 dark:text-blue-400 hover:underline">
+                    <div key={post.id} className="px-6 py-4 hover:bg-surface-2/40">
+                      <Link to={`/blog/${post.id}`} className="text-base font-semibold text-brand hover:underline">
                         {post.title}
                       </Link>
-                      <div className="flex gap-4 mt-1 text-xs text-gray-400 dark:text-gray-500">
+                      <div className="flex gap-4 mt-1 text-xs text-muted-soft">
                         <span>▲ {post.upvotes}</span>
                         <span>💬 {post.comment_count}</span>
                         <span>{fmtDate(post.created_at)}</span>
@@ -471,7 +471,7 @@ export default function UserPublicProfile() {
                       {post.tags?.length > 0 && (
                         <div className="flex gap-1.5 mt-2 flex-wrap">
                           {post.tags.map(tag => (
-                            <span key={tag} className="text-xs bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded">
+                            <span key={tag} className="text-xs bg-brand-soft text-brand px-2 py-0.5 rounded">
                               {tag}
                             </span>
                           ))}
@@ -492,24 +492,24 @@ export default function UserPublicProfile() {
         {tab === 'comments' && (
           <div>
             {commentsLoading ? (
-              <div className="text-center py-12 text-gray-400 text-sm">Loading...</div>
+              <div className="text-center py-12 text-muted-soft text-sm">Loading...</div>
             ) : comments.length === 0 ? (
               <EmptyState text="No comments yet" description="Comments they write on posts and problems will appear here." />
             ) : (
               <>
-                <div className="divide-y divide-gray-100 dark:divide-gray-700">
+                <div className="divide-y divide-hairline">
                   {comments.map(c => (
                     <div key={c.id} className="px-6 py-4">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 px-2 py-0.5 rounded capitalize">
+                        <span className="text-xs bg-surface-3 text-muted px-2 py-0.5 rounded capitalize">
                           {c.parent_type}
                         </span>
-                        <span className="text-xs text-gray-400">{fmtDate(c.created_at)}</span>
+                        <span className="text-xs text-muted-soft">{fmtDate(c.created_at)}</span>
                         {c.upvotes !== 0 && (
-                          <span className="text-xs text-gray-400">▲ {c.upvotes}</span>
+                          <span className="text-xs text-muted-soft">▲ {c.upvotes}</span>
                         )}
                       </div>
-                      <p className="text-sm text-gray-700 dark:text-gray-300 line-clamp-3">{c.content}</p>
+                      <p className="text-sm text-ink-soft line-clamp-3">{c.content}</p>
                       {c.parent_type === 'blog' && (
                         <Link to={`/blog/${c.parent_id}`} className="text-xs text-blue-500 hover:underline mt-1 inline-block">
                           View post →

@@ -197,8 +197,8 @@ export default function GroupDetail() {
         }
     }
 
-    if (loading) return <div className="text-center py-20 text-gray-400 dark:text-gray-500">Loading group details...</div>
-    if (!group) return <div className="text-center py-20 text-gray-400 dark:text-gray-500">Group not found</div>
+    if (loading) return <div className="text-center py-20 text-muted-soft">Loading group details...</div>
+    if (!group) return <div className="text-center py-20 text-muted-soft">Group not found</div>
 
     const globalRole = getRole()
     const canManage = currentUserRole === 'owner' || currentUserRole === 'manager' || globalRole === 'admin'
@@ -216,17 +216,17 @@ export default function GroupDetail() {
     return (
         <div className="space-y-6">
             {editing ? (
-                <div className="space-y-4 bg-white dark:bg-gray-900 p-6 rounded-lg border border-gray-200 dark:border-gray-800">
+                <div className="space-y-4 bg-surface p-6 rounded-lg border border-hairline">
                     <h2 className="text-xl font-bold">Edit Group</h2>
                     <div>
                         <label className="block text-sm font-medium mb-1">Group Name</label>
                         <input type="text" value={editName} onChange={e => setEditName(e.target.value)}
-                            className="w-full border border-gray-300 dark:border-gray-700 bg-transparent rounded p-2 text-sm text-gray-800 dark:text-gray-200" />
+                            className="w-full border border-hairline-strong bg-transparent rounded p-2 text-sm text-ink" />
                     </div>
                     <div>
                         <label className="block text-sm font-medium mb-1">Description</label>
                         <textarea value={editDescription} onChange={e => setEditDescription(e.target.value)} rows={3}
-                            className="w-full border border-gray-300 dark:border-gray-700 bg-transparent rounded p-2 text-sm text-gray-800 dark:text-gray-200" />
+                            className="w-full border border-hairline-strong bg-transparent rounded p-2 text-sm text-ink" />
                     </div>
                     <div className="flex items-center gap-2">
                         <input type="checkbox" id="editIsPublic" checked={editIsPublic}
@@ -236,16 +236,16 @@ export default function GroupDetail() {
                     <div>
                         <label className="block text-sm font-medium mb-1">Join Policy</label>
                         <select value={editJoinPolicy} onChange={e => setEditJoinPolicy(e.target.value)}
-                            className="w-full border border-gray-300 dark:border-gray-700 bg-transparent rounded p-2 text-sm text-gray-800 dark:text-gray-200">
+                            className="w-full border border-hairline-strong bg-transparent rounded p-2 text-sm text-ink">
                             <option value="auto_approve">Auto-Approve (Open via link)</option>
                             <option value="manual_approve">Manual Approve (Requires confirmation)</option>
                         </select>
                     </div>
                     <div className="flex gap-2 justify-end">
                         <button onClick={() => setEditing(false)}
-                            className="px-4 py-2 border border-gray-300 dark:border-gray-700 rounded text-sm hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer">Cancel</button>
+                            className="px-4 py-2 border border-hairline-strong rounded text-sm hover:bg-surface-2 cursor-pointer">Cancel</button>
                         <button onClick={handleSaveEdit}
-                            className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 cursor-pointer">Save</button>
+                            className="px-4 py-2 bg-brand text-on-brand rounded text-sm hover:bg-brand-hover cursor-pointer">Save</button>
                     </div>
                 </div>
             ) : (
@@ -262,19 +262,19 @@ export default function GroupDetail() {
                                     {group.is_public ? 'Public' : 'Private'}
                                 </span>
                                 <span className={`text-xs px-2 py-0.5 rounded font-semibold ${group.join_policy === 'auto_approve'
-                                    ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
+                                    ? 'bg-brand-soft text-brand'
                                     : 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300'
                                     }`}>
                                     {group.join_policy === 'auto_approve' ? 'Auto-Join via Link' : 'Approval Required'}
                                 </span>
                             </div>
-                            <p className="text-gray-600 dark:text-gray-400 mt-2">{group.description || 'No description provided.'}</p>
+                            <p className="text-muted mt-2">{group.description || 'No description provided.'}</p>
                         </div>
                         <div className="flex gap-2">
                             {canManage && (
                                 <>
                                     <button onClick={handleStartEdit}
-                                        className="px-4 py-2 border border-gray-300 dark:border-gray-700 rounded text-sm hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer">Edit</button>
+                                        className="px-4 py-2 border border-hairline-strong rounded text-sm hover:bg-surface-2 cursor-pointer">Edit</button>
                                     {canDelete && (
                                         <button onClick={handleDelete}
                                             className="px-4 py-2 bg-red-600 text-white rounded text-sm hover:bg-red-700 cursor-pointer">Delete</button>
@@ -283,7 +283,7 @@ export default function GroupDetail() {
                             )}
                             {getAccessToken() && (
                                 <button onClick={isMember ? handleLeave : handleJoin}
-                                    className={`px-4 py-2 rounded text-sm font-medium transition-colors cursor-pointer ${isMember ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100' : 'bg-blue-600 text-white hover:bg-blue-700'
+                                    className={`px-4 py-2 rounded text-sm font-medium transition-colors cursor-pointer ${isMember ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100' : 'bg-brand text-on-brand hover:bg-brand-hover'
                                         }`}>
                                     {isMember ? 'Leave Group' : 'Join Group'}
                                 </button>
@@ -292,15 +292,15 @@ export default function GroupDetail() {
                     </div>
 
                     {/* Tabs */}
-                    <div className="border-b border-gray-200 dark:border-gray-800 flex gap-4">
+                    <div className="border-b border-hairline flex gap-4">
                         {TABS.map(tab => (
                             <button key={tab.key} onClick={() => {
                                 setActiveTab(tab.key)
                                 if (tab.key === 'pending') fetchPending()
                             }}
                                 className={`pb-2 text-sm font-medium border-b-2 cursor-pointer ${activeTab === tab.key
-                                    ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                                    ? 'border-brand text-brand'
+                                    : 'border-transparent text-muted hover:text-gray-700'
                                     }`}>
                                 {tab.label}
                             </button>
@@ -309,11 +309,11 @@ export default function GroupDetail() {
 
                     {/* Tab: Members */}
                     {activeTab === 'members' && (
-                        <div className="border rounded-lg divide-y bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+                        <div className="border rounded-lg divide-y bg-surface border-hairline">
                             {activeMembers.map((m, i) => (
                                 <div key={i} className="px-4 py-3 flex justify-between items-center text-sm">
-                                    <span className="font-medium text-gray-800 dark:text-gray-200">{m.username || m.user_id}</span>
-                                    <span className="text-xs text-gray-400 dark:text-gray-500 uppercase font-medium">{m.role}</span>
+                                    <span className="font-medium text-ink">{m.username || m.user_id}</span>
+                                    <span className="text-xs text-muted-soft uppercase font-medium">{m.role}</span>
                                 </div>
                             ))}
                             {activeMembers.length === 0 && (
@@ -329,20 +329,20 @@ export default function GroupDetail() {
                                 <div className="flex gap-2 max-w-md">
                                     <input type="text" placeholder="Contest ID..." value={newContestId}
                                         onChange={e => setNewContestId(e.target.value)}
-                                        className="flex-1 border border-gray-300 dark:border-gray-700 bg-transparent rounded p-2 text-sm text-gray-800 dark:text-gray-200" />
+                                        className="flex-1 border border-hairline-strong bg-transparent rounded p-2 text-sm text-ink" />
                                     <button onClick={handleAddContest}
-                                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm font-medium cursor-pointer">
+                                        className="bg-brand hover:bg-brand-hover text-on-brand px-4 py-2 rounded text-sm font-medium cursor-pointer">
                                         Add Contest
                                     </button>
                                 </div>
                             )}
-                            <div className="border rounded-lg divide-y bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+                            <div className="border rounded-lg divide-y bg-surface border-hairline">
                                 {contests.map((c, i) => (
                                     <div key={i} className="px-4 py-3 flex justify-between items-center text-sm">
-                                        <Link to={`/contests/${c.id}`} className="font-medium text-blue-600 dark:text-blue-400 hover:underline">
+                                        <Link to={`/contests/${c.id}`} className="font-medium text-brand hover:underline">
                                             {c.title}
                                         </Link>
-                                        <div className="flex items-center gap-4 text-xs text-gray-400">
+                                        <div className="flex items-center gap-4 text-xs text-muted-soft">
                                             <span>Type: {c.type}</span>
                                             {canManage && (
                                                 <button onClick={() => handleRemoveContest(c.id)} className="text-red-600 hover:underline cursor-pointer">
@@ -363,32 +363,32 @@ export default function GroupDetail() {
                     {activeTab === 'pending' && canManage && (
                         <div className="space-y-4">
                             {/* Invite Code & Link */}
-                            <div className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3">
-                                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Invite Link</h3>
+                            <div className="bg-surface-2/50 border border-hairline rounded-lg p-4 space-y-3">
+                                <h3 className="text-sm font-semibold text-ink-soft">Invite Link</h3>
                                 {group.invite_code ? (
                                     <div className="flex items-center gap-2">
-                                        <code className="flex-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-3 py-2 text-sm font-mono">
+                                        <code className="flex-1 bg-surface border border-hairline rounded px-3 py-2 text-sm font-mono">
                                             {`${window.location.origin}/groups/join?code=${group.invite_code}`}
                                         </code>
                                         <button onClick={handleCopyInviteLink}
-                                            className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium cursor-pointer whitespace-nowrap">
+                                            className="px-3 py-2 bg-brand hover:bg-brand-hover text-on-brand rounded text-sm font-medium cursor-pointer whitespace-nowrap">
                                             Copy Link
                                         </button>
                                     </div>
                                 ) : (
-                                    <p className="text-sm text-gray-400 dark:text-gray-500">No invite code available.</p>
+                                    <p className="text-sm text-muted-soft">No invite code available.</p>
                                 )}
                             </div>
 
                             {/* Invite Member */}
-                            <div className="bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3">
-                                <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Invite Member</h3>
+                            <div className="bg-surface-2/50 border border-hairline rounded-lg p-4 space-y-3">
+                                <h3 className="text-sm font-semibold text-ink-soft">Invite Member</h3>
                                 <div className="flex gap-2">
                                     <input type="text" placeholder="Username..." value={inviteUsername}
                                         onChange={e => setInviteUsername(e.target.value)}
-                                        className="flex-1 border border-gray-300 dark:border-gray-700 bg-transparent rounded p-2 text-sm" />
+                                        className="flex-1 border border-hairline-strong bg-transparent rounded p-2 text-sm" />
                                     <button onClick={handleInvite} disabled={inviting || !inviteUsername.trim()}
-                                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm font-medium disabled:opacity-50 cursor-pointer">
+                                        className="bg-brand hover:bg-brand-hover text-on-brand px-4 py-2 rounded text-sm font-medium disabled:opacity-50 cursor-pointer">
                                         {inviting ? '...' : 'Invite'}
                                     </button>
                                 </div>
@@ -397,17 +397,17 @@ export default function GroupDetail() {
                             {/* Pending Requests & Invitations */}
                             {pendingMembers.length > 0 && (
                                 <div className="space-y-2">
-                                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                    <h3 className="text-sm font-semibold text-ink-soft">
                                         Requests &amp; Invitations ({pendingMembers.length})
                                     </h3>
-                                    <div className="border rounded-lg divide-y bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+                                    <div className="border rounded-lg divide-y bg-surface border-hairline">
                                         {pendingMembers.map((pm) => (
                                             <div key={pm.user_id} className="px-4 py-3 flex items-center justify-between text-sm">
                                                 <div className="flex items-center gap-2">
                                                     <span className="font-medium">{pm.username || pm.user_id}</span>
                                                     <span className={`text-xs px-1.5 py-0.5 rounded ${pm.role === 'requested'
                                                         ? 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300'
-                                                        : 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300'
+                                                        : 'bg-brand-soft text-brand'
                                                         }`}>
                                                         {pm.role === 'requested' ? 'Join Request' : 'Invited'}
                                                     </span>

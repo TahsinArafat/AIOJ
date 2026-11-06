@@ -24,6 +24,10 @@ const Profile = lazy(() => import('./pages/Profile'))
 const ProblemCreate = lazy(() => import('./pages/ProblemCreate'))
 import Navbar from './components/Navbar'
 import ActivityFeed from './components/ActivityFeed'
+import { buttonClass } from './components/ui/buttonStyles'
+import { Badge } from './components/ui/Badge'
+import { Card, CardBody, CardHeader } from './components/ui/Card'
+import { Skeleton } from './components/ui/PageHeader'
 const Practice = lazy(() => import('./pages/Practice'))
 const VirtualContest = lazy(() => import('./pages/VirtualContest'))
 const RatingHistory = lazy(() => import('./pages/RatingHistory'))
@@ -72,6 +76,52 @@ const TwoFactorVerify = lazy(() => import('./pages/auth/TwoFactorVerify'))
 const Settings = lazy(() => import('./pages/Settings'))
 import './global.css'
 
+/**
+ * Decode the display name from the access token without throwing.
+ *
+ * The old inline `JSON.parse(atob(...))` had no guard: a corrupted or
+ * half-written token in localStorage threw during render and blanked the
+ * whole home page instead of just showing the signed-out state.
+ */
+function decodeUsername(): string | null {
+    const token = localStorage.getItem('access_token')
+    if (!token) return null
+    try {
+        const payload = JSON.parse(atob(token.split('.')[1]))
+        return typeof payload?.uname === 'string' ? payload.uname : null
+    } catch {
+        return null
+    }
+}
+
+function RouteFallback() {
+    const { t } = useTranslation()
+    return (
+        <div role="status" aria-live="polite" className="mx-auto w-full max-w-5xl space-y-4 py-6">
+            <Skeleton className="h-7 w-48" />
+            <Skeleton className="h-4 w-72" />
+            <Skeleton className="h-72 w-full" />
+            <span className="sr-only">{t('common.loading')}</span>
+        </div>
+    )
+}
+
+function NotFound() {
+    return (
+        <div className="flex flex-col items-center justify-center py-24 text-center">
+            <p aria-hidden="true" className="tnum text-6xl font-semibold tracking-tight text-surface-3">404</p>
+            <h1 className="mt-4 text-xl font-semibold tracking-tight text-ink">This page does not exist</h1>
+            <p className="mt-1 max-w-sm text-sm text-muted">
+                The link may be stale, or the problem or contest it pointed at was removed.
+            </p>
+            <div className="mt-6 flex flex-wrap justify-center gap-2">
+                <Link to="/" className={buttonClass({ variant: 'secondary' })}>Back to home</Link>
+                <Link to="/problems" className={buttonClass()}>Browse problems</Link>
+            </div>
+        </div>
+    )
+}
+
 function Home() {
     const { t } = useTranslation()
     const [contests, setContests] = useState<ContestLite[]>([])
@@ -79,8 +129,7 @@ function Home() {
     const [stats, setStats] = useState({ problems: 0, users: 0, submissions: 0 })
     const [rankings, setRankings] = useState<RankingRow[]>([])
     const [loading, setLoading] = useState(true)
-    const token = localStorage.getItem('access_token')
-    const username = token ? JSON.parse(atob(token.split('.')[1])).uname : null
+    const username = decodeUsername()
 
     useEffect(() => {
         Promise.all([
@@ -100,9 +149,9 @@ function Home() {
         const now = Date.now() // eslint-disable-line react-hooks/purity -- status intentionally compared against wall clock at render
         const start = new Date(c.start_time).getTime()
         const end = new Date(c.end_time).getTime()
-        if (now < start) return { text: 'Upcoming', cls: 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20' }
-        if (now < end) return { text: 'Running', cls: 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20' }
-        return { text: 'Ended', cls: 'text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700' }
+        if (now < start) return { text: 'Upcoming', tone: 'brand' as const }
+        if (now < end) return { text: 'Running', tone: 'ok' as const }
+        return { text: 'Ended', tone: 'neutral' as const }
     }
 
     return (
@@ -110,161 +159,187 @@ function Home() {
             {/* Main Content (Left, spans 3 columns) */}
             <div className="lg:col-span-3 space-y-6">
                 {/* Hero */}
-                <section className="bg-gradient-to-r from-blue-500 to-blue-700 text-white rounded-lg px-8 py-12">
-                    <h1 className="text-3xl font-bold mb-2">{t('home.welcome')}</h1>
-                    <p className="text-blue-100 mb-6 max-w-lg">{t('home.subtitle')}</p>
-                    <div className="flex gap-3">
-                        <Link to="/problems" className="bg-white dark:bg-gray-800 text-blue-700 dark:text-blue-300 px-5 py-2 rounded font-medium hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">{t('home.browseProblems')}</Link>
-                        <Link to="/contests" className="border border-white/40 px-5 py-2 rounded font-medium hover:bg-white dark:hover:bg-gray-700/10 transition-colors">{t('home.viewContests')}</Link>
-                    </div>
-                </section>
-
-                {/* Stats */}
-                <section className="grid grid-cols-3 gap-4">
-                    {[
-                        { label: t('home.problems'), value: stats.problems },
-                        { label: t('home.users'), value: stats.users },
-                        { label: t('home.submissions'), value: stats.submissions },
-                    ].map(s => (
-                        <div key={s.label} className="border border-gray-200 dark:border-gray-700 rounded-lg p-5 text-center bg-white dark:bg-gray-800">
-                            <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">{s.value.toLocaleString()}</div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">{s.label}</div>
+                <section className="relative overflow-hidden rounded-2xl border border-hairline bg-surface p-6 shadow-[var(--shadow-card)] sm:p-8">
+                    <div
+                        aria-hidden="true"
+                        className="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full bg-brand/10 blur-3xl"
+                    />
+                    <div className="relative grid gap-8 lg:grid-cols-[1.4fr_1fr] lg:items-center">
+                        <div>
+                            <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+                                <span className="h-1.5 w-1.5 rounded-full bg-brand" aria-hidden="true" />
+                                {t('home.title')}
+                            </p>
+                            <h1 className="mt-2 text-3xl font-semibold leading-tight tracking-tight text-ink sm:text-4xl">
+                                {t('home.welcome')}
+                            </h1>
+                            <p className="mt-3 max-w-xl text-sm leading-relaxed text-muted">{t('home.subtitle')}</p>
+                            <div className="mt-6 flex flex-wrap gap-2">
+                                <Link to="/problems" className={buttonClass({ size: 'lg' })}>{t('home.browseProblems')}</Link>
+                                <Link to="/contests" className={buttonClass({ variant: 'secondary', size: 'lg' })}>{t('home.viewContests')}</Link>
+                            </div>
                         </div>
-                    ))}
+                        <dl className="grid grid-cols-3 divide-x divide-hairline rounded-xl border border-hairline bg-surface-2">
+                            {[
+                                { label: t('home.problems'), value: stats.problems },
+                                { label: t('home.users'), value: stats.users },
+                                { label: t('home.submissions'), value: stats.submissions },
+                            ].map(s => (
+                                <div key={s.label} className="px-2 py-4 text-center">
+                                    <dd className="tnum text-xl font-semibold tracking-tight text-ink sm:text-2xl">{s.value.toLocaleString()}</dd>
+                                    <dt className="mt-1 text-[10px] font-medium uppercase tracking-wide text-muted sm:text-[11px]">{s.label}</dt>
+                                </div>
+                            ))}
+                        </dl>
+                    </div>
                 </section>
 
                 <ActivityFeed limit={15} />
 
                 {/* Recent Blog Posts */}
-                <section className="space-y-4">
-                    <div className="flex justify-between items-center">
-                        <h2 className="text-xl font-bold">{t('home.latestPosts')}</h2>
-                        <Link to="/blog" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">{t('home.viewAll')}</Link>
-                    </div>
+                <Card>
+                    <CardHeader
+                        title={t('home.latestPosts')}
+                        action={<Link to="/blog" className="text-xs font-medium text-brand hover:underline">{t('home.viewAll')}</Link>}
+                    />
                     {loading ? (
-                        <div className="text-center py-8 text-gray-400 dark:text-gray-500">{t('common.loading')}</div>
-                    ) : posts.length === 0 ? (
-                        <div className="text-center py-8 text-gray-400 dark:text-gray-500">{t('home.noPostsYet')}</div>
-                    ) : (
-                        <div className="space-y-3">
-                            {posts.map(p => (
-                                <Link key={p.id} to={`/blog/${p.id}`}
-                                    className="block border border-gray-200 dark:border-gray-700 rounded-lg p-5 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors bg-white dark:bg-gray-800 shadow-sm">
-                                    <h3 className="text-lg font-semibold text-blue-600 dark:text-blue-400 hover:underline mb-2">{p.title}</h3>
-                                    <div className="text-xs text-gray-500 dark:text-gray-400 flex gap-4 items-center">
-                                        <span>By <span className="font-semibold text-gray-700 dark:text-gray-300">{p.username}</span></span>
-                                        <span>•</span>
-                                        <span>{p.upvotes} upvotes</span>
-                                        <span>•</span>
-                                        <span>{new Date(p.created_at).toLocaleDateString()}</span>
-                                    </div>
-                                </Link>
-                            ))}
+                        <div className="space-y-3 px-5 py-4">
+                            <Skeleton className="h-4 w-2/3" />
+                            <Skeleton className="h-3 w-1/3" />
                         </div>
+                    ) : posts.length === 0 ? (
+                        <p className="px-5 py-8 text-center text-sm text-muted">{t('home.noPostsYet')}</p>
+                    ) : (
+                        <ul className="divide-y divide-hairline">
+                            {posts.map(p => (
+                                <li key={p.id}>
+                                    <Link to={`/blog/${p.id}`} className="group block px-5 py-4 transition-colors hover:bg-surface-2">
+                                        <h3 className="text-sm font-semibold text-ink transition-colors group-hover:text-brand">{p.title}</h3>
+                                        <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
+                                            <span>{p.username}</span>
+                                            <span aria-hidden="true">·</span>
+                                            <span className="tnum">{p.upvotes} upvotes</span>
+                                            <span aria-hidden="true">·</span>
+                                            <time dateTime={p.created_at}>{new Date(p.created_at).toLocaleDateString()}</time>
+                                        </div>
+                                    </Link>
+                                </li>
+                            ))}
+                        </ul>
                     )}
-                </section>
+                </Card>
             </div>
 
             {/* Sidebar (Right, spans 1 column) */}
             <div className="space-y-6">
                 {/* User Stats / Login box */}
-                <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-5 bg-white dark:bg-gray-800 shadow-sm">
-                    {username ? (
-                        <div className="text-center space-y-3">
-                            <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/50 rounded-full flex items-center justify-center mx-auto">
-                                <span className="text-xl font-bold text-blue-600 dark:text-blue-300 uppercase">{username[0]}</span>
-                            </div>
-                            <div>
-                                <h3 className="font-bold text-gray-950 dark:text-gray-50">{username}</h3>
-                                <p className="text-xs text-gray-500">{t('common.loggedIn')}</p>
-                            </div>
-                            <Link to="/profile" className="block text-xs bg-blue-600 text-white py-1.5 px-3 rounded hover:bg-blue-700 transition-colors font-medium">
-                                {t('common.viewProfile')}
-                            </Link>
-                        </div>
-                    ) : (
-                        <div className="space-y-3 text-center">
-                            <h3 className="font-bold text-gray-800 dark:text-gray-200 text-sm">{t('home.joinCommunity')}</h3>
-                            <p className="text-xs text-gray-500">{t('home.signInPrompt')}</p>
-                            <div className="flex gap-2 justify-center">
-                                <Link to="/login" className="text-xs bg-blue-600 text-white py-1.5 px-4 rounded hover:bg-blue-700 transition-colors font-medium">
-                                    {t('nav.login')}
-                                </Link>
-                                <Link to="/register" className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 py-1.5 px-4 rounded transition-colors font-medium">
-                                    {t('nav.register')}
+                <Card>
+                    <CardBody>
+                        {username ? (
+                            <div className="flex items-center gap-3">
+                                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-soft text-base font-semibold uppercase text-brand">
+                                    {username[0]}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                    <p className="truncate text-sm font-semibold text-ink">{username}</p>
+                                    <p className="text-xs text-muted">{t('common.loggedIn')}</p>
+                                </div>
+                                <Link to="/profile" className={buttonClass({ variant: 'secondary', size: 'sm' })}>
+                                    {t('common.viewProfile')}
                                 </Link>
                             </div>
-                        </div>
-                    )}
-                </div>
+                        ) : (
+                            <div className="space-y-3">
+                                <div>
+                                    <h3 className="text-sm font-semibold text-ink">{t('home.joinCommunity')}</h3>
+                                    <p className="mt-1 text-xs leading-relaxed text-muted">{t('home.signInPrompt')}</p>
+                                </div>
+                                <div className="flex gap-2">
+                                    <Link to="/login" className={buttonClass({ size: 'sm', className: 'flex-1' })}>{t('nav.login')}</Link>
+                                    <Link to="/register" className={buttonClass({ variant: 'secondary', size: 'sm', className: 'flex-1' })}>{t('nav.register')}</Link>
+                                </div>
+                            </div>
+                        )}
+                    </CardBody>
+                </Card>
 
                 {/* Contests Block */}
-                <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-5 bg-white dark:bg-gray-800 shadow-sm">
-                    <h3 className="font-bold text-sm mb-3 border-b pb-2 border-gray-100 dark:border-gray-700">{t('home.recentContests')}</h3>
+                <Card>
+                    <CardHeader
+                        title={t('home.recentContests')}
+                        action={<Link to="/contests" className="text-xs font-medium text-brand hover:underline">{t('home.viewAll')}</Link>}
+                    />
                     {loading ? (
-                        <div className="text-xs text-gray-400 py-2">{t('common.loading')}</div>
+                        <div className="space-y-2 px-5 py-4">
+                            <Skeleton className="h-3 w-3/4" />
+                            <Skeleton className="h-3 w-1/2" />
+                        </div>
                     ) : contests.length === 0 ? (
-                        <div className="text-xs text-gray-400 py-2">{t('home.noContests')}</div>
+                        <p className="px-5 py-6 text-center text-xs text-muted">{t('home.noContests')}</p>
                     ) : (
-                        <div className="space-y-2">
+                        <ul className="divide-y divide-hairline">
                             {contests.map(c => {
                                 const status = contestStatus(c)
                                 return (
-                                    <Link key={c.id} to={`/contests/${contestSlug(c)}`} className="block group">
-                                        <div className="text-xs font-semibold text-gray-850 dark:text-gray-205 group-hover:text-blue-600 transition-colors line-clamp-1">
-                                            {c.title}
-                                        </div>
-                                        <div className="flex items-center justify-between mt-1 text-[10px] text-gray-500">
-                                            <span>{new Date(c.start_time).toLocaleDateString()}</span>
-                                            <span className={`px-1.5 rounded-[3px] font-medium scale-90 origin-right ${status.cls}`}>{status.text}</span>
-                                        </div>
-                                    </Link>
+                                    <li key={c.id}>
+                                        <Link to={`/contests/${contestSlug(c)}`} className="group block px-5 py-3 transition-colors hover:bg-surface-2">
+                                            <p className="line-clamp-2 text-xs font-medium leading-snug text-ink transition-colors group-hover:text-brand">
+                                                {c.title}
+                                            </p>
+                                            <div className="mt-1.5 flex items-center justify-between gap-2">
+                                                <span className="text-[11px] text-muted">
+                                                    {new Date(c.start_time).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                                </span>
+                                                <Badge tone={status.tone} dot={status.tone === 'ok'}>{status.text}</Badge>
+                                            </div>
+                                        </Link>
+                                    </li>
                                 )
                             })}
-                            <Link to="/contests" className="block text-center text-xs text-blue-600 hover:underline mt-2">
-                                View all contests
-                            </Link>
-                        </div>
+                        </ul>
                     )}
-                </div>
+                </Card>
 
                 {/* Top Rated Users rankings widget */}
-                <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-5 bg-white dark:bg-gray-800 shadow-sm">
-                    <h3 className="font-bold text-sm mb-3 border-b pb-2 border-gray-100 dark:border-gray-700">{t('home.topRated')}</h3>
+                <Card>
+                    <CardHeader
+                        title={t('home.topRated')}
+                        action={<Link to="/rankings" className="text-xs font-medium text-brand hover:underline">{t('home.viewAll')}</Link>}
+                    />
                     {loading ? (
-                        <div className="text-xs text-gray-400 py-2">{t('common.loading')}</div>
+                        <div className="space-y-2 px-5 py-4">
+                            <Skeleton className="h-3 w-2/3" />
+                            <Skeleton className="h-3 w-1/2" />
+                        </div>
                     ) : rankings.length === 0 ? (
-                        <div className="text-xs text-gray-400 py-2">{t('home.noRankings')}</div>
+                        <p className="px-5 py-6 text-center text-xs text-muted">{t('home.noRankings')}</p>
                     ) : (
-                        <div className="space-y-2">
+                        <ol className="divide-y divide-hairline">
                             {rankings.map((user, i) => (
-                                <div key={user.id} className="flex justify-between items-center text-xs">
-                                    <div className="flex gap-2 items-center">
-                                        <span className="font-mono text-gray-400 w-4">{i + 1}</span>
-                                        <Link to={`/user/${user.username}`} className="font-semibold text-blue-600 dark:text-blue-400 hover:underline">
+                                <li key={user.id} className="flex items-center justify-between gap-3 px-5 py-2">
+                                    <div className="flex min-w-0 items-center gap-2.5">
+                                        <span className="tnum w-4 shrink-0 text-right text-[11px] text-muted-soft">{i + 1}</span>
+                                        <Link to={`/user/${user.username}`} className="truncate text-xs font-medium text-ink hover:text-brand">
                                             {user.username}
                                         </Link>
                                     </div>
-                                    <span className="font-mono font-bold text-gray-700 dark:text-gray-350">{user.rating}</span>
-                                </div>
+                                    <span className="tnum shrink-0 text-xs font-semibold text-ink">{user.rating}</span>
+                                </li>
                             ))}
-                            <Link to="/rankings" className="block text-center text-xs text-blue-600 hover:underline mt-2">
-                                View full standings
-                            </Link>
-                        </div>
+                        </ol>
                     )}
-                </div>
+                </Card>
 
                 {/* Quick Links */}
-                <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-5 bg-white dark:bg-gray-800 shadow-sm">
-                    <h3 className="font-bold text-sm mb-3 border-b pb-2 border-gray-100 dark:border-gray-700">{t('home.quickLinks')}</h3>
-                    <div className="grid grid-cols-2 gap-2 text-center">
-                        <Link to="/problems" className="bg-gray-50 hover:bg-gray-100 dark:bg-gray-900/50 dark:hover:bg-gray-900 border border-gray-100 dark:border-gray-750 text-xs py-2 rounded text-gray-700 dark:text-gray-300 font-medium transition-colors">Problems</Link>
-                        <Link to="/practice" className="bg-gray-50 hover:bg-gray-100 dark:bg-gray-900/50 dark:hover:bg-gray-900 border border-gray-100 dark:border-gray-750 text-xs py-2 rounded text-gray-700 dark:text-gray-300 font-medium transition-colors">Practice</Link>
-                        <Link to="/blog" className="bg-gray-50 hover:bg-gray-100 dark:bg-gray-900/50 dark:hover:bg-gray-900 border border-gray-100 dark:border-gray-750 text-xs py-2 rounded text-gray-700 dark:text-gray-300 font-medium transition-colors">Blogs</Link>
-                        <Link to="/rankings" className="bg-gray-50 hover:bg-gray-100 dark:bg-gray-900/50 dark:hover:bg-gray-900 border border-gray-100 dark:border-gray-750 text-xs py-2 rounded text-gray-700 dark:text-gray-300 font-medium transition-colors">Rankings</Link>
+                <Card>
+                    <CardHeader title={t('home.quickLinks')} />
+                    <div className="grid grid-cols-2 gap-2 p-4">
+                        <Link to="/problems" className={buttonClass({ variant: 'secondary', size: 'sm' })}>Problems</Link>
+                        <Link to="/practice" className={buttonClass({ variant: 'secondary', size: 'sm' })}>Practice</Link>
+                        <Link to="/blog" className={buttonClass({ variant: 'secondary', size: 'sm' })}>Blogs</Link>
+                        <Link to="/rankings" className={buttonClass({ variant: 'secondary', size: 'sm' })}>Rankings</Link>
                     </div>
-                </div>
+                </Card>
             </div>
         </div>
     )
@@ -272,7 +347,6 @@ function Home() {
 
 function AppShell() {
     const location = useLocation()
-    const { t } = useTranslation()
     // Full-height workbench routes (no page chrome/footer so flex height can fill the viewport).
     const isFullscreenRoute = location.pathname === '/ide'
 
@@ -280,8 +354,8 @@ function AppShell() {
         <div
             className={
                 isFullscreenRoute
-                    ? 'h-[100dvh] overflow-hidden flex flex-col bg-white dark:bg-gray-800'
-                    : 'min-h-screen flex flex-col bg-white dark:bg-gray-800'
+                    ? 'h-[100dvh] overflow-hidden flex flex-col bg-canvas'
+                    : 'min-h-screen flex flex-col bg-canvas'
             }
         >
             <Navbar />
@@ -299,10 +373,10 @@ function AppShell() {
                 className={
                     isFullscreenRoute
                         ? 'flex-1 min-h-0 flex flex-col max-w-[1400px] mx-auto w-full min-w-0 [&>*]:w-full [&>*]:min-w-0'
-                        : 'max-w-[1400px] mx-auto w-full min-w-0 px-6 py-6 flex-1 min-h-0 flex flex-col [&>*]:w-full [&>*]:min-w-0'
+                        : 'max-w-[1400px] mx-auto w-full min-w-0 px-4 sm:px-6 py-6 sm:py-8 flex-1 min-h-0 flex flex-col [&>*]:w-full [&>*]:min-w-0'
                 }
             >
-                <Suspense fallback={<div className="text-center py-8 text-gray-400 dark:text-gray-500">{t('common.loading')}</div>}>
+                <Suspense fallback={<RouteFallback />}>
                 <Routes>
                     <Route path="/" element={<Home />} />
                     <Route path="/problems" element={<ProblemList />} />
@@ -367,15 +441,24 @@ function AppShell() {
                     <Route path="/legal/terms" element={<TermsOfService />} />
                     <Route path="/legal/privacy" element={<PrivacyPolicy />} />
                     <Route path="/legal/dmca" element={<DMCA />} />
-                    <Route path="*" element={<div className="text-center py-20 text-gray-400 dark:text-gray-500">404 Not Found</div>} />
+                    <Route path="*" element={<NotFound />} />
                 </Routes>
                 </Suspense>
             </main>
             {!isFullscreenRoute && (
-                <footer className="max-w-[1400px] mx-auto w-full px-6 py-6 border-t border-gray-200 dark:border-gray-700 text-sm text-gray-500 dark:text-gray-400 flex flex-wrap gap-4">
-                    <Link to="/legal/terms" className="hover:underline">Terms of Service</Link>
-                    <Link to="/legal/privacy" className="hover:underline">Privacy Policy</Link>
-                    <Link to="/legal/dmca" className="hover:underline">DMCA</Link>
+                <footer className="border-t border-hairline bg-surface">
+                    <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-3 px-4 py-5 text-xs text-muted sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-semibold tracking-tight text-ink">AIOJ</span>
+                            <span aria-hidden="true" className="text-hairline-strong">/</span>
+                            <span>Self-hostable competitive programming</span>
+                        </div>
+                        <nav aria-label="Legal" className="flex flex-wrap items-center gap-4">
+                            <Link to="/legal/terms" className="transition-colors hover:text-ink">Terms of Service</Link>
+                            <Link to="/legal/privacy" className="transition-colors hover:text-ink">Privacy Policy</Link>
+                            <Link to="/legal/dmca" className="transition-colors hover:text-ink">DMCA</Link>
+                        </nav>
+                    </div>
                 </footer>
             )}
             <CookieConsent />

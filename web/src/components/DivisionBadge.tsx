@@ -19,7 +19,7 @@ export default function DivisionBadge({ division, size = 'md' }: DivisionBadgePr
 
   if (division === 0) {
     return (
-      <span className={`inline-flex items-center font-medium rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 ${sizeClasses[size]}`}>
+      <span className={`inline-flex items-center font-medium rounded bg-surface-3 text-muted ${sizeClasses[size]}`}>
         {name}
       </span>
     );

@@ -49,18 +49,18 @@ export default function GroupJoin() {
             {status === 'loading' && (
                 <div>
                     <h1 className="text-2xl font-bold mb-4">Joining group...</h1>
-                    <p className="text-gray-400 dark:text-gray-500">Please wait while we process your request.</p>
+                    <p className="text-muted-soft">Please wait while we process your request.</p>
                 </div>
             )}
 
             {status === 'success' && (
                 <div>
                     <h1 className="text-2xl font-bold mb-4">Joined Successfully!</h1>
-                    <p className="text-gray-600 dark:text-gray-400 mb-6">
+                    <p className="text-muted mb-6">
                         {confirmed ? 'You are now a member of ' : ''}<span className="font-semibold">{groupName}</span>.
                     </p>
                     <div className="flex justify-center gap-4">
-                        <Link to="/groups" className="px-6 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 font-medium">
+                        <Link to="/groups" className="px-6 py-2 bg-brand text-on-brand rounded text-sm hover:bg-brand-hover font-medium">
                             Go to Groups
                         </Link>
                     </div>
@@ -72,19 +72,19 @@ export default function GroupJoin() {
                     <h1 className="text-2xl font-bold mb-4">Join Group</h1>
                     {code ? (
                         <div>
-                            <p className="text-gray-600 dark:text-gray-400 mb-2">
-                                You were invited to join a group using code: <code className="font-mono bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded">{code}</code>
+                            <p className="text-muted mb-2">
+                                You were invited to join a group using code: <code className="font-mono bg-surface-3 px-2 py-0.5 rounded">{code}</code>
                             </p>
                             {message && <p className="text-red-600 dark:text-red-400 text-sm mb-4">{message}</p>}
                             <button onClick={handleJoin}
-                                className="px-6 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 font-medium cursor-pointer">
+                                className="px-6 py-2 bg-brand text-on-brand rounded text-sm hover:bg-brand-hover font-medium cursor-pointer">
                                 Try Again
                             </button>
                         </div>
                     ) : (
                         <div>
                             <p className="text-red-600 dark:text-red-400 mb-4">{message}</p>
-                            <Link to="/groups" className="px-6 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 font-medium">
+                            <Link to="/groups" className="px-6 py-2 bg-brand text-on-brand rounded text-sm hover:bg-brand-hover font-medium">
                                 Browse Groups
                             </Link>
                         </div>

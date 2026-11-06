@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../lib/api'
+import { Card, CardHeader } from './ui/Card'
+import { Badge, type BadgeTone } from './ui/Badge'
+import { Skeleton } from './ui/PageHeader'
 
 interface ActivityItem {
   id: string
@@ -12,10 +15,10 @@ interface ActivityItem {
   created_at: string
 }
 
-const TYPE_BADGE: Record<string, { label: string; cls: string }> = {
-  ac: { label: 'AC', cls: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400' },
-  rating: { label: 'ELO', cls: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-400' },
-  comment: { label: '💬', cls: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400' },
+const TYPE_BADGE: Record<string, { label: string; tone: BadgeTone }> = {
+  ac: { label: 'AC', tone: 'ok' },
+  rating: { label: 'ELO', tone: 'brand' },
+  comment: { label: 'RE', tone: 'neutral' },
 }
 
 function timeAgo(iso: string): string {
@@ -53,45 +56,44 @@ export default function ActivityFeed({ limit = 20 }: { limit?: number }) {
   }, [limit])
 
   return (
-    <section className="space-y-4" data-testid="activity-feed">
-      <div className="flex justify-between items-center">
-        <h2 className="text-xl font-bold">Community Activity</h2>
-      </div>
-      {loading ? (
-        <div className="text-center py-6 text-gray-400 dark:text-gray-500">Loading...</div>
-      ) : items.length === 0 ? (
-        <div className="text-center py-6 text-gray-400 dark:text-gray-500 text-sm">No activity yet.</div>
-      ) : (
-        <div className="border border-gray-200 dark:border-gray-700 rounded-lg divide-y divide-gray-100 dark:divide-gray-750 bg-white dark:bg-gray-800 shadow-sm">
-          {items.map(item => {
-            const badge = TYPE_BADGE[item.type] || TYPE_BADGE.comment
-            return (
-              <div key={item.id} className="px-4 py-3 flex items-start gap-3 text-sm">
-                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${badge.cls}`}>
-                  {badge.label}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap gap-x-2 items-baseline">
-                    <Link
-                      to={`/user/${item.username}`}
-                      className="font-semibold text-blue-600 dark:text-blue-400 hover:underline"
-                    >
-                      {item.username}
-                    </Link>
-                    <span className="text-gray-700 dark:text-gray-300 truncate">{item.title}</span>
-                    <span className="text-xs text-gray-400 ml-auto shrink-0">{timeAgo(item.created_at)}</span>
+    <div data-testid="activity-feed">
+      <Card>
+        <CardHeader title="Community Activity" description="Accepted solutions, rating moves and discussion." />
+        {loading ? (
+          <div className="space-y-3 px-5 py-4">
+            <Skeleton className="h-3.5 w-2/3" />
+            <Skeleton className="h-3.5 w-1/2" />
+            <Skeleton className="h-3.5 w-3/5" />
+          </div>
+        ) : items.length === 0 ? (
+          <p className="px-5 py-8 text-center text-sm text-muted">No activity yet.</p>
+        ) : (
+          <ul className="divide-y divide-hairline">
+            {items.map(item => {
+              const badge = TYPE_BADGE[item.type] || TYPE_BADGE.comment
+              return (
+                <li key={item.id} className="flex items-start gap-3 px-5 py-3">
+                  <Badge tone={badge.tone} className="mt-0.5 shrink-0">{badge.label}</Badge>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                      <Link to={`/user/${item.username}`} className="text-sm font-medium text-ink hover:text-brand">
+                        {item.username}
+                      </Link>
+                      <span className="truncate text-sm text-ink-soft">{item.title}</span>
+                      <time dateTime={item.created_at} className="ml-auto shrink-0 text-[11px] text-muted-soft">
+                        {timeAgo(item.created_at)}
+                      </time>
+                    </div>
+                    {item.summary && (
+                      <p className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-muted">{item.summary}</p>
+                    )}
                   </div>
-                  {item.summary && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">
-                      {item.summary}
-                    </p>
-                  )}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
-    </section>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </Card>
+    </div>
   )
 }
