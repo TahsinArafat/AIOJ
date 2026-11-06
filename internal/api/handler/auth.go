@@ -221,7 +221,9 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	hsh := sha256.Sum256([]byte(req.RefreshToken))
-	userID, err := h.refreshToks.Validate(r.Context(), hex.EncodeToString(hsh[:]))
+	// Consume (not Validate): the presented token is spent here, so the response
+	// carries a rotated one and a replay of the old value is rejected.
+	userID, err := h.refreshToks.Consume(r.Context(), hex.EncodeToString(hsh[:]))
 	if err != nil {
 		http.Error(w, "invalid refresh token", http.StatusUnauthorized)
 		return
@@ -232,6 +234,25 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	respondJSON(w, http.StatusOK, h.tokenResp(r.Context(), user))
+}
+
+// Logout revokes the presented refresh token. It is deliberately
+// unauthenticated and idempotent: a client whose access token has already
+// expired must still be able to end its session, and an unknown token is
+// reported as success so logout never leaks whether a token was valid.
+func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		RefreshToken string `json:"refresh_token"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	if req.RefreshToken != "" {
+		hsh := sha256.Sum256([]byte(req.RefreshToken))
+		_, _ = h.refreshToks.Consume(r.Context(), hex.EncodeToString(hsh[:]))
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *AuthHandler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
@@ -341,6 +362,11 @@ func (h *AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	// A reset is how a locked-out user recovers from a compromise. Every session
+	// issued with the old password must die with it.
+	if err := h.refreshToks.RevokeAll(r.Context(), tok.UserID); err != nil {
+		slog.Error("revoke refresh tokens after reset failed", "user_id", tok.UserID, "error", err)
+	}
 
 	respondJSON(w, http.StatusOK, map[string]string{"message": "password reset successfully"})
 }
@@ -382,9 +408,16 @@ func (h *AuthHandler) maybe2FAChallenge(w http.ResponseWriter, r *http.Request, 
 }
 
 func (h *AuthHandler) tokenResp(ctx context.Context, user *model.User) *model.AuthResponse {
-	access, _ := h.jwt.GenerateAccessToken(user.ID, user.Username, user.Role)
+	access, err := h.jwt.GenerateAccessToken(user.ID, user.Username, user.Role)
+	if err != nil {
+		slog.Error("generate access token failed", "user_id", user.ID, "error", err)
+	}
 	raw, hashed := h.jwt.GenerateRefreshToken()
-	h.refreshToks.Create(ctx, user.ID, hashed, time.Now().Add(h.jwt.RefreshTTL()))
+	if err := h.refreshToks.Create(ctx, user.ID, hashed, time.Now().Add(h.jwt.RefreshTTL())); err != nil {
+		// The client would receive a refresh token that does not exist, so it
+		// can only re-login once the access token expires. Make that visible.
+		slog.Error("persist refresh token failed", "user_id", user.ID, "error", err)
+	}
 	return &model.AuthResponse{AccessToken: access, RefreshToken: raw, User: user}
 }
 

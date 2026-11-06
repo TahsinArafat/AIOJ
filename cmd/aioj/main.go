@@ -252,7 +252,7 @@ func main() {
 	webhookH := handler.NewWebhookHandler(webhookStore)
 	recommendationH := handler.NewRecommendationHandler(problemStore, ratingStore)
 	rankingsH := handler.NewRankingsHandler(userStore)
-	usersH := handler.NewUsersHandler(userStore, blogStore, submissionStore, teamStore, groupStore)
+	usersH := handler.NewUsersHandler(userStore, blogStore, submissionStore, teamStore, groupStore, refreshTokenStore)
 	searchStore := postgres.NewSearchStore(db)
 	searchH := handler.NewSearchHandler(searchStore)
 

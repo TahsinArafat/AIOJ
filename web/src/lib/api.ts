@@ -50,6 +50,33 @@ export function clearTokens() {
     localStorage.removeItem('refresh_token')
 }
 
+/**
+ * End the session on both sides.
+ *
+ * Clearing localStorage alone left the refresh token valid on the server for
+ * its full lifetime (168h), so a copy of it kept working after "logout". The
+ * local state is dropped first so sign-out is instant and works offline; the
+ * server call is best effort.
+ */
+export async function signOut(): Promise<void> {
+    const token = refreshToken
+    clearTokens()
+    if (!token) return
+    try {
+        await fetch(BASE + '/auth/logout', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': await ensureCsrfToken(),
+            },
+            body: JSON.stringify({ refresh_token: token }),
+        })
+    } catch {
+        // Offline or server down: the token still expires on its own.
+    }
+}
+
 export function getAccessToken(): string | null { return accessToken }
 
 function getCsrfToken(): string {
@@ -193,6 +220,8 @@ export const api = {
             request<{ status: string }>(`/auth/verify-email/${encodeURIComponent(token)}`),
         resendVerification: () =>
             request<{ message: string }>('/auth/verify-email/resend', { method: 'POST' }),
+        logout: (refresh_token: string) =>
+            request<null>('/auth/logout', { method: 'POST', body: JSON.stringify({ refresh_token }) }),
     },
     twoFactor: {
         begin: () =>
@@ -584,8 +613,10 @@ export const api = {
             request<{ data: unknown[] }>(`/contests/${contestId}/onsite/prints`),
         updatePrintStatus: (contestId: string, printId: string, status: string) =>
             request(`/contests/${contestId}/onsite/prints/${printId}/status`, { method: 'POST', body: JSON.stringify({ status }) }),
+        // Returns AuthResponse: a linked account with TOTP enabled gets
+        // { requires_2fa, challenge_id } instead of tokens.
         loginAsTeam: (contestId: string, d: unknown) =>
-            request<unknown>(`/contests/${contestId}/onsite/login`, { method: 'POST', body: JSON.stringify(d) }),
+            request<AuthResponse>(`/contests/${contestId}/onsite/login`, { method: 'POST', body: JSON.stringify(d) }),
         generateBatch: (contestId: string, d: unknown) =>
             request<{ users: OnsiteBatchUser[] }>(`/contests/${contestId}/onsite/generate`, { method: 'POST', body: JSON.stringify(d) }),
         listBatch: (contestId: string) =>

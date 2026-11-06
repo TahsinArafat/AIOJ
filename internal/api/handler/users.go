@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -15,15 +16,16 @@ import (
 )
 
 type UsersHandler struct {
-	userStore  store.UserStore
-	blogStore  *postgres.BlogStore
-	subStore   store.SubmissionStore
-	teamStore  store.TeamStore
-	groupStore store.GroupStore
+	userStore   store.UserStore
+	blogStore   *postgres.BlogStore
+	subStore    store.SubmissionStore
+	teamStore   store.TeamStore
+	groupStore  store.GroupStore
+	refreshToks store.RefreshTokenStore
 }
 
-func NewUsersHandler(us store.UserStore, bs *postgres.BlogStore, ss store.SubmissionStore, ts store.TeamStore, gs store.GroupStore) *UsersHandler {
-	return &UsersHandler{userStore: us, blogStore: bs, subStore: ss, teamStore: ts, groupStore: gs}
+func NewUsersHandler(us store.UserStore, bs *postgres.BlogStore, ss store.SubmissionStore, ts store.TeamStore, gs store.GroupStore, rt store.RefreshTokenStore) *UsersHandler {
+	return &UsersHandler{userStore: us, blogStore: bs, subStore: ss, teamStore: ts, groupStore: gs, refreshToks: rt}
 }
 
 func (h *UsersHandler) GetByUsername(w http.ResponseWriter, r *http.Request) {
@@ -203,15 +205,25 @@ func (h *UsersHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	newHash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	// auth.HashPassword keeps the cost factor consistent with registration; the
+	// bcrypt default (10) is weaker than the cost 12 used everywhere else.
+	newHash, err := auth.HashPassword(req.NewPassword)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
-	if err := h.userStore.UpdatePassword(r.Context(), claims.UserID, string(newHash)); err != nil {
+	if err := h.userStore.UpdatePassword(r.Context(), claims.UserID, newHash); err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
+	}
+	// Changing the password ends every other session: that is the whole point of
+	// changing it after a suspected compromise.
+	if h.refreshToks != nil {
+		if err := h.refreshToks.RevokeAll(r.Context(), claims.UserID); err != nil {
+			slog.Error("revoke refresh tokens after password change failed",
+				"user_id", claims.UserID, "error", err)
+		}
 	}
 	respondJSON(w, http.StatusOK, map[string]string{"message": "password updated"})
 }

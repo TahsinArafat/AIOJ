@@ -141,6 +141,7 @@ type stubRefresh struct{}
 func (s *stubRefresh) Create(context.Context, string, string, time.Time) error {
 	return nil
 }
-func (s *stubRefresh) Validate(context.Context, string) (string, error) {
+func (s *stubRefresh) Consume(context.Context, string) (string, error) {
 	return "", nil
 }
+func (s *stubRefresh) RevokeAll(context.Context, string) error { return nil }

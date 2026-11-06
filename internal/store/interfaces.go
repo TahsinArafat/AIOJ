@@ -91,7 +91,13 @@ type SubmissionStore interface {
 
 type RefreshTokenStore interface {
 	Create(ctx context.Context, userID, tokenHash string, expiresAt time.Time) error
-	Validate(ctx context.Context, tokenHash string) (string, error)
+	// Consume deletes the token and returns its owner, giving at-most-once use.
+	// Refresh therefore rotates: a replayed token finds no row and is rejected.
+	Consume(ctx context.Context, tokenHash string) (string, error)
+	// RevokeAll invalidates every refresh token for a user. Used on password
+	// change and reset so a stolen token cannot outlive the credential it came
+	// from.
+	RevokeAll(ctx context.Context, userID string) error
 }
 
 // TOTPSecretStore persists per-user TOTP secrets for 2FA.

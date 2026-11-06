@@ -160,6 +160,9 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 	r.With(rl.StrictAuth).Post("/api/auth/register", authH.Register)
 	r.With(rl.StrictAuth).Post("/api/auth/login", authH.Login)
 	r.Post("/api/auth/refresh", authH.Refresh)
+	// Unauthenticated and idempotent so a client with an expired access token
+	// can still end its session.
+	r.Post("/api/auth/logout", authH.Logout)
 	r.With(rl.StrictAuth).Post("/api/auth/forgot-password", authH.ForgotPassword)
 	r.With(rl.StrictAuth).Post("/api/auth/reset-password", authH.ResetPassword)
 	if d.VerifyEmail != nil {

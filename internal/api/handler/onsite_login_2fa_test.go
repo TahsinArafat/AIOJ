@@ -44,7 +44,8 @@ func (s *countingRefreshStore) Create(context.Context, string, string, time.Time
 	s.created++
 	return nil
 }
-func (s *countingRefreshStore) Validate(context.Context, string) (string, error) { return "", nil }
+func (s *countingRefreshStore) Consume(context.Context, string) (string, error) { return "", nil }
+func (s *countingRefreshStore) RevokeAll(context.Context, string) error         { return nil }
 
 func onsiteLoginRequest(t *testing.T, username, password string) *http.Request {
 	t.Helper()

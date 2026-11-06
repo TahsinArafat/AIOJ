@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { getAccessToken, clearTokens } from '../lib/api'
+import { getAccessToken, signOut } from '../lib/api'
 import { useTheme } from '../context/ThemeContext'
 import NotificationBell from './NotificationBell'
 import LanguageSwitcher from './LanguageSwitcher'
@@ -78,7 +78,8 @@ export default function Navbar() {
     const { theme, toggleTheme } = useTheme()
 
     const handleLogout = () => {
-        clearTokens()
+        // Revokes the refresh token server-side; local state clears immediately.
+        void signOut()
         setMobileMenuOpen(false)
         navigate('/login')
     }

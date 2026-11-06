@@ -20,13 +20,26 @@ func (s *RefreshTokenStore) Create(ctx context.Context, userID, tokenHash string
 	return err
 }
 
-func (s *RefreshTokenStore) Validate(ctx context.Context, tokenHash string) (string, error) {
+// Consume deletes the token and returns its owner. Deleting is what makes
+// refresh rotate: the old token is spent the moment it is used, so a replayed
+// or concurrently replayed token finds no row and fails.
+func (s *RefreshTokenStore) Consume(ctx context.Context, tokenHash string) (string, error) {
 	var userID string
 	err := s.db.QueryRowContext(ctx,
-		`SELECT user_id FROM refresh_tokens WHERE token_hash=$1 AND expires_at > NOW()`, tokenHash,
+		`DELETE FROM refresh_tokens WHERE token_hash=$1 AND expires_at > NOW() RETURNING user_id`,
+		tokenHash,
 	).Scan(&userID)
 	if err == sql.ErrNoRows {
 		return "", fmt.Errorf("token not found or expired")
 	}
-	return userID, err
+	if err != nil {
+		return "", err
+	}
+	return userID, nil
+}
+
+// RevokeAll invalidates every refresh token issued to a user.
+func (s *RefreshTokenStore) RevokeAll(ctx context.Context, userID string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM refresh_tokens WHERE user_id=$1`, userID)
+	return err
 }
