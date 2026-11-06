@@ -33,7 +33,7 @@ test('submits credentials and shows the 2FA step when the server asks for one', 
 
     fireEvent.change(screen.getByLabelText('Username'), { target: { value: 'alice' } })
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'hunter2hunter2' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Login' }))
 
     expect(await screen.findByRole('heading', { name: 'Two-factor authentication' })).toBeInTheDocument()
     expect(api.auth.login).toHaveBeenCalledWith({ username: 'alice', password: 'hunter2hunter2' })
@@ -53,8 +53,8 @@ test('surfaces a login error and keeps the form on screen', async () => {
 
     fireEvent.change(screen.getByLabelText('Username'), { target: { value: 'alice' } })
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'wrong' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Login' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('invalid credentials')
-    expect(screen.getByRole('button', { name: 'Sign in' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Login' })).toBeInTheDocument()
 })

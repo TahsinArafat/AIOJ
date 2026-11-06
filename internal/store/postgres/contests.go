@@ -415,7 +415,7 @@ func (s *ContestStore) GetContestProblemByIndex(ctx context.Context, contestID, 
 		       p.visible, p.spj, p.spj_language, p.spj_source_code, p.checker_type,
 		       p.float_epsilon, p.interactive, p.interactor_language, p.interactor_source_code,
 		       p.scoring_mode, p.subtask_aggregation, p.submission_count, p.accepted_count,
-		       p.source, p.remote_id, p.created_by, p.created_at, p.updated_at
+		       p.source, p.remote_id, COALESCE(p.created_by::text,''), p.created_at, p.updated_at
 		FROM problems p
 		JOIN contest_problems cp ON p.id = cp.problem_id
 		WHERE cp.contest_id = $1 AND cp.index = $2`

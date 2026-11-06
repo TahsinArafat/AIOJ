@@ -107,12 +107,12 @@ export default function Login() {
 
     return (
         <AuthLayout
-            title="Sign in"
+            title="Login"
             subtitle="Continue to your AIOJ workspace."
             footer={
                 <>
                     Don&apos;t have an account?{' '}
-                    <Link to="/register" className="font-medium text-brand hover:underline">Create one</Link>
+                    <Link to="/register" className="font-medium text-brand hover:underline">Register</Link>
                 </>
             }
         >
@@ -148,7 +148,7 @@ export default function Login() {
                     />
                 </Field>
                 <Button type="submit" size="lg" className="w-full" disabled={loading}>
-                    {loading ? 'Signing in…' : 'Sign in'}
+                    {loading ? 'Logging in…' : 'Login'}
                 </Button>
             </form>
 

@@ -2,6 +2,24 @@ import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../lib/api'
 
+/**
+ * One in-flight verify request per token, shared across mounts.
+ *
+ * Cleared once it settles so a genuine retry (user re-opens the link after a
+ * failure) still hits the server rather than replaying a cached rejection.
+ */
+const inFlight = new Map<string, Promise<unknown>>()
+
+function verifyOnce(token: string): Promise<unknown> {
+    const existing = inFlight.get(token)
+    if (existing) return existing
+    const p = api.auth.verifyEmail(token).finally(() => {
+        inFlight.delete(token)
+    })
+    inFlight.set(token, p)
+    return p
+}
+
 export default function VerifyEmail() {
     const [params] = useSearchParams()
     const token = params.get('token') || ''
@@ -17,7 +35,14 @@ export default function VerifyEmail() {
             })
             return
         }
-        api.auth.verifyEmail(token)
+        // The token is single-use server-side, so the request must fire exactly
+        // once per token. React StrictMode deliberately mounts, unmounts and
+        // re-mounts every component in development, which ran this effect
+        // twice: the first call verified and the second came back "token
+        // already used", painting a failure over a success. Sharing one
+        // in-flight promise makes the effect idempotent — and also covers a
+        // genuine remount (back/forward) landing on the same link.
+        verifyOnce(token)
             .then(() => setState('ok'))
             .catch((e) => {
                 setState('err')

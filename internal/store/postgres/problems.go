@@ -99,7 +99,7 @@ func (s *ProblemStore) getBy(ctx context.Context, field, value string) (*model.P
 		id,slug,title,description,input_format,output_format,hint,sample_cases,
 		time_limit,memory_limit,difficulty,tags,visible,testdata_path,testcase_score,
 		spj,spj_language,spj_source_code,spj_version,checker_type,float_epsilon,submission_count,accepted_count,
-		source,remote_id,created_by,created_at,updated_at,
+		source,remote_id,COALESCE(created_by::text,''),created_at,updated_at,
 		interactive,COALESCE(interactor_language,''),COALESCE(interactor_source_code,''),
 		COALESCE(scoring_mode,'complete'),COALESCE(subtask_aggregation,'min'),
 		COALESCE(ai_generated,false) FROM problems WHERE %s=$1`, field), value).Scan(

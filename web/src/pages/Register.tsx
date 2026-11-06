@@ -60,12 +60,12 @@ export default function Register() {
 
     return (
         <AuthLayout
-            title="Create an account"
+            title="Register"
             subtitle="Free, self-hosted, and yours to run."
             footer={
                 <>
                     Already have an account?{' '}
-                    <Link to="/login" className="font-medium text-brand hover:underline">Sign in</Link>
+                    <Link to="/login" className="font-medium text-brand hover:underline">Login</Link>
                 </>
             }
         >
@@ -105,7 +105,7 @@ export default function Register() {
                     />
                 </Field>
                 <Button type="submit" size="lg" className="w-full" disabled={loading}>
-                    {loading ? 'Creating account…' : 'Create account'}
+                    {loading ? 'Creating account…' : 'Register'}
                 </Button>
             </form>
         </AuthLayout>
