@@ -7,35 +7,133 @@
    appears broken even though the class is being toggled correctly. */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* ── Design tokens ────────────────────────────────────────────────────────────
+   Two layers on purpose:
+
+   1. Raw palette (`--canvas`, `--surface`, …) — what the app actually paints.
+   2. Semantic Tailwind colours (`@theme inline` below) — what components ask
+      for: `bg-surface`, `text-muted`, `border-hairline`.
+
+   Because the semantic colours resolve to the raw vars at use time, a
+   component written with `bg-surface text-ink` is automatically correct in
+   both themes. That removes the old failure mode where a card was
+   `bg-white dark:bg-gray-800` while the page canvas *was* gray-800, so in dark
+   mode cards had no edge at all and only a 1px border separated them.
+
+   Light: a faintly cool canvas so white cards read as raised surfaces.
+   Dark: a near-black canvas so elevated surfaces have somewhere to rise to.
+   ──────────────────────────────────────────────────────────────────────────── */
 :root {
-    --background: #ffffff;
-    --foreground: #0a0a0a;
+    --canvas: #f6f7f9;
+    --surface: #ffffff;
+    --surface-2: #f8fafc;
+    --surface-3: #eef1f5;
+    --ink: #0b1220;
+    --ink-soft: #38414f;
+    --muted: #5b6675;
+    --muted-soft: #7c8797;
+    --border: #e3e7ec;
+    --border-strong: #cdd4dd;
     --primary: #2563eb;
-    --border: #e5e7eb;
-    --muted: #6b7280;
+    --primary-hover: #1d4ed8;
+    --primary-ink: #ffffff;
+    --primary-soft: #eff4ff;
+    --ring: #2563eb;
+    --success: #0f7a4d;
+    --warning: #a16207;
+    --danger: #b42318;
+    --shadow-card: 0 1px 2px rgba(11, 18, 32, 0.05), 0 1px 3px rgba(11, 18, 32, 0.04);
+
+    /* Source code keeps a dark surface in both themes: it is the one place
+       where a light-on-dark block reads better than a card, and it makes the
+       submission's code visually distinct from prose. */
+    --code-bg: #0d1117;
+    --code-ink: #c9d1d9;
+    --code-border: #1f2937;
+
+    /* Back-compat aliases: a few inline styles still read these. */
+    --background: var(--canvas);
+    --foreground: var(--ink);
 }
 
-/* Eye-comfortable dark palette (not AMOLED pure black).
-   Gray-800 #1f2937 is widely used for "comfortable dark" — soft enough
-   to reduce eye strain, dark enough for OLED contrast, with ~13:1 text
-   contrast ratio (WCAG AAA) against gray-100 foreground. */
+/* Eye-comfortable dark palette (not AMOLED pure black), with the canvas
+   darker than every elevated surface so hierarchy survives. */
 .dark {
-    --background: #1f2937;
-    --foreground: #f3f4f6;
+    --canvas: #0a0e14;
+    --surface: #141a23;
+    --surface-2: #1a212c;
+    --surface-3: #212a37;
+    --ink: #e8ecf2;
+    --ink-soft: #cbd3de;
+    --muted: #97a1b0;
+    --muted-soft: #7b8697;
+    --border: #232b37;
+    --border-strong: #33404f;
     --primary: #60a5fa;
-    --border: #374151;
-    --muted: #9ca3af;
+    --primary-hover: #93c5fd;
+    --primary-ink: #071018;
+    --primary-soft: #16243a;
+    --ring: #93c5fd;
+    --success: #4ade80;
+    --warning: #fbbf24;
+    --danger: #f87171;
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+
+    --code-bg: #0d1117;
+    --code-ink: #c9d1d9;
+    --code-border: #232b37;
+
+    --background: var(--canvas);
+    --foreground: var(--ink);
+}
+
+/* Semantic utilities: `bg-surface`, `text-muted`, `border-hairline`, … */
+@theme inline {
+    --color-canvas: var(--canvas);
+    --color-surface: var(--surface);
+    --color-surface-2: var(--surface-2);
+    --color-surface-3: var(--surface-3);
+    --color-ink: var(--ink);
+    --color-ink-soft: var(--ink-soft);
+    --color-muted: var(--muted);
+    --color-muted-soft: var(--muted-soft);
+    --color-hairline: var(--border);
+    --color-hairline-strong: var(--border-strong);
+    --color-brand: var(--primary);
+    --color-brand-hover: var(--primary-hover);
+    --color-brand-soft: var(--primary-soft);
+    --color-on-brand: var(--primary-ink);
+    --color-ok: var(--success);
+    --color-warn: var(--warning);
+    --color-bad: var(--danger);
+    --color-code: var(--code-bg);
+    --color-code-ink: var(--code-ink);
+    --color-code-border: var(--code-border);
+}
+
+@theme {
+    --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+        "Helvetica Neue", Arial, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+        "Liberation Mono", monospace;
 }
 
 html {
     transition: background-color 0.2s ease, color 0.2s ease;
     height: 100%;
+    color-scheme: light;
+}
+
+html.dark {
+    color-scheme: dark;
 }
 
 body {
-    background: var(--background);
-    color: var(--foreground);
-    font-family: system-ui, -apple-system, sans-serif;
+    background: var(--canvas);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     margin: 0;
     min-height: 100%;
     overflow-x: hidden;
@@ -47,6 +145,51 @@ body {
 
 * {
     box-sizing: border-box;
+}
+
+/* A single visible focus treatment for every interactive element. Tailwind's
+   preflight strips outlines, so keyboard users previously had no focus
+   indicator on plain links and buttons. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: 6px;
+}
+
+::selection {
+    background: color-mix(in oklab, var(--primary) 26%, transparent);
+    color: var(--ink);
+}
+
+/* Numeric columns (ratings, ranks, timings, memory) line up only with
+   tabular figures. `.tnum` is opt-in for arbitrary elements. */
+.tnum {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+}
+
+/* Slim scrollbars so dense tables do not get chunky OS scrollbars inside
+   their own overflow containers. */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
+}
+
+*::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+*::-webkit-scrollbar-thumb {
+    background: var(--border-strong);
+    border-radius: 999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+    background: var(--muted-soft);
+    background-clip: content-box;
 }
 
 .prose :where(code):not(:where([class~="not-prose"], [class~="not-prose"] *)):before,
