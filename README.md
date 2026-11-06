@@ -158,6 +158,14 @@ JWT_SECRET=<long-random-string>
 
 Generate a secret with `openssl rand -hex 32`.
 
+`JWT_SECRET` is mandatory and validated at startup: the backend refuses to boot
+with an empty, shorter-than-32-byte, or published-default secret, because anyone
+who knows the signing key can forge an admin token.
+
+`AIOJ_ENV` selects the profile. It defaults to `production`; set
+`AIOJ_ENV=development` for a local checkout (this enables the
+`/api/dev/mail` inspector and only warns about weak secrets).
+
 ### 2. Start the stack
 
 ```bash
@@ -184,11 +192,14 @@ Wait a few seconds for PostgreSQL and the judge sandbox to initialize. The backe
 |---------|------|---------|
 | Frontend (nginx) | 80 | React SPA |
 | Backend (Go) | 8080 | REST API + WebSocket |
-| PostgreSQL | 5432 | Database |
-| Redis | 6379 | Judge queue |
-| go-judge | 5050 | Sandbox executor |
-| Prometheus | 9090 | Metrics |
-| Grafana | 3000 | Dashboards |
+| Prometheus | 127.0.0.1:9090 | Metrics |
+| Grafana | 127.0.0.1:3000 | Dashboards (login required) |
+
+PostgreSQL (5432), Redis (6379) and go-judge (5050) are **not published** by
+`docker-compose.yml`: they are reachable only from other containers on the
+compose network. go-judge in particular runs privileged and accepts arbitrary
+argv, and Redis holds the judge queue — neither belongs on a host port. Run
+`docker compose exec postgres psql -U aioj` for database access.
 
 ---
 
@@ -240,7 +251,9 @@ Configuration is layered: **`config.yaml`** provides defaults, and environment v
 | Env var | Purpose | Default |
 |---------|---------|---------|
 | `DB_HOST` / `DB_PORT` / `DB_NAME` / `DB_USER` / `DB_PASSWORD` | PostgreSQL connection | `localhost:5432 / aioj` |
-| `JWT_SECRET` | Signs access/refresh tokens | `change-me-in-production` |
+| `AIOJ_ENV` | `production` \| `development` (dev enables `/api/dev/mail` and relaxes secret checks) | `production` |
+| `JWT_SECRET` | Signs access/refresh tokens — **required**, ≥32 bytes, no published defaults | none |
+| `TRUSTED_PROXIES` | CIDRs allowed to set `X-Forwarded-For`; empty disables header trust | loopback + RFC1918 |
 | `CSRF_SECRET` | CSRF token signing | falls back to JWT secret |
 | `JUDGE_ENDPOINT` | go-judge base URL | `http://localhost:5050` |
 | `JUDGE_CONCURRENCY` | Parallel judge workers | `4` |

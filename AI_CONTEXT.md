@@ -20,8 +20,13 @@ make migrate-up
 **URLs:**
 - Frontend: http://localhost (React SPA via nginx)
 - Backend: http://localhost:8080 (Go, Chi router)
-- Judge: http://localhost:5050 (go-judge sandbox)
-- Postgres: localhost:5432 (user: aioj, db: aioj)
+- Judge, Postgres, Redis: **internal only** (`judge:5050`, `postgres:5432`,
+  `redis:6379` on the compose network) — deliberately not published to the host.
+  Use `docker compose exec postgres psql -U aioj` for DB access.
+
+**Environment:** `AIOJ_ENV` is `production` by default; `development` is required
+for `/api/dev/mail` and only warns about weak secrets. `JWT_SECRET` is mandatory
+(≥32 bytes) — startup aborts without it.
 
 **Default admin:** admin / admin_secret
 
