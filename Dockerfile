@@ -18,6 +18,10 @@ WORKDIR /app
 COPY --from=builder /app/aioj .
 COPY --from=builder /app/seed .
 COPY --from=builder /app/config.yaml .
+# The repo's config.yaml is the local development profile (it allows the dev
+# mail inspector and tolerates a weak JWT secret). An image is never that, so
+# bake the production profile in; compose can still override it with AIOJ_ENV.
+RUN sed -i 's/^environment:.*/environment: "production"/' /app/config.yaml
 COPY --from=builder /app/lang ./lang
 COPY --from=builder /app/internal/store/migrations ./internal/store/migrations
 RUN mkdir -p /app/backups /app/testdata

@@ -51,6 +51,17 @@ func main() {
 
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
 	slog.Info("starting aioj", "port", cfg.Server.Port)
+
+	// Refuse to boot with an empty, short, or published-default JWT secret:
+	// anyone who reads this repo could otherwise forge an admin token.
+	warnings, err := cfg.Validate()
+	if err != nil {
+		log.Fatalf("config: %v", err)
+	}
+	for _, w := range warnings {
+		slog.Warn("insecure configuration", "detail", w)
+	}
+
 	defer observability.InitSentry()()
 
 	db, err := postgres.Connect(cfg.Database)
@@ -321,9 +332,16 @@ func main() {
 	generateH := handler.NewGenerateHandler(genSvc)
 
 	verifyH := &handler.EmailVerificationHandler{Users: userStore, Tokens: evtStore}
+	// The mail-catcher inspector exposes every message (verification and
+	// password-reset links) to anyone who can reach the API. Mount it only in
+	// development — never in production, even when the driver is "catcher".
 	var devMailH *handler.DevMailHandler
-	if cfg.Mail.Driver == "catcher" {
+	if cfg.Mail.Driver == "catcher" && cfg.IsDevelopment() {
 		devMailH = &handler.DevMailHandler{Sender: mailSender}
+		slog.Warn("dev mail inspector mounted at /api/dev/mail (environment=development)")
+	} else if cfg.Mail.Driver == "catcher" {
+		slog.Warn("mail.driver=catcher outside development: messages are captured in memory " +
+			"and /api/dev/mail stays disabled")
 	}
 
 	twoFAH := &handler.TwoFactorHandler{Users: userStore, Secrets: totpStore, Backups: backupCodeStore}

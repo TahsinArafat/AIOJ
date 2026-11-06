@@ -1,6 +1,8 @@
 package config
 
 import (
+	"fmt"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -8,17 +10,88 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Environment names. Anything other than EnvDevelopment is treated as
+// production, so a missing or misspelled value fails closed.
+const (
+	EnvDevelopment = "development"
+	EnvProduction  = "production"
+)
+
 type Config struct {
-	Server   ServerConfig   `yaml:"server"`
-	Database DatabaseConfig `yaml:"database"`
-	Auth     AuthConfig     `yaml:"auth"`
-	OAuth    OAuthConfig    `yaml:"oauth"`
-	Judge    JudgeConfig    `yaml:"judge"`
-	Redis    RedisConfig    `yaml:"redis"`
-	AI       AIConfig       `yaml:"ai"`
-	Mail     MailConfig     `yaml:"mail"`
-	Features FeaturesConfig `yaml:"features"`
-	LangDir  string         `yaml:"lang_dir"`
+	// Environment selects the deployment profile. Development relaxes a few
+	// safety checks (weak secrets warn instead of aborting, dev-only routes are
+	// mounted). Default is production.
+	Environment string         `yaml:"environment"`
+	Server      ServerConfig   `yaml:"server"`
+	Database    DatabaseConfig `yaml:"database"`
+	Auth        AuthConfig     `yaml:"auth"`
+	OAuth       OAuthConfig    `yaml:"oauth"`
+	Judge       JudgeConfig    `yaml:"judge"`
+	Redis       RedisConfig    `yaml:"redis"`
+	AI          AIConfig       `yaml:"ai"`
+	Mail        MailConfig     `yaml:"mail"`
+	Features    FeaturesConfig `yaml:"features"`
+	LangDir     string         `yaml:"lang_dir"`
+}
+
+// IsDevelopment reports whether dev-only behaviour (mail catcher inspector,
+// relaxed secret checks) is allowed.
+func (c *Config) IsDevelopment() bool {
+	return strings.EqualFold(strings.TrimSpace(c.Environment), EnvDevelopment)
+}
+
+// minJWTSecretLen is the shortest HS256 key we accept. Shorter keys are
+// brute-forceable offline from a single captured token.
+const minJWTSecretLen = 32
+
+// knownWeakJWTSecrets are values that have shipped in docs, examples, or
+// earlier revisions of this repo. Anyone can sign a token with them.
+var knownWeakJWTSecrets = map[string]struct{}{
+	"change-me-in-production":                          {},
+	"change-me-in-production-use-a-long-random-string": {},
+	"changeme":   {},
+	"jwt-secret": {},
+	"secret":     {},
+	"dev":        {},
+	"test":       {},
+}
+
+// Validate reports fatal configuration problems. In development, weak secrets
+// are returned as warnings instead of errors so a local checkout still boots;
+// in production they abort startup. An empty JWT secret is always fatal.
+func (c *Config) Validate() (warnings []string, err error) {
+	if msg := c.jwtSecretProblem(); msg != "" {
+		if c.Auth.JWTSecret == "" || !c.IsDevelopment() {
+			return nil, fmt.Errorf("auth.jwt_secret %s — set JWT_SECRET to a random value "+
+				"(e.g. `openssl rand -hex 32`)", msg)
+		}
+		warnings = append(warnings, fmt.Sprintf("auth.jwt_secret %s — acceptable only because "+
+			"environment=development; set JWT_SECRET before deploying", msg))
+	}
+	if !c.IsDevelopment() && strings.EqualFold(c.Mail.Driver, "catcher") {
+		warnings = append(warnings, "mail.driver=catcher in production: outbound mail is "+
+			"captured in memory and never delivered")
+	}
+	return warnings, nil
+}
+
+// jwtSecretProblem returns a human-readable description of what is wrong with
+// the configured JWT secret, or "" when it is acceptable.
+func (c *Config) jwtSecretProblem() string {
+	secret := strings.TrimSpace(c.Auth.JWTSecret)
+	switch {
+	case secret == "":
+		return "is empty"
+	case len(secret) < minJWTSecretLen:
+		return fmt.Sprintf("is too short (%d bytes, need at least %d)", len(secret), minJWTSecretLen)
+	}
+	if _, weak := knownWeakJWTSecrets[strings.ToLower(secret)]; weak {
+		return "is a published default value"
+	}
+	if strings.Trim(secret, string(secret[0])) == "" {
+		return "is a single repeated character"
+	}
+	return ""
 }
 
 // FeaturesConfig holds geolocation / rollout toggles.
@@ -87,6 +160,35 @@ type JudgeConfig struct {
 
 type RedisConfig struct {
 	URL string `yaml:"url"`
+	// Password authenticates against a protected Redis (REDIS_PASSWORD). When
+	// empty, a password embedded in URL (redis://:pass@host:port) is used.
+	Password string `yaml:"password"`
+}
+
+// Addr returns the host:port go-redis expects, accepting either a bare
+// "host:port" (the historical form) or a redis:// URL.
+func (r RedisConfig) Addr() string {
+	u, err := url.Parse(strings.TrimSpace(r.URL))
+	if err != nil || u.Host == "" || (u.Scheme != "redis" && u.Scheme != "rediss") {
+		return strings.TrimSpace(r.URL)
+	}
+	return u.Host
+}
+
+// ResolvePassword returns the configured password, falling back to credentials
+// embedded in the URL.
+func (r RedisConfig) ResolvePassword() string {
+	if r.Password != "" {
+		return r.Password
+	}
+	u, err := url.Parse(strings.TrimSpace(r.URL))
+	if err != nil || u.User == nil {
+		return ""
+	}
+	if p, ok := u.User.Password(); ok {
+		return p
+	}
+	return ""
 }
 
 type AIConfig struct {
@@ -110,6 +212,9 @@ func Load(path string) (*Config, error) {
 	var cfg Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, err
+	}
+	if v := os.Getenv("AIOJ_ENV"); v != "" {
+		cfg.Environment = strings.TrimSpace(v)
 	}
 	if v := os.Getenv("SERVER_PORT"); v != "" {
 		cfg.Server.Port = atoi(v)
@@ -137,6 +242,9 @@ func Load(path string) (*Config, error) {
 	}
 	if v := os.Getenv("REDIS_URL"); v != "" {
 		cfg.Redis.URL = v
+	}
+	if v := os.Getenv("REDIS_PASSWORD"); v != "" {
+		cfg.Redis.Password = v
 	}
 	if v := os.Getenv("JWT_SECRET"); v != "" {
 		cfg.Auth.JWTSecret = v
