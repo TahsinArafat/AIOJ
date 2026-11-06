@@ -75,8 +75,14 @@ function setHash(hash: string) {
     })
 }
 
+/**
+ * The active tab is identified by `aria-current`, not by its colour class: the
+ * old `button.bg-blue-50` selector silently stopped matching as soon as the
+ * palette moved onto design tokens, and it never described anything a screen
+ * reader could use either.
+ */
 function activeTabLabel(): string | undefined {
-    return document.querySelector('main nav button.bg-blue-50, nav button.bg-blue-50')?.textContent?.trim()
+    return document.querySelector('nav button[aria-current="page"]')?.textContent?.trim()
 }
 
 test('admin panel starts on the tab named in the URL hash', async () => {

@@ -39,8 +39,12 @@ function renderPage() {
 }
 
 async function openTestsTab() {
-    await waitFor(() => expect(screen.getByText(/Submission sub-1/)).toBeInTheDocument())
-    fireEvent.click(screen.getByRole('button', { name: /^tests/ }))
+    // The header splits the label and the id into separate nodes for layout, so
+    // assert on the heading role rather than a single concatenated string.
+    await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Submission'))
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('sub-1')
+    // Tabs are real tabs now (`role="tab"`), not unlabelled buttons.
+    fireEvent.click(screen.getByRole('tab', { name: /^Test cases/ }))
 }
 
 function baseSubmission(overrides: Record<string, unknown> = {}) {
@@ -78,8 +82,8 @@ test('renders judge cases in the fallback (non-subtask) view', async () => {
     renderPage()
     await openTestsTab()
 
-    expect(screen.getByText('Test Case 1: small-1')).toBeInTheDocument()
-    expect(screen.getByText('Test Case 2: big-1')).toBeInTheDocument()
+    expect(screen.getByText('small-1')).toBeInTheDocument()
+    expect(screen.getByText('big-1')).toBeInTheDocument()
     expect(screen.getByText('wrong answer on line 3')).toBeInTheDocument()
 })
 
