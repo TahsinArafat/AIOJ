@@ -11,10 +11,21 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+// Token type tags. Access tokens and 2FA challenge tokens are both signed with
+// the same key, so the type claim is what keeps one from being replayed as the
+// other: a challenge token is issued after the password check alone, and
+// without this tag it was accepted by AuthMiddleware as a valid session.
+const (
+	TokenTypeAccess = "access"
+	TokenType2FA    = "2fa"
+)
+
 type Claims struct {
 	UserID   string `json:"uid"`
 	Username string `json:"uname"`
 	Role     string `json:"role"`
+	// Type must equal TokenTypeAccess for the token to authorize a request.
+	Type string `json:"typ"`
 	jwt.RegisteredClaims
 }
 
@@ -29,10 +40,16 @@ func NewJWTManager(secret string, accessTTL, refreshTTL time.Duration) *JWTManag
 }
 
 func (m *JWTManager) GenerateAccessToken(userID, username, role string) (string, error) {
-	claims := Claims{userID, username, role, jwt.RegisteredClaims{
-		ExpiresAt: jwt.NewNumericDate(time.Now().Add(m.accessTTL)),
-		IssuedAt:  jwt.NewNumericDate(time.Now()),
-	}}
+	claims := Claims{
+		UserID:   userID,
+		Username: username,
+		Role:     role,
+		Type:     TokenTypeAccess,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(m.accessTTL)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+		},
+	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString(m.secret)
 }
@@ -50,6 +67,15 @@ func (m *JWTManager) ValidateToken(tokenStr string) (*Claims, error) {
 	claims, ok := token.Claims.(*Claims)
 	if !ok || !token.Valid {
 		return nil, fmt.Errorf("invalid token")
+	}
+	// Reject anything that is not a session token. A 2FA challenge token is
+	// signed with this same key but proves only "password was correct", and it
+	// carries no uid — accepting it here authenticated the caller as user "".
+	if claims.Type != TokenTypeAccess {
+		return nil, fmt.Errorf("not an access token")
+	}
+	if claims.UserID == "" {
+		return nil, fmt.Errorf("token has no subject")
 	}
 	return claims, nil
 }
