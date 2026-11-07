@@ -43,7 +43,16 @@ func (ir *InteractiveRunner) Run(ctx context.Context, in RunInput) (RunOutput, e
 	maxTime, maxMem, totalScore := 0, 0, 0
 
 	for _, tc := range prob.TestCaseScore {
-		inputContent := loadFile(filepath.Join(prob.TestdataPath, tc.InputName))
+		inputContent, loadErr := loadFile(filepath.Join(prob.TestdataPath, tc.InputName))
+		if loadErr != nil {
+			results = append(results, model.TestCaseResult{
+				CaseName: tc.InputName,
+				Status:   model.StatusSE,
+				Detail:   "failed to load input: " + loadErr.Error(),
+			})
+			finalStatus = model.StatusSE
+			continue
+		}
 
 		interRunCopyIn := map[string]executor.CmdFile{
 			"interactor": interactorFile,

@@ -71,7 +71,17 @@ func (b *BatchRunner) runOne(
 
 	args := buildRunArgs(langCfg, in.CompiledResult)
 
-	inputContent := loadFile(filepath.Join(prob.TestdataPath, tc.InputName))
+	// A missing testdata file is an infrastructure fault, not a wrong answer.
+	// Serving an empty input made it indistinguishable from a broken test and
+	// reported WA for something the judge could not read.
+	inputContent, err := loadFile(filepath.Join(prob.TestdataPath, tc.InputName))
+	if err != nil {
+		return model.TestCaseResult{
+			CaseName: tc.InputName,
+			Status:   model.StatusSE,
+			Detail:   "failed to load input: " + err.Error(),
+		}
+	}
 	copyIn["input.txt"] = executor.CmdFile{Content: inputContent}
 
 	start := time.Now()
@@ -107,7 +117,12 @@ func (b *BatchRunner) runOne(
 	switch cr.Status {
 	case "Accepted":
 		output := cr.Files["output.txt"]
-		expected := loadFile(filepath.Join(prob.TestdataPath, tc.OutputName))
+		expected, loadErr := loadFile(filepath.Join(prob.TestdataPath, tc.OutputName))
+		if loadErr != nil {
+			r.Status = model.StatusSE
+			r.Detail = "failed to load expected output: " + loadErr.Error()
+			return r
+		}
 		b.applyChecker(prob, tc, inputContent, output, expected, in.SPJFile, &r)
 	case "Nonzero Exit Status":
 		r.Status = model.StatusRE
@@ -246,11 +261,15 @@ func subtaskOrderedCases(prob *model.Problem) []model.TestCaseScore {
 	return out
 }
 
-// loadFile reads a file from disk, returning an empty string on error.
-func loadFile(path string) string {
+// loadFile reads a testdata file, reporting a read failure.
+//
+// It used to return an empty string on error, which turned a missing or
+// unreadable test case into an empty input: the submission then "failed" on
+// data the judge never loaded, and the verdict blamed the contestant.
+func loadFile(path string) (string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return ""
+		return "", err
 	}
-	return string(data)
+	return string(data), nil
 }

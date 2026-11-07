@@ -72,8 +72,11 @@ func (s *ApplyService) Apply(ctx context.Context, job *model.AIGenerationJob, ac
 		problem.OutputFormat = p.OutputFormat
 		problem.Hint = p.Hint
 		problem.SampleCases = p.SampleCases
-		problem.TimeLimit = p.TimeLimitMs
-		problem.MemoryLimit = p.MemoryLimitKB * 1024
+		// Default rather than store zero: this judge uses time_limit as the CPU
+		// limit, so a proposal that omitted it would produce an unjudgeable
+		// problem that TLEs everything.
+		problem.TimeLimit = defaultInt(p.TimeLimitMs, 2000)
+		problem.MemoryLimit = defaultInt(p.MemoryLimitKB, 262144) * 1024
 		problem.Difficulty = p.Difficulty
 		problem.Tags = p.Tags
 	}
@@ -116,10 +119,14 @@ func (s *ApplyService) Apply(ctx context.Context, job *model.AIGenerationJob, ac
 			if strings.HasSuffix(entry.Name(), ".in") {
 				stem := strings.TrimSuffix(entry.Name(), ".in")
 				if _, err := os.Stat(filepath.Join(versionPath, stem+".out")); err == nil {
-					problem.TestCaseScore = append(problem.TestCaseScore, model.TestCaseScore{InputName: entry.Name(), OutputName: stem + ".out", Score: 10})
+					problem.TestCaseScore = append(problem.TestCaseScore, model.TestCaseScore{InputName: entry.Name(), OutputName: stem + ".out"})
 				}
 			}
 		}
+		// Spread 100 points across the cases. A flat 10 per case meant a
+		// 12-case problem was scored out of 120, which breaks every percentage
+		// and partial-score display downstream.
+		assignScores(problem.TestCaseScore)
 		if err = s.Problems.Update(ctx, problem.ID, problem); err != nil {
 			return nil, err
 		}
@@ -138,4 +145,31 @@ func (s *ApplyService) Apply(ctx context.Context, job *model.AIGenerationJob, ac
 		_ = s.Audit.Insert(ctx, &model.AuditEntry{ActorID: actorID, Action: "AI APPLY", TargetType: "problem", TargetID: problem.ID, Detail: detail})
 	}
 	return &ApplyResult{ProblemID: problem.ID, ProblemSlug: problem.Slug}, nil
+}
+
+// defaultInt returns v when positive, otherwise fallback.
+func defaultInt(v, fallback int) int {
+	if v > 0 {
+		return v
+	}
+	return fallback
+}
+
+// assignScores distributes 100 points across the cases, giving the remainder to
+// the earliest cases so the total is exactly 100.
+//
+// A flat 10 points per case meant a 12-case problem was scored out of 120,
+// which breaks every percentage and partial-score display downstream.
+func assignScores(cases []model.TestCaseScore) {
+	if len(cases) == 0 {
+		return
+	}
+	base := 100 / len(cases)
+	remainder := 100 % len(cases)
+	for i := range cases {
+		cases[i].Score = base
+		if i < remainder {
+			cases[i].Score++
+		}
+	}
 }

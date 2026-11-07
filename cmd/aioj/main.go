@@ -356,6 +356,7 @@ func main() {
 		harnessWorker := &problemgen.Worker{
 			Jobs:       aiGenerationStore,
 			Runner:     runner,
+			Corpus:     postgres.NewNoveltyCorpus(db),
 			Transcript: postgres.NewHarnessTranscript(db),
 			Staging:    cfg.AI.StagedTestdataRoot,
 			MaxBytes:   cfg.AI.MaxJobBytes,
