@@ -47,7 +47,7 @@ func (wp *WorkerPool) runInteractive(
 		PipeInput: true,
 	}
 
-	results, err := wp.exec.Run(req)
+	results, err := wp.exec.Run(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("interactive execution error: %w", err)
 	}

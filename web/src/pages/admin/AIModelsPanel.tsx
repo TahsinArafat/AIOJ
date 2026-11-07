@@ -49,6 +49,7 @@ export default function AIModelsPanel() {
     const [saving, setSaving] = useState(false)
     const [testState, setTestState] = useState<TestState>('idle')
     const [testError, setTestError] = useState('')
+    const [encryptionError, setEncryptionError] = useState(false)
 
     const loadModels = () => {
         setLoading(true)
@@ -67,6 +68,7 @@ export default function AIModelsPanel() {
         setForm({ ...emptyForm })
         setTestState('idle')
         setTestError('')
+        setEncryptionError(false)
         setShowForm(true)
     }
 
@@ -98,12 +100,14 @@ export default function AIModelsPanel() {
         setForm({ ...emptyForm })
         setTestState('idle')
         setTestError('')
+        setEncryptionError(false)
     }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!form.name || !form.endpoint || !form.model_name) return
         setSaving(true)
+        setEncryptionError(false)
         try {
             if (editingId) {
                 await api.admin.aiModels.update(editingId, form)
@@ -113,7 +117,11 @@ export default function AIModelsPanel() {
             handleCancel()
             loadModels()
         } catch (err) {
-            toast.error('Save failed: ' + (err instanceof Error ? err.message : String(err)))
+            const msg = err instanceof Error ? err.message : String(err)
+            if (msg.includes('AI_CREDENTIAL_MASTER_KEY') || msg.includes('encryption is not configured')) {
+                setEncryptionError(true)
+            }
+            toast.error('Save failed: ' + msg)
         } finally {
             setSaving(false)
         }
@@ -305,6 +313,24 @@ export default function AIModelsPanel() {
                                 <span className="text-sm text-bad dark:text-red-400">✗ {testError || 'Connection failed'}</span>
                             )}
                         </div>
+
+                        {/* Encryption-not-configured banner */}
+                        {encryptionError && (
+                            <div className="rounded-lg border border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/40 p-4 text-sm">
+                                <p className="font-semibold text-red-700 dark:text-red-400 mb-1">API key encryption is not configured</p>
+                                <p className="text-red-600 dark:text-red-300">
+                                    To store an API key, the server needs <code className="font-mono bg-red-100 dark:bg-red-900/60 px-1 rounded">AI_CREDENTIAL_MASTER_KEY</code> set
+                                    to a base64-encoded 32-byte secret.
+                                </p>
+                                <p className="text-red-600 dark:text-red-300 mt-2">
+                                    Generate one with: <code className="font-mono bg-red-100 dark:bg-red-900/60 px-1 rounded">openssl rand -base64 32</code> and add it
+                                    to your environment / <code className="font-mono bg-red-100 dark:bg-red-900/60 px-1 rounded">.env</code> file, then restart the server.
+                                </p>
+                                <p className="text-red-500 dark:text-red-400 mt-2 text-xs">
+                                    If this model does not require an API key (e.g. a local Ollama instance), leave the API Key field blank and save again.
+                                </p>
+                            </div>
+                        )}
 
                         {/* Actions */}
                         <div className="flex gap-2 pt-2">

@@ -98,7 +98,7 @@ func (j *Judge) Run(ctx context.Context, prob *model.Problem, sub *model.Submiss
 	}
 	copyIn["input.txt"] = executor.CmdFile{Content: testInput}
 
-	resp, err := j.exec.Run(&executor.ExecRequest{
+	resp, err := j.exec.Run(ctx, &executor.ExecRequest{
 		Cmd: []executor.Cmd{{
 			Args:        buildRunArgs(cfg, compiled),
 			Env:         []string{"PATH=/usr/bin:/bin", "HOME=/tmp"},

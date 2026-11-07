@@ -583,7 +583,7 @@ func (h *SubmissionHandler) CustomRun(w http.ResponseWriter, r *http.Request) {
 	}
 
 	start := time.Now()
-	resp, err := h.exec.Run(&executor.ExecRequest{
+	resp, err := h.exec.Run(r.Context(), &executor.ExecRequest{
 		Cmd: []executor.Cmd{{
 			Args:        args,
 			Env:         []string{"PATH=/usr/bin:/bin", "HOME=/tmp"},

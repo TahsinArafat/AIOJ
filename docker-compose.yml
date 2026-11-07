@@ -100,6 +100,10 @@ services:
       MAIL_DRIVER: ${MAIL_DRIVER:-catcher}
       MAIL_FROM: ${MAIL_FROM:-noreply@aioj.com}
       MAIL_PUBLIC_URL: ${MAIL_PUBLIC_URL:-http://localhost:8081}
+      # AI model management: credential encryption key is required whenever an
+      # API key is stored. Generate with: openssl rand -base64 32
+      AI_ENABLED: ${AI_ENABLED:-false}
+      AI_CREDENTIAL_MASTER_KEY: ${AI_CREDENTIAL_MASTER_KEY:-}
       # TRUSTED_PROXIES is intentionally unset: the default (loopback + RFC1918)
       # already covers the nginx container, and an explicit empty value would
       # disable X-Forwarded-For trust entirely.

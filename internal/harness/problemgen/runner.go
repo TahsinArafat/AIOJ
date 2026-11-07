@@ -111,7 +111,7 @@ func (r *JudgeRunner) Run(ctx context.Context, files map[string]executor.CmdFile
 		copyIn["input.txt"] = executor.CmdFile{Content: stdin}
 	}
 
-	res, err := r.Exec.Run(&executor.ExecRequest{Cmd: []executor.Cmd{{
+	res, err := r.Exec.Run(ctx, &executor.ExecRequest{Cmd: []executor.Cmd{{
 		Args:        args,
 		Env:         []string{"PATH=/usr/bin:/bin", "HOME=/tmp"},
 		CopyIn:      copyIn,

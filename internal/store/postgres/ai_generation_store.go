@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/tahsinarafat/aioj/internal/model"
+	"log/slog"
 	"time"
 )
 
@@ -25,11 +26,30 @@ const aiJobColumns = `id,actor_id,problem_id,ai_model_id,artifact_type,status,st
 
 func scanAIJob(row interface{ Scan(...any) error }) (*model.AIGenerationJob, error) {
 	var j model.AIGenerationJob
-	err := row.Scan(&j.ID, &j.ActorID, &j.ProblemID, &j.AIModelID, &j.ArtifactType, &j.Status, &j.Stage, &j.Progress, &j.SubmittedBrief, &j.NormalizedBrief, &j.ContextSnapshot, &j.BaseProblemUpdatedAt, &j.ConnectionSnapshot, &j.PromptVersion, &j.PromptHash, &j.Proposal, &j.ValidationReport, &j.ErrorCode, &j.ErrorMessage, &j.PromptTokens, &j.CompletionTokens, &j.LatencyMS, &j.RetryOf, &j.ClaimToken, &j.HeartbeatAt, &j.CancelRequestedAt, &j.CreatedAt, &j.StartedAt, &j.FinishedAt, &j.AppliedAt)
+	// Nullable jsonb columns must be scanned into *[]byte so SQL NULL is
+	// handled correctly; json.RawMessage ([]byte) cannot receive NULL.
+	var proposal, validationReport []byte
+	err := row.Scan(
+		&j.ID, &j.ActorID, &j.ProblemID, &j.AIModelID, &j.ArtifactType,
+		&j.Status, &j.Stage, &j.Progress,
+		&j.SubmittedBrief, &j.NormalizedBrief, &j.ContextSnapshot,
+		&j.BaseProblemUpdatedAt, &j.ConnectionSnapshot,
+		&j.PromptVersion, &j.PromptHash,
+		&proposal, &validationReport,
+		&j.ErrorCode, &j.ErrorMessage,
+		&j.PromptTokens, &j.CompletionTokens, &j.LatencyMS,
+		&j.RetryOf, &j.ClaimToken, &j.HeartbeatAt, &j.CancelRequestedAt,
+		&j.CreatedAt, &j.StartedAt, &j.FinishedAt, &j.AppliedAt,
+	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
-	return &j, err
+	if err != nil {
+		return nil, err
+	}
+	j.Proposal = proposal
+	j.ValidationReport = validationReport
+	return &j, nil
 }
 func (s *AIGenerationStore) GetByID(ctx context.Context, id string) (*model.AIGenerationJob, error) {
 	return scanAIJob(s.db.QueryRowContext(ctx, `SELECT `+aiJobColumns+` FROM ai_generation_jobs WHERE id=$1`, id))
@@ -82,8 +102,14 @@ func (s *AIGenerationStore) Heartbeat(ctx context.Context, id, token, stage stri
 	return err
 }
 func (s *AIGenerationStore) Complete(ctx context.Context, id, token string, proposal, validation json.RawMessage, promptTokens, completionTokens, latencyMS int) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE ai_generation_jobs SET status='ready',stage='ready',progress=100,proposal=$3,validation_report=$4,prompt_tokens=$5,completion_tokens=$6,latency_ms=$7,finished_at=NOW(),heartbeat_at=NOW() WHERE id=$1 AND claim_token=$2`, id, token, proposal, validation, promptTokens, completionTokens, latencyMS)
-	return err
+	res, err := s.db.ExecContext(ctx, `UPDATE ai_generation_jobs SET status='ready',stage='ready',progress=100,proposal=$3,validation_report=$4,prompt_tokens=$5,completion_tokens=$6,latency_ms=$7,finished_at=NOW(),heartbeat_at=NOW() WHERE id=$1 AND claim_token=$2 AND status='running'`, id, token, proposal, validation, promptTokens, completionTokens, latencyMS)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		slog.Error("ai jobs: Complete affected 0 rows — stale claim token or already finished", "job_id", id)
+	}
+	return nil
 }
 
 // SetManifest stores the case manifest a harness run produced and marks the job
@@ -109,8 +135,14 @@ func (s *AIGenerationStore) SetManifest(ctx context.Context, id, token string, m
 }
 
 func (s *AIGenerationStore) Fail(ctx context.Context, id, token, code, message string, validation json.RawMessage) error {
-	_, err := s.db.ExecContext(ctx, `UPDATE ai_generation_jobs SET status=CASE WHEN $5 IS NULL THEN 'failed' ELSE 'validation_failed' END,stage='failed',error_code=$3,error_message=$4,validation_report=$5,finished_at=NOW() WHERE id=$1 AND claim_token=$2`, id, token, code, message, nullableJSON(validation))
-	return err
+	res, err := s.db.ExecContext(ctx, `UPDATE ai_generation_jobs SET status=CASE WHEN $5 IS NULL THEN 'failed' ELSE 'validation_failed' END,stage='failed',error_code=$3,error_message=$4,validation_report=$5,finished_at=NOW() WHERE id=$1 AND claim_token=$2 AND status='running'`, id, token, code, message, nullableJSON(validation))
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		slog.Error("ai jobs: Fail affected 0 rows — stale claim token or already finished", "job_id", id, "code", code)
+	}
+	return nil
 }
 func nullableJSON(v json.RawMessage) any {
 	if len(v) == 0 {

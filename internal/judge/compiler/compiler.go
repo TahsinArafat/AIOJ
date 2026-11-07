@@ -56,7 +56,7 @@ func (c *Compiler) CompileContestant(ctx context.Context, sourceCode string, cfg
 		artifact = "compile.tar"
 	}
 
-	resp, err := c.exec.Run(&executor.ExecRequest{Cmd: []executor.Cmd{{
+	resp, err := c.exec.Run(ctx, &executor.ExecRequest{Cmd: []executor.Cmd{{
 		Args:          args,
 		Env:           []string{"PATH=/usr/bin:/bin", "HOME=/tmp"},
 		CPULimit:      compileCPULimit,
@@ -94,7 +94,7 @@ func (c *Compiler) compileAuxiliary(ctx context.Context, sourceCode, lang string
 	srcName := stem + cfg.Extensions[0]
 	artifact := stem
 	cmd := buildCompileCmd(cfg.CompileCmd, artifact, srcName)
-	resp, err := c.exec.Run(&executor.ExecRequest{Cmd: []executor.Cmd{{
+	resp, err := c.exec.Run(ctx, &executor.ExecRequest{Cmd: []executor.Cmd{{
 		Args:          []string{"/bin/sh", "-c", cmd},
 		Env:           []string{"PATH=/usr/bin:/bin"},
 		CPULimit:      compileCPULimit,

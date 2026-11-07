@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 
@@ -122,6 +123,10 @@ func (h *AdminAIModelHandler) Create(w http.ResponseWriter, r *http.Request) {
 		MaxOutputTokens:       req.MaxOutputTokens,
 	}
 	if err := h.store.Create(r.Context(), m); err != nil {
+		if errors.Is(err, ai.ErrEncryptionNotConfigured) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		http.Error(w, "failed to create AI model: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -186,6 +191,10 @@ func (h *AdminAIModelHandler) Update(w http.ResponseWriter, r *http.Request) {
 		MaxOutputTokens:       req.MaxOutputTokens,
 	}
 	if err := h.store.Update(r.Context(), id, updated); err != nil {
+		if errors.Is(err, ai.ErrEncryptionNotConfigured) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		http.Error(w, "failed to update AI model: "+err.Error(), http.StatusInternalServerError)
 		return
 	}

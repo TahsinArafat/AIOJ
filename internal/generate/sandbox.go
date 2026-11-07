@@ -98,7 +98,7 @@ func (v *SandboxValidator) Validate(ctx context.Context, p *Proposal, jobID stri
 func (v *SandboxValidator) runSolution(ctx context.Context, cr *compiler.CompileResult, cfg *compiler.LangConfig, input string) (string, error) {
 	artifact := cr.Files["Main"]
 	args := []string{"/bin/sh", "-c", "./Main < input.txt > output.txt"}
-	res, err := v.Exec.Run(&executor.ExecRequest{Cmd: []executor.Cmd{{Args: args, Env: []string{"PATH=/usr/bin:/bin", "HOME=/tmp"}, CopyIn: map[string]executor.CmdFile{"Main": artifact, "input.txt": {Content: input}}, CopyOut: []string{"output.txt"}, CPULimit: 5e9, MemoryLimit: 512 * 1024 * 1024, ProcLimit: 32}}})
+	res, err := v.Exec.Run(ctx, &executor.ExecRequest{Cmd: []executor.Cmd{{Args: args, Env: []string{"PATH=/usr/bin:/bin", "HOME=/tmp"}, CopyIn: map[string]executor.CmdFile{"Main": artifact, "input.txt": {Content: input}}, CopyOut: []string{"output.txt"}, CPULimit: 5e9, MemoryLimit: 512 * 1024 * 1024, ProcLimit: 32}}})
 	if err != nil || len(res) == 0 {
 		return "", fmt.Errorf("reference solution execution failed")
 	}
@@ -110,17 +110,31 @@ func (v *SandboxValidator) runSolution(ctx context.Context, cr *compiler.Compile
 
 func (v *SandboxValidator) runGenerator(ctx context.Context, cr *compiler.CompileResult, cfg *compiler.LangConfig, seed int64) (string, error) {
 	artifact := cr.Files["Main"]
-	args := []string{"./Main", fmt.Sprint(seed)}
+	// Use shell redirect to capture generator stdout as a named file so that
+	// copyOut can retrieve it. Using Files: [] with copyOut: ["stdout"] relies
+	// on go-judge's stdout-capture magic which is not reliable across versions;
+	// the redirect approach is explicit and mirrors how runSolution works.
+	seedStr := fmt.Sprint(seed)
+	shellCmd := "./Main " + seedStr + " > stdout.txt"
 	if cfg.Runtime != "" {
-		args = strings.Fields(strings.ReplaceAll(strings.ReplaceAll(cfg.Runtime, "{{dir}}", "."), "{{exe}}", "Main"))
-		args = append(args, fmt.Sprint(seed))
+		runtime := strings.ReplaceAll(strings.ReplaceAll(cfg.Runtime, "{{dir}}", "."), "{{exe}}", "Main")
+		shellCmd = runtime + " " + seedStr + " > stdout.txt"
 	}
-	res, err := v.Exec.Run(&executor.ExecRequest{Cmd: []executor.Cmd{{Args: args, Env: []string{"PATH=/usr/bin:/bin", "HOME=/tmp"}, Files: []executor.CmdFile{}, CopyIn: map[string]executor.CmdFile{"Main": artifact}, CopyOut: []string{"stdout"}, CPULimit: 2e9, MemoryLimit: 256 * 1024 * 1024, ProcLimit: 16}}})
+	args := []string{"/bin/sh", "-c", shellCmd}
+	res, err := v.Exec.Run(ctx, &executor.ExecRequest{Cmd: []executor.Cmd{{
+		Args:        args,
+		Env:         []string{"PATH=/usr/bin:/bin", "HOME=/tmp"},
+		CopyIn:      map[string]executor.CmdFile{"Main": artifact},
+		CopyOut:     []string{"stdout.txt"},
+		CPULimit:    2e9,
+		MemoryLimit: 256 * 1024 * 1024,
+		ProcLimit:   16,
+	}}})
 	if err != nil || len(res) == 0 {
 		return "", fmt.Errorf("generator execution failed")
 	}
 	if res[0].Status != "Accepted" {
 		return "", fmt.Errorf("generator failed: %s", res[0].Status)
 	}
-	return res[0].Files["stdout"], nil
+	return res[0].Files["stdout.txt"], nil
 }

@@ -253,7 +253,7 @@ func runInteractivePair(
 		PipeInput: true,
 	}
 
-	results, err := exec.Run(req)
+	results, err := exec.Run(ctx, req)
 	if err != nil {
 		return nil, err
 	}

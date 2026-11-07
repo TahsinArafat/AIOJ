@@ -13,6 +13,11 @@ import (
 
 const credentialPrefix = "enc:v1:"
 
+// ErrEncryptionNotConfigured is returned when an API key is provided but
+// AI_CREDENTIAL_MASTER_KEY has not been set. It is a configuration error,
+// not an internal server error, so callers may surface it as HTTP 400/422.
+var ErrEncryptionNotConfigured = errors.New("AI credential encryption is not configured — set AI_CREDENTIAL_MASTER_KEY (a base64-encoded 32-byte key) to store API keys")
+
 // CredentialBox encrypts provider credentials with AES-256-GCM. Ciphertexts
 // are self-identifying so future key/envelope versions can coexist.
 type CredentialBox struct{ aead cipher.AEAD }
@@ -52,7 +57,7 @@ func (b *CredentialBox) Encrypt(plain string) (string, error) {
 		return "", nil
 	}
 	if b == nil {
-		return "", errors.New("AI credential encryption is not configured")
+		return "", ErrEncryptionNotConfigured
 	}
 	nonce := make([]byte, b.aead.NonceSize())
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {

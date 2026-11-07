@@ -85,7 +85,7 @@ func (b *BatchRunner) runOne(
 	copyIn["input.txt"] = executor.CmdFile{Content: inputContent}
 
 	start := time.Now()
-	resp, err := b.exec.Run(&executor.ExecRequest{
+	resp, err := b.exec.Run(ctx, &executor.ExecRequest{
 		Cmd: []executor.Cmd{{
 			Args:        args,
 			Env:         []string{"PATH=/usr/bin:/bin", "HOME=/tmp"},
@@ -123,7 +123,7 @@ func (b *BatchRunner) runOne(
 			r.Detail = "failed to load expected output: " + loadErr.Error()
 			return r
 		}
-		b.applyChecker(prob, tc, inputContent, output, expected, in.SPJFile, &r)
+		b.applyChecker(ctx, prob, tc, inputContent, output, expected, in.SPJFile, &r)
 	case "Nonzero Exit Status":
 		r.Status = model.StatusRE
 		if errOut := cr.Files["error.txt"]; errOut != "" {
@@ -148,6 +148,7 @@ func (b *BatchRunner) runOne(
 
 // applyChecker runs either an SPJ or a built-in checker and updates r in place.
 func (b *BatchRunner) applyChecker(
+	ctx context.Context,
 	prob *model.Problem,
 	tc model.TestCaseScore,
 	inputContent, output, expected string, spjFile executor.CmdFile,
@@ -160,7 +161,7 @@ func (b *BatchRunner) applyChecker(
 			"user.txt":   {Content: output},
 			"answer.txt": {Content: expected},
 		}
-		spjResp, err := b.exec.Run(&executor.ExecRequest{
+		spjResp, err := b.exec.Run(ctx, &executor.ExecRequest{
 			Cmd: []executor.Cmd{{
 				Args:        []string{"/bin/sh", "-c", "/box/spj /box/input.txt /box/user.txt /box/answer.txt > output.txt 2> error.txt"},
 				Env:         []string{"PATH=/usr/bin:/bin"},

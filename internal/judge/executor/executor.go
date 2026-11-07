@@ -2,6 +2,7 @@ package executor
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -70,10 +71,19 @@ type Client struct {
 }
 
 func NewClient(endpoint string) *Client {
-	return &Client{endpoint: endpoint, http: &http.Client{Timeout: 30 * time.Second}}
+	// DisableKeepAlives forces a fresh TCP connection for every request.
+	// Sandbox runs are infrequent (one per test case) and go-judge may close
+	// idle connections before we reuse them, causing a silent "connection reset
+	// by peer" that the Go transport will not retry for non-idempotent POST
+	// requests. A fresh connection per call avoids this at negligible cost.
+	transport := &http.Transport{DisableKeepAlives: true}
+	return &Client{endpoint: endpoint, http: &http.Client{Timeout: 60 * time.Second, Transport: transport}}
 }
 
-func (c *Client) Run(req *ExecRequest) ([]CmdResult, error) {
+// Run submits an execution request to go-judge. The provided context controls
+// cancellation: if it is cancelled (e.g. because the job timeout fired) the
+// HTTP request is aborted and the error is returned immediately.
+func (c *Client) Run(ctx context.Context, req *ExecRequest) ([]CmdResult, error) {
 	body, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf("marshal: %w", err)
@@ -85,7 +95,12 @@ func (c *Client) Run(req *ExecRequest) ([]CmdResult, error) {
 	if len(req.Cmd) > 0 {
 		slog.Debug("executor cmd", "args", req.Cmd[0].Args, "copyIn_keys", len(req.Cmd[0].CopyIn), "files_len", len(req.Cmd[0].Files))
 	}
-	resp, err := c.http.Post(c.endpoint+"/run", "application/json", bytes.NewReader(body))
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.endpoint+"/run", bytes.NewReader(body))
+	if err != nil {
+		return nil, fmt.Errorf("build request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	resp, err := c.http.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("request: %w", err)
 	}
