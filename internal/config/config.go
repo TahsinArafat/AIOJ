@@ -159,6 +159,17 @@ type JudgeConfig struct {
 	Endpoint    string `yaml:"endpoint"`
 	Concurrency int    `yaml:"concurrency"`
 	MaxCodeSize int64  `yaml:"max_code_size"`
+	// Pressure thresholds — both default to 0 (disabled).
+	//
+	// MinFreeMemMB: pause new judgments when available RAM (MemAvailable from
+	// /proc/meminfo) drops below this value. Recommended: 512 for a server
+	// with concurrency ≥ 2 where Java/Rust submissions can spike 400 MB each.
+	// Set via JUDGE_MIN_FREE_MEM_MB.
+	MinFreeMemMB uint64 `yaml:"min_free_mem_mb"`
+	// MaxLoadPerCPU: pause when (1-min load average / numCPU) exceeds this
+	// ratio. 1.5 means "allow 50% over-subscription before pausing".
+	// Set via JUDGE_MAX_LOAD_PER_CPU.
+	MaxLoadPerCPU float64 `yaml:"max_load_per_cpu"`
 }
 
 type RedisConfig struct {
@@ -254,6 +265,14 @@ func Load(path string) (*Config, error) {
 	}
 	if v := os.Getenv("JUDGE_CONCURRENCY"); v != "" {
 		cfg.Judge.Concurrency = atoi(v)
+	}
+	if v := os.Getenv("JUDGE_MIN_FREE_MEM_MB"); v != "" {
+		n, _ := strconv.ParseUint(v, 10, 64)
+		cfg.Judge.MinFreeMemMB = n
+	}
+	if v := os.Getenv("JUDGE_MAX_LOAD_PER_CPU"); v != "" {
+		f, _ := strconv.ParseFloat(v, 64)
+		cfg.Judge.MaxLoadPerCPU = f
 	}
 	if v := os.Getenv("REDIS_URL"); v != "" {
 		cfg.Redis.URL = v

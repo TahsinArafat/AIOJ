@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/tahsinarafat/aioj/internal/judge/compiler"
 	"github.com/tahsinarafat/aioj/internal/judge/executor"
+	"github.com/tahsinarafat/aioj/internal/judge/pressure"
 	"github.com/tahsinarafat/aioj/internal/judge/runner"
 	"github.com/tahsinarafat/aioj/internal/model"
 	"github.com/tahsinarafat/aioj/internal/queue"
@@ -34,6 +35,10 @@ type WorkerPool struct {
 	langLimitStore    store.LanguageLimitStore
 	balloonStore      store.BalloonStore
 
+	// gate holds dispatch when the host is under memory or CPU pressure.
+	// A nil gate (or disabled thresholds) means dispatch is always immediate.
+	gate *pressure.PressureGate
+
 	// wg tracks in-flight judgments so Stop can drain instead of abandoning
 	// them half-written.
 	wg     sync.WaitGroup
@@ -50,6 +55,13 @@ func NewWorkerPool(q queue.JudgeQueue, exec *executor.Client, langDir string, co
 	}
 }
 
+// WithPressureGate attaches a resource-pressure gate to the pool.  Call this
+// after NewWorkerPool when pressure thresholds are configured.
+func (wp *WorkerPool) WithPressureGate(g *pressure.PressureGate) *WorkerPool {
+	wp.gate = g
+	return wp
+}
+
 func (wp *WorkerPool) Start(ctx context.Context) {
 	for {
 		subID, err := wp.queue.Dequeue(ctx)
@@ -61,6 +73,23 @@ func (wp *WorkerPool) Start(ctx context.Context) {
 			time.Sleep(time.Second)
 			continue
 		}
+
+		// Hold the job in-hand and wait until the server has enough free
+		// resources before dispatching it. The job has already been removed
+		// from the queue, so no other worker will pick it up. If the context
+		// is cancelled while we are waiting (graceful shutdown), re-enqueue
+		// the job so the reclaimer can pick it back up.
+		if wp.gate != nil {
+			if err := wp.gate.WaitUntilReady(ctx); err != nil {
+				// Context cancelled — put the submission back so it isn't lost.
+				if reqErr := wp.queue.Enqueue(ctx, subID, 0); reqErr != nil {
+					slog.Error("pressure: failed to re-enqueue submission after shutdown",
+						"id", subID, "error", reqErr)
+				}
+				return
+			}
+		}
+
 		select {
 		case wp.sem <- struct{}{}:
 			wp.wg.Add(1)

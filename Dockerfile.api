@@ -1,0 +1,66 @@
+# Lean API image — for the backend service only (--mode=server).
+#
+# The API server never compiles code: compilation happens in judge-worker
+# containers that use the full Dockerfile. Keeping compilers out of this image
+# saves ~600–900 MB of RSS per backend replica and shrinks the attack surface.
+#
+# Build stages reuse the same builder and rustengine layers as Dockerfile so
+# Docker layer-caches them across both images when built together.
+
+# Stage 1: Build the backend binary
+FROM golang:1.26-alpine AS builder
+RUN apk add --no-cache git
+WORKDIR /app
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /app/aioj ./cmd/aioj && \
+    CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /app/seed ./cmd/seed
+
+# Stage 1b: Build the plagiarism similarity engine (static Rust binary).
+# Same stage as Dockerfile — Docker reuses the cache layer.
+FROM rust:1.83-alpine AS rustengine
+RUN apk add --no-cache musl-dev file
+ENV RUSTFLAGS="-C target-feature=+crt-static"
+WORKDIR /src
+COPY rust/plagiarism/Cargo.toml rust/plagiarism/Cargo.lock ./
+RUN mkdir -p src && echo 'fn main() {}' > src/main.rs && cargo build --release
+COPY rust/plagiarism/src ./src
+RUN touch src/*.rs && \
+    cargo build --release && \
+    file target/release/aioj-plagiarism && \
+    target/release/aioj-plagiarism --version | grep -q '^aioj-plagiarism ' && \
+    printf '{"threshold":0.5,"inputs":[]}' | target/release/aioj-plagiarism | grep -q '"summary"'
+
+# Stage 2: Lean runtime — no compilers, no JDK, no Rust toolchain, no Node.
+#
+# What IS included:
+#   ca-certificates  — outbound HTTPS (OAuth, webhooks, Sentry, AI APIs)
+#   tzdata           — time-zone handling in scheduling / contest start times
+#   postgresql18-client — pg_dump for the backup handler
+#   bash             — startup script compatibility
+#
+# What is NOT included (vs full Dockerfile):
+#   g++ gcc make musl-dev  — C/C++ compilation (judge-worker only)
+#   python3                — Python execution (judge-worker only)
+#   openjdk21-jdk          — Java compilation/execution (judge-worker only)
+#   rust cargo             — Rust compilation (judge-worker only)
+#   nodejs npm             — JS execution (judge-worker only)
+FROM alpine:3.19
+RUN apk add --no-cache ca-certificates tzdata bash
+RUN apk add --no-cache --repository=https://dl-cdn.alpinelinux.org/alpine/edge/main postgresql18-client
+RUN addgroup -S aioj && adduser -S aioj -G aioj
+WORKDIR /app
+COPY --from=builder /app/aioj .
+COPY --from=builder /app/seed .
+COPY --from=builder /app/config.yaml .
+RUN sed -i 's/^environment:.*/environment: "production"/' /app/config.yaml
+COPY --from=builder /app/lang ./lang
+COPY --from=builder /app/internal/store/migrations ./internal/store/migrations
+RUN mkdir -p /app/backups /app/testdata /app/bin
+COPY --from=rustengine /src/target/release/aioj-plagiarism /app/bin/aioj-plagiarism
+ENV PLAGIARISM_RUST_BIN="/app/bin/aioj-plagiarism"
+RUN chown -R aioj:aioj /app
+USER aioj
+EXPOSE 8080
+CMD ["./aioj"]

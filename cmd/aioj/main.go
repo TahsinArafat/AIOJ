@@ -27,6 +27,7 @@ import (
 	"github.com/tahsinarafat/aioj/internal/harness/problemgen"
 	"github.com/tahsinarafat/aioj/internal/judge"
 	"github.com/tahsinarafat/aioj/internal/judge/executor"
+	"github.com/tahsinarafat/aioj/internal/judge/pressure"
 	"github.com/tahsinarafat/aioj/internal/mail"
 	"github.com/tahsinarafat/aioj/internal/oauth"
 	"github.com/tahsinarafat/aioj/internal/observability"
@@ -114,6 +115,22 @@ func main() {
 	balloonStore := postgres.NewBalloonStore(db)
 	printStore := postgres.NewPrintStore(db)
 	workerPool := judge.NewWorkerPool(judgeQueue, execClient, cfg.LangDir, cfg.Judge.Concurrency, submissionStore, problemStore, langLimitStore, balloonStore)
+
+	// Attach a pressure gate when thresholds are configured.  On Linux the
+	// gate reads /proc/meminfo + /proc/loadavg before every dispatch; on
+	// non-Linux hosts (dev, CI) DefaultGate uses a no-op sampler so the gate
+	// is always transparent.
+	pressureThresholds := pressure.Thresholds{
+		MinFreeMemMB:  cfg.Judge.MinFreeMemMB,
+		MaxLoadPerCPU: cfg.Judge.MaxLoadPerCPU,
+	}
+	if !pressureThresholds.Disabled() {
+		workerPool.WithPressureGate(pressure.DefaultGate(pressureThresholds))
+		slog.Info("judge pressure gate enabled",
+			"min_free_mem_mb", pressureThresholds.MinFreeMemMB,
+			"max_load_per_cpu", pressureThresholds.MaxLoadPerCPU,
+		)
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
