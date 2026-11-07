@@ -20,6 +20,12 @@ func Connect(cfg config.DatabaseConfig) (*sql.DB, error) {
 	db.SetMaxOpenConns(cfg.MaxOpen)
 	db.SetMaxIdleConns(cfg.MaxIdle)
 	db.SetConnMaxLifetime(5 * time.Minute)
+	// Recycle idle connections after 90 s. Without this, connections opened
+	// during a traffic burst stay alive for the full 5-minute lifetime even
+	// when the server is quiet, holding backend processes on the PostgreSQL
+	// side unnecessarily. 90 s is long enough to absorb normal request
+	// patterns and short enough to free resources during idle nights.
+	db.SetConnMaxIdleTime(90 * time.Second)
 	if err := db.Ping(); err != nil {
 		return nil, fmt.Errorf("db ping: %w", err)
 	}

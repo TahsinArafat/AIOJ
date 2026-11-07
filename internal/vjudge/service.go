@@ -206,10 +206,33 @@ func (s *Service) FetchLanguages(ctx context.Context, platform string) ([]Remote
 func (s *Service) StartPollWorkers() {
 	ctx, cancel := context.WithCancel(context.Background())
 	s.pollCancel = cancel
+	started := 0
 	for platform := range s.bots {
+		// Skip platforms that have no active bot account configured.  The poll
+		// worker would hit GetPendingRemoteSubmissions every few seconds for
+		// nothing, and the submit worker would similarly query in vain.  If an
+		// account is added later the process must be restarted — bot accounts
+		// are admin-only configuration, not runtime user data.
+		accounts, err := s.botAccStore.ListByPlatform(ctx, platform)
+		if err != nil || !hasActiveBotAccount(accounts) {
+			slog.Info("vjudge: skipping poll worker — no active bot account", "platform", platform)
+			continue
+		}
 		go s.pollWorker(ctx, platform)
+		started++
 	}
-	slog.Info("vjudge poll workers started")
+	slog.Info("vjudge poll workers started", "count", started)
+}
+
+// hasActiveBotAccount reports whether any account in the slice is marked active
+// and has credentials configured.
+func hasActiveBotAccount(accounts []model.BotAccount) bool {
+	for _, a := range accounts {
+		if a.Status == "active" && a.PlatformUser != "" {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Service) StartSubmitWorkers() {
@@ -220,22 +243,37 @@ func (s *Service) StartSubmitWorkers() {
 }
 
 func (s *Service) submitWorker(ctx context.Context) {
-	ticker := time.NewTicker(3 * time.Second)
-	defer ticker.Stop()
+	// Exponential backoff: start at 3 s, double on each empty poll up to
+	// 60 s, reset immediately when work is found.  This cuts the DB round-
+	// trips from ~1 200/hr (fixed 3 s) to at most 60/hr when idle — a 20×
+	// reduction at no cost to submit latency when submissions arrive.
+	const (
+		minInterval = 3 * time.Second
+		maxInterval = 60 * time.Second
+	)
+	interval := minInterval
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-ticker.C:
-			s.processUnsubmitted(ctx)
+		case <-time.After(interval):
+			found := s.processUnsubmitted(ctx)
+			if found {
+				interval = minInterval
+			} else if interval < maxInterval {
+				interval *= 2
+				if interval > maxInterval {
+					interval = maxInterval
+				}
+			}
 		}
 	}
 }
 
-func (s *Service) processUnsubmitted(ctx context.Context) {
+func (s *Service) processUnsubmitted(ctx context.Context) bool {
 	subs, err := s.subStore.GetUnsubmittedRemoteSubmissions(ctx)
 	if err != nil || len(subs) == 0 {
-		return
+		return false
 	}
 
 	for _, sub := range subs {
@@ -269,6 +307,7 @@ func (s *Service) processUnsubmitted(ctx context.Context) {
 			}
 		}(sub)
 	}
+	return true
 }
 
 func (s *Service) ForcePoll(ctx context.Context, platform, remoteID, submissionID string) {
@@ -368,26 +407,39 @@ func (s *Service) ForcePoll(ctx context.Context, platform, remoteID, submissionI
 }
 
 func (s *Service) pollWorker(ctx context.Context, platform string) {
-	ticker := time.NewTicker(5 * time.Second)
-	defer ticker.Stop()
+	// Same exponential-backoff pattern as submitWorker: start at 5 s, back
+	// off to 60 s when no pending remote submissions exist, reset on work.
+	const (
+		minInterval = 5 * time.Second
+		maxInterval = 60 * time.Second
+	)
+	interval := minInterval
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-ticker.C:
-			s.pollPlatform(ctx, platform)
+		case <-time.After(interval):
+			found := s.pollPlatform(ctx, platform)
+			if found {
+				interval = minInterval
+			} else if interval < maxInterval {
+				interval *= 2
+				if interval > maxInterval {
+					interval = maxInterval
+				}
+			}
 		}
 	}
 }
 
-func (s *Service) pollPlatform(ctx context.Context, platform string) {
+func (s *Service) pollPlatform(ctx context.Context, platform string) bool {
 	s.mu.RLock()
 	bot, botOK := s.bots[platform]
 	s.mu.RUnlock()
 
 	subs, err := s.subStore.GetPendingRemoteSubmissions(ctx)
 	if err != nil || len(subs) == 0 {
-		return
+		return false
 	}
 
 	if platform == "codeforces" {
@@ -395,6 +447,7 @@ func (s *Service) pollPlatform(ctx context.Context, platform string) {
 	} else if botOK {
 		s.pollGeneric(ctx, subs, bot)
 	}
+	return true
 }
 
 func (s *Service) pollCF(ctx context.Context, subs []model.PendingRemoteSubmission) {

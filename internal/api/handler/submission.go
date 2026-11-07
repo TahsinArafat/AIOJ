@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -35,6 +36,11 @@ type SubmissionHandler struct {
 	// execute service, starving everybody else.
 	submitQuota *userQuota
 	runQuota    *userQuota
+	// langsOnce / langs cache the YAML language configs loaded from langDir.
+	// /run is called on every "run code" click; re-parsing the YAML files on
+	// each request was wasted disk I/O.  Languages only change on restart.
+	langsOnce sync.Once
+	langs     map[string]*compiler.LangConfig
 }
 
 func NewSubmissionHandler(sub store.SubmissionStore, prob store.ProblemStore, contest store.ContestStore,
@@ -42,6 +48,21 @@ func NewSubmissionHandler(sub store.SubmissionStore, prob store.ProblemStore, co
 	users store.UserStore) *SubmissionHandler {
 	return &SubmissionHandler{subStore: sub, probStore: prob, contestStore: contest, queue: q, wsManager: ws, exec: exec, langDir: langDir, vjudgeSvc: vjSvc, users: users,
 		submitQuota: newSubmissionQuota(), runQuota: newRunQuota()}
+}
+
+// loadLangs returns the cached language map, initialising it on first call.
+// Language configs only change when a new lang/*.yaml is added, which requires
+// a process restart — so reading from disk once and caching forever is correct.
+func (h *SubmissionHandler) loadLangs() map[string]*compiler.LangConfig {
+	h.langsOnce.Do(func() {
+		langs, err := compiler.LoadLanguages(h.langDir)
+		if err != nil {
+			slog.Error("submission: failed to load language configs", "error", err)
+			langs = map[string]*compiler.LangConfig{}
+		}
+		h.langs = langs
+	})
+	return h.langs
 }
 
 // checkQuota enforces a per-user budget and writes a 429 when it is exhausted.
@@ -447,12 +468,7 @@ func (h *SubmissionHandler) CustomRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	langs, err := compiler.LoadLanguages(h.langDir)
-	if err != nil {
-		http.Error(w, "failed to load language configs: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
+	langs := h.loadLangs()
 	cfg := langs[req.Language]
 	if cfg == nil {
 		http.Error(w, "unsupported language: "+req.Language, http.StatusBadRequest)

@@ -39,6 +39,15 @@ type WorkerPool struct {
 	// A nil gate (or disabled thresholds) means dispatch is always immediate.
 	gate *pressure.PressureGate
 
+	// langs caches the language configs loaded from langDir.  LoadLanguages
+	// reads and YAML-parses every lang/*.yaml on every call — doing that per
+	// submission was measurable I/O on every judgment.  The cache is populated
+	// once on first use (sync.Once) and is safe for concurrent reads.  The
+	// YAML files only change when a new language is added, which requires a
+	// restart anyway, so there is no need to watch the directory.
+	langsOnce sync.Once
+	langs     map[string]*compiler.LangConfig
+
 	// wg tracks in-flight judgments so Stop can drain instead of abandoning
 	// them half-written.
 	wg     sync.WaitGroup
@@ -60,6 +69,22 @@ func NewWorkerPool(q queue.JudgeQueue, exec *executor.Client, langDir string, co
 func (wp *WorkerPool) WithPressureGate(g *pressure.PressureGate) *WorkerPool {
 	wp.gate = g
 	return wp
+}
+
+// loadLangs returns the cached language map, loading it from disk on first
+// call.  The result is shared across all goroutines in the pool.
+func (wp *WorkerPool) loadLangs() map[string]*compiler.LangConfig {
+	wp.langsOnce.Do(func() {
+		langs, err := compiler.LoadLanguages(wp.langDir)
+		if err != nil {
+			slog.Error("judge: failed to load language configs", "error", err)
+			langs = map[string]*compiler.LangConfig{}
+		} else {
+			slog.Info("judge: language configs loaded", "count", len(langs))
+		}
+		wp.langs = langs
+	})
+	return wp.langs
 }
 
 func (wp *WorkerPool) Start(ctx context.Context) {
@@ -190,7 +215,7 @@ func (wp *WorkerPool) judge(ctx context.Context, submissionID, claimToken string
 		wp.runAndFinalize(ctx, sub, claimToken, prob, wp.outputOnlyRunner, runner.RunInput{Problem: prob, SourceCode: sub.SourceCode}, "")
 		return
 	}
-	langs, _ := compiler.LoadLanguages(wp.langDir)
+	langs := wp.loadLangs()
 	cfg := langs[sub.Language]
 	if cfg == nil {
 		wp.finish(ctx, submissionID, claimToken, model.StatusCE, 0, 0, 0, "unsupported language: "+sub.Language, nil)

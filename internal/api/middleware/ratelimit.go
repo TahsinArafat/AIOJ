@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -44,7 +45,7 @@ type RateLimiter struct {
 	// many auth calls from a single loopback IP — is not throttled in the sim.
 	strictRPS   rate.Limit
 	strictBurst int
-	stop        chan struct{}
+	stopFn      context.CancelFunc
 }
 
 // NewRateLimiter creates a RateLimiter configured from environment variables.
@@ -85,10 +86,11 @@ func NewRateLimiter() *RateLimiter {
 		burst:       burst,
 		strictRPS:   rate.Limit(strictRPS),
 		strictBurst: strictBurst,
-		stop:        make(chan struct{}),
 	}
 
-	go rl.cleanup()
+	cleanupCtx, cancel := context.WithCancel(context.Background())
+	rl.stopFn = cancel
+	go rl.cleanup(cleanupCtx)
 	return rl
 }
 
@@ -109,7 +111,8 @@ func (rl *RateLimiter) getVisitor(ip string) *rate.Limiter {
 
 // cleanup removes stale entries every 10 minutes.
 // Entries older than 1 hour are deleted.
-func (rl *RateLimiter) cleanup() {
+// The goroutine exits cleanly when ctx is cancelled (via Stop).
+func (rl *RateLimiter) cleanup(ctx context.Context) {
 	ticker := time.NewTicker(10 * time.Minute)
 	defer ticker.Stop()
 
@@ -123,7 +126,7 @@ func (rl *RateLimiter) cleanup() {
 				}
 				return true
 			})
-		case <-rl.stop:
+		case <-ctx.Done():
 			return
 		}
 	}
@@ -131,7 +134,7 @@ func (rl *RateLimiter) cleanup() {
 
 // Stop terminates the cleanup goroutine.
 func (rl *RateLimiter) Stop() {
-	close(rl.stop)
+	rl.stopFn()
 }
 
 // StrictAuth is a chi-compatible middleware enforcing a tight per-IP+path
