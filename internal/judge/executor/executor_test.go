@@ -1,6 +1,7 @@
 package executor
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -31,7 +32,7 @@ func TestRun_Success(t *testing.T) {
 	}))
 	defer srv.Close()
 	client := NewClient(srv.URL)
-	resp, err := client.Run(&ExecRequest{Cmd: []Cmd{{Args: []string{"/bin/echo", "hi"}, CPULimit: 1e9, MemoryLimit: 1 << 26}}})
+	resp, err := client.Run(context.Background(), &ExecRequest{Cmd: []Cmd{{Args: []string{"/bin/echo", "hi"}, CPULimit: 1e9, MemoryLimit: 1 << 26}}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,8 +42,27 @@ func TestRun_Success(t *testing.T) {
 }
 
 func TestRun_Error(t *testing.T) {
-	_, err := NewClient("http://localhost:19999").Run(&ExecRequest{})
+	_, err := NewClient("http://localhost:19999").Run(context.Background(), &ExecRequest{})
 	if err == nil {
 		t.Fatal("expected error")
+	}
+}
+
+// TestRun_ContextCancelled verifies that a cancelled context aborts the
+// request. Sandbox validation relies on this so a job timeout cannot leave a
+// worker goroutine blocked on go-judge indefinitely.
+func TestRun_ContextCancelled(t *testing.T) {
+	block := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-block
+	}))
+	defer func() { close(block); srv.Close() }()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err := NewClient(srv.URL).Run(ctx, &ExecRequest{Cmd: []Cmd{{Args: []string{"/bin/echo"}}}})
+	if err == nil {
+		t.Fatal("expected error from cancelled context")
 	}
 }
