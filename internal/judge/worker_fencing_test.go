@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/tahsinarafat/aioj/internal/model"
+	"github.com/tahsinarafat/aioj/internal/store"
 )
 
 // fencingStore is the public SubmissionStore behavior needed by WorkerPool.
@@ -72,6 +73,13 @@ func (f *fencingStore) GetPlatformStats(context.Context) (*model.PlatformStats, 
 	return nil, nil
 }
 func (f *fencingStore) GetHackableSubmissions(context.Context, string, string) ([]model.Submission, error) {
+	return nil, nil
+}
+func (f *fencingStore) ListForBulkRejudge(context.Context, string, string) ([]string, error) {
+	return nil, nil
+}
+func (f *fencingStore) ResetForRejudge(context.Context, []string) error { return nil }
+func (f *fencingStore) ListPendingWithContext(context.Context, int) ([]store.PendingSubmissionInfo, error) {
 	return nil, nil
 }
 

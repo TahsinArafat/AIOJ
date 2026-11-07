@@ -2,11 +2,14 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
+	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/tahsinarafat/aioj/internal/model"
+	"github.com/tahsinarafat/aioj/internal/queue"
 	"github.com/tahsinarafat/aioj/internal/store"
 	"github.com/tahsinarafat/aioj/internal/vjudge"
 )
@@ -16,13 +19,29 @@ import (
 const remotePollTimeout = 2 * time.Minute
 
 type AdminSubmissionHandler struct {
-	subStore  store.SubmissionStore
-	probStore store.ProblemStore
-	vjudgeSvc *vjudge.Service
+	subStore     store.SubmissionStore
+	probStore    store.ProblemStore
+	contestStore store.ContestStore
+	queue        queue.JudgeQueue
+	vjudgeSvc    *vjudge.Service
 }
 
 func NewAdminSubmissionHandler(subStore store.SubmissionStore, probStore store.ProblemStore, vjSvc *vjudge.Service) *AdminSubmissionHandler {
 	return &AdminSubmissionHandler{subStore: subStore, probStore: probStore, vjudgeSvc: vjSvc}
+}
+
+// WithQueue attaches the judge queue so admin rejudge endpoints can enqueue
+// local-problem submissions.  Call this after NewAdminSubmissionHandler.
+func (h *AdminSubmissionHandler) WithQueue(q queue.JudgeQueue) *AdminSubmissionHandler {
+	h.queue = q
+	return h
+}
+
+// WithContestStore attaches the contest store so bulk-rejudge can query
+// contest membership.
+func (h *AdminSubmissionHandler) WithContestStore(cs store.ContestStore) *AdminSubmissionHandler {
+	h.contestStore = cs
+	return h
 }
 
 func (h *AdminSubmissionHandler) ListPendingRemote(w http.ResponseWriter, r *http.Request) {
@@ -34,6 +53,13 @@ func (h *AdminSubmissionHandler) ListPendingRemote(w http.ResponseWriter, r *htt
 	respondJSON(w, http.StatusOK, map[string]interface{}{"data": subs, "total": len(subs)})
 }
 
+// Rejudge handles both local and remote OJ submissions.
+//
+// For remote OJ problems it resets the remote ID/bot fields so the vjudge
+// submit worker picks the row back up.
+//
+// For local problems it resets status to 'pending' and re-enqueues at
+// PriorityNormal (admin/manual rejudge should not jump live contest traffic).
 func (h *AdminSubmissionHandler) Rejudge(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	sub, err := h.subStore.GetByID(r.Context(), id)
@@ -43,15 +69,33 @@ func (h *AdminSubmissionHandler) Rejudge(w http.ResponseWriter, r *http.Request)
 	}
 
 	prob, err := h.probStore.GetByID(r.Context(), sub.ProblemID)
-	if err != nil || prob == nil || prob.Source == "" || prob.Source == "local" {
-		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "not a remote OJ problem"})
+	if err != nil || prob == nil {
+		respondJSON(w, http.StatusNotFound, map[string]string{"error": "problem not found"})
 		return
 	}
 
-	h.subStore.UpdateStatus(r.Context(), id, model.StatusPending)
-	h.subStore.UpdateRemoteID(r.Context(), id, "", "")
-	h.subStore.UpdateBotID(r.Context(), id, "", "")
+	isRemote := prob.Source != "" && prob.Source != "local"
 
+	if isRemote {
+		// Remote OJ: clear remote tracking so the submit worker resubmits.
+		h.subStore.UpdateStatus(r.Context(), id, model.StatusPending)
+		h.subStore.UpdateRemoteID(r.Context(), id, "", "")
+		h.subStore.UpdateBotID(r.Context(), id, "", "")
+		respondJSON(w, http.StatusOK, map[string]string{"status": "rejudging"})
+		return
+	}
+
+	// Local problem: reset and re-enqueue.
+	if h.queue == nil {
+		respondJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "judge queue not available"})
+		return
+	}
+	h.subStore.UpdateStatus(r.Context(), id, model.StatusPending)
+	if err := h.queue.Enqueue(r.Context(), id, PriorityNormal); err != nil {
+		slog.Error("admin rejudge: enqueue failed", "id", id, "error", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to enqueue"})
+		return
+	}
 	respondJSON(w, http.StatusOK, map[string]string{"status": "rejudging"})
 }
 
@@ -84,4 +128,60 @@ func (h *AdminSubmissionHandler) ForceRefresh(w http.ResponseWriter, r *http.Req
 	}
 
 	respondJSON(w, http.StatusOK, map[string]string{"status": "refreshing"})
+}
+
+// RejudgeBulk re-enqueues all judged local submissions for a contest (or
+// optionally a specific problem within that contest) at PriorityBulk.
+// This is the right tool after fixing test data mid-contest: it won't delay
+// live contest submissions because PriorityBulk is the lowest priority tier.
+//
+// POST /api/admin/submissions/rejudge-bulk
+//
+//	{ "contest_id": "...", "problem_id": "..." (optional) }
+func (h *AdminSubmissionHandler) RejudgeBulk(w http.ResponseWriter, r *http.Request) {
+	if h.queue == nil {
+		respondJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "judge queue not available"})
+		return
+	}
+
+	var req struct {
+		ContestID string `json:"contest_id"`
+		ProblemID string `json:"problem_id,omitempty"` // optional — all problems if empty
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ContestID == "" {
+		respondJSON(w, http.StatusBadRequest, map[string]string{"error": "contest_id is required"})
+		return
+	}
+
+	ids, err := h.subStore.ListForBulkRejudge(r.Context(), req.ContestID, req.ProblemID)
+	if err != nil {
+		slog.Error("bulk rejudge: list failed", "contest", req.ContestID, "problem", req.ProblemID, "error", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to list submissions"})
+		return
+	}
+	if len(ids) == 0 {
+		respondJSON(w, http.StatusOK, map[string]interface{}{"enqueued": 0})
+		return
+	}
+
+	// Reset all matching rows to 'pending' in the DB first (single UPDATE).
+	if err := h.subStore.ResetForRejudge(r.Context(), ids); err != nil {
+		slog.Error("bulk rejudge: reset failed", "contest", req.ContestID, "count", len(ids), "error", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to reset submissions"})
+		return
+	}
+
+	// Enqueue at PriorityBulk — lower than live contest (PriorityContest=1)
+	// and normal practice (PriorityNormal=2), so bulk work drains last.
+	enqueued := 0
+	for _, id := range ids {
+		if err := h.queue.Enqueue(r.Context(), id, PriorityBulk); err != nil {
+			slog.Error("bulk rejudge: enqueue failed", "id", id, "error", err)
+			continue
+		}
+		enqueued++
+	}
+	slog.Info("bulk rejudge enqueued", "contest", req.ContestID, "problem", req.ProblemID,
+		"total", len(ids), "enqueued", enqueued)
+	respondJSON(w, http.StatusOK, map[string]interface{}{"enqueued": enqueued, "total": len(ids)})
 }

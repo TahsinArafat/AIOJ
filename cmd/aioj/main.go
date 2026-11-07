@@ -320,7 +320,9 @@ func main() {
 	langAdminH := handler.NewAdminLanguageHandler(cfg.LangDir)
 
 	remoteLangH := handler.NewRemoteLanguageHandler(remoteLangStore, vjService)
-	adminSubH := handler.NewAdminSubmissionHandler(submissionStore, problemStore, vjService)
+	adminSubH := handler.NewAdminSubmissionHandler(submissionStore, problemStore, vjService).
+		WithQueue(judgeQueue).
+		WithContestStore(contestStore)
 	backupH := handler.NewAdminBackupHandler(userStore, cfg.Database, "./backups")
 
 	credentialKey, err := ai.ParseCredentialKey(cfg.AI.CredentialMasterKey)

@@ -8,9 +8,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/tahsinarafat/aioj/internal/model"
+	"github.com/tahsinarafat/aioj/internal/store"
 )
 
 type SubmissionStore struct{ db *sql.DB }
@@ -51,9 +53,9 @@ func (s *SubmissionStore) Create(ctx context.Context, sub *model.Submission) err
 	cid := sql.NullString{String: sub.ContestID, Valid: sub.ContestID != ""}
 	compressed := compressCode(sub.SourceCode)
 	return s.db.QueryRowContext(ctx,
-		`INSERT INTO submissions(id,problem_id,user_id,contest_id,language,source_code,source_code_gz,code_size,status,submission_type)
-		 VALUES($1,$2,$3,$4,$5,'',$6,$7,$8,$9) RETURNING created_at`,
-		sub.ID, sub.ProblemID, sub.UserID, cid, sub.Language, compressed, sub.CodeSize, sub.Status, sub.SubmissionType,
+		`INSERT INTO submissions(id,problem_id,user_id,contest_id,language,source_code,source_code_gz,code_size,status,submission_type,is_upsolving)
+		 VALUES($1,$2,$3,$4,$5,'',$6,$7,$8,$9,$10) RETURNING created_at`,
+		sub.ID, sub.ProblemID, sub.UserID, cid, sub.Language, compressed, sub.CodeSize, sub.Status, sub.SubmissionType, sub.IsUpsolving,
 	).Scan(&sub.CreatedAt)
 }
 
@@ -72,10 +74,10 @@ func (s *SubmissionStore) GetByID(ctx context.Context, id string) (*model.Submis
 		`SELECT id,problem_id,user_id,COALESCE(contest_id::text,''),language,source_code,source_code_gz,code_size,
 		        status,score,time_used,memory_used,compile_output,judge_result,
 		        judged_by,created_at,judged_at,submission_type,remote_id,remote_url,
-		        COALESCE(bot_id,''),COALESCE(bot_slug,'') FROM submissions WHERE id=$1`, id).Scan(
+		        COALESCE(bot_id,''),COALESCE(bot_slug,''),COALESCE(is_upsolving,false) FROM submissions WHERE id=$1`, id).Scan(
 		&sub.ID, &sub.ProblemID, &sub.UserID, &cid, &sub.Language, &sub.SourceCode, &compressed, &sub.CodeSize,
 		&sub.Status, &sub.Score, &sub.TimeUsed, &sub.MemoryUsed, &co, &jr,
-		&sub.JudgedBy, &sub.CreatedAt, &ja, &sub.SubmissionType, &remoteID, &remoteURL, &botID, &botSlug)
+		&sub.JudgedBy, &sub.CreatedAt, &ja, &sub.SubmissionType, &remoteID, &remoteURL, &botID, &botSlug, &sub.IsUpsolving)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -463,6 +465,7 @@ func (s *SubmissionStore) ListByContest(ctx context.Context, contestID string, o
 	return items, total, nil
 }
 
+// ListPending returns IDs of local pending submissions, ordered oldest first.
 func (s *SubmissionStore) ListPending(ctx context.Context, limit int) ([]string, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT s.id
@@ -486,6 +489,36 @@ func (s *SubmissionStore) ListPending(ctx context.Context, limit int) ([]string,
 		ids = append(ids, id)
 	}
 	return ids, rows.Err()
+}
+
+// ListPendingWithContext returns pending local submissions enriched with their
+// contest window so the reclaimer can assign the correct queue priority.
+func (s *SubmissionStore) ListPendingWithContext(ctx context.Context, limit int) ([]store.PendingSubmissionInfo, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT s.id,
+		       c.start_time,
+		       c.end_time
+		  FROM submissions s
+		  JOIN problems p ON p.id = s.problem_id
+		  LEFT JOIN contests c ON c.id = s.contest_id
+		 WHERE s.status = 'pending'
+		   AND COALESCE(s.remote_id, '') = ''
+		   AND COALESCE(p.source, 'local') IN ('', 'local')
+		 ORDER BY s.created_at ASC
+		 LIMIT $1`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []store.PendingSubmissionInfo
+	for rows.Next() {
+		var info store.PendingSubmissionInfo
+		if err := rows.Scan(&info.ID, &info.ContestStart, &info.ContestEnd); err != nil {
+			return nil, err
+		}
+		out = append(out, info)
+	}
+	return out, rows.Err()
 }
 
 func (s *SubmissionStore) GetProblemStats(ctx context.Context, problemID string) (*model.ProblemStats, error) {
@@ -545,3 +578,67 @@ func (s *SubmissionStore) GetPlatformStats(ctx context.Context) (*model.Platform
 	s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM submissions").Scan(&stats.Submissions)
 	return &stats, nil
 }
+
+// ListForBulkRejudge returns IDs of judged local submissions in a contest,
+// optionally filtered to one problem.  Pending/judging rows are excluded so
+// they don't get double-enqueued by a concurrent reclaimer sweep.
+func (s *SubmissionStore) ListForBulkRejudge(ctx context.Context, contestID, problemID string) ([]string, error) {
+	query := `
+		SELECT s.id
+		  FROM submissions s
+		  JOIN problems p ON p.id = s.problem_id
+		 WHERE s.contest_id = $1
+		   AND s.status NOT IN ('pending', 'judging')
+		   AND COALESCE(s.remote_id, '') = ''
+		   AND COALESCE(p.source, 'local') IN ('', 'local')`
+	args := []interface{}{contestID}
+	if problemID != "" {
+		args = append(args, problemID)
+		query += ` AND s.problem_id = $2`
+	}
+	query += ` ORDER BY s.created_at ASC`
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+// ResetForRejudge atomically resets a batch of submission IDs to 'pending',
+// clears prior verdicts, and clears any stale claim token.
+func (s *SubmissionStore) ResetForRejudge(ctx context.Context, ids []string) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	// Build $1,$2,... placeholder list.
+	placeholders := make([]string, len(ids))
+	args := make([]interface{}, len(ids))
+	for i, id := range ids {
+		placeholders[i] = fmt.Sprintf("$%d", i+1)
+		args[i] = id
+	}
+	_, err := s.db.ExecContext(ctx, `
+		UPDATE submissions
+		   SET status = 'pending',
+		       score = 0,
+		       time_used = 0,
+		       memory_used = 0,
+		       compile_output = '',
+		       judge_result = NULL,
+		       judging_started_at = NULL,
+		       judging_claim_token = NULL,
+		       judged_at = NULL
+		 WHERE id IN (`+strings.Join(placeholders, ",")+`)`, args...)
+	return err
+}
+

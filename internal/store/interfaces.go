@@ -8,6 +8,14 @@ import (
 	"github.com/tahsinarafat/aioj/internal/model"
 )
 
+// PendingSubmissionInfo is returned by ListPendingWithContext.
+// It carries just enough context for the reclaimer to assign priority.
+type PendingSubmissionInfo struct {
+	ID           string
+	ContestStart *time.Time
+	ContestEnd   *time.Time
+}
+
 type UserStore interface {
 	Create(ctx context.Context, user *model.User) error
 	GetByID(ctx context.Context, id string) (*model.User, error)
@@ -84,6 +92,16 @@ type SubmissionStore interface {
 	GetPendingRemoteSubmissions(ctx context.Context) ([]model.PendingRemoteSubmission, error)
 	GetUnsubmittedRemoteSubmissions(ctx context.Context) ([]model.Submission, error)
 	ListPending(ctx context.Context, limit int) ([]string, error)
+	// ListPendingWithContext returns pending local submissions enriched with
+	// their contest time window so the reclaimer can assign correct priority.
+	ListPendingWithContext(ctx context.Context, limit int) ([]PendingSubmissionInfo, error)
+	// ListForBulkRejudge returns IDs of all judged local submissions in a
+	// contest (optionally filtered to one problem) suitable for rejudging.
+	// It excludes submissions still pending/judging to avoid double-dispatch.
+	ListForBulkRejudge(ctx context.Context, contestID, problemID string) ([]string, error)
+	// ResetForRejudge atomically resets a batch of submissions to 'pending'
+	// and clears their judge result, preparing them for re-execution.
+	ResetForRejudge(ctx context.Context, ids []string) error
 	GetProblemStats(ctx context.Context, problemID string) (*model.ProblemStats, error)
 	GetUserStats(ctx context.Context, userID string) (*model.UserProblemStats, error)
 	GetPlatformStats(ctx context.Context) (*model.PlatformStats, error)

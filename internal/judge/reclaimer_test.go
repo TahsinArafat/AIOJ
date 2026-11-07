@@ -9,6 +9,7 @@ import (
 
 	"github.com/tahsinarafat/aioj/internal/model"
 	"github.com/tahsinarafat/aioj/internal/queue"
+	"github.com/tahsinarafat/aioj/internal/store"
 )
 
 type fakeSubStore struct {
@@ -104,6 +105,25 @@ func (f *fakeSubStore) GetPlatformStats(context.Context) (*model.PlatformStats, 
 }
 func (f *fakeSubStore) GetHackableSubmissions(context.Context, string, string) ([]model.Submission, error) {
 	return nil, nil
+}
+func (f *fakeSubStore) ListForBulkRejudge(context.Context, string, string) ([]string, error) {
+	return nil, nil
+}
+func (f *fakeSubStore) ResetForRejudge(context.Context, []string) error { return nil }
+func (f *fakeSubStore) ListPendingWithContext(_ context.Context, limit int) ([]store.PendingSubmissionInfo, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.listErr != nil {
+		return nil, f.listErr
+	}
+	if limit > len(f.pending) {
+		limit = len(f.pending)
+	}
+	out := make([]store.PendingSubmissionInfo, limit)
+	for i, id := range f.pending[:limit] {
+		out[i] = store.PendingSubmissionInfo{ID: id}
+	}
+	return out, nil
 }
 
 type failOnceQueue struct {

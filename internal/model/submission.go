@@ -63,6 +63,7 @@ type Submission struct {
 	BotSlug        string           `json:"bot_slug,omitempty"`
 	IsRemote       bool             `json:"is_remote"`
 	RemoteOJ       string           `json:"remote_oj,omitempty"`
+	IsUpsolving    bool             `json:"is_upsolving"`
 	CreatedAt      time.Time        `json:"created_at"`
 	JudgedAt       *time.Time       `json:"judged_at,omitempty"`
 }

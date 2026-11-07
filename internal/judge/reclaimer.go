@@ -84,16 +84,28 @@ func (r *Reclaimer) Sweep(ctx context.Context) int {
 	// path; this is the lossless fallback. RequeueStale has already returned
 	// the reclaimed IDs, but they are pending now and are included in this
 	// single authoritative list, avoiding duplicate queue entries.
-	ids, err := r.subStore.ListPending(ctx, 1000)
+	//
+	// ListPendingWithContext returns each submission's contest window so we
+	// can re-enqueue live-contest submissions at PriorityContest (1) instead
+	// of the flat priority=1 that previously treated every reclaimed submission
+	// the same as background practice work.
+	infos, err := r.subStore.ListPendingWithContext(ctx, 1000)
 	if err != nil {
 		slog.Error("pending-submission reconciliation failed", "error", err)
 		return 0
 	}
 
+	now := time.Now()
 	queued := 0
-	for _, id := range ids {
-		if err := r.queue.Enqueue(ctx, id, 1); err != nil {
-			slog.Error("re-enqueue of pending submission failed", "id", id, "error", err)
+	for _, info := range infos {
+		// Assign priority based on whether the contest is currently live.
+		priority := 2 // PriorityNormal — matches handler constant
+		if info.ContestStart != nil && info.ContestEnd != nil &&
+			now.After(*info.ContestStart) && now.Before(*info.ContestEnd) {
+			priority = 1 // PriorityContest
+		}
+		if err := r.queue.Enqueue(ctx, info.ID, priority); err != nil {
+			slog.Error("re-enqueue of pending submission failed", "id", info.ID, "error", err)
 			continue
 		}
 		queued++

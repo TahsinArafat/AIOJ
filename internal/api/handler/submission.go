@@ -21,6 +21,19 @@ import (
 	"github.com/tahsinarafat/aioj/internal/vjudge"
 )
 
+// Judge queue priority levels.  Lower = more urgent (min-heap / Redis ZSET).
+const (
+	// PriorityAuto lets buildAndEnqueue decide from the contest window.
+	// Never store this value in the queue — it is always resolved before Enqueue.
+	PriorityAuto = 0
+	// PriorityContest is for submissions during a live contest window (highest urgency).
+	PriorityContest = 1
+	// PriorityNormal is for practice, upsolving, and admin single rejudge.
+	PriorityNormal = 2
+	// PriorityBulk is for background batch rejudge that must not delay live contest judging.
+	PriorityBulk = 3
+)
+
 type SubmissionHandler struct {
 	subStore     store.SubmissionStore
 	probStore    store.ProblemStore
@@ -114,7 +127,16 @@ type submissionBuildRequest struct {
 	ContestID  string
 	UserID     string
 	Upsolving  bool
-	Priority   int // 0=auto (contest=0, normal=1), >0=explicit override
+	// IsTester marks a submission made by a contest judge/tester/manager
+	// before the contest window opens.  These get PriorityContest because
+	// they validate problems and must not wait behind practice submissions.
+	IsTester bool
+	// Priority controls queue ordering (lower = more urgent).
+	// PriorityAuto (0) means: detect automatically from contest window.
+	// PriorityContest (1) = live-contest or tester; PriorityNormal (2) = practice/upsolving;
+	// PriorityBulk (3) = background batch rejudge.
+	// Admin endpoints pass explicit values; user submissions always use PriorityAuto.
+	Priority int
 }
 
 func (h *SubmissionHandler) buildAndEnqueue(r *http.Request, w http.ResponseWriter, req submissionBuildRequest) {
@@ -135,6 +157,7 @@ func (h *SubmissionHandler) buildAndEnqueue(r *http.Request, w http.ResponseWrit
 	}
 	if req.ContestID != "" {
 		sub.ContestID = req.ContestID
+		sub.IsUpsolving = req.Upsolving
 	}
 
 	if err := h.subStore.Create(r.Context(), sub); err != nil {
@@ -148,14 +171,21 @@ func (h *SubmissionHandler) buildAndEnqueue(r *http.Request, w http.ResponseWrit
 	}
 
 	priority := req.Priority
-	if priority == 0 {
-		priority = 1
+	if priority == PriorityAuto {
+		// Auto-detect: live contest window → PriorityContest, everything else → PriorityNormal.
+		priority = PriorityNormal
 		if req.ContestID != "" && !req.Upsolving {
 			contest, cerr := h.contestStore.GetByID(r.Context(), req.ContestID)
 			if cerr == nil && contest != nil {
 				now := time.Now()
 				if now.After(contest.StartTime) && now.Before(contest.EndTime) {
-					priority = 0
+					// Live contest window.
+					priority = PriorityContest
+				} else if req.IsTester && now.Before(contest.StartTime) {
+					// Pre-contest tester/judge/manager validating the problem set.
+					// Give contest priority so their submissions don't queue behind
+					// practice work from other users.
+					priority = PriorityContest
 				}
 			}
 		}
@@ -205,7 +235,9 @@ func (h *SubmissionHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Language   string `json:"language"`
 		SourceCode string `json:"source_code"`
 		ContestID  string `json:"contest_id,omitempty"`
-		Priority   int    `json:"priority,omitempty"`
+		// Priority is intentionally NOT accepted from the user request body.
+		// Priority is determined server-side by contest-window detection.
+		// Admins may set it via the admin rejudge endpoints only.
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid body", http.StatusBadRequest)
@@ -240,8 +272,15 @@ func (h *SubmissionHandler) Create(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		} else if now.Before(contest.StartTime) {
-			http.Error(w, "contest has not started yet", http.StatusForbidden)
-			return
+			// Before the contest starts: only judges/managers/testers may submit,
+			// to validate the problem set.
+			isStaff := claims.Role == "admin" || contest.CreatedBy == claims.UserID ||
+				h.contestStore.HasAccess(r.Context(), contest.ID, claims.UserID, "manager", "judge", "tester")
+			if !isStaff {
+				http.Error(w, "contest has not started yet", http.StatusForbidden)
+				return
+			}
+			// Staff are allowed through; IsTester=true gives them PriorityContest.
 		} else {
 			if !contest.UpsolvingEnabled {
 				isJudge := claims.Role == "admin" || contest.CreatedBy == claims.UserID || h.contestStore.HasAccess(r.Context(), contest.ID, claims.UserID, "manager", "judge", "tester")
@@ -259,7 +298,20 @@ func (h *SubmissionHandler) Create(w http.ResponseWriter, r *http.Request) {
 		SourceCode: req.SourceCode,
 		ContestID:  req.ContestID,
 		UserID:     claims.UserID,
-		Priority:   req.Priority,
+		// IsTester is set to true when staff (admin/creator/judge/manager/tester)
+		// submit before the contest starts, so pre-contest validation gets
+		// PriorityContest instead of PriorityNormal.
+		IsTester: req.ContestID != "" && func() bool {
+			c, err := h.contestStore.GetByID(r.Context(), req.ContestID)
+			if err != nil || c == nil {
+				return false
+			}
+			return time.Now().Before(c.StartTime) &&
+				(claims.Role == "admin" || c.CreatedBy == claims.UserID ||
+					h.contestStore.HasAccess(r.Context(), req.ContestID, claims.UserID, "manager", "judge", "tester"))
+		}(),
+		// Priority is always PriorityAuto for user submissions; server-side
+		// contest detection sets the real value inside buildAndEnqueue.
 	})
 }
 

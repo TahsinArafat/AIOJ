@@ -449,6 +449,7 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 
 		r.Route("/submissions", func(r chi.Router) {
 			r.Get("/pending-remote", adminSubH.ListPendingRemote)
+			r.Post("/rejudge-bulk", adminSubH.RejudgeBulk)
 			r.Post("/{id}/rejudge", adminSubH.Rejudge)
 			r.Post("/{id}/refresh", adminSubH.ForceRefresh)
 		})
