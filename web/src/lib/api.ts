@@ -938,35 +938,6 @@ export const api = {
         list: (platform: string) =>
             request<{ data: RemoteLanguage[] }>(`/remote-languages/${platform}`),
     },
-    generate: {
-        problem: (d: {
-            tags: string[]
-            rating: number
-            problem_type: string
-            testcase_count: number
-            has_subtasks: boolean
-            additional_prompt?: string
-            primary_topics?: string[]
-            secondary_topics?: string[]
-            required_techniques?: string[]
-            forbidden_techniques?: string[]
-            rating_min?: number
-            rating_max?: number
-            solver_mode?: 'solo' | 'team'
-            team_size?: number
-            event_context?: 'practice' | 'online' | 'onsite'
-            format_profile?: 'general' | 'codeforces' | 'icpc' | 'oi'
-            expected_solve_minutes?: number
-            audience_level?: string
-            insight_emphasis?: 'insight' | 'implementation' | 'balanced'
-            story_tone?: string
-            constraint_guidance?: string
-        }) =>
-            request<{ problem_id: string; problem_slug: string; editorial_id: string }>(
-                '/generate/problem',
-                { method: 'POST', body: JSON.stringify(d) }
-            ),
-    },
     ai: {
         connections: () => request<{ data: AIModel[] }>('/ai/connections'),
         presets: () => request<{ version: string; data: AIBriefPreset[] }>('/ai/brief-presets'),

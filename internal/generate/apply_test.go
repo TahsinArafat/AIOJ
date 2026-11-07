@@ -40,3 +40,28 @@ func TestDefaultIntFallsBackOnlyForNonPositive(t *testing.T) {
 		t.Fatalf("got %d, want the explicit value", got)
 	}
 }
+
+// problems.memory_limit is kilobytes. A proposal's memory_limit_kb must land in
+// the column unchanged; multiplying by 1024 here stored bytes and made the
+// problem page show "262144000 MB".
+func TestProblemMemoryLimitIsStoredAsKilobytes(t *testing.T) {
+	cases := []struct {
+		name string
+		in   int
+		want int
+	}{
+		{"explicit 256 MB", 262144, 262144},
+		{"explicit 512 MB", 524288, 524288},
+		{"explicit non-round", 256000, 256000},
+		{"omitted falls back to 256 MB", 0, 262144},
+		{"negative falls back to 256 MB", -1, 262144},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := problemMemoryLimitKB(Proposal{MemoryLimitKB: tc.in})
+			if got != tc.want {
+				t.Fatalf("problemMemoryLimitKB(%d) = %d, want %d KB", tc.in, got, tc.want)
+			}
+		})
+	}
+}

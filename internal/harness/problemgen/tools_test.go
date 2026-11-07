@@ -69,6 +69,29 @@ func TestCatalogExposesNoShellTool(t *testing.T) {
 	}
 }
 
+// The statement is rendered with remark-math + KaTeX, so the schema description
+// has to steer the model away from backtick "math", which renders as literal
+// monospace characters instead of typeset notation.
+func TestStatementToolDescribesLaTeXConvention(t *testing.T) {
+	tools := newTestTools(t)
+	for _, tool := range tools.Tools() {
+		if tool.Function.Name != "set_statement" {
+			continue
+		}
+		desc := tool.Function.Description
+		if !strings.Contains(desc, "LaTeX") && !strings.Contains(desc, "$...$") {
+			t.Fatalf("set_statement description must mention $...$ LaTeX: %q", desc)
+		}
+		props, _ := tool.Function.Parameters["properties"].(map[string]any)
+		body, _ := props["description"].(map[string]any)
+		if text, _ := body["description"].(string); !strings.Contains(text, "$...$") {
+			t.Fatalf("description field must require $...$ math: %q", text)
+		}
+		return
+	}
+	t.Fatal("set_statement tool not found")
+}
+
 func TestFinalizePassesForACompleteProblem(t *testing.T) {
 	tools := newTestTools(t)
 	buildProblem(t, tools)

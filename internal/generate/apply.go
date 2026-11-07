@@ -76,7 +76,7 @@ func (s *ApplyService) Apply(ctx context.Context, job *model.AIGenerationJob, ac
 		// limit, so a proposal that omitted it would produce an unjudgeable
 		// problem that TLEs everything.
 		problem.TimeLimit = defaultInt(p.TimeLimitMs, 2000)
-		problem.MemoryLimit = defaultInt(p.MemoryLimitKB, 262144) * 1024
+		problem.MemoryLimit = problemMemoryLimitKB(p)
 		problem.Difficulty = p.Difficulty
 		problem.Tags = p.Tags
 	}
@@ -159,6 +159,22 @@ func defaultInt(v, fallback int) int {
 		return v
 	}
 	return fallback
+}
+
+// defaultMemoryLimitKB is the judge's conventional 256 MB when a proposal
+// omits the limit.
+const defaultMemoryLimitKB = 262144
+
+// problemMemoryLimitKB resolves the value written to problems.memory_limit.
+//
+// That column is in KILOBYTES: the admin create handler stores the form value
+// verbatim, the judge reads it as KB and multiplies by 1024 itself
+// (judge.WorkerPool.getEffectiveLimits), and the problem page renders
+// memory_limit/1024 as MB. Keep this a straight passthrough — multiplying here
+// (as this file once did) stores bytes, which displays as "262144000 MB" and
+// hands the sandbox a limit 1024x larger than intended.
+func problemMemoryLimitKB(p Proposal) int {
+	return defaultInt(p.MemoryLimitKB, defaultMemoryLimitKB)
 }
 
 // assignScores distributes 100 points across the cases, giving the remainder to

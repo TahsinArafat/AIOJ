@@ -69,17 +69,17 @@ func (t *Tools) Tools() []ai.Tool {
 			}, "n_min", "n_max", "value_min", "value_max")),
 
 		ai.NewTool("set_limits",
-			"Declare the judge limits. The reference solution must pass the maximum case inside these limits.",
+			"Declare the judge limits. The reference solution must pass the maximum case inside these limits. Use KiB: 256 MB is 262144, 512 MB is 524288.",
 			object(map[string]any{
 				"time_limit_ms":   integer("Per-case CPU limit in milliseconds."),
-				"memory_limit_kb": integer("Per-case memory limit in kilobytes."),
+				"memory_limit_kb": integer("Per-case memory limit in KiB. Use 262144 for 256 MB, 524288 for 512 MB, 1048576 for 1 GB; a decimal value like 256000 displays as 250 MB."),
 			}, "time_limit_ms", "memory_limit_kb")),
 
 		ai.NewTool("set_statement",
-			"Write the problem statement. Samples are verified against the reference solution, so they must be correct.",
+			"Write the problem statement. Samples are verified against the reference solution, so they must be correct. Write mathematics as $...$ LaTeX (KaTeX renders it); backticks render as literal monospace text, never as math.",
 			object(map[string]any{
 				"title":         str("Short problem title."),
-				"description":   str("Full Markdown statement."),
+				"description":   str("Full Markdown statement. Mathematical notation must be $...$ LaTeX, e.g. $1 \\le n \\le 2\\cdot10^5$; do not use backticks for math."),
 				"input_format":  str("Input format description."),
 				"output_format": str("Output format description."),
 				"hint":          str("Optional hint; may be empty."),

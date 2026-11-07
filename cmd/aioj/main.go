@@ -467,8 +467,6 @@ func main() {
 	// Retention runs regardless of AI_ENABLED: old jobs left from a period when
 	// generation was on must still be purged after it is switched off.
 	startAIRetention()
-	genSvc := generate.NewService(aiModelStore, problemStore, editorialStore)
-	generateH := handler.NewGenerateHandler(genSvc)
 
 	verifyH := &handler.EmailVerificationHandler{Users: userStore, Tokens: evtStore}
 	// The mail-catcher inspector exposes every message (verification and
@@ -774,7 +772,6 @@ func main() {
 		AuditLog:        auditH,
 		Health:          healthH,
 		Activity:        handler.NewActivityHandler(submissionStore, ratingStore, feedStore),
-		Generate:        generateH,
 		AIModel:         aiModelH,
 		AIGeneration:    aiGenerationH,
 		Features:        featuresH,

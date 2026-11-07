@@ -698,16 +698,10 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 		r.Put("/pairs/{pairId}", plagiarismH.UpdatePairStatus)
 	})
 
-	r.Route("/api/generate", func(r chi.Router) {
-		r.Use(middleware.AuthMiddleware(jwtManager))
-		r.Use(middleware.RequireRole("admin", "setter"))
-		// After auth, so the gate reads the claims instead of re-validating the
-		// token; the gate is still self-sufficient for the groups that mix
-		// public and authenticated routes.
-		r.Use(gate(feature.KeyAIGeneration))
-		r.Post("/problem", d.Generate.Problem)
-	})
-
+	// POST /api/generate/problem (the synchronous, unvalidated generator) has been
+	// removed. POST /api/ai/jobs is the only generation entry point: it queues
+	// the work, runs it through the sandboxed harness, and requires the result to
+	// pass validation before it can be applied to a problem.
 	if d.AIGeneration != nil && d.AIEnabled {
 		r.Route("/api/ai", func(r chi.Router) {
 			r.Use(middleware.AuthMiddleware(jwtManager))

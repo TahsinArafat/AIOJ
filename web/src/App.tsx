@@ -67,7 +67,7 @@ const ContestPlagiarism = lazy(() => import('./pages/ContestPlagiarism'))
 const ContestProblem = lazy(() => import('./pages/ContestProblem'))
 const ContestManage = lazy(() => import('./pages/ContestManage'))
 const IDE = lazy(() => import('./pages/IDE'))
-const GenerateProblem = lazy(() => import('./pages/GenerateProblem'))
+const AIProblemCreate = lazy(() => import('./pages/AIProblemCreate'))
 const TermsOfService = lazy(() => import('./pages/legal/TermsOfService'))
 const PrivacyPolicy = lazy(() => import('./pages/legal/PrivacyPolicy'))
 const DMCA = lazy(() => import('./pages/legal/DMCA'))
@@ -420,9 +420,11 @@ function AppShell() {
                     <Route path="/admin" element={<AdminDashboard />} />
                     <Route path="/setter" element={<FeatureGate feature="setter_workspace"><SetterPanel /></FeatureGate>} />
                     <Route path="/setter/create" element={<FeatureGate feature="setter_workspace"><ProblemCreate /></FeatureGate>} />
-                    <Route path="/setter/:slug" element={<FeatureGate feature="setter_workspace"><SetterProblemWorkspace /></FeatureGate>} />
+                    {/* Declared before /setter/:slug so the static segment wins on
+                        its own merits rather than relying on route ranking. */}
+                    <Route path="/setter/ai" element={<FeatureGate feature="setter_workspace"><FeatureGate feature="ai_generation"><AIProblemCreate /></FeatureGate></FeatureGate>} />
                     <Route path="/setter/contest/create" element={<FeatureGate feature="setter_workspace"><ContestCreate /></FeatureGate>} />
-                    <Route path="/generate/problem" element={<FeatureGate feature="ai_generation"><GenerateProblem /></FeatureGate>} />
+                    <Route path="/setter/:slug" element={<FeatureGate feature="setter_workspace"><SetterProblemWorkspace /></FeatureGate>} />
 
                     <Route path="/practice" element={<FeatureGate feature="practice"><Practice /></FeatureGate>} />
                     <Route path="/organizations" element={<FeatureGate feature="organizations"><OrganizationList /></FeatureGate>} />

@@ -31,6 +31,47 @@ test('ready proposal exposes selective apply controls', async () => {
  expect(screen.getByText(/statement: ok/)).toBeInTheDocument()
 })
 
+// Without a problemId the tab authors a brand-new problem: it must not look up
+// per-problem jobs, must send no problem_id, and must always ask for the whole
+// package (the other artifact scopes only patch an existing problem).
+test('creates a new problem when no problemId is given', async () => {
+ vi.mocked(api.ai.createJob).mockResolvedValue({id:'j2',actor_id:'u1',artifact_type:'full_problem',status:'queued',stage:'queued',progress:0,submitted_brief:{tags:['dp'],rating:1400,problem_type:'standard',testcase_count:10,has_subtasks:false},normalized_brief:{tags:['dp'],rating:1400,problem_type:'standard',testcase_count:10,has_subtasks:false},prompt_tokens:0,completion_tokens:0,latency_ms:0,created_at:''})
+ render(<AIStudioTab />)
+ await waitFor(()=>expect(screen.getByText(/Local/)).toBeInTheDocument())
+ // No existing problem, so no resume lookup and no artifact picker.
+ expect(api.ai.problemJobs).not.toHaveBeenCalled()
+ expect(screen.queryByRole('button',{name:'Tests & generator'})).not.toBeInTheDocument()
+
+ fireEvent.click(screen.getByRole('button',{name:'Generate problem'}))
+ await waitFor(()=>expect(api.ai.createJob).toHaveBeenCalledTimes(1))
+ const sent = vi.mocked(api.ai.createJob).mock.calls[0][0]
+ expect(sent.problem_id).toBeUndefined()
+ expect(sent.artifact_type).toBe('full_problem')
+})
+
+// The brief controls are the whole point of the page: changing a topic and the
+// rating must reach the job request, not just the default brief.
+test('carries the operator brief customisation into the job', async () => {
+ vi.mocked(api.ai.createJob).mockResolvedValue({id:'j3',actor_id:'u1',artifact_type:'full_problem',status:'queued',stage:'queued',progress:0,submitted_brief:{tags:['dp'],rating:1400,problem_type:'standard',testcase_count:10,has_subtasks:false},normalized_brief:{tags:['dp'],rating:1400,problem_type:'standard',testcase_count:10,has_subtasks:false},prompt_tokens:0,completion_tokens:0,latency_ms:0,created_at:''})
+ render(<AIStudioTab problemId="p1" />)
+ await waitFor(()=>expect(screen.getByText(/Local/)).toBeInTheDocument())
+
+ // Topic chip, rating quick-pick, and a free-form field.
+ fireEvent.click(screen.getByRole('button',{name:'greedy'}))
+ fireEvent.click(screen.getByRole('button',{name:'1900'}))
+ fireEvent.change(screen.getByLabelText('Forbidden techniques'), {target:{value:'flows, geometry'}})
+
+ fireEvent.click(screen.getByRole('button',{name:'Generate proposal'}))
+ await waitFor(()=>expect(api.ai.createJob).toHaveBeenCalledTimes(1))
+ const sent = vi.mocked(api.ai.createJob).mock.calls[0][0]
+ expect(sent.brief.tags).toEqual(expect.arrayContaining(['dp','greedy']))
+ expect(sent.brief.rating).toBe(1900)
+ // The acceptable range must still contain the rating or the backend rejects it.
+ expect(sent.brief.rating_min).toBeLessThanOrEqual(1900)
+ expect(sent.brief.rating_max).toBeGreaterThanOrEqual(1900)
+ expect(sent.brief.forbidden_techniques).toEqual(['flows','geometry'])
+})
+
 test('resumes the newest job for the problem on mount', async () => {
  const ready={id:'j9',actor_id:'u1',artifact_type:'full_problem',status:'ready' as const,stage:'ready',progress:100,submitted_brief:{tags:['dp'],rating:1400,problem_type:'standard',testcase_count:10,has_subtasks:false},normalized_brief:{tags:['dp'],rating:1400,problem_type:'standard',testcase_count:10,has_subtasks:false},proposal:{title:'Resumed',description:'Statement'},validation_report:{valid:true,checks:[{name:'coverage',passed:true,message:'31 cases'}]},prompt_tokens:10,completion_tokens:20,latency_ms:100,created_at:''}
  vi.mocked(api.ai.problemJobs).mockResolvedValue({data:[ready]})

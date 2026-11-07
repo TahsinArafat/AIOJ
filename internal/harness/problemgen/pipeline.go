@@ -42,7 +42,17 @@ Rules:
 - Never attempt to emit a large input as text. Use generate_case or
   materialize_matrix and let the generator produce it.
 - Fix compile errors from the reported log; do not rewrite blindly.
-- Keep the statement consistent with the constraints you declared.`
+- Keep the statement consistent with the constraints you declared.
+- Write mathematics as LaTeX wrapped in single dollar signs: $1 \le n \le 2\cdot10^5$,
+  $a_i$, $O(n \log n)$. The renderer runs remark-math plus KaTeX, so this is the
+  only syntax that becomes typeset math.
+- Do NOT put mathematics in inline-code spans (backtick pairs). Those render as
+  literal monospace text, so 10^9 reaches the reader as the four characters
+  "10^9" instead of a typeset power, and a_i never becomes a subscript. Reserve
+  inline code for tokens that must stay verbatim, such as a language keyword.
+- Express memory limits in KiB, not decimal bytes: 256 MB is 262144, 512 MB is
+  524288, 1 GB is 1048576. The problem page renders memory_limit_kb / 1024 as
+  MB, so a decimal value like 256000 displays as "250 MB".`
 
 // Pipeline composes the loop, the catalog and the workspace.
 type Pipeline struct {

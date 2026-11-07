@@ -33,13 +33,6 @@ type Request struct {
 	ConstraintGuidance   string   `json:"constraint_guidance,omitempty"`
 }
 
-// GenerateResult is returned after a successful generation + DB save.
-type GenerateResult struct {
-	ProblemID   string `json:"problem_id"`
-	ProblemSlug string `json:"problem_slug"`
-	EditorialID string `json:"editorial_id"`
-}
-
 // Accepted solver modes, event contexts, and format profiles.
 const (
 	SolverSolo = "solo"

@@ -170,6 +170,19 @@ func TestPipelineSystemPromptStatesTheHardConstraints(t *testing.T) {
 	if !strings.Contains(prompt, "deterministic") {
 		t.Fatal("the prompt must require determinism")
 	}
+	// The problem page renders statements with remark-math + KaTeX, which only
+	// typesets $...$. Without this instruction the model wrote math in backticks
+	// and readers saw the literal characters "10^9".
+	if !strings.Contains(prompt, "$") {
+		t.Fatal("the prompt must ask for $...$ LaTeX math")
+	}
+	if !strings.Contains(prompt, "backtick") {
+		t.Fatal("the prompt must forbid inline-code spans for mathematics")
+	}
+	// memory_limit_kb is KiB; the page divides by 1024 to show MB.
+	if !strings.Contains(prompt, "262144") {
+		t.Fatal("the prompt must state the KiB value for 256 MB")
+	}
 	if len(model.prompts) != 1 || model.prompts[0] != "the brief" {
 		t.Fatalf("brief not forwarded: %v", model.prompts)
 	}

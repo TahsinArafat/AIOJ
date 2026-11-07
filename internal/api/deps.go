@@ -75,7 +75,6 @@ type Deps struct {
 	// Health is optional; when set, /api/health reports dependency status.
 	Health       *handler.HealthChecker
 	Activity     *handler.ActivityHandler
-	Generate     *handler.GenerateHandler
 	AIModel      *handler.AdminAIModelHandler
 	AIGeneration *handler.AIGenerationHandler
 	// Features serves the feature-gate registry and its admin CRUD.
