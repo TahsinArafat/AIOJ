@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { api, getAccessToken } from '../lib/api'
+import { usePageVisible } from '../hooks/usePageVisible'
 import DivisionBadge from '../components/DivisionBadge'
 import { ContestStatusBadge, ContestFormatBadge, ContestTypeBadge } from '../components/contest/ContestBadges'
 import type { Division } from '../lib/divisions'
@@ -216,6 +217,7 @@ export default function ContestDetail() {
     const confirm = useConfirm()
     const toast = useToast()
     const { id } = useParams<{ id: string }>()
+    const pageVisible = usePageVisible()
     const role = decodeRole()
     const userId = decodeUserId()
     const isAdmin = role === 'admin' || role === 'owner'
@@ -384,9 +386,13 @@ export default function ContestDetail() {
             }).catch(() => { })
         }
         pollNotices()
+        // Skip the interval when the tab is hidden — the server poll wastes
+        // DB work while the user isn't watching.  It restarts automatically
+        // when pageVisible becomes true again.
+        if (!pageVisible) return () => {}
         const interval = setInterval(pollNotices, 15000)
         return () => clearInterval(interval)
-    }, [id]) // eslint-disable-line react-hooks/exhaustive-deps -- notification loop keeps its established stale-closure behavior
+    }, [id, pageVisible]) // eslint-disable-line react-hooks/exhaustive-deps -- notification loop keeps its established stale-closure behavior
 
     const handleRegister = async () => {
         if (!id) return

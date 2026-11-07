@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { api } from '../lib/api'
+import { usePageVisible } from '../hooks/usePageVisible'
 import type { PlagiarismPairDetail, PlagiarismReport } from '../types/api'
 import { errorMessage } from '../lib/errors'
 import { EmptyState } from '../components/EmptyState'
@@ -29,6 +30,7 @@ function similarityTone(ratio: number): { bar: string; label: string } {
 
 export default function ContestPlagiarism() {
 	const { id } = useParams<{ id: string }>()
+	const pageVisible = usePageVisible()
 	const [report, setReport] = useState<PlagiarismReport | null>(null)
 	const [pairs, setPairs] = useState<PlagiarismPairDetail[]>([])
 	const [loading, setLoading] = useState(true)
@@ -79,11 +81,14 @@ export default function ContestPlagiarism() {
 	}, [fetchReport])
 
 	// Poll while a check is running so the table fills in without a manual reload.
+	// Skip when the tab is hidden — the scan can take minutes and there's no
+	// point hitting the DB every 5 s while the user has switched away.
 	useEffect(() => {
 		if (report?.status !== 'running') return
+		if (!pageVisible) return
 		const interval = setInterval(() => { void fetchReport() }, 5000)
 		return () => clearInterval(interval)
-	}, [report?.status, fetchReport])
+	}, [report?.status, pageVisible, fetchReport])
 
 	const handleRunCheck = async () => {
 		if (!id) return

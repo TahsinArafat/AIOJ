@@ -511,136 +511,173 @@ func main() {
 		// in the SitemapSection rather than logged and dropped. Dropping it is
 		// what previously turned a query against a non-existent column into a
 		// clean-looking empty sitemap.
-		Sitemap: func(ctx context.Context) []handler.SitemapSection {
-			origin := handler.NormalizeOrigin(os.Getenv("PUBLIC_ORIGIN"))
-			if origin == "" {
-				origin = "http://localhost:8081"
-			}
-			toURLs := func(entries []postgres.SitemapEntry) []handler.SitemapURL {
-				out := make([]handler.SitemapURL, 0, len(entries))
-				for _, e := range entries {
-					out = append(out, handler.SitemapURL{
-						Location:   e.Location,
-						LastMod:    e.LastMod,
-						ChangeFreq: e.ChangeFreq,
-						Priority:   e.Priority,
-					})
+		//
+		// The sitemap is cached in-process for 1 hour: crawlers hit /sitemap.xml
+		// frequently and the content changes at most a few times per day.  A
+		// transient DB error returns the stale cached copy (if any) instead of
+		// serving a 500 to the crawler.
+		Sitemap: func() func(ctx context.Context) []handler.SitemapSection {
+			cache := &handler.TTLCache[[]handler.SitemapSection]{TTL: time.Hour}
+			return func(ctx context.Context) []handler.SitemapSection {
+				origin := handler.NormalizeOrigin(os.Getenv("PUBLIC_ORIGIN"))
+				if origin == "" {
+					origin = "http://localhost:8081"
 				}
-				return out
+				toURLs := func(entries []postgres.SitemapEntry) []handler.SitemapURL {
+					out := make([]handler.SitemapURL, 0, len(entries))
+					for _, e := range entries {
+						out = append(out, handler.SitemapURL{
+							Location:   e.Location,
+							LastMod:    e.LastMod,
+							ChangeFreq: e.ChangeFreq,
+							Priority:   e.Priority,
+						})
+					}
+					return out
+				}
+				sections, _ := cache.Get(func() ([]handler.SitemapSection, error) {
+					problems, errProblems := sitemapStore.PublicProblems(ctx, origin)
+					contests, errContests := sitemapStore.PublicContests(ctx, origin)
+					users, errUsers := sitemapStore.PublicUsers(ctx, origin)
+					// If any section errored, propagate so the caller can 500
+					// rather than serve a silently incomplete sitemap.
+					for _, e := range []error{errProblems, errContests, errUsers} {
+						if e != nil {
+							return nil, e
+						}
+					}
+					return []handler.SitemapSection{
+						{Name: "problems", URLs: toURLs(problems)},
+						{Name: "contests", URLs: toURLs(contests)},
+						{Name: "users", URLs: toURLs(users)},
+					}, nil
+				})
+				return sections
 			}
-
-			problems, errProblems := sitemapStore.PublicProblems(ctx, origin)
-			contests, errContests := sitemapStore.PublicContests(ctx, origin)
-			users, errUsers := sitemapStore.PublicUsers(ctx, origin)
-
-			return []handler.SitemapSection{
-				{Name: "problems", URLs: toURLs(problems), Err: errProblems},
-				{Name: "contests", URLs: toURLs(contests), Err: errContests},
-				{Name: "users", URLs: toURLs(users), Err: errUsers},
-			}
-		},
+		}(),
 		// Feed items for /feed/problems.atom. The error is returned, not logged,
 		// so a failed query surfaces as a 500 instead of a valid-looking empty
 		// feed -- the mistake that hid the first sitemap's broken query.
-		Feed: func(ctx context.Context) ([]handler.FeedItem, error) {
-			origin := handler.NormalizeOrigin(os.Getenv("PUBLIC_ORIGIN"))
-			if origin == "" {
-				origin = "http://localhost:8081"
-			}
-			entries, err := feedStore.RecentProblems(ctx, 25)
-			if err != nil {
-				return nil, err
-			}
-			items := make([]handler.FeedItem, 0, len(entries))
-			for _, e := range entries {
-				url := origin + "/problems/" + e.Slug
-				items = append(items, handler.FeedItem{
-					Title:   e.Title,
-					Link:    url,
-					ID:      url,
-					Summary: truncateForFeed(e.Summary, 500),
-					Updated: toTime(e.Created),
-				})
-			}
-			return items, nil
-		},
-		CommentFeed: func(ctx context.Context) ([]handler.FeedItem, error) {
-			origin := handler.NormalizeOrigin(os.Getenv("PUBLIC_ORIGIN"))
-			if origin == "" {
-				origin = "http://localhost:8081"
-			}
-			entries, err := feedStore.RecentComments(ctx, 25)
-			if err != nil {
-				return nil, err
-			}
-			items := make([]handler.FeedItem, 0, len(entries))
-			for _, e := range entries {
-				// Link to the thread the comment belongs to, not the bare id.
-				var link string
-				switch e.ParentType {
-				case "problem":
-					link = origin + "/problems/" + strconv.FormatInt(e.ParentID, 10)
-				case "contest":
-					link = origin + "/contests/" + strconv.FormatInt(e.ParentID, 10)
-				case "blog":
-					link = origin + "/blog/" + strconv.FormatInt(e.ParentID, 10)
-				default:
-					link = origin + "/"
+		// Cached for 10 minutes: feeds are polled by RSS readers frequently.
+		Feed: func() func(ctx context.Context) ([]handler.FeedItem, error) {
+			cache := &handler.TTLCache[[]handler.FeedItem]{TTL: 10 * time.Minute}
+			return func(ctx context.Context) ([]handler.FeedItem, error) {
+				origin := handler.NormalizeOrigin(os.Getenv("PUBLIC_ORIGIN"))
+				if origin == "" {
+					origin = "http://localhost:8081"
 				}
-				items = append(items, handler.FeedItem{
-					Title:   e.Username + " commented",
-					Link:    link,
-					ID:      origin + "/comments/" + strconv.FormatInt(e.ID, 10),
-					Summary: truncateForFeed(e.Content, 500),
-					Updated: toTime(e.Created),
+				return cache.Get(func() ([]handler.FeedItem, error) {
+					entries, err := feedStore.RecentProblems(ctx, 25)
+					if err != nil {
+						return nil, err
+					}
+					items := make([]handler.FeedItem, 0, len(entries))
+					for _, e := range entries {
+						url := origin + "/problems/" + e.Slug
+						items = append(items, handler.FeedItem{
+							Title:   e.Title,
+							Link:    url,
+							ID:      url,
+							Summary: truncateForFeed(e.Summary, 500),
+							Updated: toTime(e.Created),
+						})
+					}
+					return items, nil
 				})
 			}
-			return items, nil
-		},
-		BlogFeed: func(ctx context.Context) ([]handler.FeedItem, error) {
-			origin := handler.NormalizeOrigin(os.Getenv("PUBLIC_ORIGIN"))
-			if origin == "" {
-				origin = "http://localhost:8081"
-			}
-			entries, err := feedStore.RecentBlogPosts(ctx, 25)
-			if err != nil {
-				return nil, err
-			}
-			items := make([]handler.FeedItem, 0, len(entries))
-			for _, e := range entries {
-				url := origin + "/blog/" + strconv.FormatInt(e.ID, 10)
-				items = append(items, handler.FeedItem{
-					Title:   e.Title,
-					Link:    url,
-					ID:      url,
-					Summary: truncateForFeed(e.Content, 500),
-					Updated: toTime(e.Created),
+		}(),
+		CommentFeed: func() func(ctx context.Context) ([]handler.FeedItem, error) {
+			cache := &handler.TTLCache[[]handler.FeedItem]{TTL: 10 * time.Minute}
+			return func(ctx context.Context) ([]handler.FeedItem, error) {
+				origin := handler.NormalizeOrigin(os.Getenv("PUBLIC_ORIGIN"))
+				if origin == "" {
+					origin = "http://localhost:8081"
+				}
+				return cache.Get(func() ([]handler.FeedItem, error) {
+					entries, err := feedStore.RecentComments(ctx, 25)
+					if err != nil {
+						return nil, err
+					}
+					items := make([]handler.FeedItem, 0, len(entries))
+					for _, e := range entries {
+						// Link to the thread the comment belongs to, not the bare id.
+						var link string
+						switch e.ParentType {
+						case "problem":
+							link = origin + "/problems/" + strconv.FormatInt(e.ParentID, 10)
+						case "contest":
+							link = origin + "/contests/" + strconv.FormatInt(e.ParentID, 10)
+						case "blog":
+							link = origin + "/blog/" + strconv.FormatInt(e.ParentID, 10)
+						default:
+							link = origin + "/"
+						}
+						items = append(items, handler.FeedItem{
+							Title:   e.Username + " commented",
+							Link:    link,
+							ID:      origin + "/comments/" + strconv.FormatInt(e.ID, 10),
+							Summary: truncateForFeed(e.Content, 500),
+							Updated: toTime(e.Created),
+						})
+					}
+					return items, nil
 				})
 			}
-			return items, nil
-		},
-		ContestFeed: func(ctx context.Context) ([]handler.FeedItem, error) {
-			origin := handler.NormalizeOrigin(os.Getenv("PUBLIC_ORIGIN"))
-			if origin == "" {
-				origin = "http://localhost:8081"
-			}
-			entries, err := feedStore.RecentContests(ctx, 25)
-			if err != nil {
-				return nil, err
-			}
-			items := make([]handler.FeedItem, 0, len(entries))
-			for _, e := range entries {
-				url := origin + "/contests/" + e.Slug
-				items = append(items, handler.FeedItem{
-					Title:   e.Title,
-					Link:    url,
-					ID:      url,
-					Summary: truncateForFeed(e.Summary, 500),
-					Updated: toTime(e.Created),
+		}(),
+		BlogFeed: func() func(ctx context.Context) ([]handler.FeedItem, error) {
+			cache := &handler.TTLCache[[]handler.FeedItem]{TTL: 10 * time.Minute}
+			return func(ctx context.Context) ([]handler.FeedItem, error) {
+				origin := handler.NormalizeOrigin(os.Getenv("PUBLIC_ORIGIN"))
+				if origin == "" {
+					origin = "http://localhost:8081"
+				}
+				return cache.Get(func() ([]handler.FeedItem, error) {
+					entries, err := feedStore.RecentBlogPosts(ctx, 25)
+					if err != nil {
+						return nil, err
+					}
+					items := make([]handler.FeedItem, 0, len(entries))
+					for _, e := range entries {
+						url := origin + "/blog/" + strconv.FormatInt(e.ID, 10)
+						items = append(items, handler.FeedItem{
+							Title:   e.Title,
+							Link:    url,
+							ID:      url,
+							Summary: truncateForFeed(e.Content, 500),
+							Updated: toTime(e.Created),
+						})
+					}
+					return items, nil
 				})
 			}
-			return items, nil
-		},
+		}(),
+		ContestFeed: func() func(ctx context.Context) ([]handler.FeedItem, error) {
+			cache := &handler.TTLCache[[]handler.FeedItem]{TTL: 10 * time.Minute}
+			return func(ctx context.Context) ([]handler.FeedItem, error) {
+				origin := handler.NormalizeOrigin(os.Getenv("PUBLIC_ORIGIN"))
+				if origin == "" {
+					origin = "http://localhost:8081"
+				}
+				return cache.Get(func() ([]handler.FeedItem, error) {
+					entries, err := feedStore.RecentContests(ctx, 25)
+					if err != nil {
+						return nil, err
+					}
+					items := make([]handler.FeedItem, 0, len(entries))
+					for _, e := range entries {
+						url := origin + "/contests/" + e.Slug
+						items = append(items, handler.FeedItem{
+							Title:   e.Title,
+							Link:    url,
+							ID:      url,
+							Summary: truncateForFeed(e.Summary, 500),
+							Updated: toTime(e.Created),
+						})
+					}
+					return items, nil
+				})
+			}
+		}(),
 		Submission:      submissionH,
 		Contest:         contestH,
 		ContestProblem:  contestProblemH,

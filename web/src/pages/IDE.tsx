@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import CodeEditor from '../components/CodeEditor'
+import { lazy } from 'react'
+const CodeEditor = lazy(() => import('../components/CodeEditor'))
 import { api, getAccessToken } from '../lib/api'
 import { DEFAULT_LANGUAGE, LANGUAGE_OPTIONS, languageTemplate } from '../lib/languages'
 import { VerdictBadge } from '../components/ui/VerdictBadge'

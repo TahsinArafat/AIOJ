@@ -82,32 +82,43 @@ func (w *JobWorker) Run(ctx context.Context) {
 	if w.Timeout <= 0 {
 		w.Timeout = 5 * time.Minute
 	}
-	ticker := time.NewTicker(w.Poll)
-	defer ticker.Stop()
+	// Exponential backoff: start at Poll (default 1 s), double on each empty
+	// cycle up to 30 s, reset immediately when a job is found.  Avoids a
+	// continuous DB round-trip every second when the AI feature is enabled but
+	// no generation jobs are queued.
+	const maxPoll = 30 * time.Second
+	interval := w.Poll
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-ticker.C:
+		case <-time.After(interval):
 			_, _ = w.Jobs.RequeueStale(ctx, 10*time.Minute)
-			w.processOne(ctx)
+			if w.processOne(ctx) {
+				interval = w.Poll // found work — reset to minimum
+			} else if interval < maxPoll {
+				interval *= 2
+				if interval > maxPoll {
+					interval = maxPoll
+				}
+			}
 		}
 	}
 }
-func (w *JobWorker) processOne(ctx context.Context) {
+func (w *JobWorker) processOne(ctx context.Context) bool {
 	token := uuid.NewString()
 	job, err := w.Jobs.ClaimNext(ctx, token)
 	if err != nil || job == nil {
-		return
+		return false
 	}
 	if cancelled, _ := w.Jobs.IsCancellationRequested(ctx, job.ID); cancelled {
 		_ = w.Jobs.MarkCancelled(ctx, job.ID, token)
-		return
+		return true
 	}
 	var brief Request
 	if json.Unmarshal(job.NormalizedBrief, &brief) != nil {
 		_ = w.Jobs.Fail(ctx, job.ID, token, "invalid_brief", "stored brief is invalid", nil)
-		return
+		return true
 	}
 	m, err := w.Models.GetDefault(ctx)
 	if job.AIModelID != nil {
@@ -115,7 +126,7 @@ func (w *JobWorker) processOne(ctx context.Context) {
 	}
 	if err != nil || m == nil {
 		_ = w.Jobs.Fail(ctx, job.ID, token, "connection_unavailable", "AI connection is unavailable", nil)
-		return
+		return true
 	}
 	_ = w.Jobs.Heartbeat(ctx, job.ID, token, "drafting", 15)
 	client := ai.NewWithOptions(m.Endpoint, m.APIKey, m.ModelName, ai.ClientOptions{Mode: m.StructuredOutputMode, Timeout: time.Duration(m.RequestTimeoutSeconds) * time.Second, MaxOutputTokens: m.MaxOutputTokens, AllowPrivateNetwork: m.AllowPrivateNetwork})
@@ -125,18 +136,18 @@ func (w *JobWorker) processOne(ctx context.Context) {
 	result, err := client.CompleteJSON(runCtx, systemPrompt, buildUserPrompt(brief), ProposalJSONSchema())
 	if err != nil {
 		_ = w.Jobs.Fail(ctx, job.ID, token, "provider_error", "AI generation failed", nil)
-		return
+		return true
 	}
 	if cancelled, _ := w.Jobs.IsCancellationRequested(ctx, job.ID); cancelled {
 		_ = w.Jobs.MarkCancelled(ctx, job.ID, token)
-		return
+		return true
 	}
 	_ = w.Jobs.Heartbeat(ctx, job.ID, token, "validating", 75)
 	proposal, report, err := ParseAndValidateProposal(result.Content, job.ArtifactType)
 	reportJSON, _ := json.Marshal(report)
 	if err != nil {
 		_ = w.Jobs.Fail(ctx, job.ID, token, "validation_failed", "Generated proposal failed validation", reportJSON)
-		return
+		return true
 	}
 	if (job.ArtifactType == "full_problem" || job.ArtifactType == "tests") && w.Sandbox != nil {
 		sandboxChecks, sandboxErr := w.Sandbox.Validate(runCtx, proposal, job.ID)
@@ -146,10 +157,11 @@ func (w *JobWorker) processOne(ctx context.Context) {
 			report.Checks = append(report.Checks, ValidationCheck{Name: "sandbox", Passed: false, Message: sandboxErr.Error()})
 			reportJSON, _ = json.Marshal(report)
 			_ = w.Jobs.Fail(ctx, job.ID, token, "sandbox_validation_failed", "Generated code failed sandbox validation", reportJSON)
-			return
+			return true
 		}
 		reportJSON, _ = json.Marshal(report)
 	}
 	proposalJSON, _ := json.Marshal(proposal)
 	_ = w.Jobs.Complete(ctx, job.ID, token, proposalJSON, reportJSON, result.PromptTokens, result.CompletionTokens, int(time.Since(start).Milliseconds()))
+	return true
 }
