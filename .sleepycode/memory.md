@@ -1,34 +1,30 @@
-- **Current state**: `21ef3c3` (all 16 audit findings closed) on `main`. Preceded by `bcf7c04` (priority judging), `bca52b0` (sitemap cache/AI backoff/Monaco lazy), `d090e05` (lazy-init), `b84128f` (pressure gate + lean API image).
-- **Judge priority ladder (`bcf7c04`)** — constants in `internal/api/handler/submission.go`: PriorityAuto=0 (resolved before enqueue, never stored), PriorityContest=1, PriorityNormal=2, PriorityBulk=3. Lower = more urgent. Users can NOT set priority in the submit body. Admin single rejudge → Normal; `POST /api/admin/submissions/rejudge-bulk {contest_id, problem_id?}` → Bulk. Reclaimer assigns from `is_upsolving` + contest window.
-- **Audit fixes (`21ef3c3`)** — do not regress these:
-  - **WebSocket verdict push** — `judge.VerdictNotifier` interface (`NotifyVerdict(id, status)`), implemented by `handler.WSManager.NotifyVerdict`, attached via `WorkerPool.WithNotifier` in server mode only (judge-worker has no WS server). Pushed in `finish()` AFTER persistence.
-  - **Hack judging** — `internal/hack/judge.go` really compiles+runs the defender's submission in go-judge. Success = RE/TLE/MLE, or wrong output when `HackRequest.ExpectedOutput` is supplied. Output capped 8 KiB. `ErrHackJudgingUnavailable` → 503. `hack.Runner` interface lets tests inject fakes.
-  - **ProposalJSONSchema** — real schema matching Proposal, `additionalProperties:false` (Agrees with DisallowUnknownFields).
-  - **go-judge pinned** `criyle/go-judge:v1.11.4`. `deploy/judge/Dockerfile` DELETED (contradicted the real one). New `sandbox` network (`internal: true`): judge joins it only; backend/judge-worker/ai-harness join default+sandbox; cf-bypass stays off it.
-  - **vjudge** — uses caller ctx (no more `context.Background()` in Submit); `remoteHTTPClient` 20s timeout; `submitAttemptTimeout` 3min per submission.
-  - **.golangci.yml** — errcheck/ineffassign/staticcheck/unused ENABLED + `issues.new-from-merge-base: main` ratchet. Do not re-add blanket exclusions.
-  - **AI retention** — `AIGenerationStore.PurgeCompletedBefore` (terminal states only) + 6h sweep in main.go; runs even when AI disabled.
-  - **format registry** — `MustGet`/`MustCreate` removed; `Create` returns `ErrUnknownFormat`. Never reintroduce a panic on stored data.
-  - **executor logs** at Debug, not Info.
-- **`.worktrees/`** — gitignored, untracked, but hold 39/3/12 UNMERGED commits (feature/global-readiness-phase-a|-b, feature/production-oj). Do not delete without the user asking.
-- **Wire recipe — WebSocket client**: subscribe with `{"type":"subscribe","submission_id":"..."}`; server pushes `{"type":"submission_result","submission_id":"...","data":{"status":"ac"}}`.
-- **Migrations**: at 75 (`000075_submission_upsolving`). Apply locally with `DB_DSN="postgres://aioj:aioj_secret@localhost:5432/aioj?sslmode=disable" go run ./cmd/migrate up` — the store integration tests need it or they fail on missing columns.
-- **Pressure gate** — `internal/judge/pressure/`: reads /proc/meminfo MemAvailable + /proc/loadavg on Linux, NoopSampler elsewhere. `JUDGE_MIN_FREE_MEM_MB` (512), `JUDGE_MAX_LOAD_PER_CPU` (1.5). Fail-open.
-- **Lazy-init done**: LoadLanguages cached via sync.Once (both WorkerPool and SubmissionHandler); vjudge workers skip platforms with no active bot + exponential backoff 3→60s/5→60s; `SetConnMaxIdleTime(90s)`; rate-limiter cleanup uses context.CancelFunc.
-- **Sitemap/feed cache**: `handler.TTLCache[T]` — sitemap 1h, feeds 10min, stale-on-error.
-- **Frontend**: Monaco `CodeEditor` is `lazy()` in ProblemDetail/ContestProblem/IDE; `usePageVisible()` hook pauses polls in ContestDetail + ContestPlagiarism.
-- **Rust plagiarism engine** — `rust/plagiarism/`; `PLAGIARISM_ENGINE=auto|native|rust`; needs `touch src/*.rs` before real build in Docker (mtime normalization).
-- **Design system**: semantic tokens in `web/src/global.css` → `@theme inline`. Never `bg-white dark:bg-gray-800`.
-- **Verify recipe**: `go build ./... && go test ./cmd/... ./internal/...`; `cd web && npx tsc -b && npx eslint . && npx vitest run`; `docker compose config -q`; `gofmt -l .`; Rust: `cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test`.
-- **Local stack**: Docker Desktop running; admin `ai` / `Aioj-Sim-Admin-2026!` (dev-only). CSRF: `GET /api/auth/csrf` then `Cookie: csrf=` + `X-CSRF-Token:`. Bearer bypasses.
-- **Pitfalls**: never delegate implementation to `worker` subagents; `replace_text` needs exact oldText — read first; network-dependent tests must `t.Skip` on remote drift, not `t.Fatalf`.
-- **Open product calls**: registration distinct 409s for username/email; ~40 raw-palette classes need a design decision; legacy `/api/generate/problem` still backs the UI's "Generate with AI" button (bounded + deprecated, but a real AI Studio page is the proper retirement).
-- **AI credential fix** — `AI_CREDENTIAL_MASTER_KEY` was missing from backend service in `docker-compose.yml` (was only in ai-harness). Added `AI_ENABLED` and `AI_CREDENTIAL_MASTER_KEY` env vars to the backend service. `ErrEncryptionNotConfigured` sentinel in `internal/ai/credentials.go`; handler returns HTTP 400 (not 500) for this user-fixable config error; UI shows inline banner with `openssl rand -base64 32` instructions.
-- **nginx proxy timeout fix** — `web/nginx.conf`: added `/api/generate/` and `/api/ai/` location blocks with `proxy_http_version 1.1`, `Connection ""` keepalive, and `proxy_read_timeout 300s`. Main `/api/` block also upgraded to HTTP/1.1 to prevent "upstream prematurely closed connection".
-- **AI job system fixes (all deployed)**:
-  - `scanAIJob` in `ai_generation_store.go`: nullable jsonb fields (`proposal`, `validation_report`) must scan into `[]byte` not `json.RawMessage` to handle SQL NULL — was causing `GET /api/ai/jobs/:id` to return 500.
-  - `executor.Client.Run` now takes `context.Context` and uses `http.NewRequestWithContext`; `DisableKeepAlives: true` prevents stale connection reuse.
-  - `runGenerator` in `internal/generate/sandbox.go` now uses shell redirect `./Main seed > stdout.txt` + `copyOut: ["stdout.txt"]` instead of `copyOut: ["stdout"]` magic name which returned empty string when `Files: []` (no stdio capture).
-  - `Fail` and `Complete` in `ai_generation_store.go` now log when 0 rows affected (stale claim token) and add `AND status='running'` guard.
-  - All executor call sites updated to pass context.
-- **AI job pipeline confirmed working**: full end-to-end run takes ~102s. 16 go-judge calls: 2 compilations + 6 generator determinism checks (3 seeds × 2 runs) + 8 solution runs (3 seeds + 5 curated cases). All 11 validation checks pass. `GET /api/ai/jobs/:id` returns HTTP 200 with `status: ready`.
+- **Current state**: `4d77eab` on `main` — harness end-to-end fixes. CI fully green (Lint, Backend tests, Frontend build & test, Docker image, Deploy staging). Preceded by `67ca0b4` (executor tests), `9ca352f`/`21ef3c3` (audit), `bcf7c04` (priority judging).
+- **THREE AI generation tiers — know which one you are touching**:
+  1. **Legacy** `POST /api/generate/problem` → `generate.Service.Generate`: ONE model call, no sandbox, no validation. This is what `/generate/problem` page uses. Deprecated.
+  2. **Job worker** `POST /api/ai/jobs` → `generate.JobWorker` (in-process, needs `AI_ENABLED=true`): one model call + `SandboxValidator`.
+  3. **Harness** (the real problem-setter) `POST /api/ai/jobs` → `problemgen.Worker` (`--mode=ai-harness`, needs `AI_ENABLED=true` + `AI_HARNESS_ENABLED=true`, compose profile `ai`): multi-turn tool loop, stores `case_manifest` + `turn_count` + `harness_version=problemgen-v1`.
+  UI entry for tiers 2/3: Setter Workspace → **AI Studio** tab (`web/src/pages/SetterProblemWorkspace.tsx` → `AIStudioTab.tsx`).
+- **Do not regress the harness fixes (`4d77eab`)**:
+  - **Queue ownership** — tiers 2 and 3 share `ai_generation_jobs` via `ClaimNext`. `cmd/aioj/main.go` skips `startAIWorkers()` when `cfg.AI.Harness` is true; `AI_HARNESS_ENABLED` is passed to the backend service in docker-compose. Without this they race and a harness deploy silently falls back to tier 2.
+  - **Turn budget** — `harness.DefaultBudget().MaxTurns=10` is BELOW the mandatory tool spine (~10–12 calls), so it is only a generic floor. `problemgen.DefaultBudget(repairTurns)` = `spineTurns(12) + repairTurns*turnPerRepair(6)`; `cfg.AI.RepairTurns` (default 2) feeds it. Real ready runs need ~15 turns.
+  - **stdio in `problemgen.JudgeRunner.Run`** — `executor.Cmd.CopyOut` names real sandbox FILES; asking for `"stdout"` fails the run with status `File Error`. Streams must be `Cmd.Files` entries: `[{content:stdin},{Name:"stdout",Max:N},{Name:"stderr",Max:N}]`. Stdin must be `Files[0]`, NOT a `copyIn["input.txt"]` file (programs read fd 0, so they saw EOF). `executor.CmdFile` has `Name`/`Max` for this.
+  - **`model.AIGenerationJob` JSON tags** — the API must emit snake_case; `web/src/types/api.ts` depends on it. Without tags the browser read `undefined` everywhere, which blanked AI Studio (`job.stage.replaceAll`) and made finished proposals unreachable. `ClaimToken` is `json:"-"`.
+  - **Proposal bridge** — `Apply` reads the `proposal` column; the harness authors a Manifest. `problemgen.proposalJSON` converts a READY manifest (statement/solution/generator/limits/deduped seeds) and `SetManifest` persists it. Unready runs keep `proposal` NULL on purpose so nothing partially validated can be promoted. `proposal.go` redeclares the fields rather than importing `generate` to avoid coupling.
+  - `turn_count` must be `manifest.Usage.Turns`, not `manifest.Usage.Materialized` (the latter is the case count).
+- **Verified live (2026-11-07)**: admin login → AI Studio → generate → job `ce8a8b14` reached `ready` in 15 turns, 30 cases, gates 4/4 (coverage, determinism, samples, limits) → Apply promoted 30 `.in`/`.out` pairs + statement into problem `harness-sim-1` (title "Maximum Average Subarray of Length At Least K", medium, tags from brief).
+- **Judge priority ladder (`bcf7c04`)** — PriorityAuto=0 (resolved before enqueue), PriorityContest=1, PriorityNormal=2, PriorityBulk=3. Lower = more urgent. Users can NOT set priority in the submit body.
+- **Audit fixes (`21ef3c3`)** — do not regress: WebSocket verdict push after persistence; real hack judging in go-judge; `ProposalJSONSchema` `additionalProperties:false`; go-judge pinned `criyle/go-judge:v1.11.4` + `sandbox` internal network; vjudge caller ctx; `.golangci.yml` ratchet on `main`; AI retention 6h sweep; no panics on stored data; executor logs at Debug.
+- **`.worktrees/`** — gitignored, untracked, hold 39/3/12 UNMERGED commits. Do not delete without asking.
+- **Migrations**: at 75. Apply with `DB_DSN="postgres://aioj:aioj_secret@localhost:5432/aioj?sslmode=disable" go run ./cmd/migrate up`.
+- **Pressure gate** `internal/judge/pressure/`: `JUDGE_MIN_FREE_MEM_MB` 512, `JUDGE_MAX_LOAD_PER_CPU` 1.5. Fail-open.
+- **Sitemap/feed cache**: `handler.TTLCache[T]` — sitemap 1h, feeds 10m, stale-on-error.
+- **Rust plagiarism** `rust/plagiarism/`; `PLAGIARISM_ENGINE=auto|native|rust`.
+- **Design system**: semantic tokens in `web/src/global.css`. Never `bg-white dark:bg-gray-800`.
+- **Verify recipe (mirror CI)**: `go build ./... && go vet ./... && go test ./cmd/... ./internal/...`; `cd web && npx tsc -b && npx eslint . && npx vitest run` (133 tests); `docker compose config -q`; `gofmt -l .`. **`go build` alone does NOT compile `_test.go` — a signature change passes build and fails CI's vet/lint.**
+- **Local stack**: frontend **:8081**, backend **:8080**. The 8081 binding comes ONLY from `docker-compose.sim.yml` (`ports: !override - "8081:80"`). Admin `ai` / `Aioj-Sim-Admin-2026!` (dev-only). CSRF: `GET /api/auth/csrf` → `Cookie: csrf=` + `X-CSRF-Token:`; Bearer bypasses.
+- **PITFALLS**:
+  - **Never restart with plain `docker compose up -d <svc>`** — drops the sim overlay, rebinds frontend to `:80`, breaks `http://localhost:8081`. Always `docker compose -f docker-compose.yml -f docker-compose.sim.yml [--profile ai] up -d [--no-deps] <svc>`.
+  - **The frontend sets a service worker** (`/service-worker.js`) that caches `index.html` + chunks. After a rebuild the browser keeps running a bundle whose asset hash no longer exists. Unregister SW + clear caches, then navigate with a cache-busting query (`?cb=...`).
+  - Never delegate implementation to `worker` subagents; `replace_text` needs exact oldText — read first; network tests must `t.Skip` on remote drift.
+  - Host disk fills from Docker build cache (25 GB observed) — `docker builder prune -af` then rebuild (cold, slower).
+- **Open product calls**: `/generate/problem` page still uses the legacy single-shot tier — retiring it in favour of AI Studio is the real fix; registration distinct 409s; ~40 raw-palette classes need a design decision.
