@@ -70,6 +70,86 @@ func (s *AIGenerationStore) ListByProblem(ctx context.Context, problemID string,
 	}
 	return out, rows.Err()
 }
+func (s *AIGenerationStore) ListByActor(ctx context.Context, actorID string, offset, limit int) ([]model.AIGenerationJob, int, error) {
+	var total int
+	if err := s.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM ai_generation_jobs WHERE actor_id=$1`, actorID,
+	).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT `+aiJobColumns+` FROM ai_generation_jobs WHERE actor_id=$1 ORDER BY created_at DESC OFFSET $2 LIMIT $3`,
+		actorID, offset, limit)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	out := []model.AIGenerationJob{}
+	for rows.Next() {
+		j, err := scanAIJob(rows)
+		if err != nil {
+			return nil, 0, err
+		}
+		out = append(out, *j)
+	}
+	return out, total, rows.Err()
+}
+
+func (s *AIGenerationStore) ListAll(ctx context.Context, actorID, status string, offset, limit int) ([]model.AIGenerationJob, int, error) {
+	where := "1=1"
+	args := []any{offset, limit}
+	idx := 3
+	if actorID != "" {
+		where += fmt.Sprintf(" AND actor_id=$%d", idx)
+		args = append(args, actorID)
+		idx++
+	}
+	if status != "" {
+		where += fmt.Sprintf(" AND status=$%d", idx)
+		args = append(args, status)
+		idx++
+	}
+	var total int
+	countArgs := args[2:] // skip offset/limit for count
+	if err := s.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM ai_generation_jobs WHERE `+where, countArgs...,
+	).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT `+aiJobColumns+` FROM ai_generation_jobs WHERE `+where+` ORDER BY created_at DESC OFFSET $1 LIMIT $2`,
+		args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	out := []model.AIGenerationJob{}
+	for rows.Next() {
+		j, err := scanAIJob(rows)
+		if err != nil {
+			return nil, 0, err
+		}
+		out = append(out, *j)
+	}
+	return out, total, rows.Err()
+}
+
+// AdminRequestCancel sets cancel_requested_at and immediately cancels a queued
+// job without checking actor_id — for admin use only.
+func (s *AIGenerationStore) AdminRequestCancel(ctx context.Context, id string) (bool, error) {
+	r, err := s.db.ExecContext(ctx,
+		`UPDATE ai_generation_jobs
+		 SET cancel_requested_at=NOW(),
+		     status=CASE WHEN status='queued' THEN 'cancelled' ELSE status END,
+		     finished_at=CASE WHEN status='queued' THEN NOW() ELSE finished_at END
+		 WHERE id=$1 AND status IN ('queued','running')`, id)
+	if err != nil {
+		return false, err
+	}
+	n, _ := r.RowsAffected()
+	return n == 1, nil
+}
+
 func (s *AIGenerationStore) CountActiveByActor(ctx context.Context, actorID string) (running, queued int, err error) {
 	err = s.db.QueryRowContext(ctx, `SELECT COUNT(*) FILTER (WHERE status='running'),COUNT(*) FILTER (WHERE status='queued') FROM ai_generation_jobs WHERE actor_id=$1 AND status IN ('running','queued')`, actorID).Scan(&running, &queued)
 	return

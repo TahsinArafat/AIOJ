@@ -468,6 +468,13 @@ type AIGenerationStore interface {
 	Create(ctx context.Context, job *model.AIGenerationJob) error
 	GetByID(ctx context.Context, id string) (*model.AIGenerationJob, error)
 	ListByProblem(ctx context.Context, problemID string, offset, limit int) ([]model.AIGenerationJob, error)
+	// ListByActor returns jobs created by the given actor, newest first.
+	ListByActor(ctx context.Context, actorID string, offset, limit int) ([]model.AIGenerationJob, int, error)
+	// ListAll returns all jobs visible to an admin, optionally filtered by status
+	// and/or actorID (empty string = no filter). Newest first.
+	ListAll(ctx context.Context, actorID, status string, offset, limit int) ([]model.AIGenerationJob, int, error)
+	// AdminRequestCancel cancels any job regardless of actor (admin use only).
+	AdminRequestCancel(ctx context.Context, id string) (bool, error)
 	CountActiveByActor(ctx context.Context, actorID string) (running, queued int, err error)
 	ClaimNext(ctx context.Context, claimToken string) (*model.AIGenerationJob, error)
 	Heartbeat(ctx context.Context, id, claimToken, stage string, progress int) error

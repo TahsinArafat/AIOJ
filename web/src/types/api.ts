@@ -47,7 +47,9 @@ export interface AIGenerationJob {
     status: 'queued'|'running'|'ready'|'validation_failed'|'failed'|'cancelled'|'applied'|'discarded'
     stage: string; progress: number; submitted_brief: AIBrief; normalized_brief: AIBrief
     proposal?: AIProposal; validation_report?: AIValidationReport; error_code?: string; error_message?: string
-    prompt_tokens: number; completion_tokens: number; latency_ms: number; created_at: string
+    prompt_tokens: number; completion_tokens: number; latency_ms: number
+    created_at: string; started_at?: string | null; finished_at?: string | null; applied_at?: string | null
+    cancel_requested_at?: string | null; heartbeat_at?: string | null
 }
 export interface AIBriefPreset { id: string; name: string; description: string; values: Partial<AIBrief> }
 

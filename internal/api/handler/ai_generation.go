@@ -162,3 +162,50 @@ func (h *AIGenerationHandler) ListProblem(w http.ResponseWriter, r *http.Request
 	}
 	respondJSON(w, 200, map[string]any{"data": items})
 }
+
+// ListActor handles GET /api/ai/jobs — the signed-in setter's own jobs.
+func (h *AIGenerationHandler) ListActor(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r)
+	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	if limit <= 0 || limit > 100 {
+		limit = 50
+	}
+	items, total, err := h.jobs.ListByActor(r.Context(), claims.UserID, offset, limit)
+	if err != nil {
+		http.Error(w, "failed to list jobs", 500)
+		return
+	}
+	respondJSON(w, 200, map[string]any{"data": items, "total": total})
+}
+
+// AdminList handles GET /api/admin/ai/jobs — admin view of all AI generation jobs.
+func (h *AIGenerationHandler) AdminList(w http.ResponseWriter, r *http.Request) {
+	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	if limit <= 0 || limit > 100 {
+		limit = 50
+	}
+	actorID := r.URL.Query().Get("actor_id")
+	status := r.URL.Query().Get("status")
+	items, total, err := h.jobs.ListAll(r.Context(), actorID, status, offset, limit)
+	if err != nil {
+		http.Error(w, "failed to list jobs", 500)
+		return
+	}
+	respondJSON(w, 200, map[string]any{"data": items, "total": total})
+}
+
+// AdminCancel handles POST /api/admin/ai/jobs/{id}/cancel — admin force-cancel.
+func (h *AIGenerationHandler) AdminCancel(w http.ResponseWriter, r *http.Request) {
+	ok, err := h.jobs.AdminRequestCancel(r.Context(), chi.URLParam(r, "id"))
+	if err != nil {
+		http.Error(w, "cancel failed", 500)
+		return
+	}
+	if !ok {
+		http.Error(w, "job cannot be cancelled", 409)
+		return
+	}
+	respondJSON(w, 200, map[string]bool{"cancelled": true})
+}

@@ -941,6 +941,8 @@ export const api = {
     ai: {
         connections: () => request<{ data: AIModel[] }>('/ai/connections'),
         presets: () => request<{ version: string; data: AIBriefPreset[] }>('/ai/brief-presets'),
+        listJobs: (offset = 0, limit = 50) =>
+            request<{ data: AIGenerationJob[]; total: number }>(`/ai/jobs?offset=${offset}&limit=${limit}`),
         createJob: (d: { problem_id?: string; ai_model_id?: string; artifact_type: string; brief: AIBrief }) =>
             request<AIGenerationJob>('/ai/jobs', { method: 'POST', body: JSON.stringify(d) }),
         getJob: (id: string) => request<AIGenerationJob>(`/ai/jobs/${id}`),
@@ -950,5 +952,14 @@ export const api = {
         applyJob: (id: string, sections: string[], expected_updated_at?: string) =>
             request<{ problem_id: string; problem_slug: string }>(`/ai/jobs/${id}/apply`, { method: 'POST', body: JSON.stringify({ sections, expected_updated_at }) }),
         problemJobs: (problemId: string) => request<{ data: AIGenerationJob[] }>(`/ai/problems/${problemId}/jobs`),
+        adminListJobs: (params: { offset?: number; limit?: number; actor_id?: string; status?: string } = {}) => {
+            const q = new URLSearchParams()
+            if (params.offset !== undefined) q.set('offset', String(params.offset))
+            if (params.limit !== undefined) q.set('limit', String(params.limit))
+            if (params.actor_id) q.set('actor_id', params.actor_id)
+            if (params.status) q.set('status', params.status)
+            return request<{ data: AIGenerationJob[]; total: number }>(`/admin/ai/jobs?${q}`)
+        },
+        adminCancelJob: (id: string) => request<{ cancelled: boolean }>(`/admin/ai/jobs/${id}/cancel`, { method: 'POST' }),
     },
 }

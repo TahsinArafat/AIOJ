@@ -68,6 +68,8 @@ const ContestProblem = lazy(() => import('./pages/ContestProblem'))
 const ContestManage = lazy(() => import('./pages/ContestManage'))
 const IDE = lazy(() => import('./pages/IDE'))
 const AIProblemCreate = lazy(() => import('./pages/AIProblemCreate'))
+const AIJobsPage = lazy(() => import('./pages/AIJobsPage'))
+const AIJobDetailPage = lazy(() => import('./pages/AIJobDetailPage'))
 const TermsOfService = lazy(() => import('./pages/legal/TermsOfService'))
 const PrivacyPolicy = lazy(() => import('./pages/legal/PrivacyPolicy'))
 const DMCA = lazy(() => import('./pages/legal/DMCA'))
@@ -423,6 +425,8 @@ function AppShell() {
                     {/* Declared before /setter/:slug so the static segment wins on
                         its own merits rather than relying on route ranking. */}
                     <Route path="/setter/ai" element={<FeatureGate feature="setter_workspace"><FeatureGate feature="ai_generation"><AIProblemCreate /></FeatureGate></FeatureGate>} />
+                    <Route path="/setter/ai/jobs" element={<FeatureGate feature="setter_workspace"><FeatureGate feature="ai_generation"><AIJobsPage /></FeatureGate></FeatureGate>} />
+                    <Route path="/setter/ai/jobs/:id" element={<FeatureGate feature="setter_workspace"><FeatureGate feature="ai_generation"><AIJobDetailPage /></FeatureGate></FeatureGate>} />
                     <Route path="/setter/contest/create" element={<FeatureGate feature="setter_workspace"><ContestCreate /></FeatureGate>} />
                     <Route path="/setter/:slug" element={<FeatureGate feature="setter_workspace"><SetterProblemWorkspace /></FeatureGate>} />
 

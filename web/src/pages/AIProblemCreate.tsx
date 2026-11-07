@@ -1,6 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { PageHeader } from '../components/ui/PageHeader'
 import AIStudioTab from '../components/SetterWorkspace/AIStudioTab'
+import { buttonClass } from '../components/ui/buttonStyles'
 
 function decodeRole(): string | null {
     const token = localStorage.getItem('access_token')
@@ -42,6 +43,11 @@ export default function AIProblemCreate() {
                 eyebrow={<Link to="/setter" className="hover:text-ink">← Setter workspace</Link>}
                 title="New problem with AI"
                 description="The harness drafts the statement, writes a generator and reference solution, materialises test data, and runs the validation gates. You review the result before anything is published."
+                actions={
+                    <Link to="/setter/ai/jobs" className={buttonClass({ variant: 'secondary', size: 'sm' })}>
+                        Job history
+                    </Link>
+                }
             />
             <AIStudioTab onCreated={slug => navigate(`/setter/${slug}`)} />
             <p className="mt-6 space-y-1 border-t border-hairline pt-4 text-xs text-muted-soft">

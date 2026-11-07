@@ -201,6 +201,12 @@ export default function AIStudioTab({ problemId, problemUpdatedAt, onApplied, on
                         <p className="mt-2 text-xs text-muted">
                             {job.status} · {job.prompt_tokens + job.completion_tokens} tokens · {job.latency_ms} ms
                         </p>
+                        <a
+                            href={`/setter/ai/jobs/${job.id}`}
+                            className="mt-1.5 block text-xs text-brand hover:underline"
+                        >
+                            Open full status page →
+                        </a>
                     </div>
 
                     {job.status === 'running' || job.status === 'queued' ? (

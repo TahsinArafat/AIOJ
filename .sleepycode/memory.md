@@ -1,30 +1,16 @@
-- **Current state**: `b453b1e` on `main` — legacy generator removed, harness brief customisation + new-problem authoring, memory-unit and KaTeX fixes. CI fully green (Lint, Backend tests, Frontend build & test, Docker image, Deploy staging).
-- **AI generation is now ONE path**: `POST /api/ai/jobs` → `problemgen.Worker` (`--mode=ai-harness`). `POST /api/generate/problem`, `handler.GenerateHandler`, `generate.Service`, `web/src/pages/GenerateProblem.tsx` and `api.generate` are DELETED — do not resurrect them. `generate/slug.go` keeps `slugify` for ApplyService.
-- **`generate.JobWorker` still exists** as the in-process fallback for deployments without the harness container (runs only when `AI_HARNESS_ENABLED` is false); it is NOT the legacy generator. Harness wins the queue whenever `AI_HARNESS_ENABLED=true`.
-- **UI entry points**: `/setter/ai` (`AIProblemCreate`, new problem) and Setter Workspace → **AI Studio** tab (`AIStudioTab`, existing problem). Both render the shared `components/AI/AIBriefForm.tsx`; defaults + range helpers in `lib/aiBrief.ts` (non-component exports must stay out of the .tsx — `react-refresh/only-export-components`).
-- **`problems.memory_limit` is KILOBYTES** — admin form stores it verbatim (default 262144), `judge.WorkerPool.getEffectiveLimits` multiplies by 1024, `ProblemDetail` renders `/1024` as MB. `generate.ApplyService` must NOT multiply (it did → 250 GB, "262144000 MB"). Migration 76 repaired byte-valued rows; guard in `problemMemoryLimitKB` + `TestProblemMemoryLimitIsStoredAsKilobytes`.
-- **KaTeX works but only for `$...$`** — `ProblemDetail` uses remark-math + rehype-katex. The model used backticks, which render as literal monospace and never trigger math. `problemgen.SystemPrompt` + `set_statement`/`set_limits` schemas now require `$...$`, forbid inline code for math, and ask for KiB (262144 = 256 MB). SystemPrompt is a RAW string — never put a literal backtick in it.
-- **Three AI tiers → now two**: (1) jobs + `generate.JobWorker` fallback, (2) jobs + `problemgen.Worker` harness (the real one). Both share `ai_generation_jobs` via `ClaimNext`.
-- **Do not regress these harness fixes**:
-  - Queue ownership: `cmd/aioj/main.go` skips `startAIWorkers()` when `cfg.AI.Harness`; `AI_HARNESS_ENABLED` is passed to the backend in docker-compose.
-  - Turn budget: `harness.DefaultBudget().MaxTurns=10` is below the mandatory spine; `problemgen.DefaultBudget(repairTurns)` = `12 + repairTurns*6`; `cfg.AI.RepairTurns` (default 2) feeds it. Ready runs need ~14–22 turns.
-  - stdio: `executor.Cmd.CopyOut` names real sandbox FILES (asking for "stdout" → `File Error`). Streams are `Cmd.Files = [{content:stdin},{Name:"stdout",Max:N},{Name:"stderr",Max:N}]`; stdin must be `Files[0]`, never `copyIn["input.txt"]`.
-  - `model.AIGenerationJob` JSON tags are the frontend contract (snake_case); `ClaimToken` is `json:"-"`. Without tags AI Studio blanked (`undefined.replaceAll`).
-  - Proposal bridge: `problemgen.proposalJSON` converts a READY manifest → applyable proposal; `SetManifest` persists it; unready runs keep it NULL. `turn_count` = `manifest.Usage.Turns`, not `Materialized`.
-  - Admin may target any problem in `JobService.Create` (`ActorIsAdmin`), matching Get/ListProblem.
-  - Empty editorials are not published (harness authors none).
-- **Verified live (b453b1e)**: `/setter/ai` → rating 1500 → job `e054ef0b` ready in 22 turns, 25 cases, 4/4 gates, `memory_limit_kb=262144`, `$...$` LaTeX → apply created `increasing-prefix-chains` at 256 MB, page renders 12 KaTeX nodes.
-- **Judge priority ladder (`bcf7c04`)** — PriorityAuto=0, PriorityContest=1, PriorityNormal=2, PriorityBulk=3; users cannot set priority in the submit body.
-- **Audit fixes (`21ef3c3`)** — do not regress: WS verdict push after persistence; real hack judging in go-judge; `ProposalJSONSchema` `additionalProperties:false`; go-judge pinned `criyle/go-judge:v1.11.4` + `sandbox` internal network; vjudge caller ctx; `.golangci.yml` ratchet; AI retention sweep; no panics on stored data; executor logs at Debug.
-- **`.worktrees/`** — gitignored, untracked, hold 39/3/12 UNMERGED commits. Do not delete without asking.
-- **Migrations**: now at **76** (`000076_problem_memory_limit_kb`). Backend applies them on boot; manual: `DB_DSN="postgres://aioj:aioj_secret@localhost:5432/aioj?sslmode=disable" go run ./cmd/migrate up`. Every up needs a down (the runner errors otherwise).
-- **Local stack**: frontend **:8081**, backend **:8080**. The 8081 binding comes ONLY from `docker-compose.sim.yml` (`ports: !override - "8081:80"`). Admin `ai` / `Aioj-Sim-Admin-2026!`. CSRF: `GET /api/auth/csrf` → `Cookie: csrf=` + `X-CSRF-Token:`; Bearer bypasses.
-- **PITFALLS**:
-  - Never `docker compose up -d <svc>` without `-f docker-compose.sim.yml` — rebinds frontend to `:80` and breaks 8081.
-  - The frontend registers a **service worker** that caches `index.html` + chunks; after a rebuild the browser keeps a dead bundle hash. Unregister SW + clear caches, then navigate with `?cb=<random>`.
-  - `go build ./...` does NOT compile `_test.go` — a signature change passes build and fails CI vet/lint. Always `go vet ./... && go test ./cmd/... ./internal/...`.
-  - Raw-string Go constants (`SystemPrompt`) cannot contain a literal backtick.
-  - `replace_text` needs exact oldText — read first; prefer rewriting a file over fragile scripted edits.
-  - Host disk fills from Docker build cache (~25 GB). `docker builder prune -af` then rebuild (cold, slow).
-- **Verify recipe**: `go build ./... && go vet ./... && go test ./cmd/... ./internal/...`; `cd web && npx tsc -b && npx eslint . && npx vitest run` (135 tests); `docker compose config -q`; `gofmt -l .`.
-- **Open product calls**: `ai_harmony`/tier-1 fallback worker still shares the queue (worth retiring once the harness is always deployed); registration distinct 409s; ~40 raw-palette classes need a design decision.
+## AI generation job monitoring (added)
+- **Backend**: `AIGenerationStore` interface + postgres impl now has `ListByActor`, `ListAll`, `AdminRequestCancel`
+- **Routes**: `GET /api/ai/jobs` (setter list own jobs), `GET /api/admin/ai/jobs` (admin: all, filterable by actor_id/status), `POST /api/admin/ai/jobs/{id}/cancel`
+- **Frontend pages**: `web/src/pages/AIJobsPage.tsx` (list, shared setter+admin), `web/src/pages/AIJobDetailPage.tsx` (detail, polling, cancel/retry/discard/apply)
+- **Routes wired**: `/setter/ai/jobs` and `/setter/ai/jobs/:id` in App.tsx
+- **Admin dashboard**: added "AI Jobs" tab that embeds AIJobsPage with admin role (uses `adminListJobs`)
+- **API helpers**: `api.ai.listJobs`, `api.ai.adminListJobs`, `api.ai.adminCancelJob` in `web/src/lib/api.ts`
+- **AIStudioTab**: added "Open full status page →" link on the inline job card
+
+## Project conventions
+- Backend: chi router, Go, store interface + postgres impl pattern
+- Frontend: React, Vite, TypeScript, Vitest for tests
+- UI: `Badge`, `Button`, `Card`, `TableShell/Table/Th/Td/THead`, `PageHeader`, `EmptyState` from ui/ components
+- Tr component does NOT accept onClick — use native `<tr>` for clickable rows
+- Admin dashboard: tab-based with hash sync; add to AdminTab union type + tabs array + valid array + render block + import
+- Role checks: decode JWT from localStorage; `decodeRole()` pattern used consistently

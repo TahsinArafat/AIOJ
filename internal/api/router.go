@@ -709,6 +709,7 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 			r.Use(gate(feature.KeyAIGeneration))
 			r.Get("/connections", d.AIGeneration.Connections)
 			r.Get("/brief-presets", d.AIGeneration.Presets)
+			r.Get("/jobs", d.AIGeneration.ListActor)
 			r.Post("/jobs", d.AIGeneration.Create)
 			r.Get("/jobs/{id}", d.AIGeneration.Get)
 			r.Post("/jobs/{id}/cancel", d.AIGeneration.Cancel)
@@ -716,6 +717,14 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 			r.Post("/jobs/{id}/apply", d.AIGeneration.Apply)
 			r.Post("/jobs/{id}/retry", d.AIGeneration.Retry)
 			r.Get("/problems/{problemId}/jobs", d.AIGeneration.ListProblem)
+		})
+		// Admin-only job monitoring: list all jobs across all setters, force-cancel.
+		r.Route("/api/admin/ai", func(r chi.Router) {
+			r.Use(middleware.AuthMiddleware(jwtManager))
+			r.Use(middleware.RequireRole("admin"))
+			r.Use(gate(feature.KeyAIGeneration))
+			r.Get("/jobs", d.AIGeneration.AdminList)
+			r.Post("/jobs/{id}/cancel", d.AIGeneration.AdminCancel)
 		})
 	}
 
