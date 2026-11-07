@@ -698,9 +698,12 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 	})
 
 	r.Route("/api/generate", func(r chi.Router) {
-		r.Use(gate(feature.KeyAIGeneration))
 		r.Use(middleware.AuthMiddleware(jwtManager))
 		r.Use(middleware.RequireRole("admin", "setter"))
+		// After auth, so the gate reads the claims instead of re-validating the
+		// token; the gate is still self-sufficient for the groups that mix
+		// public and authenticated routes.
+		r.Use(gate(feature.KeyAIGeneration))
 		r.Post("/problem", d.Generate.Problem)
 	})
 

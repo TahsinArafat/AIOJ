@@ -26,18 +26,29 @@ import (
 func FeatureGate(jwtManager *auth.JWTManager, resolver *feature.Resolver, key string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			principal := PrincipalFromRequest(r)
-			if principal.Anonymous && jwtManager != nil {
-				if token := bearerToken(r); token != "" {
-					if claims, err := jwtManager.ValidateToken(token); err == nil {
-						principal = principalFor(claims)
-					}
-				}
-			}
+			principal, tokenInvalid := resolvePrincipal(r, jwtManager)
 
 			decision := resolver.Decide(r.Context(), key, principal)
 			if decision.Allowed {
 				next.ServeHTTP(w, r)
+				return
+			}
+
+			// A credential was presented and rejected. Answering 403 would tell
+			// the SPA "policy says no", so its single-flight refresh-on-401
+			// would never fire and an expired session would look like a
+			// permission problem — the user would be stuck on "sign in to
+			// continue" while the client still believed it was signed in.
+			// Only do this when identity is what decided it: a disabled
+			// feature is a policy answer regardless of who is asking.
+			if tokenInvalid && decision.Reason != feature.ReasonDisabled {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusUnauthorized)
+				_ = json.NewEncoder(w).Encode(map[string]any{
+					"error":   "access token is invalid or expired",
+					"code":    "token_invalid",
+					"feature": key,
+				})
 				return
 			}
 
@@ -54,9 +65,29 @@ func FeatureGate(jwtManager *auth.JWTManager, resolver *feature.Resolver, key st
 	}
 }
 
-// PrincipalFromRequest builds the feature principal for the caller. Anonymous
-// requests (no claims) are represented rather than rejected, because some
-// features are legitimately open to visitors.
+// resolvePrincipal builds the feature principal for the caller, reporting
+// whether a bearer token was presented and rejected. Anonymous requests (no
+// claims) are represented rather than rejected, because some features are
+// legitimately open to visitors.
+func resolvePrincipal(r *http.Request, jwtManager *auth.JWTManager) (principal feature.Principal, tokenInvalid bool) {
+	if claims := GetUserClaims(r); claims != nil {
+		return principalFor(claims), false
+	}
+	if jwtManager == nil {
+		return feature.Principal{Anonymous: true}, false
+	}
+	token := bearerToken(r)
+	if token == "" {
+		return feature.Principal{Anonymous: true}, false
+	}
+	claims, err := jwtManager.ValidateToken(token)
+	if err != nil {
+		return feature.Principal{Anonymous: true}, true
+	}
+	return principalFor(claims), false
+}
+
+// PrincipalFromRequest builds the feature principal for the caller.
 func PrincipalFromRequest(r *http.Request) feature.Principal {
 	if claims := GetUserClaims(r); claims != nil {
 		return principalFor(claims)

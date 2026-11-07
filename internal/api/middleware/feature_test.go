@@ -13,7 +13,9 @@ import (
 	"github.com/tahsinarafat/aioj/internal/model"
 )
 
-type stubSettings struct{ items map[string]model.SystemSetting }
+type stubSettings struct {
+	items map[string]model.SystemSetting
+}
 
 func (s *stubSettings) List(context.Context) ([]model.SystemSetting, error) {
 	out := make([]model.SystemSetting, 0, len(s.items))
@@ -151,12 +153,76 @@ func TestFeatureGateResolvesTheCallerFromTheToken(t *testing.T) {
 	}
 }
 
-func TestFeatureGateIgnoresAnInvalidToken(t *testing.T) {
+func TestFeatureGateIgnoresAnInvalidTokenOnAnOpenFeature(t *testing.T) {
 	h, _ := newGate(t, feature.KeyGym, nil)
-	// A garbage token must be treated as anonymous rather than 500 or 401:
-	// the gate is not the authentication boundary.
+	// A garbage token on an open feature must pass through: public browsing
+	// with a stale token in localStorage still has to work. The gate is not
+	// the authentication boundary, so it must not 401 here.
 	if rec := do(h, "not-a-jwt"); rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+}
+
+func TestFeatureGateReturns401WhenThePresentedTokenIsRejected(t *testing.T) {
+	// Regression: treating an expired token as "anonymous" made a
+	// login-required feature answer 403, so the SPA's refresh-on-401 never
+	// fired and an expired session looked like a permission problem.
+	h, _ := newGate(t, feature.KeySetterWorkspace, nil) // RequiresLogin
+
+	rec := do(h, "not-a-jwt")
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401 for a rejected credential", rec.Code)
+	}
+	var body struct {
+		Code    string `json:"code"`
+		Feature string `json:"feature"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("body is not JSON: %v (%s)", err, rec.Body.String())
+	}
+	if body.Code != "token_invalid" {
+		t.Fatalf("code = %q, want token_invalid", body.Code)
+	}
+	if body.Feature != feature.KeySetterWorkspace {
+		t.Fatalf("feature = %q, want %q", body.Feature, feature.KeySetterWorkspace)
+	}
+}
+
+func TestFeatureGateKeeps403ForAMissingToken(t *testing.T) {
+	// No credential at all is a policy answer, not a bad credential: the SPA
+	// renders "sign in to continue" from this body.
+	h, _ := newGate(t, feature.KeySetterWorkspace, nil)
+	if rec := do(h, ""); rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403", rec.Code)
+	}
+}
+
+func TestFeatureGateKeeps403ForADisabledFeatureEvenWithABadToken(t *testing.T) {
+	// A disabled feature is a policy answer regardless of who is asking, so it
+	// must not become a 401 the client would try to refresh away.
+	h, _ := newGate(t, feature.KeyGym, func(s *stubSettings) {
+		s.put(t, feature.KeyGym, feature.Policy{Enabled: false})
+	})
+	if rec := do(h, "not-a-jwt"); rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403", rec.Code)
+	}
+}
+
+func TestFeatureGateReturns401ForAnExpiredToken(t *testing.T) {
+	store := &stubSettings{items: map[string]model.SystemSetting{}}
+	resolver := feature.NewResolver(store, nil)
+	// Negative TTL: the token is signed correctly but already expired.
+	expired := auth.NewJWTManager("test-secret-that-is-long-enough-for-hmac", -time.Minute, time.Hour)
+	token, err := expired.GenerateAccessToken("u1", "user", model.RoleUser)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	h := FeatureGate(expired, resolver, feature.KeySetterWorkspace)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	if rec := do(h, token); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401 for an expired token", rec.Code)
 	}
 }
 
