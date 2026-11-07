@@ -272,7 +272,15 @@ func main() {
 	trainingH := handler.NewTrainingHandler(trainingStore, orgStore)
 
 	plagiarismStore := postgres.NewPlagiarismStore(db)
-	plagiarismService := plagiarism.NewService(plagiarismStore, contestStore, submissionStore)
+	// The similarity scan is the one CPU-bound job on the platform, so it can run
+	// in a Rust process instead of Go. Selection is by environment (see
+	// plagiarism.SelectEngine): "auto" uses the Rust binary when present and the
+	// pure-Go engine otherwise, so a checkout without a Rust toolchain still boots.
+	plagiarismEngine, err := plagiarism.SelectEngine()
+	if err != nil {
+		log.Fatalf("plagiarism engine: %v", err)
+	}
+	plagiarismService := plagiarism.NewServiceWithEngine(plagiarismStore, contestStore, submissionStore, plagiarismEngine)
 	plagiarismH := handler.NewPlagiarismHandler(plagiarismService, plagiarismStore, contestStore)
 
 	mediaH := handler.NewMediaHandler("./media")

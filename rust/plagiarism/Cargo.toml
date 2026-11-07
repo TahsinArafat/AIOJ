@@ -1,0 +1,21 @@
+[package]
+name = "aioj-plagiarism"
+version = "0.1.0"
+edition = "2021"
+# rayon requires 1.80, so that is the real floor for this crate.
+rust-version = "1.80"
+publish = false
+description = "Pairwise source-similarity engine for AIOJ plagiarism reports"
+
+# Intentionally no `serde` derive: proc-macros cannot be built for a *-musl
+# target, so a derive-based schema breaks the static docker build. `serde_json`
+# still gives correct JSON escaping, which is the part worth not hand-rolling.
+[dependencies]
+rayon = "1.10"
+serde_json = "1"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = true

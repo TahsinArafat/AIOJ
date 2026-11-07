@@ -75,6 +75,55 @@ Worker lifecycle: `WorkerPool.Start` drains the queue; `WorkerPool.Stop` waits u
 
 ---
 
+## Plagiarism Similarity Engine (Rust)
+
+`internal/plagiarism` is the only CPU-bound job on the platform (O(n²) pairs × O(m·n)
+LCS), so it has a Rust implementation in `rust/plagiarism/` that runs as a
+**short-lived subprocess**: one process per report, JSON in on stdin, NDJSON out
+on stdout. No cgo, no new port, no new auth surface.
+
+```
+POST /api/contests/:id/plagiarism
+  -> plagiarism.Service.RunCheck
+       -> collect accepted submissions (cap 300/problem)
+       -> exec aioj-plagiarism  (or NativeEngine when the binary is absent)
+       -> write plagiarism_pairs + report counts
+```
+
+**Engine selection** (`plagiarism.SelectEngine`, read from the environment):
+
+| `PLAGIARISM_ENGINE` | Behaviour |
+|---|---|
+| `auto` (default) | Rust if the binary is found, pure Go otherwise |
+| `native` | Always pure Go |
+| `rust` | Rust, and **startup fails** if the binary is missing |
+
+`PLAGIARISM_RUST_BIN` points at the binary (the image sets `/app/bin/aioj-plagiarism`).
+If the Rust engine fails at runtime the service logs it and re-runs the scan on
+`NativeEngine`, so a broken deployment loses speed, never correctness.
+
+**Verified on a 44,850-pair corpus with 900-token sources:** original Go loop
+~96 s → `NativeEngine` 17.0 s → Rust 0.68 s. On very short sources the two engines
+tie (the subprocess boundary costs as much as the whole scan), so the Rust path
+earns its place only when the LCS work is real.
+
+**Correctness contract — do not weaken it.** Both engines must report exactly what
+`CompareCodes` reports. The prefilter is only allowed because it is *sound*
+(`LCS <= multiset intersection`, so a pair below the bound cannot cross the
+threshold). `internal/plagiarism/engine_parity_test.go` asserts pair sets,
+similarity values and the report's pair count against the reference at ten
+thresholds, and `TestRustTokenizerMatchesGo` diffs the Rust tokenizer against Go
+token-by-token. The Rust tokenizer intentionally reproduces the Go regex pipeline's
+quirks (`//` stripped inside string literals, unterminated `/*` kept) — "fixing"
+them changes every score.
+
+**Commands:** `make rust-build` (also `rust-test`, `rust-lint`, `rust-fmt`) and
+`make test-parity` for the Go-vs-Rust differential tests. Without `make rust-build`
+everything still builds and tests green: the Rust cases skip and the backend uses
+the pure-Go engine.
+
+---
+
 ## Implemented Features (status as of 2026-05-29 — Superiority Roadmap COMPLETE)
 
 | Phase | Plans | Status |

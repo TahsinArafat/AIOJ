@@ -6,6 +6,9 @@
 /bin/
 vendor/
 
+# Rust build output (the engine binary lands in /bin via `make rust-build`)
+rust/plagiarism/target/
+
 # Frontend dependencies and generated output
 web/node_modules/
 web/dist/

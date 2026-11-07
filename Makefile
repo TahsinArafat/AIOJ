@@ -1,4 +1,4 @@
-.PHONY: build run test openapi cli test-frontend lint fmt fmt-check build-image migrate-up migrate-down migrate-status migrate-version migrate-force
+.PHONY: build run test openapi cli test-frontend lint fmt fmt-check build-image migrate-up migrate-down migrate-status migrate-version migrate-force rust-build rust-test rust-fmt rust-lint test-parity
 
 MIGRATE_DSN ?= postgres://aioj:aioj_dev@localhost:5432/aioj?sslmode=disable
 TEST_DSN    ?= $(MIGRATE_DSN)
@@ -12,6 +12,33 @@ run:
 
 test:
 	AIOJ_TEST_DSN="$${AIOJ_TEST_DSN:-$(TEST_DSN)}" go test ./cmd/... ./internal/... -count=1
+
+# --- Rust similarity engine ------------------------------------------------
+# The plagiarism scan is the platform's only CPU-bound job, so it has a Rust
+# implementation (rust/plagiarism). It is optional: the backend falls back to the
+# pure-Go engine when the binary is absent, so `make build` does not need cargo.
+RUST_ENGINE_DIR = rust/plagiarism
+RUST_ENGINE_BIN = bin/aioj-plagiarism
+
+rust-build:
+	cd $(RUST_ENGINE_DIR) && cargo build --release
+	@mkdir -p bin
+	cp $(RUST_ENGINE_DIR)/target/release/aioj-plagiarism $(RUST_ENGINE_BIN)
+	@echo "built $(RUST_ENGINE_BIN)"
+
+rust-test:
+	cd $(RUST_ENGINE_DIR) && cargo test
+
+rust-fmt:
+	cd $(RUST_ENGINE_DIR) && cargo fmt --check
+
+rust-lint:
+	cd $(RUST_ENGINE_DIR) && cargo clippy --all-targets -- -D warnings
+
+# Go-vs-Rust differential tests. Builds the engine first so the parity tests run
+# instead of skipping.
+test-parity: rust-build
+	go test ./internal/plagiarism/ -count=1 -run 'Rust|Native|Reference'
 
 # CI parity: frontend typecheck+build+vitest
 test-frontend:
