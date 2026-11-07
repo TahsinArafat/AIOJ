@@ -65,7 +65,6 @@ const TrainingPlanCreate = lazy(() => import('./pages/TrainingPlanCreate'))
 const TrainingPlanDetail = lazy(() => import('./pages/TrainingPlanDetail'))
 const ContestPlagiarism = lazy(() => import('./pages/ContestPlagiarism'))
 const ContestProblem = lazy(() => import('./pages/ContestProblem'))
-const ContestEdit = lazy(() => import('./pages/ContestEdit'))
 const ContestManage = lazy(() => import('./pages/ContestManage'))
 const IDE = lazy(() => import('./pages/IDE'))
 const GenerateProblem = lazy(() => import('./pages/GenerateProblem'))
@@ -394,7 +393,6 @@ function AppShell() {
                     <Route path="/contests/:id/scoreboard" element={<FeatureGate feature="contests"><ContestScoreboard /></FeatureGate>} />
                     <Route path="/contests/:id/plagiarism" element={<FeatureGate feature="plagiarism"><ContestPlagiarism /></FeatureGate>} />
                     <Route path="/contests/:contestId/problem/:index" element={<FeatureGate feature="contests"><ContestProblem /></FeatureGate>} />
-                    <Route path="/setter/contest/:id/edit" element={<ContestEdit />} />
                     <Route path="/setter/contest/:id/manage" element={<ContestManage />} />
                     <Route path="/gym" element={<FeatureGate feature="gym"><GymList /></FeatureGate>} />
                     <Route path="/gym/:id" element={<FeatureGate feature="gym"><GymDetail /></FeatureGate>} />
