@@ -23,7 +23,7 @@ type JobStore interface {
 	IsCancellationRequested(ctx context.Context, id string) (bool, error)
 	MarkCancelled(ctx context.Context, id, token string) error
 	RequeueStale(ctx context.Context, older time.Duration) ([]string, error)
-	SetManifest(ctx context.Context, id, token string, manifest, report json.RawMessage, ready bool, turns int) error
+	SetManifest(ctx context.Context, id, token string, proposal, manifest, report json.RawMessage, ready bool, turns int) error
 	Fail(ctx context.Context, id, token, code, message string, validation json.RawMessage) error
 }
 
@@ -133,20 +133,60 @@ func (w *Worker) processOne(ctx context.Context) {
 	}
 	reportJSON, _ := json.Marshal(manifest.Report)
 
-	if err := w.Jobs.SetManifest(ctx, job.ID, token, manifestJSON, reportJSON, manifest.Report.Ready, manifest.Usage.Materialized); err != nil {
+	// The harness authors a Manifest, but Apply reads the Proposal column. Derive
+	// one so a validated run can actually be promoted onto a problem.
+	proposalRaw, err := proposalJSON(*manifest)
+	if err != nil {
+		_ = w.Jobs.Fail(ctx, job.ID, token, "proposal_encode", err.Error(), nil)
+		return
+	}
+
+	// The final argument is turn_count. It previously received
+	// manifest.Usage.Materialized, so the column recorded the number of test
+	// cases produced (31 for a 16-call run) instead of the conversation length.
+	if err := w.Jobs.SetManifest(ctx, job.ID, token, proposalRaw, manifestJSON, reportJSON, manifest.Report.Ready, manifest.Usage.Turns); err != nil {
 		slog.Error("ai harness: persist manifest failed", "job", job.ID, "error", err)
 		return
 	}
 	slog.Info("ai harness: job finished",
 		"job", job.ID, "ready", manifest.Report.Ready,
-		"cases", len(manifest.Cases), "blocked", manifest.Report.Blocked)
+		"cases", len(manifest.Cases), "turns", manifest.Usage.Turns,
+		"blocked", manifest.Report.Blocked)
 }
 
+// Turn accounting for the tool loop.
+//
+// The loop has a mandatory spine that every run must walk before it can
+// finalize: set_constraints, set_limits, set_generator_shapes, write_generator,
+// write_solution, materialize_matrix, run_reference, check_samples,
+// check_determinism, finalize. That is ten calls even when nothing goes wrong,
+// and observed runs also repeat a couple of setup calls while settling on
+// constraints, so the spine realistically costs twelve.
+//
+// harness.DefaultBudget() ships MaxTurns: 10, which is less than the spine
+// alone. A real run therefore stopped at StopMaxTurns during setup with
+// "the run stopped early: max_turns" and never reached materialization or
+// finalization. Raise the floor to the spine plus repair headroom.
+const (
+	// spineTurns covers the mandatory tool path with slack for repeated setup.
+	spineTurns = 12
+	// turnPerRepair is how many extra turns one repair cycle needs: rewrite the
+	// offending artifact, re-materialize, and re-run the failing gate.
+	turnPerRepair = 6
+)
+
 // DefaultBudget derives the loop budget from config.
-func DefaultBudget(maxTurns int) harness.Budget {
+//
+// repairTurns is cfg.AI.RepairTurns, which was loaded and defaulted but never
+// read, so the repair allowance the config advertised did not exist. It now
+// widens MaxTurns instead of being dead configuration.
+func DefaultBudget(repairTurns int) harness.Budget {
 	b := harness.DefaultBudget()
-	if maxTurns > 0 {
-		b.MaxTurns = maxTurns
+	if repairTurns < 0 {
+		repairTurns = 0
+	}
+	if want := spineTurns + repairTurns*turnPerRepair; want > b.MaxTurns {
+		b.MaxTurns = want
 	}
 	return b
 }

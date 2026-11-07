@@ -116,6 +116,7 @@ func (p *Pipeline) Run(ctx context.Context, jobID string, brief string) (*Manife
 		m.Usage.SandboxCPU = time.Since(started)
 	}
 	m.Usage.BytesWritten = outcome.Usage.BytesWritten
+	m.Usage.Turns = outcome.Usage.Turns
 
 	// A run that stopped on a budget did not finish; report it as not ready
 	// rather than letting a partial manifest reach review as if it were whole.

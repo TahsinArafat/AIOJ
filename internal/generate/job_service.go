@@ -23,6 +23,11 @@ type CreateJobRequest struct {
 	AIModelID    *string
 	ArtifactType string
 	Brief        Request
+	// ActorIsAdmin lets an admin target any problem. The read-side endpoints
+	// (Get, ListProblem) already grant admins this bypass; without the same rule
+	// on Create an admin could open AI Studio on a problem they do not own and
+	// be refused with "problem edit access required" before any work started.
+	ActorIsAdmin bool
 }
 
 func (s *JobService) Create(ctx context.Context, actorID string, req CreateJobRequest) (*model.AIGenerationJob, error) {
@@ -53,7 +58,7 @@ func (s *JobService) Create(ctx context.Context, actorID string, req CreateJobRe
 		if p == nil {
 			return nil, fmt.Errorf("problem not found")
 		}
-		if !s.Problems.HasAccess(ctx, p.ID, actorID, "owner", "co_author") {
+		if !req.ActorIsAdmin && !s.Problems.HasAccess(ctx, p.ID, actorID, "owner", "co_author") {
 			return nil, fmt.Errorf("problem edit access required")
 		}
 	}

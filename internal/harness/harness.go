@@ -84,8 +84,14 @@ type Budget struct {
 	MaxBytes       int64
 }
 
-// DefaultBudget is the shipped policy: enough turns to draft, compile, fix a
-// determinism bug and finalize, with the last few reserved for repair.
+// DefaultBudget is the generic loop floor, not the shipped generation policy.
+//
+// MaxTurns here is deliberately small because this package knows nothing about
+// the tool catalog. The real generator spine (constraints, limits, shapes,
+// generator, solution, materialize, run_reference, check_samples,
+// check_determinism, finalize) needs more than ten calls, so
+// problemgen.DefaultBudget raises MaxTurns to cover the spine plus repair
+// headroom. Do not treat this value as sufficient for a generation run.
 func DefaultBudget() Budget {
 	return Budget{
 		MaxTurns:       10,

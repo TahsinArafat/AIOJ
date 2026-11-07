@@ -15,6 +15,10 @@ export default function AIStudioTab({ problemId, problemUpdatedAt, onApplied }: 
  const [selected,setSelected]=useState<string[]>(['statement','solution','editorial','tests'])
  const [error,setError]=useState('')
  useEffect(()=>{api.ai.connections().then(r=>setConnections(r.data||[])).catch(e=>setError(String(e)))},[])
+ // Resume the newest unfinished/reviewable job for this problem. Without this
+ // the tab always opened on a blank form, so a finished proposal was
+ // unreachable after a reload and could never be reviewed or applied.
+ useEffect(()=>{queueMicrotask(()=>{api.ai.problemJobs(problemId).then(r=>{const latest=(r.data||[]).find(j=>!['discarded','cancelled'].includes(j.status));if(latest)setJob(latest)}).catch(()=>{})})},[problemId])
  useEffect(()=>{if(!job||!['queued','running'].includes(job.status))return;const id=window.setInterval(()=>api.ai.getJob(job.id).then(setJob).catch(()=>{}),1500);return()=>window.clearInterval(id)},[job])
  const start=async()=>{setError('');try{setJob(await api.ai.createJob({problem_id:problemId,ai_model_id:connections[0]?.id,artifact_type:artifact,brief}))}catch(e){setError(e instanceof Error?e.message:String(e))}}
  const apply=async()=>{if(!job)return;try{await api.ai.applyJob(job.id,selected,problemUpdatedAt);setJob(await api.ai.getJob(job.id));onApplied?.()}catch(e){setError(e instanceof Error?e.message:String(e))}}

@@ -15,6 +15,8 @@ type fakeJobStore struct {
 	job       *model.AIGenerationJob
 	claimed   bool
 	manifest  json.RawMessage
+	proposal  json.RawMessage
+	turns     int
 	ready     bool
 	failed    string
 	cancelled bool
@@ -40,9 +42,11 @@ func (f *fakeJobStore) RequeueStale(context.Context, time.Duration) ([]string, e
 	return nil, nil
 }
 
-func (f *fakeJobStore) SetManifest(_ context.Context, _, _ string, manifest, _ json.RawMessage, ready bool, _ int) error {
+func (f *fakeJobStore) SetManifest(_ context.Context, _, _ string, proposal, manifest, _ json.RawMessage, ready bool, turns int) error {
+	f.proposal = proposal
 	f.manifest = manifest
 	f.ready = ready
+	f.turns = turns
 	return nil
 }
 

@@ -24,6 +24,17 @@ func TestCmdFileMarshalPreservesEmptyContent(t *testing.T) {
 	if got, want := string(data), `{"fileId":"file-1"}`; got != want {
 		t.Fatalf("file ID JSON = %s, want %s", got, want)
 	}
+
+	// A stream entry must serialise as {"name","max"} and nothing else. go-judge
+	// picks the file variant from whichever key is present; emitting content
+	// alongside name would make it an invalid file type.
+	data, err = json.Marshal(CmdFile{Name: "stdout", Max: 4096})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := string(data), `{"name":"stdout","max":4096}`; got != want {
+		t.Fatalf("stream JSON = %s, want %s", got, want)
+	}
 }
 
 func TestRun_Success(t *testing.T) {

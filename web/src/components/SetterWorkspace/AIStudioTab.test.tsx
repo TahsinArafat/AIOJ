@@ -3,11 +3,12 @@ import { expect, test, vi, beforeEach } from 'vitest'
 import AIStudioTab from './AIStudioTab'
 import { api } from '../../lib/api'
 
-vi.mock('../../lib/api', () => ({ api: { ai: { connections: vi.fn(), createJob: vi.fn(), getJob: vi.fn(), cancelJob: vi.fn(), discardJob: vi.fn(), applyJob: vi.fn() } } }))
+vi.mock('../../lib/api', () => ({ api: { ai: { connections: vi.fn(), problemJobs: vi.fn(), createJob: vi.fn(), getJob: vi.fn(), cancelJob: vi.fn(), discardJob: vi.fn(), applyJob: vi.fn() } } }))
 
 beforeEach(() => {
  vi.mocked(api.ai.connections).mockReset().mockResolvedValue({data:[{id:'m1',name:'Local',endpoint:'http://localhost',model_name:'model',enabled:true,priority:1,description:'',created_at:'',updated_at:''}]})
  vi.mocked(api.ai.createJob).mockReset()
+ vi.mocked(api.ai.problemJobs).mockReset().mockResolvedValue({data:[]})
 })
 
 test('renders artifact choices and creates a scoped job', async () => {
@@ -28,4 +29,14 @@ test('ready proposal exposes selective apply controls', async () => {
  fireEvent.click(screen.getByRole('button',{name:'Generate proposal'}))
  await waitFor(()=>expect(screen.getByRole('button',{name:'Apply selected'})).toBeInTheDocument())
  expect(screen.getByText(/statement: ok/)).toBeInTheDocument()
+})
+
+test('resumes the newest job for the problem on mount', async () => {
+ const ready={id:'j9',actor_id:'u1',artifact_type:'full_problem',status:'ready' as const,stage:'ready',progress:100,submitted_brief:{tags:['dp'],rating:1400,problem_type:'standard',testcase_count:10,has_subtasks:false},normalized_brief:{tags:['dp'],rating:1400,problem_type:'standard',testcase_count:10,has_subtasks:false},proposal:{title:'Resumed',description:'Statement'},validation_report:{valid:true,checks:[{name:'coverage',passed:true,message:'31 cases'}]},prompt_tokens:10,completion_tokens:20,latency_ms:100,created_at:''}
+ vi.mocked(api.ai.problemJobs).mockResolvedValue({data:[ready]})
+ render(<AIStudioTab problemId="p1" />)
+ // A finished proposal must survive a reload instead of resetting to a blank
+ // form, otherwise it can never be reviewed or applied.
+ await waitFor(()=>expect(screen.getByRole('button',{name:'Apply selected'})).toBeInTheDocument())
+ expect(api.ai.problemJobs).toHaveBeenCalledWith('p1')
 })

@@ -103,19 +103,30 @@ func runArgs(cfg *compiler.LangConfig) []string {
 }
 
 func (r *JudgeRunner) Run(ctx context.Context, files map[string]executor.CmdFile, args []string, stdin string, lim Limits) (RunOutcome, error) {
-	copyIn := make(map[string]executor.CmdFile, len(files)+1)
+	copyIn := make(map[string]executor.CmdFile, len(files))
 	for k, v := range files {
 		copyIn[k] = v
 	}
-	if stdin != "" {
-		copyIn["input.txt"] = executor.CmdFile{Content: stdin}
-	}
+
+	// Test programs read test data from their process stdin, and both the
+	// generator and the reference solution write their answer to process stdout.
+	// go-judge expresses those three channels as the positional Cmd.Files
+	// triple, so they must be declared here.
+	//
+	// Two prior bugs came from getting this wrong:
+	//   - stdin was handed over as a copyIn *file* named input.txt, which no
+	//     program reads, so every solution saw immediate EOF;
+	//   - stdout was requested with CopyOut: ["stdout"], but copyOut names real
+	//     files in the sandbox, so go-judge failed every run with "File Error".
+	stdinFile := executor.CmdFile{Content: stdin}
+	stdoutStream := executor.CmdFile{Name: "stdout", Max: maxCapturedOutput}
+	stderrStream := executor.CmdFile{Name: "stderr", Max: maxCapturedOutput}
 
 	res, err := r.Exec.Run(ctx, &executor.ExecRequest{Cmd: []executor.Cmd{{
 		Args:        args,
 		Env:         []string{"PATH=/usr/bin:/bin", "HOME=/tmp"},
+		Files:       []executor.CmdFile{stdinFile, stdoutStream, stderrStream},
 		CopyIn:      copyIn,
-		CopyOut:     []string{"stdout", "stderr"},
 		CPULimit:    uint64(lim.TimeLimitMS) * 1e6,
 		MemoryLimit: uint64(lim.MemoryLimitKB) * 1024,
 		ProcLimit:   64,

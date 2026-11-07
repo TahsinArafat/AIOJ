@@ -15,6 +15,17 @@ type CmdFile struct {
 	Content string `json:"content,omitempty"`
 	FileID  string `json:"fileId,omitempty"`
 	Src     string `json:"src,omitempty"`
+	// Name and Max describe a stdio *stream* rather than a sandbox file. go-judge
+	// treats Cmd.Files as the positional stdin/stdout/stderr triple, so a stream
+	// is declared as a Files entry with Name ("stdout"/"stderr") and Max (byte
+	// cap). Captured bytes then come back in CmdResult.Files under that name.
+	//
+	// Without this, the only way to read a program's stdout is to redirect it to
+	// a real file with a shell, and asking copyOut for "stdout" instead makes
+	// go-judge look for a file that does not exist, failing the run with
+	// status "File Error".
+	Name string `json:"name,omitempty"`
+	Max  int64  `json:"max,omitempty"`
 }
 
 // MarshalJSON emits exactly one go-judge file variant. In particular, an
@@ -25,6 +36,11 @@ func (f CmdFile) MarshalJSON() ([]byte, error) {
 		Content *string `json:"content,omitempty"`
 		FileID  string  `json:"fileId,omitempty"`
 		Src     string  `json:"src,omitempty"`
+		Name    string  `json:"name,omitempty"`
+		Max     int64   `json:"max,omitempty"`
+	}
+	if f.Name != "" {
+		return json.Marshal(wire{Name: f.Name, Max: f.Max})
 	}
 	if f.FileID != "" {
 		return json.Marshal(wire{FileID: f.FileID})

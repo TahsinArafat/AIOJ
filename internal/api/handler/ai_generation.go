@@ -51,7 +51,7 @@ func (h *AIGenerationHandler) Create(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid request", 400)
 		return
 	}
-	job, err := h.service.Create(r.Context(), claims.UserID, generate.CreateJobRequest{ProblemID: req.ProblemID, AIModelID: req.AIModelID, ArtifactType: req.ArtifactType, Brief: req.Brief})
+	job, err := h.service.Create(r.Context(), claims.UserID, generate.CreateJobRequest{ProblemID: req.ProblemID, AIModelID: req.AIModelID, ArtifactType: req.ArtifactType, Brief: req.Brief, ActorIsAdmin: claims.Role == "admin"})
 	if err != nil {
 		http.Error(w, err.Error(), 400)
 		return
@@ -140,7 +140,7 @@ func (h *AIGenerationHandler) Retry(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "stored brief is invalid", http.StatusConflict)
 		return
 	}
-	job, err := h.service.Create(r.Context(), claims.UserID, generate.CreateJobRequest{ProblemID: old.ProblemID, AIModelID: old.AIModelID, ArtifactType: old.ArtifactType, Brief: brief})
+	job, err := h.service.Create(r.Context(), claims.UserID, generate.CreateJobRequest{ProblemID: old.ProblemID, AIModelID: old.AIModelID, ArtifactType: old.ArtifactType, Brief: brief, ActorIsAdmin: claims.Role == "admin"})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

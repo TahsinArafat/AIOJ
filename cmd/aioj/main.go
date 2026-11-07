@@ -424,7 +424,7 @@ func main() {
 			Transcript: postgres.NewHarnessTranscript(db),
 			Staging:    cfg.AI.StagedTestdataRoot,
 			MaxBytes:   cfg.AI.MaxJobBytes,
-			Budget:     problemgen.DefaultBudget(0),
+			Budget:     problemgen.DefaultBudget(cfg.AI.RepairTurns),
 			Resolve: func(ctx context.Context, modelID *string) (harness.Model, error) {
 				m, err := aiModelStore.GetDefault(ctx)
 				if modelID != nil {
@@ -454,7 +454,14 @@ func main() {
 	}
 	// Development/default deployment: process jobs in the API process. A
 	// dedicated --mode=ai-worker can be used to isolate workloads.
-	if cfg.AI.Enabled {
+	//
+	// Skipped when the harness is enabled: problemgen.Worker (--mode=ai-harness)
+	// claims from the same ai_generation_jobs queue, so leaving the single-shot
+	// worker running would race it for every job. Whichever calls ClaimNext
+	// first wins, which made a harness deployment silently fall back to the
+	// legacy one-shot pipeline on a coin flip. The harness container owns the
+	// queue whenever it is deployed.
+	if cfg.AI.Enabled && !cfg.AI.Harness {
 		startAIWorkers()
 	}
 	// Retention runs regardless of AI_ENABLED: old jobs left from a period when

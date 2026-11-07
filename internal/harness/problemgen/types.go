@@ -216,12 +216,16 @@ type Manifest struct {
 
 // Usage accounts for what the run consumed inside the sandbox.
 type Usage struct {
-	SandboxCPU    time.Duration `json:"sandbox_cpu"`
-	BytesWritten  int64         `json:"bytes_written"`
-	Compilations  int           `json:"compilations"`
-	CaseRuns      int           `json:"case_runs"`
-	Materialized  int           `json:"cases_materialized"`
-	ReferenceRuns int           `json:"reference_runs"`
+	SandboxCPU   time.Duration `json:"sandbox_cpu"`
+	BytesWritten int64         `json:"bytes_written"`
+	Compilations int           `json:"compilations"`
+	CaseRuns     int           `json:"case_runs"`
+	Materialized int           `json:"cases_materialized"`
+	// Turns is the length of the model conversation, reported separately from
+	// Materialized because the two are unrelated (a 16-turn run can materialize
+	// 31 cases) and turn_count is what operators read to judge loop efficiency.
+	ReferenceRuns int `json:"reference_runs"`
+	Turns         int `json:"turns"`
 }
 
 // hashBytes returns the manifest hash of a case body.

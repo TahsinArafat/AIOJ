@@ -104,6 +104,10 @@ services:
       # API key is stored. Generate with: openssl rand -base64 32
       AI_ENABLED: ${AI_ENABLED:-false}
       AI_CREDENTIAL_MASTER_KEY: ${AI_CREDENTIAL_MASTER_KEY:-}
+      # Declares that the ai-harness container owns the generation queue. The
+      # API process then skips its in-process job worker, which would otherwise
+      # race the harness for every job via ClaimNext on ai_generation_jobs.
+      AI_HARNESS_ENABLED: ${AI_HARNESS_ENABLED:-false}
       # TRUSTED_PROXIES is intentionally unset: the default (loopback + RFC1918)
       # already covers the nginx container, and an explicit empty value would
       # disable X-Forwarded-For trust entirely.

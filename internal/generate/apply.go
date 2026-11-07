@@ -88,7 +88,13 @@ func (s *ApplyService) Apply(ctx context.Context, job *model.AIGenerationJob, ac
 	} else if err = s.Problems.Update(ctx, problem.ID, problem); err != nil {
 		return nil, err
 	}
-	if selected["editorial"] || selected["solution"] {
+	// Only publish an official editorial when the proposal actually contains
+	// one. The harness pipeline authors a statement, solution and tests but no
+	// editorial, and the UI selects every section by default, so an unguarded
+	// upsert created a blank "official" editorial on the problem. The reference
+	// solution is still preserved in the generation asset written below.
+	if (selected["editorial"] || selected["solution"]) &&
+		(p.EditorialTitle != "" || p.EditorialContent != "") {
 		e := &model.Editorial{ProblemID: problem.ID, UserID: actorID, Title: p.EditorialTitle, Content: p.EditorialContent, SolutionCode: p.SolutionCode, SolutionLanguage: p.SolutionLanguage, Approach: p.EditorialApproach, TimeComplexity: p.TimeComplexity, SpaceComplexity: p.SpaceComplexity, IsOfficial: true}
 		if err = s.Editorials.UpsertOfficial(ctx, e); err != nil {
 			return nil, err
