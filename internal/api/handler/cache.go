@@ -14,10 +14,10 @@ import (
 // called under the write lock so only one goroutine refreshes at a time; all
 // others block briefly then read the fresh value.
 type TTLCache[T any] struct {
-	mu      sync.RWMutex
-	val     T
+	mu       sync.RWMutex
+	val      T
 	loadedAt time.Time
-	TTL     time.Duration
+	TTL      time.Duration
 }
 
 // Get returns the cached value, calling loader to refresh it when the cache is

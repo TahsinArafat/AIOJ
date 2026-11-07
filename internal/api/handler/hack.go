@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -47,6 +48,12 @@ func (h *HackHandler) SubmitHack(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.service.SubmitHack(r.Context(), claims.UserID, req)
 	if err != nil {
+		// A deployment without hack judging is a server limitation, not a bad
+		// request; report it as such instead of blaming the caller.
+		if errors.Is(err, hack.ErrHackJudgingUnavailable) {
+			http.Error(w, err.Error(), http.StatusServiceUnavailable)
+			return
+		}
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}

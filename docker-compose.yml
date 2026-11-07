@@ -39,6 +39,13 @@ services:
       context: .
       dockerfile: Dockerfile.judge
     privileged: true
+    # Only on the internal sandbox network. go-judge's /run accepts arbitrary
+    # argv with no authentication, so anything else on the network could ask it
+    # to execute code. Before this, it shared the default network with
+    # cf-bypass — an unauthenticated headless browser — which meant a
+    # compromised browser container had a direct line to the sandbox.
+    networks:
+      - sandbox
     # go-judge >= 1.11 reads its cgroup parent from /proc/self/cgroup. Docker's
     # default private cgroup namespace rewrites that path to "/", which the
     # binary rejects with "cgroup path is empty" (fatal restart loop). Host
@@ -98,6 +105,9 @@ services:
       # disable X-Forwarded-For trust entirely.
     ports:
       - "8080:8080"
+    networks:
+      - default
+      - sandbox
     volumes:
       - testdata:/app/testdata
       - ./lang:/app/lang
@@ -147,6 +157,9 @@ services:
       AI_MAX_CASE_N: ${AI_MAX_CASE_N:-1000000}
       AI_MAX_JOB_BYTES: ${AI_MAX_JOB_BYTES:-67108864}
       AI_STAGED_TESTDATA_ROOT: /app/testdata/ai-staging
+    networks:
+      - default
+      - sandbox
     volumes:
       - testdata:/app/testdata
       - ./lang:/app/lang
@@ -186,6 +199,9 @@ services:
     volumes:
       - testdata:/app/testdata
       - ./lang:/app/lang
+    networks:
+      - default
+      - sandbox
     depends_on:
       postgres:
         condition: service_healthy
@@ -321,6 +337,18 @@ services:
     restart: unless-stopped
     profiles:
       - production
+
+networks:
+  # Internal-only network for the code-execution boundary. `internal: true`
+  # means Docker installs no gateway route, so a container here cannot reach
+  # the internet and nothing outside the listed services can reach in.
+  #
+  # judge lives here (and nowhere else); backend / judge-worker / ai-harness
+  # join it in addition to the default network so they can call JUDGE_ENDPOINT.
+  # Every other service — notably the unauthenticated cf-bypass browser — stays
+  # off it.
+  sandbox:
+    internal: true
 
 volumes:
   pgdata:

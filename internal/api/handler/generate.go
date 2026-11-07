@@ -1,8 +1,10 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
 	"github.com/tahsinarafat/aioj/internal/generate"
@@ -18,10 +20,20 @@ func NewGenerateHandler(svc *generate.Service) *GenerateHandler {
 	return &GenerateHandler{svc: svc}
 }
 
+// legacyGenerateTimeout bounds the deprecated synchronous generation call.
+//
+// This endpoint runs the whole AI generation inline in the HTTP request, so
+// without a deadline a slow provider held the connection open indefinitely and
+// tied up a server goroutine with it. The asynchronous jobs API
+// (POST /api/ai/jobs) has no such problem and is the supported path.
+const legacyGenerateTimeout = 5 * time.Minute
+
 // Problem handles POST /api/generate/problem.
 // It is restricted to users with the "admin" or "setter" role.
-// The handler validates the request, delegates to generate.Service,
-// and returns the new problem slug + IDs so the caller can navigate to it.
+//
+// Deprecated: this runs generation synchronously inside the request and has no
+// sandbox review or size cap. Prefer POST /api/ai/jobs, which queues the work,
+// streams progress, and validates the result before it can be applied.
 func (h *GenerateHandler) Problem(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetUserClaims(r)
 	if claims == nil {
@@ -44,8 +56,20 @@ func (h *GenerateHandler) Problem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := h.svc.Generate(r.Context(), claims.UserID, req)
+	// Point clients at the supported path without breaking existing callers.
+	w.Header().Set("Deprecation", "true")
+	w.Header().Set("Link", `</api/ai/jobs>; rel="successor-version"`)
+
+	ctx, cancel := context.WithTimeout(r.Context(), legacyGenerateTimeout)
+	defer cancel()
+
+	result, err := h.svc.Generate(ctx, claims.UserID, req)
 	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			http.Error(w, "generation timed out; use POST /api/ai/jobs for long runs",
+				http.StatusGatewayTimeout)
+			return
+		}
 		http.Error(w, "generation failed: "+err.Error(), http.StatusBadGateway)
 		return
 	}

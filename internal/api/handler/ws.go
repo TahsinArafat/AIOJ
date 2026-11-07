@@ -135,3 +135,14 @@ func (m *WSManager) NotifySubmission(id string, msg WSMessage) {
 		c.WriteMessage(websocket.TextMessage, data)
 	}
 }
+
+// NotifyVerdict implements judge.VerdictNotifier so the judge worker can push a
+// finished verdict without importing this package (which would invert the
+// dependency: the API layer already depends on the judge).
+func (m *WSManager) NotifyVerdict(submissionID, status string) {
+	m.NotifySubmission(submissionID, WSMessage{
+		Type:         "submission_result",
+		SubmissionID: submissionID,
+		Data:         map[string]string{"status": status},
+	})
+}

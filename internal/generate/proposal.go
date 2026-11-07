@@ -111,4 +111,92 @@ func ValidateProposal(p *Proposal, artifact string) ValidationReport {
 	return ValidationReport{Valid: valid, Checks: checks}
 }
 
-func ProposalJSONSchema() map[string]any { return map[string]any{"type": "object"} }
+// ProposalJSONSchema returns a JSON Schema describing Proposal.
+//
+// It previously returned {"type":"object"}, which is the same as "anything
+// goes": a strict-mode provider had nothing to constrain the response with, so
+// the model could omit required fields and the failure only surfaced later in
+// ParseAndValidateProposal as a generic validation error. The schema below
+// declares every field with its type and marks the ones the prompt relies on as
+// required, so a spec-compliant endpoint produces a usable artifact on the
+// first turn.
+//
+// additionalProperties is false to match Proposal's DisallowUnknownFields
+// decoding: a schema that permitted extra keys would let the model emit fields
+// the decoder then rejects.
+func ProposalJSONSchema() map[string]any {
+	stringField := func(desc string) map[string]any {
+		return map[string]any{"type": "string", "description": desc}
+	}
+	return map[string]any{
+		"type":                 "object",
+		"additionalProperties": false,
+		"required":             []string{"title", "description", "input_format", "output_format"},
+		"properties": map[string]any{
+			"title":              stringField("Problem title"),
+			"description":        stringField("Full problem statement"),
+			"input_format":       stringField("Description of the input format"),
+			"output_format":      stringField("Description of the output format"),
+			"hint":               stringField("Optional short hint"),
+			"time_limit_ms":      map[string]any{"type": "integer", "minimum": 100, "description": "CPU time limit in milliseconds"},
+			"memory_limit_kb":    map[string]any{"type": "integer", "minimum": 1024, "description": "Memory limit in kilobytes"},
+			"tags":               map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
+			"difficulty":         stringField("Difficulty band, e.g. easy/medium/hard"),
+			"solution_code":      stringField("Reference solution source"),
+			"solution_language":  stringField("Language key of the reference solution"),
+			"editorial_title":    stringField("Editorial heading"),
+			"editorial_content":  stringField("Editorial body"),
+			"editorial_approach": stringField("High-level approach"),
+			"time_complexity":    stringField("e.g. O(n log n)"),
+			"space_complexity":   stringField("e.g. O(n)"),
+			"generator_code":     stringField("Test-generator source"),
+			"generator_language": stringField("Language key of the generator"),
+			"seeds": map[string]any{
+				"type":        "array",
+				"items":       map[string]any{"type": "integer"},
+				"description": "Deterministic seeds for the generator",
+			},
+			"sample_cases": map[string]any{
+				"type": "array",
+				"items": map[string]any{
+					"type":                 "object",
+					"additionalProperties": false,
+					"required":             []string{"input", "output"},
+					"properties": map[string]any{
+						"input":       map[string]any{"type": "string"},
+						"output":      map[string]any{"type": "string"},
+						"explanation": map[string]any{"type": "string"},
+					},
+				},
+			},
+			"curated_cases": map[string]any{
+				"type": "array",
+				"items": map[string]any{
+					"type":                 "object",
+					"additionalProperties": false,
+					"required":             []string{"name", "input"},
+					"properties": map[string]any{
+						"name":   map[string]any{"type": "string"},
+						"input":  map[string]any{"type": "string"},
+						"intent": map[string]any{"type": "string"},
+						"score":  map[string]any{"type": "integer"},
+					},
+				},
+			},
+			"difficulty_rationale": map[string]any{
+				"type":                 "object",
+				"additionalProperties": false,
+				"properties": map[string]any{
+					"core_insight":          map[string]any{"type": "string"},
+					"prerequisites":         map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
+					"implementation_burden": map[string]any{"type": "string"},
+					"likely_wrong_approaches": map[string]any{
+						"type":  "array",
+						"items": map[string]any{"type": "string"},
+					},
+					"constraint_fit": map[string]any{"type": "string"},
+				},
+			},
+		},
+	}
+}

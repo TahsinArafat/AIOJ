@@ -27,6 +27,10 @@ type HackRequest struct {
 	ProblemID    string `json:"problem_id"`
 	SubmissionID string `json:"submission_id"`
 	TestInput    string `json:"test_input"`
+	// ExpectedOutput is optional. When supplied, the hack also succeeds if the
+	// submission runs but prints something different. Without it, only a
+	// crash, timeout, or memory failure counts as a successful hack.
+	ExpectedOutput string `json:"expected_output,omitempty"`
 }
 
 type HackResult struct {

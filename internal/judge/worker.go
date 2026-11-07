@@ -21,6 +21,17 @@ import (
 // Beyond it the process exits anyway; the reclaimer picks the rows back up.
 const drainTimeout = 30 * time.Second
 
+// VerdictNotifier is implemented by the WebSocket manager so a finished
+// verdict reaches the browser without polling. Declared here (rather than
+// importing the handler package) to keep the dependency direction
+// api/handler -> judge, never the reverse.
+//
+// A nil notifier is fine: the worker simply skips the push and the client
+// falls back to its poll.
+type VerdictNotifier interface {
+	NotifyVerdict(submissionID, status string)
+}
+
 type WorkerPool struct {
 	queue             queue.JudgeQueue
 	exec              *executor.Client
@@ -38,6 +49,9 @@ type WorkerPool struct {
 	// gate holds dispatch when the host is under memory or CPU pressure.
 	// A nil gate (or disabled thresholds) means dispatch is always immediate.
 	gate *pressure.PressureGate
+
+	// notifier pushes finished verdicts to subscribed browsers. Nil is valid.
+	notifier VerdictNotifier
 
 	// langs caches the language configs loaded from langDir.  LoadLanguages
 	// reads and YAML-parses every lang/*.yaml on every call — doing that per
@@ -68,6 +82,13 @@ func NewWorkerPool(q queue.JudgeQueue, exec *executor.Client, langDir string, co
 // after NewWorkerPool when pressure thresholds are configured.
 func (wp *WorkerPool) WithPressureGate(g *pressure.PressureGate) *WorkerPool {
 	wp.gate = g
+	return wp
+}
+
+// WithNotifier attaches a verdict notifier so finished judgments are pushed to
+// the browser over the existing WebSocket instead of waiting for a poll.
+func (wp *WorkerPool) WithNotifier(n VerdictNotifier) *WorkerPool {
+	wp.notifier = n
 	return wp
 }
 
@@ -187,8 +208,15 @@ func (wp *WorkerPool) finish(ctx context.Context, submissionID, claimToken strin
 	}
 	if !applied {
 		slog.Warn("discarded superseded verdict", "id", submissionID, "status", status)
+		return false
 	}
-	return applied
+	// Push the verdict only after it is durably persisted: a client that
+	// reconnects and re-fetches must never see a different answer than the
+	// socket delivered.
+	if wp.notifier != nil {
+		wp.notifier.NotifyVerdict(submissionID, string(status))
+	}
+	return true
 }
 
 func (wp *WorkerPool) judge(ctx context.Context, submissionID, claimToken string) {

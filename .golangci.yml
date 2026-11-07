@@ -4,16 +4,21 @@ run:
   timeout: 10m
 
 linters:
+  # Everything in the standard set, including the four that matter most for
+  # correctness: errcheck (ignored errors), ineffassign (dead assignments),
+  # staticcheck (real bugs), unused (dead code).
+  #
+  # These used to be switched off for the entire tree, which meant a new
+  # `_ = doSomething()` or an unchecked error was never reported either. The
+  # exclusion below is now a ratchet rather than a blanket switch-off: the
+  # existing debt stays quiet, and anything a change *adds* is reported at
+  # full strength.
   default: standard
   exclusions:
     paths:
       - Reference_Projects/
       - '.*_test\.go$'
     rules:
-      # Pre-existing debt — ratchet in a dedicated cleanup pass (Phase B plan).
-      # Rule needs ≥2 keys (linters + path) for golangci-lint v2.
-      - linters: [unused, errcheck, ineffassign, staticcheck]
-        path: ./
       # Deprecated chi.RealIP — intentional until reverse-proxy trust review.
       - linters: [staticcheck]
         text: RealIP
@@ -22,3 +27,10 @@ linters:
 formatters:
   enable:
     - gofmt
+
+issues:
+  # Report only what this branch introduces. Combined with the linters being
+  # on, that holds new code to the full standard without failing on the
+  # pre-existing debt the repo already carries (see the audit in
+  # docs/), which a blanket exclusion used to hide — including for new code.
+  new-from-merge-base: main

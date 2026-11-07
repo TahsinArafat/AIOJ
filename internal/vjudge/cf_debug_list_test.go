@@ -24,7 +24,14 @@ func TestDebugCF2232C2List(t *testing.T) {
 		return string(body), nil
 	}
 
-	html, _ := fetcher(context.Background(), "https://codeforces.com/contest/2232/problem/C2")
+	// This test scrapes a live Codeforces page and asserts on its markup, so it
+	// depends on a remote site that changes without notice (and is blocked from
+	// most CI runners). Skip rather than fail when the page cannot be fetched:
+	// a network or remote-markup change is not a defect in this repository.
+	html, fetchErr := fetcher(context.Background(), "https://codeforces.com/contest/2232/problem/C2")
+	if fetchErr != nil || !strings.Contains(html, "problem-statement") {
+		t.Skipf("codeforces unreachable or markup changed; skipping live scrape test (err=%v)", fetchErr)
+	}
 
 	// Find the list in raw HTML
 	idx := strings.Index(html, "<ul>")

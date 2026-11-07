@@ -1,4 +1,13 @@
-FROM criyle/go-judge:latest
+# Pinned, not `latest`.
+#
+# The backend already depends on go-judge behaviour introduced in v1.11: it
+# reads its cgroup parent from /proc/self/cgroup, and an older image gets
+# "cgroup path is empty" and a fatal restart loop. Floating on `latest` meant a
+# cluster upgrade could change that behaviour or the /run wire format with no
+# change on our side and no way to reproduce yesterday's binary.
+#
+# Bump this tag deliberately, with a sandbox smoke test (see docs/DEPLOYMENT.md).
+FROM criyle/go-judge:v1.11.4
 RUN apt-get update && apt-get install -y --no-install-recommends \
     g++ gcc make \
     python3 pypy3 \

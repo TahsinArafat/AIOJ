@@ -98,6 +98,18 @@ func (s canonicalSubmissionStore) GetByID(context.Context, string) (*model.Submi
 	return s.sub, nil
 }
 
+// fakeRunner stands in for the go-judge-backed judge so this test can focus on
+// contest-ID canonicalisation without needing a sandbox.
+type fakeRunner struct {
+	verdict Verdict
+	err     error
+}
+
+func (fakeRunner) Enabled() bool { return true }
+func (f fakeRunner) Run(context.Context, *model.Problem, *model.Submission, string, string) (Verdict, error) {
+	return f.verdict, f.err
+}
+
 func TestSubmitHackPersistsCanonicalContestUUID(t *testing.T) {
 	contest := &model.Contest{ID: "00000000-0000-0000-0000-000000000012", HackPhaseEnabled: true}
 	hackStore := &canonicalHackStore{}
@@ -105,7 +117,7 @@ func TestSubmitHackPersistsCanonicalContestUUID(t *testing.T) {
 		hackStore,
 		canonicalHackContestStore{contest: contest},
 		canonicalSubmissionStore{sub: &model.Submission{ID: "sub-1", UserID: "defender"}},
-	)
+	).WithJudge(canonicalProblemStore{}, fakeRunner{verdict: Verdict{Failed: true, Status: "re"}})
 
 	result, err := svc.SubmitHack(context.Background(), "attacker", model.HackRequest{
 		ContestID:    "12",
@@ -124,5 +136,16 @@ func TestSubmitHackPersistsCanonicalContestUUID(t *testing.T) {
 	}
 }
 
+// canonicalProblemStore returns a minimal problem for the hack to run against.
+type canonicalProblemStore struct {
+	store.ProblemStore
+}
+
+func (canonicalProblemStore) GetByID(_ context.Context, id string) (*model.Problem, error) {
+	return &model.Problem{ID: id, TimeLimit: 2000, MemoryLimit: 262144}, nil
+}
+
 var _ store.HackStore = (*canonicalHackStore)(nil)
 var _ store.ContestStore = canonicalHackContestStore{}
+var _ Runner = fakeRunner{}
+var _ Runner = (*Judge)(nil)

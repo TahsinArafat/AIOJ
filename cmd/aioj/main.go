@@ -156,6 +156,11 @@ func main() {
 	}
 
 	wsManager := handler.NewWSManager(jwtManager)
+	// In server mode the same process also owns the judge workers, so a
+	// finished verdict can be pushed straight to the subscribed browser. In
+	// --mode=judge-worker there is no WS server here; the API process is
+	// separate and the client falls back to polling.
+	workerPool.WithNotifier(wsManager)
 	passwordResetTokenStore := postgres.NewPasswordResetTokenStore(db)
 	onsiteUserStore := postgres.NewOnsiteUserStore(db)
 	evtStore := postgres.NewEmailVerificationTokenStore(db)
@@ -258,7 +263,8 @@ func main() {
 	gymStore := postgres.NewGymStore(db)
 	gymH := handler.NewGymHandler(gymStore)
 	hackStore := postgres.NewHackStore(db)
-	hackService := hack.NewService(hackStore, contestStore, submissionStore)
+	hackService := hack.NewService(hackStore, contestStore, submissionStore).
+		WithJudge(problemStore, hack.NewJudge(execClient, cfg.LangDir))
 	hackH := handler.NewHackHandler(hackService, hackStore, contestStore)
 	statsH := handler.NewStatsHandler(submissionStore)
 	notifStore := postgres.NewNotificationStore(db)
@@ -353,11 +359,42 @@ func main() {
 			go aiWorker.Run(ctx)
 		}
 	}
+	// Retention: AI_RETENTION_DAYS was loaded and defaulted but never read, so
+	// every generation job (prompt, proposal, validation transcript) was kept
+	// forever. Purge terminal jobs older than the configured window. Runs in
+	// every mode that touches the table; the first sweep is immediate so a
+	// restart also cleans up.
+	startAIRetention := func() {
+		go func() {
+			purge := func() {
+				cutoff := time.Now().AddDate(0, 0, -cfg.AI.RetentionDays)
+				if n, err := aiGenerationStore.PurgeCompletedBefore(ctx, cutoff); err != nil {
+					if ctx.Err() == nil {
+						slog.Error("ai retention purge failed", "error", err)
+					}
+				} else if n > 0 {
+					slog.Info("ai retention purge", "deleted", n, "older_than_days", cfg.AI.RetentionDays)
+				}
+			}
+			purge()
+			ticker := time.NewTicker(6 * time.Hour)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					purge()
+				}
+			}
+		}()
+	}
 	if *mode == "ai-worker" {
 		if !cfg.AI.Enabled {
 			log.Fatal("ai-worker mode requires AI_ENABLED=true")
 		}
 		startAIWorkers()
+		startAIRetention()
 		slog.Info("running in ai-worker mode, waiting for generation jobs")
 		quit := make(chan os.Signal, 1)
 		signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
@@ -420,6 +457,9 @@ func main() {
 	if cfg.AI.Enabled {
 		startAIWorkers()
 	}
+	// Retention runs regardless of AI_ENABLED: old jobs left from a period when
+	// generation was on must still be purged after it is switched off.
+	startAIRetention()
 	genSvc := generate.NewService(aiModelStore, problemStore, editorialStore)
 	generateH := handler.NewGenerateHandler(genSvc)
 

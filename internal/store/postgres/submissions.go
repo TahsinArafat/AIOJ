@@ -497,7 +497,8 @@ func (s *SubmissionStore) ListPendingWithContext(ctx context.Context, limit int)
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT s.id,
 		       c.start_time,
-		       c.end_time
+		       c.end_time,
+		       COALESCE(s.is_upsolving, false)
 		  FROM submissions s
 		  JOIN problems p ON p.id = s.problem_id
 		  LEFT JOIN contests c ON c.id = s.contest_id
@@ -513,7 +514,7 @@ func (s *SubmissionStore) ListPendingWithContext(ctx context.Context, limit int)
 	var out []store.PendingSubmissionInfo
 	for rows.Next() {
 		var info store.PendingSubmissionInfo
-		if err := rows.Scan(&info.ID, &info.ContestStart, &info.ContestEnd); err != nil {
+		if err := rows.Scan(&info.ID, &info.ContestStart, &info.ContestEnd, &info.IsUpsolving); err != nil {
 			return nil, err
 		}
 		out = append(out, info)
@@ -641,4 +642,3 @@ func (s *SubmissionStore) ResetForRejudge(ctx context.Context, ids []string) err
 		 WHERE id IN (`+strings.Join(placeholders, ",")+`)`, args...)
 	return err
 }
-

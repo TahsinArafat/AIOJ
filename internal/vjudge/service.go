@@ -17,6 +17,19 @@ import (
 	"github.com/tahsinarafat/aioj/internal/store"
 )
 
+// remoteHTTPTimeout bounds every outbound call this package makes to a remote
+// judge. The package previously used http.Get, whose default client has no
+// timeout at all: a remote site that accepted the connection and then stalled
+// pinned the poll goroutine indefinitely.
+const remoteHTTPTimeout = 20 * time.Second
+
+// submitAttemptTimeout bounds one whole submit attempt (all bot accounts in
+// turn) so a single unhealthy submission cannot hold a goroutine forever.
+const submitAttemptTimeout = 3 * time.Minute
+
+// remoteHTTPClient is the shared client for remote-judge HTTP calls.
+var remoteHTTPClient = &http.Client{Timeout: remoteHTTPTimeout}
+
 type SubmitRequest struct {
 	ID              string `json:"id"`
 	ProblemRemoteID string `json:"problem_remote_id"`
@@ -113,7 +126,9 @@ func (s *Service) Submit(ctx context.Context, req SubmitRequest) error {
 
 	sourceCode := req.SourceCode + "\n// AIOJ:" + req.ID + "\n"
 	if s.remoteLangStore != nil {
-		langs, err := s.remoteLangStore.ListByPlatform(context.Background(), req.RemoteOJ)
+		// Use the caller's context, not Background: a cancelled submit must not
+		// leave a query running against the database with no deadline.
+		langs, err := s.remoteLangStore.ListByPlatform(ctx, req.RemoteOJ)
 		if err == nil {
 			for _, l := range langs {
 				if l.LocalID == req.Language && l.InlineCommentPrefix != "" {
@@ -156,7 +171,10 @@ func (s *Service) Submit(ctx context.Context, req SubmitRequest) error {
 
 		bot.Configure(cfg)
 
-		remoteID, err := bot.Submit(context.Background(), req.ProblemRemoteID, sourceCode, req.Language)
+		// Same reason: the caller's deadline bounds the whole retry loop across
+		// bot accounts. Background here meant a stuck bot held the goroutine
+		// forever, long after the triggering request had gone.
+		remoteID, err := bot.Submit(ctx, req.ProblemRemoteID, sourceCode, req.Language)
 		if err != nil {
 			slog.Error("bot submit failed, trying next", "bot", acc.PlatformUser, "err", err)
 			s.botAccStore.IncrementFailures(ctx, acc.ID)
@@ -284,7 +302,13 @@ func (s *Service) processUnsubmitted(ctx context.Context) bool {
 		go func(sub model.Submission) {
 			defer s.activeSubmits.Delete(sub.ID)
 
-			prob, err := s.probStore.GetByID(ctx, sub.ProblemID)
+			// One submission's submit attempt gets its own deadline. Without it
+			// a single stalled remote site kept a goroutine (and its activeSubmits
+			// entry) alive for the life of the process.
+			subCtx, cancel := context.WithTimeout(ctx, submitAttemptTimeout)
+			defer cancel()
+
+			prob, err := s.probStore.GetByID(subCtx, sub.ProblemID)
 			if err != nil || prob == nil {
 				slog.Error("async submit: problem not found", "sub", sub.ID, "prob", sub.ProblemID)
 				s.subStore.UpdateStatus(ctx, sub.ID, model.StatusSE)
@@ -300,10 +324,13 @@ func (s *Service) processUnsubmitted(ctx context.Context) bool {
 			}
 
 			slog.Info("async submit: submitting to remote OJ", "sub", sub.ID, "platform", prob.Source, "remote_id", prob.RemoteID)
-			err = s.Submit(ctx, vjReq)
+			err = s.Submit(subCtx, vjReq)
 			if err != nil {
 				slog.Error("async submit: remote submission failed", "sub", sub.ID, "err", err)
-				s.subStore.UpdateStatus(ctx, sub.ID, model.StatusSE)
+				// Record the failure with a background context: subCtx is very
+				// likely the thing that just timed out, so reusing it here would
+				// drop the status update and leave the row pending forever.
+				s.subStore.UpdateStatus(context.WithoutCancel(ctx), sub.ID, model.StatusSE)
 			}
 		}(sub)
 	}
@@ -326,7 +353,7 @@ func (s *Service) ForcePoll(ctx context.Context, platform, remoteID, submissionI
 				continue
 			}
 			u := fmt.Sprintf("https://codeforces.com/api/user.status?handle=%s&count=20", acc.PlatformUser)
-			resp, err := http.Get(u)
+			resp, err := remoteHTTPClient.Get(u)
 			if err != nil {
 				continue
 			}
@@ -460,7 +487,7 @@ func (s *Service) pollCF(ctx context.Context, subs []model.PendingRemoteSubmissi
 			continue
 		}
 		u := fmt.Sprintf("https://codeforces.com/api/user.status?handle=%s&count=20", acc.PlatformUser)
-		resp, err := http.Get(u)
+		resp, err := remoteHTTPClient.Get(u)
 		if err != nil {
 			continue
 		}

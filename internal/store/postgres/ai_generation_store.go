@@ -170,3 +170,20 @@ func (s *AIGenerationStore) RequeueStale(ctx context.Context, older time.Duratio
 	}
 	return ids, rows.Err()
 }
+
+// PurgeCompletedBefore deletes terminal jobs older than cutoff.
+//
+// Only terminal states are eligible: 'queued' and 'running' rows are skipped
+// regardless of age, so retention can never delete a job out from under the
+// worker that holds its claim. Returns the number of rows removed.
+func (s *AIGenerationStore) PurgeCompletedBefore(ctx context.Context, cutoff time.Time) (int, error) {
+	res, err := s.db.ExecContext(ctx, `
+		DELETE FROM ai_generation_jobs
+		 WHERE created_at < $1
+		   AND status NOT IN ('queued', 'running')`, cutoff)
+	if err != nil {
+		return 0, err
+	}
+	n, _ := res.RowsAffected()
+	return int(n), nil
+}

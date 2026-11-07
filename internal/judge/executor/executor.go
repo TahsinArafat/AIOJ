@@ -78,9 +78,12 @@ func (c *Client) Run(req *ExecRequest) ([]CmdResult, error) {
 	if err != nil {
 		return nil, fmt.Errorf("marshal: %w", err)
 	}
-	slog.Info("executor request", "body_len", len(body), "cmds", len(req.Cmd))
+	// Debug, not Info: a single judgment runs one command per test case, so
+	// Info-level logging here emitted hundreds of lines per second during a
+	// contest and drowned the lines that matter.
+	slog.Debug("executor request", "body_len", len(body), "cmds", len(req.Cmd))
 	if len(req.Cmd) > 0 {
-		slog.Info("executor cmd", "args", req.Cmd[0].Args, "copyIn_keys", len(req.Cmd[0].CopyIn), "files_len", len(req.Cmd[0].Files))
+		slog.Debug("executor cmd", "args", req.Cmd[0].Args, "copyIn_keys", len(req.Cmd[0].CopyIn), "files_len", len(req.Cmd[0].Files))
 	}
 	resp, err := c.http.Post(c.endpoint+"/run", "application/json", bytes.NewReader(body))
 	if err != nil {
@@ -91,7 +94,7 @@ func (c *Client) Run(req *ExecRequest) ([]CmdResult, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read body: %w", err)
 	}
-	slog.Info("executor response", "status", resp.StatusCode, "body_len", len(respBody))
+	slog.Debug("executor response", "status", resp.StatusCode, "body_len", len(respBody))
 	if resp.StatusCode != 200 {
 		slog.Error("executor error response", "status", resp.StatusCode, "body", string(respBody[:min(len(respBody), 500)]))
 	}

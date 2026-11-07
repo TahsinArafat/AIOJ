@@ -98,9 +98,13 @@ func (r *Reclaimer) Sweep(ctx context.Context) int {
 	now := time.Now()
 	queued := 0
 	for _, info := range infos {
-		// Assign priority based on whether the contest is currently live.
-		priority := 2 // PriorityNormal — matches handler constant
-		if info.ContestStart != nil && info.ContestEnd != nil &&
+		// Assign priority from the submission's own record, not just the
+		// contest clock. An upsolve submitted after the window must not be
+		// promoted to contest priority even if the contest is somehow still
+		// marked live (a stretched window, a clock skew) — that would let
+		// practice traffic overtake real contestants.
+		priority := 2 // PriorityNormal — matches the handler constants
+		if !info.IsUpsolving && info.ContestStart != nil && info.ContestEnd != nil &&
 			now.After(*info.ContestStart) && now.Before(*info.ContestEnd) {
 			priority = 1 // PriorityContest
 		}

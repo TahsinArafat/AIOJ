@@ -14,6 +14,10 @@ type PendingSubmissionInfo struct {
 	ID           string
 	ContestStart *time.Time
 	ContestEnd   *time.Time
+	// IsUpsolving distinguishes a post-contest upsolve from an in-window
+	// contest submission. It is persisted on the row (migration 75) so the
+	// distinction survives even when the contest window has since closed.
+	IsUpsolving bool
 }
 
 type UserStore interface {
@@ -475,4 +479,9 @@ type AIGenerationStore interface {
 	MarkDiscarded(ctx context.Context, id, actorID string) (bool, error)
 	MarkApplied(ctx context.Context, id string) error
 	RequeueStale(ctx context.Context, olderThan time.Duration) ([]string, error)
+	// PurgeCompletedBefore deletes terminal (complete/failed/cancelled/
+	// discarded/applied) jobs older than the cutoff and returns how many rows
+	// were removed. Active jobs are never deleted, however old, so a long run
+	// cannot be purged out from under the worker holding its claim.
+	PurgeCompletedBefore(ctx context.Context, cutoff time.Time) (int, error)
 }
