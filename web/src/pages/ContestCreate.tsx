@@ -290,7 +290,7 @@ export default function ContestCreate() {
                             <label className={labelCls}>
                                 Title <span className="text-bad">*</span>
                             </label>
-                            <input
+                            <input aria-label="Title"
                                 required
                                 value={title}
                                 onChange={e => setTitle(e.target.value)}
@@ -315,7 +315,7 @@ export default function ContestCreate() {
                         </div>
                         <div>
                             <label className={labelCls}>Description</label>
-                            <textarea
+                            <textarea aria-label="Description"
                                 rows={3}
                                 value={description}
                                 onChange={e => setDescription(e.target.value)}
@@ -334,7 +334,7 @@ export default function ContestCreate() {
                             <label className={labelCls}>
                                 Start Time <span className="text-bad">*</span>
                             </label>
-                            <input
+                            <input aria-label="Start Time"
                                 type="datetime-local"
                                 required
                                 value={startTime}
@@ -346,7 +346,7 @@ export default function ContestCreate() {
                             <label className={labelCls}>
                                 End Time <span className="text-bad">*</span>
                             </label>
-                            <input
+                            <input aria-label="End Time"
                                 type="datetime-local"
                                 required
                                 value={endTime}
@@ -356,7 +356,7 @@ export default function ContestCreate() {
                         </div>
                         <div>
                             <label className={labelCls}>Freeze Time</label>
-                            <input
+                            <input aria-label="Freeze Time"
                                 type="datetime-local"
                                 value={freezeTime}
                                 onChange={e => setFreezeTime(e.target.value)}
@@ -377,7 +377,7 @@ export default function ContestCreate() {
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div>
                             <label className={labelCls}>Scoring Format</label>
-                            <select value={format} onChange={e => setFormat(e.target.value)} className={inputCls}>
+                            <select aria-label="Scoring Format" value={format} onChange={e => setFormat(e.target.value)} className={inputCls}>
                                 {FORMAT_OPTIONS.map(o => (
                                     <option key={o.value} value={o.value}>{o.label}</option>
                                 ))}
@@ -388,7 +388,7 @@ export default function ContestCreate() {
                         </div>
                         <div>
                             <label className={labelCls}>Division</label>
-                            <select value={division} onChange={e => setDivision(e.target.value)} className={inputCls}>
+                            <select aria-label="Division" value={division} onChange={e => setDivision(e.target.value)} className={inputCls}>
                                 {(Object.entries(DIVISIONS) as [string, { name: string }][]).map(([k, v]) => (
                                     <option key={k} value={k}>{v.name}</option>
                                 ))}
@@ -396,7 +396,7 @@ export default function ContestCreate() {
                         </div>
                         <div>
                             <label className={labelCls}>Contest Type</label>
-                            <select value={type} onChange={e => setType(e.target.value)} className={inputCls}>
+                            <select aria-label="Contest Type" value={type} onChange={e => setType(e.target.value)} className={inputCls}>
                                 {TYPE_OPTIONS.map(o => (
                                     <option key={o.value} value={o.value}>{o.label}</option>
                                 ))}
@@ -408,7 +408,7 @@ export default function ContestCreate() {
                     {format === 'acm' && (
                         <div className="mt-4 max-w-xs">
                             <label className={labelCls}>Penalty Per Wrong Answer (minutes)</label>
-                            <input
+                            <input aria-label="Penalty Per Wrong Answer (minutes)"
                                 type="number"
                                 min="0"
                                 value={penaltyPerWrong}
@@ -421,7 +421,7 @@ export default function ContestCreate() {
                     {format === 'oi' && (
                         <div className="mt-4 max-w-xs">
                             <label className={labelCls}>Max Score Per Problem</label>
-                            <input
+                            <input aria-label="Max Score Per Problem"
                                 type="number"
                                 min="1"
                                 value={maxScorePerProblem}
@@ -436,7 +436,7 @@ export default function ContestCreate() {
                             <div className="grid grid-cols-3 gap-3 max-w-lg">
                                 <div>
                                     <label className={labelCls}>Decay Factor</label>
-                                    <input
+                                    <input aria-label="Decay Factor"
                                         type="number"
                                         min="1"
                                         value={decayFactor}
@@ -446,7 +446,7 @@ export default function ContestCreate() {
                                 </div>
                                 <div>
                                     <label className={labelCls}>Min Score Ratio</label>
-                                    <input
+                                    <input aria-label="Min Score Ratio"
                                         type="number"
                                         min="0"
                                         max="1"
@@ -458,7 +458,7 @@ export default function ContestCreate() {
                                 </div>
                                 <div>
                                     <label className={labelCls}>Wrong Sub. Penalty</label>
-                                    <input
+                                    <input aria-label="Wrong Sub. Penalty"
                                         type="number"
                                         min="0"
                                         value={cfPenalty}
@@ -629,7 +629,7 @@ export default function ContestCreate() {
                         </div>
                         <div className="max-w-sm">
                             <label className={labelCls}>Password</label>
-                            <input
+                            <input aria-label="Password"
                                 type="text"
                                 value={password}
                                 onChange={e => setPassword(e.target.value)}

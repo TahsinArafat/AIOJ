@@ -84,7 +84,7 @@ int main(int argc, char* argv[]) {
 
       <div>
         <label className="block text-xs font-semibold text-muted uppercase mb-1">Checker Method</label>
-        <select
+        <select aria-label="Checker Method"
           value={formState.checkerType}
           onChange={e => onUpdate('checkerType', e.target.value)}
           className="border border-hairline-strong rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)] bg-surface text-ink"
@@ -101,7 +101,7 @@ int main(int argc, char* argv[]) {
       {(formState.checkerType === 'float' || formState.checkerType === 'float_absolute' || formState.checkerType === 'float_relative') && (
         <div>
           <label className="block text-xs font-semibold text-muted uppercase mb-1">Float Epsilon (Precision Tolerance)</label>
-          <input
+          <input aria-label="Float Epsilon (Precision Tolerance)"
             type="number"
             step="any"
             value={formState.floatEpsilon}
@@ -168,7 +168,7 @@ int main(int argc, char* argv[]) {
 
             <div>
               <label className="block text-[10px] font-bold text-muted-soft uppercase tracking-wider mb-1">SPJ Sandbox Language</label>
-              <select
+              <select aria-label="SPJ Sandbox Language"
                 value={formState.spjLanguage}
                 onChange={e => onUpdate('spjLanguage', e.target.value)}
                 className="border border-hairline-strong rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)] bg-surface text-ink"
@@ -213,7 +213,7 @@ int main(int argc, char* argv[]) {
           <div className="space-y-3 pl-6 border-l-2 border-brand/30">
             <div>
               <label className="block text-xs font-medium text-muted mb-1">Interactor Language</label>
-              <select
+              <select aria-label="Interactor Language"
                 value={formState.interactorLanguage}
                 onChange={e => onUpdate('interactorLanguage', e.target.value)}
                 className="border border-hairline-strong rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)] bg-surface text-ink"

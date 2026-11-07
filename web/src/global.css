@@ -31,7 +31,10 @@
     --ink: #0b1220;
     --ink-soft: #38414f;
     --muted: #5b6675;
-    --muted-soft: #7c8797;
+    /* Kept dark enough to clear 4.5:1 on every light surface (canvas, surface,
+       surface-2). The previous #7c8797 landed at 3.6:1, which failed AA for the
+       hint text and small metadata it is used for. */
+    --muted-soft: #667081;
     --border: #e3e7ec;
     --border-strong: #cdd4dd;
     --primary: #2563eb;
@@ -63,6 +66,9 @@
     --code-bg: #0d1117;
     --code-ink: #c9d1d9;
     --code-border: #1f2937;
+    /* `--danger` is a text tone tuned for light surfaces and only reaches
+       2.9:1 on the dark code block. Error output inside code needs its own. */
+    --danger-on-code: #f87171;
 
     /* Back-compat aliases: a few inline styles still read these. */
     --background: var(--canvas);
@@ -79,7 +85,8 @@
     --ink: #e8ecf2;
     --ink-soft: #cbd3de;
     --muted: #97a1b0;
-    --muted-soft: #7b8697;
+    /* Same reason as the light palette: #7b8697 fell to 3.9:1 on surface-3. */
+    --muted-soft: #8b96a6;
     --border: #232b37;
     --border-strong: #33404f;
     --primary: #60a5fa;
@@ -102,6 +109,7 @@
     --code-bg: #0d1117;
     --code-ink: #c9d1d9;
     --code-border: #232b37;
+    --danger-on-code: #f87171;
 
     --background: var(--canvas);
     --foreground: var(--ink);
@@ -136,6 +144,7 @@
     --color-code: var(--code-bg);
     --color-code-ink: var(--code-ink);
     --color-code-border: var(--code-border);
+    --color-bad-on-code: var(--danger-on-code);
 }
 
 @theme {

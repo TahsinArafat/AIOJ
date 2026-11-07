@@ -21,6 +21,8 @@ interface CodeEditorProps {
   onChange: (code: string) => void
   height?: string
   readOnly?: boolean
+  /** Accessible name for Monaco's textarea; without it the editor is unlabelled. */
+  ariaLabel?: string
 }
 
 // ---------------------------------------------------------------------------
@@ -234,6 +236,7 @@ export default function CodeEditor({
   onChange,
   height = '400px',
   readOnly = false,
+  ariaLabel,
 }: CodeEditorProps) {
   const { theme: appTheme } = useTheme()
   const [settings, setSettings] = useState<EditorSettings>(loadSettings)
@@ -262,9 +265,13 @@ export default function CodeEditor({
         minimap: { enabled: settings.minimap },
         readOnly,
       })
+      // Monaco renders a bare <textarea>; without this it has no accessible name.
+      if (ariaLabel) {
+        editor.getDomNode()?.querySelector('textarea')?.setAttribute('aria-label', ariaLabel)
+      }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [readOnly],
+    [readOnly, ariaLabel],
   )
 
   const handleChange = useCallback(

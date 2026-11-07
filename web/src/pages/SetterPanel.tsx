@@ -319,12 +319,12 @@ export default function SetterPanel() {
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-xs font-medium text-muted mb-1">Contest ID</label>
-                                        <input type="text" value={contestId} onChange={e => setContestId(e.target.value)}
+                                        <input aria-label="Contest ID" type="text" value={contestId} onChange={e => setContestId(e.target.value)}
                                             placeholder="e.g. 1800" className="w-full border rounded px-3 py-2 text-sm border-hairline-strong bg-transparent text-ink" />
                                     </div>
                                     <div>
                                         <label className="block text-xs font-medium text-muted mb-1">Problem Indices (space/comma separated for bulk)</label>
-                                        <input type="text" value={problemIndex} onChange={e => setProblemIndex(e.target.value)}
+                                        <input aria-label="Problem Indices (space/comma separated for bulk)" type="text" value={problemIndex} onChange={e => setProblemIndex(e.target.value)}
                                             placeholder="e.g. A, B, C" className="w-full border rounded px-3 py-2 text-sm border-hairline-strong bg-transparent text-ink" />
                                     </div>
                                 </div>
@@ -341,7 +341,7 @@ export default function SetterPanel() {
                             <div className="space-y-4">
                                 <div>
                                     <label className="block text-xs font-medium text-muted mb-1">Problem ID(s) (space/comma separated for bulk)</label>
-                                    <input type="text" value={csesProblemId} onChange={e => setCSESProblemId(e.target.value)}
+                                    <input aria-label="Problem ID(s) (space/comma separated for bulk)" type="text" value={csesProblemId} onChange={e => setCSESProblemId(e.target.value)}
                                         placeholder="e.g. 1068, 1069" className="w-full border rounded px-3 py-2 text-sm border-hairline-strong bg-transparent text-ink" />
                                 </div>
                                 <button onClick={handleCSESImport} disabled={importing}
@@ -358,12 +358,12 @@ export default function SetterPanel() {
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-xs font-medium text-muted mb-1">Contest ID</label>
-                                        <input type="text" value={atcoderContestId} onChange={e => setAtcoderContestId(e.target.value)}
+                                        <input aria-label="Contest ID" type="text" value={atcoderContestId} onChange={e => setAtcoderContestId(e.target.value)}
                                             placeholder="e.g. abc300" className="w-full border rounded px-3 py-2 text-sm border-hairline-strong bg-transparent text-ink" />
                                     </div>
                                     <div>
                                         <label className="block text-xs font-medium text-muted mb-1">Problem ID(s) (space/comma separated for bulk)</label>
-                                        <input type="text" value={atcoderProblemId} onChange={e => setAtcoderProblemId(e.target.value)}
+                                        <input aria-label="Problem ID(s) (space/comma separated for bulk)" type="text" value={atcoderProblemId} onChange={e => setAtcoderProblemId(e.target.value)}
                                             placeholder="e.g. abc300_a, abc300_b" className="w-full border rounded px-3 py-2 text-sm border-hairline-strong bg-transparent text-ink" />
                                     </div>
                                 </div>
@@ -380,7 +380,7 @@ export default function SetterPanel() {
                             <div className="space-y-4">
                                 <div>
                                     <label className="block text-xs font-medium text-muted mb-1">Problem ID(s) (space/comma separated for bulk)</label>
-                                    <input type="text" value={tophProblemId} onChange={e => setTophProblemId(e.target.value)}
+                                    <input aria-label="Problem ID(s) (space/comma separated for bulk)" type="text" value={tophProblemId} onChange={e => setTophProblemId(e.target.value)}
                                         placeholder="e.g. copycat, formatted-numbers" className="w-full border rounded px-3 py-2 text-sm border-hairline-strong bg-transparent text-ink" />
                                 </div>
                                 <button onClick={handleTophImport} disabled={importing}
@@ -396,7 +396,7 @@ export default function SetterPanel() {
                             <div className="space-y-4">
                                 <div>
                                     <label className="block text-xs font-medium text-muted mb-1">Problem ID(s) (space/comma separated for bulk)</label>
-                                    <input type="text" value={qojProblemId} onChange={e => setQojProblemId(e.target.value)}
+                                    <input aria-label="Problem ID(s) (space/comma separated for bulk)" type="text" value={qojProblemId} onChange={e => setQojProblemId(e.target.value)}
                                         placeholder="e.g. 1000, 1001" className="w-full border rounded px-3 py-2 text-sm border-hairline-strong bg-transparent text-ink" />
                                 </div>
                                 <button onClick={handleQOJImport} disabled={importing}

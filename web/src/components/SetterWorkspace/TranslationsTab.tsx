@@ -155,7 +155,7 @@ export default function TranslationsTab({ problemId, defaultTitle, defaultDescri
         <div className="space-y-4 max-w-2xl">
           <div>
             <label className="block text-sm font-medium mb-1">Title</label>
-            <input
+            <input aria-label="Title"
               type="text"
               value={title}
               onChange={(e) => { setTitle(e.target.value); setSaved(false) }}
@@ -166,7 +166,7 @@ export default function TranslationsTab({ problemId, defaultTitle, defaultDescri
 
           <div>
             <label className="block text-sm font-medium mb-1">Statement</label>
-            <textarea
+            <textarea aria-label="Statement"
               value={description}
               onChange={(e) => { setDescription(e.target.value); setSaved(false) }}
               placeholder={defaultDescription || 'Translated statement (Markdown supported)'}

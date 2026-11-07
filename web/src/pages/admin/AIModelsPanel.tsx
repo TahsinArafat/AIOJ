@@ -267,7 +267,7 @@ export default function AIModelsPanel() {
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-muted mb-1">Description</label>
-                                    <textarea
+                                    <textarea aria-label="Description"
                                         value={form.description}
                                         onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
                                         placeholder="Optional notes about this model's strengths, training data, etc."

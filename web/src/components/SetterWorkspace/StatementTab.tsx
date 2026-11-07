@@ -59,7 +59,7 @@ export default function StatementTab({
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-xs font-semibold text-muted uppercase mb-1">Title</label>
-          <input
+          <input aria-label="Title"
             type="text"
             value={formState.title}
             onChange={e => onUpdate('title', e.target.value)}
@@ -69,7 +69,7 @@ export default function StatementTab({
         </div>
         <div>
           <label className="block text-xs font-semibold text-muted uppercase mb-1">Tags (comma-separated)</label>
-          <input
+          <input aria-label="Tags (comma-separated)"
             type="text"
             value={formState.tags}
             onChange={e => onUpdate('tags', e.target.value)}
@@ -81,7 +81,7 @@ export default function StatementTab({
       <div className="grid grid-cols-3 gap-4">
         <div>
           <label className="block text-xs font-semibold text-muted uppercase mb-1">Difficulty</label>
-          <select
+          <select aria-label="Difficulty"
             value={formState.difficulty}
             onChange={e => onUpdate('difficulty', e.target.value)}
             className="w-full border border-hairline-strong rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)] bg-surface text-ink"
@@ -93,7 +93,7 @@ export default function StatementTab({
         </div>
         <div>
           <label className="block text-xs font-semibold text-muted uppercase mb-1">Time Limit (ms)</label>
-          <input
+          <input aria-label="Time Limit (ms)"
             type="number"
             value={formState.timeLimit}
             onChange={e => onUpdate('timeLimit', Number(e.target.value))}
@@ -102,7 +102,7 @@ export default function StatementTab({
         </div>
         <div>
           <label className="block text-xs font-semibold text-muted uppercase mb-1">Memory Limit (KB)</label>
-          <input
+          <input aria-label="Memory Limit (KB)"
             type="number"
             value={formState.memoryLimit}
             onChange={e => onUpdate('memoryLimit', Number(e.target.value))}
@@ -116,7 +116,7 @@ export default function StatementTab({
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="block text-xs font-semibold text-muted uppercase">Description (Markdown + LaTeX)</label>
-              <input
+              <input aria-label="Description (Markdown + LaTeX)"
                 type="file"
                 ref={imageInputRef}
                 onChange={handleImageChange}
@@ -243,7 +243,7 @@ export default function StatementTab({
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-muted mb-1">Input</label>
-                <textarea
+                <textarea aria-label="Input"
                   value={sc.input}
                   onChange={e => {
                     const updated = [...formState.sampleCases]
@@ -256,7 +256,7 @@ export default function StatementTab({
               </div>
               <div>
                 <label className="block text-xs font-medium text-muted mb-1">Expected Output</label>
-                <textarea
+                <textarea aria-label="Expected Output"
                   value={sc.output}
                   onChange={e => {
                     const updated = [...formState.sampleCases]
@@ -270,7 +270,7 @@ export default function StatementTab({
             </div>
             <div>
               <label className="block text-xs font-medium text-muted mb-1">Explanation (optional)</label>
-              <input
+              <input aria-label="Explanation (optional)"
                 type="text"
                 value={sc.explanation ?? ''}
                 onChange={e => {

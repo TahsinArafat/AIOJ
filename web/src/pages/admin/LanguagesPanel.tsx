@@ -239,19 +239,19 @@ export default function LanguagesPanel() {
                     {useRawEditor && !showCreate ? (
                         <div>
                             <label className="block text-xs font-medium text-muted uppercase mb-1">YAML Content</label>
-                            <textarea value={rawYaml} onChange={e => setRawYaml(e.target.value)} rows={16}
+                            <textarea aria-label="YAML Content" value={rawYaml} onChange={e => setRawYaml(e.target.value)} rows={16}
                                 className="w-full font-mono text-xs border border-hairline-strong rounded p-3 bg-surface focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)]" />
                         </div>
                     ) : (
                         <div className="grid grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-xs font-medium text-muted uppercase mb-1">Key *</label>
-                                <input value={form.key} onChange={e => setForm({ ...form, key: e.target.value })} disabled={!!editKey}
+                                <input aria-label="Key" value={form.key} onChange={e => setForm({ ...form, key: e.target.value })} disabled={!!editKey}
                                     placeholder="cpp-gpp-64" className="w-full border border-hairline-strong rounded px-3 py-2 text-sm disabled:bg-gray-100 focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)]" />
                             </div>
                             <div>
                                 <label className="block text-xs font-medium text-muted uppercase mb-1">Display Name *</label>
-                                <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
+                                <input aria-label="Display Name" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
                                     placeholder="C++ (G++ 64-bit)" className="w-full border border-hairline-strong rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)]" />
                             </div>
                             <div className="col-span-2">
@@ -272,21 +272,21 @@ export default function LanguagesPanel() {
                             </div>
                             <div>
                                 <label className="block text-xs font-medium text-muted uppercase mb-1">Time Limit Multiplier</label>
-                                <input type="number" step="0.1" min="0.1" value={form.time_limit_multiplier}
+                                <input aria-label="Time Limit Multiplier" type="number" step="0.1" min="0.1" value={form.time_limit_multiplier}
                                     onChange={e => setForm({ ...form, time_limit_multiplier: parseFloat(e.target.value) || 1.0 })}
                                     className="w-full border border-hairline-strong rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)]" />
                                 <p className="text-xs text-muted-soft mt-1">Python=3.0, Java=2.0, C++=1.0</p>
                             </div>
                             <div>
                                 <label className="block text-xs font-medium text-muted uppercase mb-1">Memory Limit Multiplier</label>
-                                <input type="number" step="0.1" min="0.1" value={form.memory_limit_multiplier}
+                                <input aria-label="Memory Limit Multiplier" type="number" step="0.1" min="0.1" value={form.memory_limit_multiplier}
                                     onChange={e => setForm({ ...form, memory_limit_multiplier: parseFloat(e.target.value) || 1.0 })}
                                     className="w-full border border-hairline-strong rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)]" />
                                 <p className="text-xs text-muted-soft mt-1">Python=2.0, Java=2.0, C++=1.0</p>
                             </div>
                             <div>
                                 <label className="block text-xs font-medium text-muted uppercase mb-1">Seccomp Rule</label>
-                                <select value={form.seccomp_rule} onChange={e => setForm({ ...form, seccomp_rule: e.target.value })}
+                                <select aria-label="Seccomp Rule" value={form.seccomp_rule} onChange={e => setForm({ ...form, seccomp_rule: e.target.value })}
                                     className="w-full border border-hairline-strong rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)]">
                                     {seccompOptions.map(s => <option key={s} value={s}>{s}</option>)}
                                 </select>

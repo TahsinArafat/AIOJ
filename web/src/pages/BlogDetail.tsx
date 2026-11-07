@@ -108,7 +108,7 @@ export default function BlogDetail() {
                     <h2 className="text-xl font-bold">Edit Blog Post</h2>
                     <div>
                         <label className="block text-sm font-medium mb-1">Title</label>
-                        <input
+                        <input aria-label="Title"
                             type="text"
                             value={editTitle}
                             onChange={e => setEditTitle(e.target.value)}
@@ -117,7 +117,7 @@ export default function BlogDetail() {
                     </div>
                     <div>
                         <label className="block text-sm font-medium mb-1">Tags (comma separated)</label>
-                        <input
+                        <input aria-label="Tags (comma separated)"
                             type="text"
                             value={editTags}
                             onChange={e => setEditTags(e.target.value)}
@@ -126,7 +126,7 @@ export default function BlogDetail() {
                     </div>
                     <div>
                         <label className="block text-sm font-medium mb-1">Content (Markdown supported)</label>
-                        <textarea
+                        <textarea aria-label="Content (Markdown supported)"
                             value={editContent}
                             onChange={e => setEditContent(e.target.value)}
                             rows={12}

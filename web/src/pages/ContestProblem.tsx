@@ -46,6 +46,12 @@ function isPdfUrl(url: string | undefined | null): boolean {
 }
 
 
+/** True when the split view has to collapse into a single column (matches `lg`). */
+function isNarrowViewport(): boolean {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false
+    return window.matchMedia('(max-width: 1023px)').matches
+}
+
 const TEMPLATE_CODE: Record<string, string> = {
     'cpp-gpp-64': `#include <iostream>\nusing namespace std;\n\nint main() {\n    // Your code here\n    \n    return 0;\n}`,
     'cpp-gpp-32': `#include <iostream>\nusing namespace std;\n\nint main() {\n    // Your code here\n    \n    return 0;\n}`,
@@ -355,7 +361,7 @@ function SubmissionResult({ result }: { result: SubmissionView }) {
             {result.status === 'ce' && result.compile_output && (
                 <div className="mt-2">
                     <div className="text-xs font-semibold text-muted mb-1">Compile Output:</div>
-                    <pre className="bg-code text-bad text-xs p-3 rounded-md overflow-x-auto font-mono max-h-40">
+                    <pre className="bg-code text-bad-on-code text-xs p-3 rounded-md overflow-x-auto font-mono max-h-40">
                         {result.compile_output}
                     </pre>
                 </div>
@@ -486,6 +492,18 @@ export default function ContestProblem() {
     })
     const [dragging, setDragging] = useState(false)
     const containerRef = useRef<HTMLDivElement>(null)
+
+    // The drag divider only makes sense when both panes fit side by side. Below
+    // `lg` each pane was ~170px wide at 390px, which pushed the Run/Submit
+    // buttons out of the submit pane, so stack the panes instead.
+    const [isNarrow, setIsNarrow] = useState(isNarrowViewport)
+    useEffect(() => {
+        if (typeof window.matchMedia !== 'function') return
+        const mq = window.matchMedia('(max-width: 1023px)')
+        const onChange = () => setIsNarrow(mq.matches)
+        mq.addEventListener('change', onChange)
+        return () => mq.removeEventListener('change', onChange)
+    }, [])
 
     const handleMouseDown = (e: React.MouseEvent) => {
         e.preventDefault()
@@ -786,10 +804,17 @@ export default function ContestProblem() {
                 </div>
             )}
 
-            {/* Main split-pane layout */}
-            <div ref={containerRef} className="flex h-full select-none" style={{ cursor: dragging ? 'col-resize' : undefined }}>
+            {/* Main split-pane layout (stacks into one column below `lg`) */}
+            <div
+                ref={containerRef}
+                className={`flex h-full select-none ${isNarrow ? 'flex-col gap-6' : ''}`}
+                style={{ cursor: dragging ? 'col-resize' : undefined }}
+            >
                 {/* LEFT: Problem content (splitPos% width) */}
-                <div className="space-y-4 overflow-y-auto pr-1" style={{ width: `${splitPos}%`, minWidth: '20%' }}>
+                <div
+                    className="space-y-4 overflow-y-auto pr-1"
+                    style={isNarrow ? { width: '100%' } : { width: `${splitPos}%`, minWidth: '20%' }}
+                >
                     {/* Back link */}
                     <Link
                         to={`/contests/${contestId}`}
@@ -940,27 +965,33 @@ export default function ContestProblem() {
                     )}
                 </div>
 
-                {/* DIVIDER */}
-                <div
-                    onMouseDown={handleMouseDown}
-                    className={`w-3 flex-shrink-0 cursor-col-resize group transition-colors relative ${dragging ? 'bg-brand' : 'bg-surface-3 hover:bg-brand'}`}
-                >
-                    {/* Grip dots indicator */}
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
-                        <span className="w-1 h-1 rounded-full bg-muted-soft group-hover:bg-white/70 transition-colors" />
-                        <span className="w-1 h-1 rounded-full bg-muted-soft group-hover:bg-white/70 transition-colors" />
-                        <span className="w-1 h-1 rounded-full bg-muted-soft group-hover:bg-white/70 transition-colors" />
+                {/* DIVIDER (only meaningful when the panes sit side by side) */}
+                {!isNarrow && (
+                    <div
+                        onMouseDown={handleMouseDown}
+                        className={`w-3 flex-shrink-0 cursor-col-resize group transition-colors relative ${dragging ? 'bg-brand' : 'bg-surface-3 hover:bg-brand'}`}
+                    >
+                        {/* Grip dots indicator */}
+                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
+                            <span className="w-1 h-1 rounded-full bg-muted-soft group-hover:bg-white/70 transition-colors" />
+                            <span className="w-1 h-1 rounded-full bg-muted-soft group-hover:bg-white/70 transition-colors" />
+                            <span className="w-1 h-1 rounded-full bg-muted-soft group-hover:bg-white/70 transition-colors" />
+                        </div>
                     </div>
-                </div>
+                )}
 
                 {/* RIGHT: Submit panel (100-splitPos% width) */}
-                <div className="flex flex-col gap-3 overflow-y-auto pl-1" style={{ width: `${100 - splitPos}%`, minWidth: '20%' }}>
+                <div
+                    className="flex flex-col gap-3 overflow-y-auto pl-1"
+                    style={isNarrow ? { width: '100%' } : { width: `${100 - splitPos}%`, minWidth: '20%' }}
+                >
                     {showSubmit ? (
                         <>
-                            <div className="flex items-center justify-between">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
                                 <select
                                     value={language}
                                     onChange={e => setLanguage(e.target.value)}
+                                    aria-label="Solution language"
                                     className="border border-hairline-strong rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)]"
                                 >
                                     {LANGUAGE_OPTIONS.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
@@ -988,6 +1019,7 @@ export default function ContestProblem() {
                                 value={code}
                                 onChange={handleCodeChange}
                                 height="400px"
+                                ariaLabel="Solution source code"
                             />
 
                             {result && <SubmissionResult result={result} />}
@@ -1060,7 +1092,7 @@ export default function ContestProblem() {
                                 <div className="p-4 space-y-4">
                                     <div>
                                         <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">Custom Input (Stdin)</label>
-                                        <textarea
+                                        <textarea aria-label="Custom Input (Stdin)"
                                             value={customInput}
                                             onChange={(e) => setCustomInput(e.target.value)}
                                             rows={4}
@@ -1102,11 +1134,11 @@ export default function ContestProblem() {
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                                     <div>
                                                         <span className="block text-xs font-semibold text-muted mb-1">Standard Output (Stdout)</span>
-                                                        <pre className="bg-code text-code-ink font-mono text-xs p-3 rounded overflow-x-auto max-h-40">{customOutput.stdout || <span className="text-muted italic">No output</span>}</pre>
+                                                        <pre className="bg-code text-code-ink font-mono text-xs p-3 rounded overflow-x-auto max-h-40">{customOutput.stdout || <span className="text-code-ink/60 italic">No output</span>}</pre>
                                                     </div>
                                                     <div>
                                                         <span className="block text-xs font-semibold text-muted mb-1">Standard Error (Stderr)</span>
-                                                        <pre className="bg-code text-bad font-mono text-xs p-3 rounded overflow-x-auto max-h-40">{customOutput.stderr || <span className="text-muted italic">No stderr</span>}</pre>
+                                                        <pre className="bg-code text-bad-on-code font-mono text-xs p-3 rounded overflow-x-auto max-h-40">{customOutput.stderr || <span className="text-code-ink/60 italic">No stderr</span>}</pre>
                                                     </div>
                                                 </div>
                                             )}

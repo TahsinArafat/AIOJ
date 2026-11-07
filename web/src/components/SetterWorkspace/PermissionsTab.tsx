@@ -75,7 +75,7 @@ export default function PermissionsTab({
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-medium text-muted mb-1">Username</label>
-            <input
+            <input aria-label="Username"
               type="text"
               placeholder="Enter username"
               value={newUsername}
@@ -85,7 +85,7 @@ export default function PermissionsTab({
           </div>
           <div>
             <label className="block text-xs font-medium text-muted mb-1">Access Level</label>
-            <select
+            <select aria-label="Access Level"
               value={newAccessLevel}
               onChange={e => onNewAccessLevelChange(e.target.value)}
               className="w-full border border-hairline-strong rounded px-3 py-1.5 text-xs bg-surface text-ink focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)]"

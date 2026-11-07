@@ -375,7 +375,7 @@ export default function BackupsPanel() {
                                 <label className="block text-xs font-medium text-muted mb-1">
                                     Admin Password
                                 </label>
-                                <input
+                                <input aria-label="Admin Password"
                                     type="password"
                                     value={password}
                                     onChange={e => setPassword(e.target.value)}

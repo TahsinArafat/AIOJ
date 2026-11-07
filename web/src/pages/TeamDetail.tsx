@@ -185,12 +185,12 @@ const [team, setTeam] = useState<TeamInfo | null>(null)
                     <h2 className="text-xl font-bold">Edit Team</h2>
                     <div>
                         <label className="block text-sm font-medium mb-1">Team Name</label>
-                        <input type="text" value={editName} onChange={e => setEditName(e.target.value)}
+                        <input aria-label="Team Name" type="text" value={editName} onChange={e => setEditName(e.target.value)}
                             className="w-full border border-hairline-strong bg-transparent rounded p-2 text-sm text-ink" />
                     </div>
                     <div>
                         <label className="block text-sm font-medium mb-1">Description</label>
-                        <textarea value={editDescription} onChange={e => setEditDescription(e.target.value)} rows={3}
+                        <textarea aria-label="Description" value={editDescription} onChange={e => setEditDescription(e.target.value)} rows={3}
                             className="w-full border border-hairline-strong bg-transparent rounded p-2 text-sm text-ink" />
                     </div>
                     <div className="flex items-center gap-2">

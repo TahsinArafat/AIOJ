@@ -55,7 +55,7 @@ export default function HackPanel() {
             <div className="border border-hairline rounded-lg p-6 bg-surface space-y-4">
                 <div>
                     <label className="block text-sm font-semibold text-ink-soft mb-1">Select Target Submission</label>
-                    <select value={selectedSub} onChange={e => setSelectedSub(e.target.value)} className="w-full border rounded px-3 py-2 text-sm">
+                    <select aria-label="Select Target Submission" value={selectedSub} onChange={e => setSelectedSub(e.target.value)} className="w-full border rounded px-3 py-2 text-sm">
                         <option value="">-- Select Submission --</option>
                         {submissions.map(s => (
                             <option key={s.id} value={s.id}>
@@ -67,7 +67,7 @@ export default function HackPanel() {
 
                 <div>
                     <label className="block text-sm font-semibold text-ink-soft mb-1">Counter-Test Input</label>
-                    <textarea value={testInput} onChange={e => setTestInput(e.target.value)} rows={6}
+                    <textarea aria-label="Counter-Test Input" value={testInput} onChange={e => setTestInput(e.target.value)} rows={6}
                         placeholder="Enter the test input to break the solution..." className="w-full border rounded px-3 py-2 text-sm font-mono" />
                 </div>
 

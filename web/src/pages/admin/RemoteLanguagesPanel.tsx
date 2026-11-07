@@ -172,27 +172,27 @@ export default function RemoteLanguagesPanel() {
                     <form onSubmit={handleSubmit} className="grid grid-cols-6 gap-4 items-end">
                         <div>
                             <label className="block text-xs font-medium text-muted mb-1">Local ID</label>
-                            <input value={form.local_id} onChange={e => setForm({ ...form, local_id: e.target.value })}
+                            <input aria-label="Local ID" value={form.local_id} onChange={e => setForm({ ...form, local_id: e.target.value })}
                                 placeholder="e.g. cpp-gpp-64" required className="w-full border rounded px-3 py-2 text-sm" />
                         </div>
                         <div>
                             <label className="block text-xs font-medium text-muted mb-1">Remote ID</label>
-                            <input value={form.remote_id} onChange={e => setForm({ ...form, remote_id: e.target.value })}
+                            <input aria-label="Remote ID" value={form.remote_id} onChange={e => setForm({ ...form, remote_id: e.target.value })}
                                 placeholder="e.g. 54" required className="w-full border rounded px-3 py-2 text-sm" />
                         </div>
                         <div>
                             <label className="block text-xs font-medium text-muted mb-1">Display Name</label>
-                            <input value={form.display_name} onChange={e => setForm({ ...form, display_name: e.target.value })}
+                            <input aria-label="Display Name" value={form.display_name} onChange={e => setForm({ ...form, display_name: e.target.value })}
                                 placeholder="e.g. GNU G++17" required className="w-full border rounded px-3 py-2 text-sm" />
                         </div>
                         <div>
                             <label className="block text-xs font-medium text-muted mb-1">Comment Prefix</label>
-                            <input value={form.inline_comment_prefix} onChange={e => setForm({ ...form, inline_comment_prefix: e.target.value })}
+                            <input aria-label="Comment Prefix" value={form.inline_comment_prefix} onChange={e => setForm({ ...form, inline_comment_prefix: e.target.value })}
                                 placeholder="e.g. //" className="w-full border rounded px-3 py-2 text-sm font-mono" />
                         </div>
                         <div>
                             <label className="block text-xs font-medium text-muted mb-1">Sort Order</label>
-                            <input type="number" value={form.sort_order} onChange={e => setForm({ ...form, sort_order: parseInt(e.target.value) || 0 })}
+                            <input aria-label="Sort Order" type="number" value={form.sort_order} onChange={e => setForm({ ...form, sort_order: parseInt(e.target.value) || 0 })}
                                 className="w-full border rounded px-3 py-2 text-sm" />
                         </div>
                         <div className="flex gap-2">

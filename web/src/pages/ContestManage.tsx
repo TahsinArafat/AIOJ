@@ -1122,14 +1122,14 @@ function SettingsTab({ contestId }: { contestId: string }) {
                 {/* Title */}
                 <div>
                     <label className="block text-sm font-medium text-ink-soft mb-1">Title</label>
-                    <input value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))}
+                    <input aria-label="Title" value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))}
                         className="w-full border border-hairline-strong rounded-lg px-3 py-2 text-sm focus:ring-2 focus-visible:outline-[var(--ring)] focus:border-brand" />
                 </div>
 
                 {/* Description */}
                 <div>
                     <label className="block text-sm font-medium text-ink-soft mb-1">Description</label>
-                    <textarea value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
+                    <textarea aria-label="Description" value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
                         rows={3} className="w-full border border-hairline-strong rounded-lg px-3 py-2 text-sm focus:ring-2 focus-visible:outline-[var(--ring)] focus:border-brand" />
                 </div>
 
@@ -1137,17 +1137,17 @@ function SettingsTab({ contestId }: { contestId: string }) {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                         <label className="block text-sm font-medium text-ink-soft mb-1">Start Time</label>
-                        <input type="datetime-local" value={form.start_time} onChange={e => setForm(p => ({ ...p, start_time: e.target.value }))}
+                        <input aria-label="Start Time" type="datetime-local" value={form.start_time} onChange={e => setForm(p => ({ ...p, start_time: e.target.value }))}
                             className="w-full border border-hairline-strong rounded-lg px-3 py-2 text-sm focus:ring-2 focus-visible:outline-[var(--ring)] focus:border-brand" />
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-ink-soft mb-1">End Time</label>
-                        <input type="datetime-local" value={form.end_time} onChange={e => setForm(p => ({ ...p, end_time: e.target.value }))}
+                        <input aria-label="End Time" type="datetime-local" value={form.end_time} onChange={e => setForm(p => ({ ...p, end_time: e.target.value }))}
                             className="w-full border border-hairline-strong rounded-lg px-3 py-2 text-sm focus:ring-2 focus-visible:outline-[var(--ring)] focus:border-brand" />
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-ink-soft mb-1">Freeze Time <span className="text-muted-soft">(optional)</span></label>
-                        <input type="datetime-local" value={form.freeze_time} onChange={e => setForm(p => ({ ...p, freeze_time: e.target.value }))}
+                        <input aria-label="Freeze Time (optional)" type="datetime-local" value={form.freeze_time} onChange={e => setForm(p => ({ ...p, freeze_time: e.target.value }))}
                             className="w-full border border-hairline-strong rounded-lg px-3 py-2 text-sm focus:ring-2 focus-visible:outline-[var(--ring)] focus:border-brand" />
                     </div>
                 </div>
@@ -1155,7 +1155,7 @@ function SettingsTab({ contestId }: { contestId: string }) {
                 {/* Visibility Settings */}
                 <div>
                     <label className="block text-sm font-medium text-ink-soft mb-1">Visibility Mode</label>
-                    <select value={form.visibility} onChange={e => setForm(p => ({ ...p, visibility: e.target.value }))}
+                    <select aria-label="Visibility Mode" value={form.visibility} onChange={e => setForm(p => ({ ...p, visibility: e.target.value }))}
                         className="w-full border border-hairline-strong rounded-lg px-3 py-2 text-sm focus:ring-2 focus-visible:outline-[var(--ring)] focus:border-brand bg-surface">
                         <option value="public">Public (Anyone can join)</option>
                         <option value="private">Private (Password/Invite required)</option>
@@ -1166,7 +1166,7 @@ function SettingsTab({ contestId }: { contestId: string }) {
                 {form.visibility === 'private' && (
                     <div>
                         <label className="block text-sm font-medium text-ink-soft mb-1">Contest Password</label>
-                        <input value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))}
+                        <input aria-label="Contest Password" value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))}
                             placeholder={form.has_password ? "•••••••• (leave blank to keep current)" : "Enter password for private access..."}
                             className="w-full border border-hairline-strong rounded-lg px-3 py-2 text-sm focus:ring-2 focus-visible:outline-[var(--ring)] focus:border-brand" />
                     </div>
@@ -1175,7 +1175,7 @@ function SettingsTab({ contestId }: { contestId: string }) {
                 {form.visibility === 'group' && (
                     <div>
                         <label className="block text-sm font-medium text-ink-soft mb-1">Select Restricted Group</label>
-                        <select value={form.group_id} onChange={e => setForm(p => ({ ...p, group_id: e.target.value }))}
+                        <select aria-label="Select Restricted Group" value={form.group_id} onChange={e => setForm(p => ({ ...p, group_id: e.target.value }))}
                             className="w-full border border-hairline-strong rounded-lg px-3 py-2 text-sm focus:ring-2 focus-visible:outline-[var(--ring)] focus:border-brand bg-surface">
                             <option value="">-- Choose Group --</option>
                             {groups.map(g => (

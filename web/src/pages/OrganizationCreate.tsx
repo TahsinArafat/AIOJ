@@ -34,13 +34,13 @@ export default function OrganizationCreate() {
 			<form onSubmit={handleSubmit} className="space-y-4">
 				<div>
 					<label className="block text-sm font-medium text-ink-soft mb-1">Organization Name</label>
-					<input required value={name} onChange={e => setName(e.target.value)}
+					<input aria-label="Organization Name" required value={name} onChange={e => setName(e.target.value)}
 						placeholder="e.g. MIT CS Department"
 						className="w-full border border-hairline-strong rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)]" />
 				</div>
 				<div>
 					<label className="block text-sm font-medium text-ink-soft mb-1">Description</label>
-					<textarea rows={4} value={desc} onChange={e => setDesc(e.target.value)}
+					<textarea aria-label="Description" rows={4} value={desc} onChange={e => setDesc(e.target.value)}
 						placeholder="Add a brief description..."
 						className="w-full border border-hairline-strong rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)]" />
 				</div>

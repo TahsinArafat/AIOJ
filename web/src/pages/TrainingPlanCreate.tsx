@@ -87,13 +87,13 @@ export default function TrainingPlanCreate() {
 				<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 					<div>
 						<label className="block text-sm font-medium text-ink-soft mb-1">Title</label>
-						<input required value={title} onChange={e => setTitle(e.target.value)}
+						<input aria-label="Title" required value={title} onChange={e => setTitle(e.target.value)}
 							placeholder="e.g. Master DP in 30 Days"
 							className="w-full border border-hairline-strong rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)] bg-surface" />
 					</div>
 					<div>
 						<label className="block text-sm font-medium text-ink-soft mb-1">Organization Scope <span className="text-muted-soft font-normal">(optional)</span></label>
-						<select value={orgId} onChange={e => setOrgId(e.target.value)}
+						<select aria-label="Organization Scope (optional)" value={orgId} onChange={e => setOrgId(e.target.value)}
 							className="w-full border border-hairline-strong rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)] bg-surface">
 							<option value="">Public (Open to All)</option>
 							{myOrgs.map(o => (
@@ -104,7 +104,7 @@ export default function TrainingPlanCreate() {
 				</div>
 				<div>
 					<label className="block text-sm font-medium text-ink-soft mb-1">Description</label>
-					<textarea rows={3} value={desc} onChange={e => setDesc(e.target.value)}
+					<textarea aria-label="Description" rows={3} value={desc} onChange={e => setDesc(e.target.value)}
 						placeholder="Add curriculum outline or guidelines..."
 						className="w-full border border-hairline-strong rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)] bg-surface" />
 				</div>

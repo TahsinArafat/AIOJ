@@ -961,7 +961,7 @@ export default function ProblemDetail() {
                     <div className="p-4 space-y-4">
                         <div>
                             <label className="block text-xs font-semibold text-muted uppercase tracking-wider mb-1.5">Custom Input (Stdin)</label>
-                            <textarea
+                            <textarea aria-label="Custom Input (Stdin)"
                                 value={customInput}
                                 onChange={(e) => setCustomInput(e.target.value)}
                                 rows={4}
@@ -1003,11 +1003,11 @@ export default function ProblemDetail() {
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                         <div>
                                             <span className="block text-xs font-semibold text-muted mb-1">Standard Output (Stdout)</span>
-                                            <pre className="bg-code text-code-ink font-mono text-xs p-3 rounded overflow-x-auto max-h-40">{customOutput.stdout || <span className="text-muted italic">No output</span>}</pre>
+                                            <pre className="bg-code text-code-ink font-mono text-xs p-3 rounded overflow-x-auto max-h-40">{customOutput.stdout || <span className="text-code-ink/60 italic">No output</span>}</pre>
                                         </div>
                                         <div>
                                             <span className="block text-xs font-semibold text-muted mb-1">Standard Error (Stderr)</span>
-                                            <pre className="bg-code text-bad font-mono text-xs p-3 rounded overflow-x-auto max-h-40">{customOutput.stderr || <span className="text-muted italic">No stderr</span>}</pre>
+                                            <pre className="bg-code text-bad-on-code font-mono text-xs p-3 rounded overflow-x-auto max-h-40">{customOutput.stderr || <span className="text-code-ink/60 italic">No stderr</span>}</pre>
                                         </div>
                                     </div>
                                 )}

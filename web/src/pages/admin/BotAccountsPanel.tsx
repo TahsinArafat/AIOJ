@@ -242,7 +242,7 @@ export default function BotAccountsPanel() {
                         <div className="grid grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-xs font-medium text-muted mb-1">Platform</label>
-                                <select
+                                <select aria-label="Platform"
                                     required
                                     value={form.platform}
                                     onChange={e => setForm({ ...form, platform: e.target.value })}
@@ -299,12 +299,12 @@ export default function BotAccountsPanel() {
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-xs font-medium text-muted mb-1">Username</label>
-                                    <input type="text" value={form.platform_user} onChange={e => setForm({ ...form, platform_user: e.target.value })}
+                                    <input aria-label="Username" type="text" value={form.platform_user} onChange={e => setForm({ ...form, platform_user: e.target.value })}
                                         placeholder="Remote OJ username" className="w-full border rounded px-3 py-2 text-sm" />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-muted mb-1">Password</label>
-                                    <input type="password" value={form.platform_pass} onChange={e => setForm({ ...form, platform_pass: e.target.value })}
+                                    <input aria-label="Password" type="password" value={form.platform_pass} onChange={e => setForm({ ...form, platform_pass: e.target.value })}
                                         placeholder="Leave empty to keep existing" className="w-full border rounded px-3 py-2 text-sm" />
                                 </div>
                             </div>
@@ -315,12 +315,12 @@ export default function BotAccountsPanel() {
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-xs font-medium text-muted mb-1">API Key</label>
-                                        <input type="text" value={form.api_key} onChange={e => setForm({ ...form, api_key: e.target.value })}
+                                        <input aria-label="API Key" type="text" value={form.api_key} onChange={e => setForm({ ...form, api_key: e.target.value })}
                                             placeholder="From https://codeforces.com/settings/api" className="w-full border rounded px-3 py-2 text-sm" />
                                     </div>
                                     <div>
                                         <label className="block text-xs font-medium text-muted mb-1">API Secret</label>
-                                        <input type="password" value={form.api_secret} onChange={e => setForm({ ...form, api_secret: e.target.value })}
+                                        <input aria-label="API Secret" type="password" value={form.api_secret} onChange={e => setForm({ ...form, api_secret: e.target.value })}
                                             placeholder="Leave empty to keep existing" className="w-full border rounded px-3 py-2 text-sm" />
                                     </div>
                                 </div>
@@ -332,21 +332,21 @@ export default function BotAccountsPanel() {
                                 <div className="space-y-3">
                                     <div>
                                         <label className="block text-xs font-medium text-muted mb-1">JSESSIONID</label>
-                                        <input type="text" value={getCookieValue(form.session_data, 'JSESSIONID')}
+                                        <input aria-label="JSESSIONID" type="text" value={getCookieValue(form.session_data, 'JSESSIONID')}
                                             onChange={e => setForm({ ...form, session_data: updateCookieValue(form.session_data, 'JSESSIONID', e.target.value) })}
                                             placeholder="Copy from browser DevTools (F12) → Application → Cookies → JSESSIONID"
                                             className="w-full border rounded px-3 py-2 text-sm font-mono" />
                                     </div>
                                     <div>
                                         <label className="block text-xs font-medium text-muted mb-1">39ce7</label>
-                                        <input type="text" value={getCookieValue(form.session_data, '39ce7')}
+                                        <input aria-label="39ce7" type="text" value={getCookieValue(form.session_data, '39ce7')}
                                             onChange={e => setForm({ ...form, session_data: updateCookieValue(form.session_data, '39ce7', e.target.value) })}
                                             placeholder="Copy from browser DevTools (F12) → Application → Cookies → 39ce7"
                                             className="w-full border rounded px-3 py-2 text-sm font-mono" />
                                     </div>
                                     <div>
                                         <label className="block text-xs font-medium text-muted mb-1">cf_clearance (optional, auto-generated by bypass proxy)</label>
-                                        <input type="text" value={getCookieValue(form.session_data, 'cf_clearance')}
+                                        <input aria-label="cf_clearance (optional, auto-generated by bypass proxy)" type="text" value={getCookieValue(form.session_data, 'cf_clearance')}
                                             onChange={e => setForm({ ...form, session_data: updateCookieValue(form.session_data, 'cf_clearance', e.target.value) })}
                                             placeholder="Auto-filled by bypass proxy, or paste from browser"
                                             className="w-full border rounded px-3 py-2 text-sm font-mono" />
@@ -363,7 +363,7 @@ export default function BotAccountsPanel() {
                                 <h4 className="text-xs font-semibold text-muted uppercase mb-3">AtCoder Cookies</h4>
                                 <div>
                                     <label className="block text-xs font-medium text-muted mb-1">REPSESSID</label>
-                                    <input type="text" value={getCookieValue(form.session_data, 'REPSESSID')}
+                                    <input aria-label="REPSESSID" type="text" value={getCookieValue(form.session_data, 'REPSESSID')}
                                         onChange={e => setForm({ ...form, session_data: updateCookieValue(form.session_data, 'REPSESSID', e.target.value) })}
                                         placeholder="Copy from browser DevTools → Application → Cookies → REPSESSID"
                                         className="w-full border rounded px-3 py-2 text-sm font-mono" />
@@ -375,7 +375,7 @@ export default function BotAccountsPanel() {
                                 <h4 className="text-xs font-semibold text-muted uppercase mb-3">Toph Cookies</h4>
                                 <div>
                                     <label className="block text-xs font-medium text-muted mb-1">t (Session Cookie)</label>
-                                    <input type="text" value={getCookieValue(form.session_data, 't')}
+                                    <input aria-label="t (Session Cookie)" type="text" value={getCookieValue(form.session_data, 't')}
                                         onChange={e => setForm({ ...form, session_data: updateCookieValue(form.session_data, 't', e.target.value) })}
                                         placeholder="Copy from browser DevTools → Application → Cookies → t"
                                         className="w-full border rounded px-3 py-2 text-sm font-mono" />
@@ -387,7 +387,7 @@ export default function BotAccountsPanel() {
                                 <h4 className="text-xs font-semibold text-muted uppercase mb-3">QOJ Cookies</h4>
                                 <div>
                                     <label className="block text-xs font-medium text-muted mb-1">UOJSESSID</label>
-                                    <input type="text" value={getCookieValue(form.session_data, 'UOJSESSID')}
+                                    <input aria-label="UOJSESSID" type="text" value={getCookieValue(form.session_data, 'UOJSESSID')}
                                         onChange={e => setForm({ ...form, session_data: updateCookieValue(form.session_data, 'UOJSESSID', e.target.value) })}
                                         placeholder="Copy from browser DevTools → Application → Cookies → UOJSESSID"
                                         className="w-full border rounded px-3 py-2 text-sm font-mono" />
@@ -399,7 +399,7 @@ export default function BotAccountsPanel() {
                                 <h4 className="text-xs font-semibold text-muted uppercase mb-3">CSES Cookies</h4>
                                 <div>
                                     <label className="block text-xs font-medium text-muted mb-1">PHPSESSID</label>
-                                    <input type="text" value={getCookieValue(form.session_data, 'PHPSESSID')}
+                                    <input aria-label="PHPSESSID" type="text" value={getCookieValue(form.session_data, 'PHPSESSID')}
                                         onChange={e => setForm({ ...form, session_data: updateCookieValue(form.session_data, 'PHPSESSID', e.target.value) })}
                                         placeholder="Copy from browser DevTools → Application → Cookies → PHPSESSID"
                                         className="w-full border rounded px-3 py-2 text-sm font-mono" />
@@ -411,7 +411,7 @@ export default function BotAccountsPanel() {
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-xs font-medium text-muted mb-1">Proxy URL</label>
-                                    <input type="text" value={form.proxy_url} onChange={e => setForm({ ...form, proxy_url: e.target.value })}
+                                    <input aria-label="Proxy URL" type="text" value={form.proxy_url} onChange={e => setForm({ ...form, proxy_url: e.target.value })}
                                         placeholder="http://user:pass@host:port" className="w-full border rounded px-3 py-2 text-sm font-mono" />
                                 </div>
                                 <div className="flex items-center pt-6">
@@ -427,7 +427,7 @@ export default function BotAccountsPanel() {
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-xs font-medium text-muted mb-1">Rate Limit (requests/sec)</label>
-                                    <input type="number" step="0.1" min="0.1" value={form.rate_limit_rps} onChange={e => setForm({ ...form, rate_limit_rps: e.target.value })}
+                                    <input aria-label="Rate Limit (requests/sec)" type="number" step="0.1" min="0.1" value={form.rate_limit_rps} onChange={e => setForm({ ...form, rate_limit_rps: e.target.value })}
                                         className="w-full border rounded px-3 py-2 text-sm" />
                                 </div>
                             </div>

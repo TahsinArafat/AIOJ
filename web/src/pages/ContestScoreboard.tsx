@@ -336,8 +336,10 @@ export default function ContestScoreboard() {
                 return (
                   <th key={idx} className="px-2 py-2.5 text-center font-bold w-[72px]">
                     <div className="text-sm">{idx}</div>
+                    {/* The header row sits on the dark code surface, so the
+                        light-theme `text-muted` grey would be unreadable here. */}
                     {pm?.title && (
-                      <div className="text-[11px] font-normal text-muted truncate max-w-[68px]" title={pm.title}>{pm.title}</div>
+                      <div className="text-[11px] font-normal text-code-ink/70 truncate max-w-[68px]" title={pm.title}>{pm.title}</div>
                     )}
                   </th>
                 );

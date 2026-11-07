@@ -99,7 +99,7 @@ export default function TestCasesTab({
             <div className="flex gap-4 items-end">
               <div>
                 <label className="block text-xs text-muted mb-1">Set Score for All Test Cases</label>
-                <input
+                <input aria-label="Set Score for All Test Cases"
                   type="number"
                   value={batchScore}
                   onChange={e => onBatchScoreChange(Number(e.target.value))}
@@ -125,7 +125,7 @@ export default function TestCasesTab({
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="block text-xs text-muted mb-1">Input Name</label>
-              <input
+              <input aria-label="Input Name"
                 type="text"
                 placeholder="e.g. 01.in"
                 value={newTestCase.input_name}
@@ -135,7 +135,7 @@ export default function TestCasesTab({
             </div>
             <div>
               <label className="block text-xs text-muted mb-1">Output Name</label>
-              <input
+              <input aria-label="Output Name"
                 type="text"
                 placeholder="e.g. 01.out"
                 value={newTestCase.output_name}
@@ -145,7 +145,7 @@ export default function TestCasesTab({
             </div>
             <div>
               <label className="block text-xs text-muted mb-1">Score</label>
-              <input
+              <input aria-label="Score"
                 type="number"
                 value={newTestCase.score}
                 onChange={e => onNewTestCaseChange({ ...newTestCase, score: Number(e.target.value) })}

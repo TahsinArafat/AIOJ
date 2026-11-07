@@ -54,7 +54,7 @@ export default function EditorialForm({ problemId, isUserAdmin, onSuccess, onCan
       
       <div>
         <label className="block font-medium text-ink-soft mb-1">Title *</label>
-        <input
+        <input aria-label="Title"
           type="text"
           value={title}
           onChange={e => setTitle(e.target.value)}
@@ -66,7 +66,7 @@ export default function EditorialForm({ problemId, isUserAdmin, onSuccess, onCan
 
       <div>
         <label className="block font-medium text-ink-soft mb-1">Approach Description</label>
-        <textarea
+        <textarea aria-label="Approach Description"
           value={approach}
           onChange={e => setApproach(e.target.value)}
           rows={3}
@@ -77,7 +77,7 @@ export default function EditorialForm({ problemId, isUserAdmin, onSuccess, onCan
 
       <div>
         <label className="block font-medium text-ink-soft mb-1">Editorial Content (Markdown Supported) *</label>
-        <textarea
+        <textarea aria-label="Editorial Content (Markdown Supported)"
           value={content}
           onChange={e => setContent(e.target.value)}
           rows={6}
@@ -90,7 +90,7 @@ export default function EditorialForm({ problemId, isUserAdmin, onSuccess, onCan
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block font-medium text-ink-soft mb-1">Time Complexity</label>
-          <input
+          <input aria-label="Time Complexity"
             type="text"
             value={timeComplexity}
             onChange={e => setTimeComplexity(e.target.value)}
@@ -100,7 +100,7 @@ export default function EditorialForm({ problemId, isUserAdmin, onSuccess, onCan
         </div>
         <div>
           <label className="block font-medium text-ink-soft mb-1">Space Complexity</label>
-          <input
+          <input aria-label="Space Complexity"
             type="text"
             value={spaceComplexity}
             onChange={e => setSpaceComplexity(e.target.value)}
@@ -113,7 +113,7 @@ export default function EditorialForm({ problemId, isUserAdmin, onSuccess, onCan
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block font-medium text-ink-soft mb-1">Solution Language</label>
-          <select
+          <select aria-label="Solution Language"
             value={solutionLanguage}
             onChange={e => setSolutionLanguage(e.target.value)}
             className="w-full border rounded px-3 py-2 bg-surface dark:border-gray-700"
@@ -130,7 +130,7 @@ export default function EditorialForm({ problemId, isUserAdmin, onSuccess, onCan
 
       <div>
         <label className="block font-medium text-ink-soft mb-1">Solution Code</label>
-        <textarea
+        <textarea aria-label="Solution Code"
           value={solutionCode}
           onChange={e => setSolutionCode(e.target.value)}
           rows={6}
