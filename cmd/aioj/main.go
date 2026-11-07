@@ -20,6 +20,7 @@ import (
 	"github.com/tahsinarafat/aioj/internal/api/handler"
 	"github.com/tahsinarafat/aioj/internal/auth"
 	"github.com/tahsinarafat/aioj/internal/config"
+	"github.com/tahsinarafat/aioj/internal/feature"
 	"github.com/tahsinarafat/aioj/internal/generate"
 	"github.com/tahsinarafat/aioj/internal/hack"
 	"github.com/tahsinarafat/aioj/internal/judge"
@@ -284,6 +285,11 @@ func main() {
 	botAccountH := handler.NewAdminBotAccountHandler(botAccountStore, vjService)
 	settingsStore := postgres.NewSystemSettingsStore(db)
 	settingsH := handler.NewAdminSystemSettingsHandler(settingsStore)
+
+	// One resolver is shared by the gates and the admin handler, so a policy
+	// saved through the panel invalidates the cache the gates read.
+	featureResolver := feature.NewResolver(settingsStore, userStore)
+	featuresH := handler.NewFeaturesHandler(featureResolver, settingsStore)
 	langAdminH := handler.NewAdminLanguageHandler(cfg.LangDir)
 
 	remoteLangH := handler.NewRemoteLanguageHandler(remoteLangStore, vjService)
@@ -558,58 +564,60 @@ func main() {
 			}
 			return items, nil
 		},
-		Submission:     submissionH,
-		Contest:        contestH,
-		ContestProblem: contestProblemH,
-		VJudge:         vjH,
-		Admin:          adminH,
-		Testcase:       testcaseH,
-		WS:             wsManager,
-		Rating:         ratingH,
-		Registration:   registrationH,
-		Virtual:        virtualH,
-		Gym:            gymH,
-		Hack:           hackH,
-		Stats:          statsH,
-		Notification:   notifH,
-		Group:          groupH,
-		Team:           teamH,
-		Blog:           blogH,
-		Editorial:      editorialH,
-		APIKey:         apiKeyH,
-		Webhook:        webhookH,
-		Recommendation: recommendationH,
-		Rankings:       rankingsH,
-		Users:          usersH,
-		Search:         searchH,
-		LangLimit:      langLimitH,
-		Import:         importH,
-		Org:            orgH,
-		Class:          classH,
-		Training:       trainingH,
-		Plagiarism:     plagiarismH,
-		Media:          mediaH,
-		Onsite:         onsiteH,
-		OnsiteBatch:    onsiteBatchH,
-		Clarification:  clarificationH,
-		Notice:         noticeH,
-		BotAccount:     botAccountH,
-		Settings:       settingsH,
-		LangAdmin:      langAdminH,
-		RemoteLang:     remoteLangH,
-		AdminSub:       adminSubH,
-		Backup:         backupH,
-		CDN:            handler.NewCDNHandler(handler.CDNConfig{}),
-		Achievements:   handler.NewAchievementHandler(postgres.NewAchievementStore(db)),
-		Friendships:    handler.NewFriendshipHandler(postgres.NewFriendshipStore(db), userStore),
-		AuditLog:       auditH,
-		Health:         healthH,
-		Activity:       handler.NewActivityHandler(submissionStore, ratingStore, feedStore),
-		Generate:       generateH,
-		AIModel:        aiModelH,
-		AIGeneration:   aiGenerationH,
-		AIEnabled:      cfg.AI.Enabled,
-		MetricsToken:   cfg.Server.MetricsToken,
+		Submission:      submissionH,
+		Contest:         contestH,
+		ContestProblem:  contestProblemH,
+		VJudge:          vjH,
+		Admin:           adminH,
+		Testcase:        testcaseH,
+		WS:              wsManager,
+		Rating:          ratingH,
+		Registration:    registrationH,
+		Virtual:         virtualH,
+		Gym:             gymH,
+		Hack:            hackH,
+		Stats:           statsH,
+		Notification:    notifH,
+		Group:           groupH,
+		Team:            teamH,
+		Blog:            blogH,
+		Editorial:       editorialH,
+		APIKey:          apiKeyH,
+		Webhook:         webhookH,
+		Recommendation:  recommendationH,
+		Rankings:        rankingsH,
+		Users:           usersH,
+		Search:          searchH,
+		LangLimit:       langLimitH,
+		Import:          importH,
+		Org:             orgH,
+		Class:           classH,
+		Training:        trainingH,
+		Plagiarism:      plagiarismH,
+		Media:           mediaH,
+		Onsite:          onsiteH,
+		OnsiteBatch:     onsiteBatchH,
+		Clarification:   clarificationH,
+		Notice:          noticeH,
+		BotAccount:      botAccountH,
+		Settings:        settingsH,
+		LangAdmin:       langAdminH,
+		RemoteLang:      remoteLangH,
+		AdminSub:        adminSubH,
+		Backup:          backupH,
+		CDN:             handler.NewCDNHandler(handler.CDNConfig{}),
+		Achievements:    handler.NewAchievementHandler(postgres.NewAchievementStore(db)),
+		Friendships:     handler.NewFriendshipHandler(postgres.NewFriendshipStore(db), userStore),
+		AuditLog:        auditH,
+		Health:          healthH,
+		Activity:        handler.NewActivityHandler(submissionStore, ratingStore, feedStore),
+		Generate:        generateH,
+		AIModel:         aiModelH,
+		AIGeneration:    aiGenerationH,
+		Features:        featuresH,
+		FeatureResolver: featureResolver,
+		AIEnabled:       cfg.AI.Enabled,
+		MetricsToken:    cfg.Server.MetricsToken,
 	}, jwtManager)
 
 	srv := &http.Server{

@@ -10,6 +10,7 @@ import (
 	"github.com/tahsinarafat/aioj/internal/api/handler"
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
 	"github.com/tahsinarafat/aioj/internal/auth"
+	"github.com/tahsinarafat/aioj/internal/feature"
 )
 
 func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
@@ -53,10 +54,21 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 	noticeH := d.Notice
 	botAccountH := d.BotAccount
 	settingsH := d.Settings
+	featuresH := d.Features
 	langAdminH := d.LangAdmin
 	remoteLangH := d.RemoteLang
 	adminSubH := d.AdminSub
 	backupH := d.Backup
+	// gate is the per-route feature gate. It is a no-op when no resolver was
+	// wired (router unit tests build a Deps by hand), so a missing resolver
+	// fails open instead of panicking the whole server.
+	gate := func(key string) func(http.Handler) http.Handler {
+		if d.FeatureResolver == nil {
+			return func(next http.Handler) http.Handler { return next }
+		}
+		return middleware.FeatureGate(jwtManager, d.FeatureResolver, key)
+	}
+
 	r := chi.NewRouter()
 	rl := middleware.NewRateLimiter()
 	// Order matters: RealIP must run before the rate limiter, which keys its
@@ -87,6 +99,12 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 
 	if d.Activity != nil {
 		r.Get("/api/activity", d.Activity.List)
+	}
+
+	// Feature gate decisions for the caller. Optional auth so a signed-in user
+	// gets their role/rating verdicts rather than the anonymous ones.
+	if featuresH != nil {
+		r.With(middleware.OptionalAuthMiddleware(jwtManager)).Get("/api/features", featuresH.List)
 	}
 
 	// Public status page (Phase C/D) — static HTML polling /api/health.
@@ -219,6 +237,7 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 	r.With(middleware.AuthMiddleware(jwtManager)).Get("/api/users/profile/invites", usersH.GetUserPendingInvites)
 
 	r.Route("/api/problems", func(r chi.Router) {
+		r.Use(gate(feature.KeyProblems))
 		r.Get("/", problemH.List)
 		r.Get("/tags", problemH.ListTags)
 		r.With(middleware.AuthMiddleware(jwtManager)).Get("/my", problemH.ListMyProblems)
@@ -236,6 +255,10 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 		r.Get("/{slug}/language-limits", langLimitH.List)
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.AuthMiddleware(jwtManager))
+			// Everything below writes a problem, its testcases or its
+			// permissions: that is the setter workspace, so the authoring gate
+			// covers it as well as the UI.
+			r.Use(gate(feature.KeySetterWorkspace))
 			r.Post("/", problemH.Create)
 			r.Put("/{slug}", problemH.Update)
 			r.Delete("/{slug}", problemH.Delete)
@@ -257,6 +280,7 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 	})
 
 	r.Route("/api/submissions", func(r chi.Router) {
+		r.Use(gate(feature.KeySubmissions))
 		r.Use(middleware.AuthMiddleware(jwtManager))
 		r.Post("/", submissionH.Create)
 		r.Post("/upsolving", submissionH.CreateUpsolving)
@@ -268,6 +292,7 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 	})
 
 	r.Route("/api/contests", func(r chi.Router) {
+		r.Use(gate(feature.KeyContests))
 		r.Get("/", contestH.List)
 		r.Get("/formats", contestH.ListAvailableFormats)
 		r.With(middleware.AuthMiddleware(jwtManager)).Get("/my", contestH.ListMyContests)
@@ -278,6 +303,8 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 		r.With(middleware.OptionalAuthMiddleware(jwtManager)).Get("/{id}/pdf", contestH.DownloadPDF)
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.AuthMiddleware(jwtManager))
+			// Contest authoring and management belong to the setter workspace.
+			r.Use(gate(feature.KeySetterWorkspace))
 			r.Post("/", contestH.Create)
 			r.Post("/educational", contestH.CreateEducational)
 			r.Put("/{id}", contestH.Update)
@@ -296,6 +323,7 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 	})
 
 	r.Route("/api/contests/{contestId}/clarifications", func(r chi.Router) {
+		r.Use(gate(feature.KeyContests))
 		r.Get("/", clarificationH.List)
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.AuthMiddleware(jwtManager))
@@ -305,6 +333,7 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 	})
 
 	r.Route("/api/contests/{contestId}/notices", func(r chi.Router) {
+		r.Use(gate(feature.KeyContests))
 		r.Get("/", noticeH.List)
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.AuthMiddleware(jwtManager))
@@ -314,14 +343,16 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 	})
 
 	r.Route("/api/contests/{id}/register", func(r chi.Router) {
+		r.Use(gate(feature.KeyContests))
 		r.Get("/", registrationH.CheckRegistration)
 		r.With(middleware.AuthMiddleware(jwtManager)).Post("/", registrationH.Register)
 		r.With(middleware.AuthMiddleware(jwtManager)).Delete("/", registrationH.Unregister)
 	})
 
-	r.Get("/api/contests/{id}/registrations", registrationH.ListRegistrations)
+	r.With(gate(feature.KeyContests)).Get("/api/contests/{id}/registrations", registrationH.ListRegistrations)
 
 	r.Route("/api/contests/{id}/onsite", func(r chi.Router) {
+		r.Use(gate(feature.KeyContests))
 		r.Use(middleware.AuthMiddleware(jwtManager))
 		r.Get("/balloons", onsiteH.ListBalloons)
 		r.Post("/balloons/{balloonId}/dispatch", onsiteH.DispatchBalloon)
@@ -335,9 +366,10 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 
 	// A public password login: it needs the same brute-force budget as
 	// /api/auth/login.
-	r.With(rl.StrictAuth).Post("/api/contests/{id}/onsite/login", onsiteBatchH.LoginAsTeam)
+	r.With(rl.StrictAuth, gate(feature.KeyContests)).Post("/api/contests/{id}/onsite/login", onsiteBatchH.LoginAsTeam)
 
 	r.Route("/api/vjudge", func(r chi.Router) {
+		r.Use(gate(feature.KeyVJudge))
 		r.Use(middleware.AuthMiddleware(jwtManager))
 		r.Get("/bots", vjudgeH.ListBots)
 		r.Post("/submit", vjudgeH.Submit)
@@ -373,6 +405,16 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 			r.Get("/{key}", settingsH.Get)
 			r.Delete("/{key}", settingsH.Delete)
 		})
+
+		// Feature gates are never themselves gated: locking the admin out of
+		// the panel that reopens a feature would be unrecoverable without SQL.
+		if featuresH != nil {
+			r.Route("/features", func(r chi.Router) {
+				r.Get("/", featuresH.AdminList)
+				r.Put("/{key}", featuresH.AdminSet)
+				r.Delete("/{key}", featuresH.AdminReset)
+			})
+		}
 
 		if d.CDN != nil {
 			r.Get("/cdn/status", d.CDN.Status)
@@ -446,9 +488,10 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 		r.Get("/contest/{contestId}", ratingH.GetByContest)
 	})
 
-	r.Get("/api/rankings", rankingsH.List)
+	r.With(gate(feature.KeyRankings)).Get("/api/rankings", rankingsH.List)
 
 	r.Route("/api/virtual", func(r chi.Router) {
+		r.Use(gate(feature.KeyVirtualContests))
 		r.Use(middleware.AuthMiddleware(jwtManager))
 		r.Post("/start", virtualH.Start)
 		r.Get("/status", virtualH.Status)
@@ -456,6 +499,7 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 	})
 
 	r.Route("/api/gym", func(r chi.Router) {
+		r.Use(gate(feature.KeyGym))
 		r.Get("/", gymH.List)
 		r.Get("/{id}", gymH.GetByID)
 		r.Group(func(r chi.Router) {
@@ -467,6 +511,7 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 	})
 
 	r.Route("/api/hacks", func(r chi.Router) {
+		r.Use(gate(feature.KeyHacks))
 		r.Use(middleware.AuthMiddleware(jwtManager))
 		r.Post("/", hackH.SubmitHack)
 		r.Get("/{id}", hackH.GetHack)
@@ -481,6 +526,7 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 	})
 
 	r.Route("/api/notifications", func(r chi.Router) {
+		r.Use(gate(feature.KeyNotifications))
 		r.Use(middleware.AuthMiddleware(jwtManager))
 		r.Get("/", notifH.List)
 		r.Get("/unread-count", notifH.UnreadCount)
@@ -491,6 +537,7 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 	})
 
 	r.Route("/api/groups", func(r chi.Router) {
+		r.Use(gate(feature.KeyGroups))
 		r.Get("/", groupH.List)
 		r.With(middleware.AuthMiddleware(jwtManager)).Post("/join-code", groupH.JoinByCode)
 		r.Get("/{id}", groupH.GetByID)
@@ -513,6 +560,7 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 	})
 
 	r.Route("/api/teams", func(r chi.Router) {
+		r.Use(gate(feature.KeyTeams))
 		r.Get("/", teamH.List)
 		r.Get("/{id}", teamH.GetByID)
 		r.Get("/{id}/members", teamH.GetMembers)
@@ -531,6 +579,7 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 	})
 
 	r.Route("/api/blog", func(r chi.Router) {
+		r.Use(gate(feature.KeyBlog))
 		r.Get("/", blogH.ListPosts)
 		r.Get("/{id}", blogH.GetPost)
 		r.Get("/{type}/{id}/comments", blogH.GetComments)
@@ -546,6 +595,7 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 	})
 
 	r.Route("/api/editorials", func(r chi.Router) {
+		r.Use(gate(feature.KeyEditorials))
 		r.Get("/", editorialH.List)
 		r.Get("/{id}", editorialH.GetByID)
 		r.Get("/problem/{problemId}", editorialH.GetByProblem)
@@ -556,6 +606,7 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 	})
 
 	r.Route("/api/keys", func(r chi.Router) {
+		r.Use(gate(feature.KeyAPIKeys))
 		r.Use(middleware.AuthMiddleware(jwtManager))
 		r.Get("/", apiKeyH.List)
 		r.Post("/", apiKeyH.Create)
@@ -563,6 +614,7 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 	})
 
 	r.Route("/api/webhooks", func(r chi.Router) {
+		r.Use(gate(feature.KeyWebhooks))
 		r.Use(middleware.AuthMiddleware(jwtManager))
 		r.Get("/", webhookH.List)
 		r.Post("/", webhookH.Create)
@@ -570,11 +622,13 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 	})
 
 	r.Route("/api/recommendations", func(r chi.Router) {
+		r.Use(gate(feature.KeyRecommendations))
 		r.Use(middleware.AuthMiddleware(jwtManager))
 		r.Get("/", recommendationH.GetRecommendations)
 	})
 
 	r.Route("/api/organizations", func(r chi.Router) {
+		r.Use(gate(feature.KeyOrganizations))
 		r.Get("/", orgH.List)
 		r.Get("/{id}", orgH.GetByID)
 		r.Get("/{id}/members", orgH.GetMembers)
@@ -592,6 +646,7 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 	})
 
 	r.Route("/api/organizations/{orgId}/classes", func(r chi.Router) {
+		r.Use(gate(feature.KeyClasses))
 		r.Get("/", classH.List)
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.AuthMiddleware(jwtManager))
@@ -600,6 +655,7 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 	})
 
 	r.Route("/api/classes", func(r chi.Router) {
+		r.Use(gate(feature.KeyClasses))
 		r.Get("/{id}", classH.GetByID)
 		r.Get("/{id}/members", classH.GetMembers)
 		r.Group(func(r chi.Router) {
@@ -612,6 +668,7 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 	})
 
 	r.Route("/api/training", func(r chi.Router) {
+		r.Use(gate(feature.KeyTraining))
 		r.Get("/", trainingH.List)
 		r.Get("/{id}", trainingH.GetByID)
 		r.Get("/{id}/enrollments", trainingH.GetEnrollments)
@@ -631,6 +688,7 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 	})
 
 	r.Route("/api/contests/{contestId}/plagiarism", func(r chi.Router) {
+		r.Use(gate(feature.KeyPlagiarism))
 		r.Use(middleware.AuthMiddleware(jwtManager))
 		r.Post("/check", plagiarismH.RunCheck)
 		r.Get("/report", plagiarismH.GetReportByContest)
@@ -640,6 +698,7 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 	})
 
 	r.Route("/api/generate", func(r chi.Router) {
+		r.Use(gate(feature.KeyAIGeneration))
 		r.Use(middleware.AuthMiddleware(jwtManager))
 		r.Use(middleware.RequireRole("admin", "setter"))
 		r.Post("/problem", d.Generate.Problem)
@@ -649,6 +708,7 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 		r.Route("/api/ai", func(r chi.Router) {
 			r.Use(middleware.AuthMiddleware(jwtManager))
 			r.Use(middleware.RequireRole("admin", "setter"))
+			r.Use(gate(feature.KeyAIGeneration))
 			r.Get("/connections", d.AIGeneration.Connections)
 			r.Get("/brief-presets", d.AIGeneration.Presets)
 			r.Post("/jobs", d.AIGeneration.Create)
@@ -664,7 +724,7 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 	// Serve uploads through the media handler, not http.FileServer: FileServer
 	// lists the directory for /media/ and serves whatever happens to be in it.
 	if mediaH != nil {
-		r.Handle("/media/*", http.HandlerFunc(mediaH.Serve))
+		r.With(gate(feature.KeyMediaUploads)).Handle("/media/*", http.HandlerFunc(mediaH.Serve))
 	}
 
 	return r

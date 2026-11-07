@@ -1519,3 +1519,50 @@ export interface ContestStats {
     languages: Record<string, number>
     verdicts: Record<string, number>
 }
+
+// ── Feature gates (internal/feature) ─────────────────────────────────────────
+
+/**
+ * One admin decision about one feature. Mirrors internal/feature.Policy.
+ * The zero value is "on for everybody", so an unconfigured feature is open.
+ */
+export interface FeaturePolicy {
+    enabled: boolean
+    /** Empty/absent means every role. */
+    roles?: string[]
+    /** 0 means unbounded. */
+    min_rating?: number
+    max_rating?: number
+    /** Shown to a user who is denied access. */
+    message?: string
+}
+
+/** One entry of GET /api/features, already resolved for the caller. */
+export interface ResolvedFeature {
+    key: string
+    label: string
+    description: string
+    category: string
+    default_policy: FeaturePolicy
+    requires_login: boolean
+    /** Whether the backend rejects requests, or the gate only hides UI. */
+    api_enforced: boolean
+    policy: FeaturePolicy
+    allowed: boolean
+    reason?: 'disabled' | 'login_required' | 'role' | 'rating'
+    message?: string
+}
+
+/** One entry of GET /api/admin/features. */
+export interface AdminFeature {
+    key: string
+    label: string
+    description: string
+    category: string
+    default_policy: FeaturePolicy
+    requires_login: boolean
+    api_enforced: boolean
+    policy: FeaturePolicy
+    /** True when a stored policy differs from the registry default. */
+    customized: boolean
+}

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Users, FileText, Bot, Settings, Code, Globe, Send, Database, Cpu } from 'lucide-react'
+import { Users, FileText, Bot, Settings, Code, Globe, Send, Database, Cpu, SlidersHorizontal } from 'lucide-react'
 import UsersPanel from './admin/UsersPanel'
 import SetterAppsPanel from './admin/SetterAppsPanel'
 import BotAccountsPanel from './admin/BotAccountsPanel'
@@ -9,8 +9,9 @@ import RemoteLanguagesPanel from './admin/RemoteLanguagesPanel'
 import SubmissionsPanel from './admin/SubmissionsPanel'
 import BackupsPanel from './admin/BackupsPanel'
 import AIModelsPanel from './admin/AIModelsPanel'
+import FeaturesPanel from './admin/FeaturesPanel'
 
-type AdminTab = 'users' | 'applications' | 'bots' | 'languages' | 'remote-languages' | 'submissions' | 'settings' | 'backups' | 'ai-models'
+type AdminTab = 'users' | 'applications' | 'bots' | 'languages' | 'remote-languages' | 'submissions' | 'settings' | 'backups' | 'ai-models' | 'features'
 
 const tabs: { key: AdminTab; label: string; icon: typeof Users }[] = [
     { key: 'users', label: 'Users', icon: Users },
@@ -21,13 +22,14 @@ const tabs: { key: AdminTab; label: string; icon: typeof Users }[] = [
     { key: 'submissions', label: 'Remote Subs', icon: Send },
     { key: 'backups', label: 'Backup & Restore', icon: Database },
     { key: 'ai-models', label: 'AI Models', icon: Cpu },
+    { key: 'features', label: 'Feature Gates', icon: SlidersHorizontal },
     { key: 'settings', label: 'Settings', icon: Settings },
 ]
 
 export default function AdminDashboard() {
     const [activeTab, setActiveTab] = useState<AdminTab>(() => {
         const hash = window.location.hash.replace('#', '') as AdminTab
-        const validTabs: AdminTab[] = ['users', 'applications', 'bots', 'languages', 'remote-languages', 'submissions', 'backups', 'ai-models', 'settings']
+        const validTabs: AdminTab[] = ['users', 'applications', 'bots', 'languages', 'remote-languages', 'submissions', 'backups', 'ai-models', 'features', 'settings']
         return validTabs.includes(hash) ? hash : 'users'
     })
 
@@ -41,7 +43,7 @@ export default function AdminDashboard() {
         }
         const onHashChange = () => {
             const next = window.location.hash.replace('#', '') as AdminTab
-            const valid: AdminTab[] = ['users', 'applications', 'bots', 'languages', 'remote-languages', 'submissions', 'backups', 'ai-models', 'settings']
+            const valid: AdminTab[] = ['users', 'applications', 'bots', 'languages', 'remote-languages', 'submissions', 'backups', 'ai-models', 'features', 'settings']
             if (valid.includes(next)) setActiveTab(next)
         }
         window.addEventListener('hashchange', onHashChange)
@@ -89,6 +91,7 @@ export default function AdminDashboard() {
                     {activeTab === 'submissions' && <SubmissionsPanel />}
                     {activeTab === 'backups' && <BackupsPanel />}
                     {activeTab === 'ai-models' && <AIModelsPanel />}
+                    {activeTab === 'features' && <FeaturesPanel />}
                     {activeTab === 'settings' && <SystemSettingsPanel />}
                 </div>
             </div>

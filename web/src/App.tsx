@@ -2,6 +2,8 @@ import { useState, useEffect, Suspense, lazy } from 'react'
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom'
 import { api, contestSlug } from './lib/api'
 import { ThemeProvider } from './context/ThemeContext'
+import { FeaturesProvider } from './context/FeaturesContext'
+import { FeatureGate } from './components/FeatureGate'
 import { ConfirmProvider } from './components/ConfirmDialog'
 import { ToastProvider } from './components/Toast'
 import { useTranslation } from 'react-i18next'
@@ -379,64 +381,64 @@ function AppShell() {
                 <Suspense fallback={<RouteFallback />}>
                 <Routes>
                     <Route path="/" element={<Home />} />
-                    <Route path="/problems" element={<ProblemList />} />
-                    <Route path="/problems/:slug" element={<ProblemDetail />} />
+                    <Route path="/problems" element={<FeatureGate feature="problems"><ProblemList /></FeatureGate>} />
+                    <Route path="/problems/:slug" element={<FeatureGate feature="problems"><ProblemDetail /></FeatureGate>} />
                     <Route path="/login" element={<Login />} />
                     <Route path="/register" element={<Register />} />
                     <Route path="/forgot-password" element={<ForgotPassword />} />
                     <Route path="/reset-password" element={<ResetPassword />} />
                     <Route path="/verify-email" element={<VerifyEmail />} />
                     <Route path="/oauth/complete" element={<OAuthComplete />} />
-                    <Route path="/contests" element={<ContestList />} />
-                    <Route path="/contests/:id" element={<ContestDetail />} />
-                    <Route path="/contests/:id/scoreboard" element={<ContestScoreboard />} />
-                    <Route path="/contests/:id/plagiarism" element={<ContestPlagiarism />} />
-                    <Route path="/contests/:contestId/problem/:index" element={<ContestProblem />} />
+                    <Route path="/contests" element={<FeatureGate feature="contests"><ContestList /></FeatureGate>} />
+                    <Route path="/contests/:id" element={<FeatureGate feature="contests"><ContestDetail /></FeatureGate>} />
+                    <Route path="/contests/:id/scoreboard" element={<FeatureGate feature="contests"><ContestScoreboard /></FeatureGate>} />
+                    <Route path="/contests/:id/plagiarism" element={<FeatureGate feature="plagiarism"><ContestPlagiarism /></FeatureGate>} />
+                    <Route path="/contests/:contestId/problem/:index" element={<FeatureGate feature="contests"><ContestProblem /></FeatureGate>} />
                     <Route path="/setter/contest/:id/edit" element={<ContestEdit />} />
                     <Route path="/setter/contest/:id/manage" element={<ContestManage />} />
-                    <Route path="/gym" element={<GymList />} />
-                    <Route path="/gym/:id" element={<GymDetail />} />
-                    <Route path="/hack/:contestId/:problemId" element={<HackPanel />} />
-                    <Route path="/groups" element={<GroupList />} />
-                    <Route path="/groups/create" element={<GroupCreate />} />
-                    <Route path="/groups/join" element={<GroupJoin />} />
-                    <Route path="/groups/:id" element={<GroupDetail />} />
-                    <Route path="/teams" element={<TeamList />} />
-                    <Route path="/teams/create" element={<TeamCreate />} />
-                    <Route path="/teams/:id" element={<TeamDetail />} />
-                    <Route path="/blog" element={<BlogList />} />
-                    <Route path="/blog/create" element={<BlogCreate />} />
-                    <Route path="/blog/:id" element={<BlogDetail />} />
-                    <Route path="/editorials" element={<EditorialList />} />
-                    <Route path="/editorials/:id" element={<EditorialDetail />} />
+                    <Route path="/gym" element={<FeatureGate feature="gym"><GymList /></FeatureGate>} />
+                    <Route path="/gym/:id" element={<FeatureGate feature="gym"><GymDetail /></FeatureGate>} />
+                    <Route path="/hack/:contestId/:problemId" element={<FeatureGate feature="hacks"><HackPanel /></FeatureGate>} />
+                    <Route path="/groups" element={<FeatureGate feature="groups"><GroupList /></FeatureGate>} />
+                    <Route path="/groups/create" element={<FeatureGate feature="groups"><GroupCreate /></FeatureGate>} />
+                    <Route path="/groups/join" element={<FeatureGate feature="groups"><GroupJoin /></FeatureGate>} />
+                    <Route path="/groups/:id" element={<FeatureGate feature="groups"><GroupDetail /></FeatureGate>} />
+                    <Route path="/teams" element={<FeatureGate feature="teams"><TeamList /></FeatureGate>} />
+                    <Route path="/teams/create" element={<FeatureGate feature="teams"><TeamCreate /></FeatureGate>} />
+                    <Route path="/teams/:id" element={<FeatureGate feature="teams"><TeamDetail /></FeatureGate>} />
+                    <Route path="/blog" element={<FeatureGate feature="blog"><BlogList /></FeatureGate>} />
+                    <Route path="/blog/create" element={<FeatureGate feature="blog"><BlogCreate /></FeatureGate>} />
+                    <Route path="/blog/:id" element={<FeatureGate feature="blog"><BlogDetail /></FeatureGate>} />
+                    <Route path="/editorials" element={<FeatureGate feature="editorials"><EditorialList /></FeatureGate>} />
+                    <Route path="/editorials/:id" element={<FeatureGate feature="editorials"><EditorialDetail /></FeatureGate>} />
                     <Route path="/settings" element={<Settings />} />
-                    <Route path="/settings/api" element={<APISettings />} />
-                    <Route path="/settings/notifications" element={<NotificationPreferences />} />
+                    <Route path="/settings/api" element={<FeatureGate feature="api_keys"><APISettings /></FeatureGate>} />
+                    <Route path="/settings/notifications" element={<FeatureGate feature="notifications"><NotificationPreferences /></FeatureGate>} />
                     <Route path="/auth/2fa/setup" element={<TwoFactorSetup />} />
                     <Route path="/auth/2fa/verify" element={<TwoFactorVerify />} />
-                    <Route path="/notifications" element={<Notifications />} />
-                    <Route path="/submissions" element={<Submissions />} />
-                    <Route path="/submissions/:id" element={<SubmissionDetail />} />
+                    <Route path="/notifications" element={<FeatureGate feature="notifications"><Notifications /></FeatureGate>} />
+                    <Route path="/submissions" element={<FeatureGate feature="submissions"><Submissions /></FeatureGate>} />
+                    <Route path="/submissions/:id" element={<FeatureGate feature="submissions"><SubmissionDetail /></FeatureGate>} />
                     <Route path="/admin" element={<AdminDashboard />} />
-                    <Route path="/setter" element={<SetterPanel />} />
-                    <Route path="/setter/create" element={<ProblemCreate />} />
-                    <Route path="/setter/:slug" element={<SetterProblemWorkspace />} />
-                    <Route path="/setter/contest/create" element={<ContestCreate />} />
-                    <Route path="/generate/problem" element={<GenerateProblem />} />
+                    <Route path="/setter" element={<FeatureGate feature="setter_workspace"><SetterPanel /></FeatureGate>} />
+                    <Route path="/setter/create" element={<FeatureGate feature="setter_workspace"><ProblemCreate /></FeatureGate>} />
+                    <Route path="/setter/:slug" element={<FeatureGate feature="setter_workspace"><SetterProblemWorkspace /></FeatureGate>} />
+                    <Route path="/setter/contest/create" element={<FeatureGate feature="setter_workspace"><ContestCreate /></FeatureGate>} />
+                    <Route path="/generate/problem" element={<FeatureGate feature="ai_generation"><GenerateProblem /></FeatureGate>} />
 
-                    <Route path="/practice" element={<Practice />} />
-                    <Route path="/organizations" element={<OrganizationList />} />
-                    <Route path="/organizations/create" element={<OrganizationCreate />} />
-                    <Route path="/organizations/:id" element={<OrganizationDetail />} />
-                    <Route path="/classes/:id" element={<ClassDetail />} />
-                    <Route path="/training" element={<TrainingPlanList />} />
-                    <Route path="/training/create" element={<TrainingPlanCreate />} />
-                    <Route path="/training/:id" element={<TrainingPlanDetail />} />
-                    <Route path="/ide" element={<IDE />} />
+                    <Route path="/practice" element={<FeatureGate feature="practice"><Practice /></FeatureGate>} />
+                    <Route path="/organizations" element={<FeatureGate feature="organizations"><OrganizationList /></FeatureGate>} />
+                    <Route path="/organizations/create" element={<FeatureGate feature="organizations"><OrganizationCreate /></FeatureGate>} />
+                    <Route path="/organizations/:id" element={<FeatureGate feature="organizations"><OrganizationDetail /></FeatureGate>} />
+                    <Route path="/classes/:id" element={<FeatureGate feature="classes"><ClassDetail /></FeatureGate>} />
+                    <Route path="/training" element={<FeatureGate feature="training"><TrainingPlanList /></FeatureGate>} />
+                    <Route path="/training/create" element={<FeatureGate feature="training"><TrainingPlanCreate /></FeatureGate>} />
+                    <Route path="/training/:id" element={<FeatureGate feature="training"><TrainingPlanDetail /></FeatureGate>} />
+                    <Route path="/ide" element={<FeatureGate feature="ide"><IDE /></FeatureGate>} />
                     <Route path="/profile" element={<Profile />} />
-                    <Route path="/virtual" element={<VirtualContest />} />
+                    <Route path="/virtual" element={<FeatureGate feature="virtual_contests"><VirtualContest /></FeatureGate>} />
                     <Route path="/rating-history" element={<RatingHistory />} />
-                    <Route path="/rankings" element={<Rankings />} />
+                    <Route path="/rankings" element={<FeatureGate feature="rankings"><Rankings /></FeatureGate>} />
                     <Route path="/user/:username" element={<UserPublicProfile />} />
                     <Route path="/legal/terms" element={<TermsOfService />} />
                     <Route path="/legal/privacy" element={<PrivacyPolicy />} />
@@ -474,11 +476,13 @@ export default function App() {
     return (
         <BrowserRouter>
             <ThemeProvider>
-                <ToastProvider>
-                    <ConfirmProvider>
-                        <AppShell />
-                    </ConfirmProvider>
-                </ToastProvider>
+                <FeaturesProvider>
+                    <ToastProvider>
+                        <ConfirmProvider>
+                            <AppShell />
+                        </ConfirmProvider>
+                    </ToastProvider>
+                </FeaturesProvider>
             </ThemeProvider>
         </BrowserRouter>
     )

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { getAccessToken, signOut } from '../lib/api'
 import { useTheme } from '../context/ThemeContext'
+import { useFeatures } from '../context/FeaturesContext'
 import NotificationBell from './NotificationBell'
 import LanguageSwitcher from './LanguageSwitcher'
 import GlobalSearch from './GlobalSearch'
@@ -101,6 +102,31 @@ export default function Navbar() {
 
     const isActive = (to: string) => location.pathname === to || location.pathname.startsWith(to + '/')
 
+    // Admin-controlled feature gates. A denied feature is hidden here and
+    // rejected by its API; the gate is resolved server-side because it depends
+    // on the caller's role and rating.
+    const { isAllowed } = useFeatures()
+    const show = {
+        problems: isAllowed('problems'),
+        contests: isAllowed('contests'),
+        gym: isAllowed('gym'),
+        practice: isAllowed('practice'),
+        ide: isAllowed('ide'),
+        organizations: isAllowed('organizations'),
+        groups: isAllowed('groups'),
+        teams: isAllowed('teams'),
+        blog: isAllowed('blog'),
+        training: isAllowed('training'),
+        rankings: isAllowed('rankings'),
+        submissions: isAllowed('submissions'),
+        notifications: isAllowed('notifications'),
+        apiKeys: isAllowed('api_keys'),
+        setter: isAllowed('setter_workspace'),
+    }
+    // A dropdown whose every entry is gated away would be an empty menu.
+    const showCompete = show.contests || show.gym || show.practice
+    const showCommunity = show.organizations || show.groups || show.teams || show.blog || show.training || show.rankings
+
     return (
         <nav className="sticky top-0 z-50 border-b border-hairline bg-surface/85 backdrop-blur-md">
             {/* The full desktop nav (logo + Compete + Community + Problems + IDE +
@@ -123,35 +149,43 @@ export default function Navbar() {
                     <div className="hidden items-center gap-0.5 lg:flex">
                         {!isContestant && (
                             <>
-                                <NavDropdown label="Compete" icon={Trophy}>
-                                    <NavLink to="/contests" icon={Trophy}>Contests</NavLink>
-                                    <NavLink to="/gym" icon={Dumbbell}>Gym</NavLink>
-                                    <NavLink to="/practice" icon={BookOpen}>Practice</NavLink>
-                                </NavDropdown>
-                                <NavDropdown label="Community" icon={Users}>
-                                    <NavLink to="/organizations" icon={Building2}>Organizations</NavLink>
-                                    <NavLink to="/groups" icon={Users}>Groups</NavLink>
-                                    <NavLink to="/teams" icon={UserCheck}>Teams</NavLink>
-                                    <NavLink to="/blog" icon={MessageSquare}>Blog</NavLink>
-                                    <NavLink to="/training" icon={GraduationCap}>Training Plans</NavLink>
-                                    <NavLink to="/rankings" icon={BarChart3}>Rankings</NavLink>
-                                </NavDropdown>
-                                <Link
-                                    to="/problems"
-                                    aria-current={isActive('/problems') ? 'page' : undefined}
-                                    className={`${TRIGGER} ${isActive('/problems') ? 'bg-surface-2 text-ink' : ''}`}
-                                >
-                                    <Code2 className="h-4 w-4" />
-                                    <span>Problems</span>
-                                </Link>
-                                <Link
-                                    to="/ide"
-                                    aria-current={isActive('/ide') ? 'page' : undefined}
-                                    className={`${TRIGGER} ${isActive('/ide') ? 'bg-surface-2 text-ink' : ''}`}
-                                >
-                                    <Terminal className="h-4 w-4" />
-                                    <span>IDE</span>
-                                </Link>
+                                {showCompete && (
+                                    <NavDropdown label="Compete" icon={Trophy}>
+                                        {show.contests && <NavLink to="/contests" icon={Trophy}>Contests</NavLink>}
+                                        {show.gym && <NavLink to="/gym" icon={Dumbbell}>Gym</NavLink>}
+                                        {show.practice && <NavLink to="/practice" icon={BookOpen}>Practice</NavLink>}
+                                    </NavDropdown>
+                                )}
+                                {showCommunity && (
+                                    <NavDropdown label="Community" icon={Users}>
+                                        {show.organizations && <NavLink to="/organizations" icon={Building2}>Organizations</NavLink>}
+                                        {show.groups && <NavLink to="/groups" icon={Users}>Groups</NavLink>}
+                                        {show.teams && <NavLink to="/teams" icon={UserCheck}>Teams</NavLink>}
+                                        {show.blog && <NavLink to="/blog" icon={MessageSquare}>Blog</NavLink>}
+                                        {show.training && <NavLink to="/training" icon={GraduationCap}>Training Plans</NavLink>}
+                                        {show.rankings && <NavLink to="/rankings" icon={BarChart3}>Rankings</NavLink>}
+                                    </NavDropdown>
+                                )}
+                                {show.problems && (
+                                    <Link
+                                        to="/problems"
+                                        aria-current={isActive('/problems') ? 'page' : undefined}
+                                        className={`${TRIGGER} ${isActive('/problems') ? 'bg-surface-2 text-ink' : ''}`}
+                                    >
+                                        <Code2 className="h-4 w-4" />
+                                        <span>Problems</span>
+                                    </Link>
+                                )}
+                                {show.ide && (
+                                    <Link
+                                        to="/ide"
+                                        aria-current={isActive('/ide') ? 'page' : undefined}
+                                        className={`${TRIGGER} ${isActive('/ide') ? 'bg-surface-2 text-ink' : ''}`}
+                                    >
+                                        <Terminal className="h-4 w-4" />
+                                        <span>IDE</span>
+                                    </Link>
+                                )}
                             </>
                         )}
                         {isAdmin && (
@@ -181,13 +215,13 @@ export default function Navbar() {
                     {loggedIn ? (
                         <NavDropdown label="" icon={User} align="right" ariaLabel="Account menu">
                             <NavLink to="/profile" icon={User}>Profile</NavLink>
-                            <NavLink to="/notifications" icon={Bell}>Notifications</NavLink>
-                            <NavLink to="/submissions" icon={FileCode}>My Submissions</NavLink>
-                            <NavLink to="/setter" icon={FileCode}>Setter Workspace</NavLink>
+                            {show.notifications && <NavLink to="/notifications" icon={Bell}>Notifications</NavLink>}
+                            {show.submissions && <NavLink to="/submissions" icon={FileCode}>My Submissions</NavLink>}
+                            {show.setter && <NavLink to="/setter" icon={FileCode}>Setter Workspace</NavLink>}
                             {!isContestant && (
                                 <>
-                                    <NavLink to="/settings/api" icon={Key}>API Keys</NavLink>
-                                    <NavLink to="/settings/notifications" icon={Bell}>Notification Settings</NavLink>
+                                    {show.apiKeys && <NavLink to="/settings/api" icon={Key}>API Keys</NavLink>}
+                                    {show.notifications && <NavLink to="/settings/notifications" icon={Bell}>Notification Settings</NavLink>}
                                 </>
                             )}
                             <hr className="my-1 border-hairline" />
@@ -250,20 +284,24 @@ export default function Navbar() {
                 >
                     {!isContestant && (
                         <>
-                            <p className="px-2 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-soft">Compete</p>
-                            <MobileLink to="/contests" icon={Trophy}>Contests</MobileLink>
-                            <MobileLink to="/gym" icon={Dumbbell}>Gym</MobileLink>
-                            <MobileLink to="/practice" icon={BookOpen}>Practice</MobileLink>
-                            <MobileLink to="/problems" icon={Code2}>Problems</MobileLink>
-                            <MobileLink to="/ide" icon={Terminal}>IDE</MobileLink>
+                            {showCompete && (
+                                <p className="px-2 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-soft">Compete</p>
+                            )}
+                            {show.contests && <MobileLink to="/contests" icon={Trophy}>Contests</MobileLink>}
+                            {show.gym && <MobileLink to="/gym" icon={Dumbbell}>Gym</MobileLink>}
+                            {show.practice && <MobileLink to="/practice" icon={BookOpen}>Practice</MobileLink>}
+                            {show.problems && <MobileLink to="/problems" icon={Code2}>Problems</MobileLink>}
+                            {show.ide && <MobileLink to="/ide" icon={Terminal}>IDE</MobileLink>}
 
-                            <p className="px-2 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-soft">Community</p>
-                            <MobileLink to="/organizations" icon={Building2}>Organizations</MobileLink>
-                            <MobileLink to="/groups" icon={Users}>Groups</MobileLink>
-                            <MobileLink to="/teams" icon={UserCheck}>Teams</MobileLink>
-                            <MobileLink to="/blog" icon={MessageSquare}>Blog</MobileLink>
-                            <MobileLink to="/training" icon={GraduationCap}>Training Plans</MobileLink>
-                            <MobileLink to="/rankings" icon={BarChart3}>Rankings</MobileLink>
+                            {showCommunity && (
+                                <p className="px-2 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-soft">Community</p>
+                            )}
+                            {show.organizations && <MobileLink to="/organizations" icon={Building2}>Organizations</MobileLink>}
+                            {show.groups && <MobileLink to="/groups" icon={Users}>Groups</MobileLink>}
+                            {show.teams && <MobileLink to="/teams" icon={UserCheck}>Teams</MobileLink>}
+                            {show.blog && <MobileLink to="/blog" icon={MessageSquare}>Blog</MobileLink>}
+                            {show.training && <MobileLink to="/training" icon={GraduationCap}>Training Plans</MobileLink>}
+                            {show.rankings && <MobileLink to="/rankings" icon={BarChart3}>Rankings</MobileLink>}
                         </>
                     )}
 
@@ -273,7 +311,7 @@ export default function Navbar() {
                             <MobileLink to="/admin" icon={Settings}>Admin Dashboard</MobileLink>
                         </>
                     )}
-                    {loggedIn && !isContestant && (
+                    {loggedIn && !isContestant && show.setter && (
                         <MobileLink to="/setter" icon={FileCode}>Setter Workspace</MobileLink>
                     )}
 
@@ -281,9 +319,9 @@ export default function Navbar() {
                     {loggedIn ? (
                         <>
                             <MobileLink to="/profile" icon={User}>Profile</MobileLink>
-                            <MobileLink to="/notifications" icon={Bell}>Notifications</MobileLink>
-                            <MobileLink to="/submissions" icon={FileCode}>My Submissions</MobileLink>
-                            {!isContestant && <MobileLink to="/settings/api" icon={Key}>API Keys</MobileLink>}
+                            {show.notifications && <MobileLink to="/notifications" icon={Bell}>Notifications</MobileLink>}
+                            {show.submissions && <MobileLink to="/submissions" icon={FileCode}>My Submissions</MobileLink>}
+                            {!isContestant && show.apiKeys && <MobileLink to="/settings/api" icon={Key}>API Keys</MobileLink>}
                             <button
                                 type="button"
                                 onClick={handleLogout}

@@ -36,11 +36,25 @@ const BASE = '/api'
 let accessToken: string | null = localStorage.getItem('access_token')
 let refreshToken: string | null = localStorage.getItem('refresh_token')
 
+/**
+ * Fired whenever the session starts or ends.
+ *
+ * Feature verdicts depend on who is signed in (role and rating), so the
+ * features context has to refetch when the session changes. A DOM event keeps
+ * this module free of any React dependency.
+ */
+export const AUTH_CHANGE_EVENT = 'aioj:auth-change'
+
+function notifyAuthChange() {
+    window.dispatchEvent(new Event(AUTH_CHANGE_EVENT))
+}
+
 export function setTokens(a: string, r: string) {
     accessToken = a
     refreshToken = r
     localStorage.setItem('access_token', a)
     localStorage.setItem('refresh_token', r)
+    notifyAuthChange()
 }
 
 export function clearTokens() {
@@ -48,6 +62,7 @@ export function clearTokens() {
     refreshToken = null
     localStorage.removeItem('access_token')
     localStorage.removeItem('refresh_token')
+    notifyAuthChange()
 }
 
 /**
@@ -203,7 +218,7 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
     }
 }
 
-import type { AIBrief, AIBriefPreset, AIGenerationJob, AIModel, APIKey, ActivityItem, AuthResponse, AuthSessionResponse, BackupFile, BlogListItem, BlogPost, BotAccount, Clarification, Class, ClassListItem, ClassMember, Comment, Contest, ContestDetailResponse, ContestNotice, ContestPermission, ContestProblem, ContestRegistration, ContestSubmissionsResponse, DetectedTool, Editorial, Group, GroupListItem, GroupMember, GroupPendingInvite, GymContest, GymData, Hack, HackResult, HackSubmission, LanguageConfig, Notification, NotificationPreferences, OnsiteBatchUser, Organization, OrganizationListItem, OrganizationMember, PendingInvite, PendingRemoteSubmission, PlagiarismPairDetail, PlagiarismReport, Problem, ProblemI18n, ProblemListItem, ProblemPermission, ProblemStats, PublicProfile, RankingEntry, RatingHistoryEntry, RemoteLanguage, ScoreboardData, SetterApplication, Submission, Team, TeamListItem, TeamMember, TestResult, TrainingPlan, TrainingPlanDetail, TrainingPlanEnrollment, TrainingPlanProblem, TrainingPlanProgress, TrainingPlanSection, User, UserAchievement, UserProblemStats, UserProfile, VirtualContest, VirtualStatusResponse, WeakTagsRecommendations, Webhook } from '../types/api'
+import type { AIBrief, AIBriefPreset, AIGenerationJob, AIModel, APIKey, ActivityItem, AdminFeature, AuthResponse, AuthSessionResponse, BackupFile, BlogListItem, BlogPost, BotAccount, Clarification, Class, ClassListItem, ClassMember, Comment, Contest, ContestDetailResponse, ContestNotice, ContestPermission, ContestProblem, ContestRegistration, ContestSubmissionsResponse, DetectedTool, Editorial, FeaturePolicy, Group, GroupListItem, GroupMember, GroupPendingInvite, GymContest, GymData, Hack, HackResult, HackSubmission, LanguageConfig, Notification, NotificationPreferences, OnsiteBatchUser, Organization, OrganizationListItem, OrganizationMember, PendingInvite, PendingRemoteSubmission, PlagiarismPairDetail, PlagiarismReport, Problem, ProblemI18n, ProblemListItem, ProblemPermission, ProblemStats, PublicProfile, RankingEntry, RatingHistoryEntry, RemoteLanguage, ResolvedFeature, ScoreboardData, SetterApplication, Submission, Team, TeamListItem, TeamMember, TestResult, TrainingPlan, TrainingPlanDetail, TrainingPlanEnrollment, TrainingPlanProblem, TrainingPlanProgress, TrainingPlanSection, User, UserAchievement, UserProblemStats, UserProfile, VirtualContest, VirtualStatusResponse, WeakTagsRecommendations, Webhook } from '../types/api'
 
 export const api = {
     auth: {
@@ -432,7 +447,23 @@ export const api = {
             return request<{ data: Submission[]; total: number }>(url);
         },
     },
+    features: {
+        /**
+         * Every gateable feature with the verdict for the current caller.
+         * Public: the SPA needs this before it can render navigation, and the
+         * verdict differs per role/rating, so it is resolved server-side.
+         */
+        list: () => request<{ data: ResolvedFeature[] }>('/features'),
+    },
+
     admin: {
+        features: {
+            list: () => request<{ data: AdminFeature[] }>('/admin/features'),
+            set: (key: string, policy: FeaturePolicy) =>
+                request(`/admin/features/${encodeURIComponent(key)}`, { method: 'PUT', body: JSON.stringify(policy) }),
+            reset: (key: string) =>
+                request(`/admin/features/${encodeURIComponent(key)}`, { method: 'DELETE' }),
+        },
         listUsers: (offset = 0, limit = 20) =>
             request<{ data: User[]; total: number }>(`/admin/users?offset=${offset}&limit=${limit}`),
         updateRole: (userId: string, role: string) =>

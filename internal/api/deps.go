@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/tahsinarafat/aioj/internal/api/handler"
+	"github.com/tahsinarafat/aioj/internal/feature"
 )
 
 // Deps holds all HTTP handler dependencies for the router.
@@ -72,22 +73,27 @@ type Deps struct {
 	Friendships    *handler.FriendshipHandler
 	AuditLog       *handler.AuditLogHandler
 	// Health is optional; when set, /api/health reports dependency status.
-	Health        *handler.HealthChecker
-	Activity      *handler.ActivityHandler
-	Generate      *handler.GenerateHandler
-	AIModel       *handler.AdminAIModelHandler
-	AIGeneration  *handler.AIGenerationHandler
-	DevMail       *handler.DevMailHandler
-	VerifyEmail   *handler.EmailVerificationHandler
-	TwoFA         *handler.TwoFactorHandler
-	TwoFAVerify   *handler.TwoFactorVerifyHandler
-	OAuthStart    *handler.OAuthStartHandler
-	OAuthCallback *handler.OAuthCallbackHandler
-	Legal         *handler.LegalHandler
-	UsersExport   *handler.UsersExportHandler
-	UsersDeletion *handler.UsersDeletionHandler
-	CSRFSecret    string
-	AIEnabled     bool
+	Health       *handler.HealthChecker
+	Activity     *handler.ActivityHandler
+	Generate     *handler.GenerateHandler
+	AIModel      *handler.AdminAIModelHandler
+	AIGeneration *handler.AIGenerationHandler
+	// Features serves the feature-gate registry and its admin CRUD.
+	Features *handler.FeaturesHandler
+	// FeatureResolver is the same resolver the handler writes through; the
+	// router mounts it as per-route gates.
+	FeatureResolver *feature.Resolver
+	DevMail         *handler.DevMailHandler
+	VerifyEmail     *handler.EmailVerificationHandler
+	TwoFA           *handler.TwoFactorHandler
+	TwoFAVerify     *handler.TwoFactorVerifyHandler
+	OAuthStart      *handler.OAuthStartHandler
+	OAuthCallback   *handler.OAuthCallbackHandler
+	Legal           *handler.LegalHandler
+	UsersExport     *handler.UsersExportHandler
+	UsersDeletion   *handler.UsersDeletionHandler
+	CSRFSecret      string
+	AIEnabled       bool
 	// MetricsToken guards /metrics. Empty means only an admin access token can
 	// scrape it (anonymous scraping is never allowed).
 	MetricsToken string
