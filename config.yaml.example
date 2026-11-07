@@ -32,6 +32,13 @@ ai:
   max_response_bytes: 4194304
   retention_days: 14
   staged_testdata_root: "./testdata/ai-staging"
+  # Multi-turn generator pipeline (internal/harness). Off keeps the single-shot
+  # JSON path; on runs the tool loop that materializes large cases by executing
+  # generated code instead of asking the model to type them.
+  harness: false              # env AI_HARNESS_ENABLED
+  max_case_n: 1000000         # env AI_MAX_CASE_N — bounds the largest test case
+  max_job_bytes: 67108864     # env AI_MAX_JOB_BYTES — 64 MiB of materialized data per job
+  repair_turns: 2             # env AI_REPAIR_TURNS — retries after a failed gate
 mail:
   driver: "catcher"           # smtp | catcher | noop — override with MAIL_DRIVER
   host: ""

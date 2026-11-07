@@ -92,6 +92,50 @@ services:
         condition: service_started
     restart: unless-stopped
 
+  # Multi-turn AI problem-generation harness.
+  #
+  # Its own service on purpose: a generation run is token-heavy and takes
+  # minutes, so mixing it into the API process would let one long run compete
+  # with request handling. It shares the testdata volume (that is where
+  # materialized cases land) and talks to go-judge directly, never executing
+  # generated code in this container.
+  #
+  # Started only with an explicit profile, because it needs a configured AI
+  # model and a credential master key:
+  #   docker compose --profile ai up -d ai-harness
+  ai-harness:
+    profiles: ["ai"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: /app/aioj --mode=ai-harness
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: aioj
+      DB_USER: aioj
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set in .env}
+      JUDGE_ENDPOINT: http://judge:5050
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env (openssl rand -hex 32)}
+      AIOJ_ENV: ${AIOJ_ENV:-production}
+      AI_ENABLED: ${AI_ENABLED:-false}
+      AI_HARNESS_ENABLED: ${AI_HARNESS_ENABLED:-false}
+      AI_CREDENTIAL_MASTER_KEY: ${AI_CREDENTIAL_MASTER_KEY:-}
+      AI_MAX_CASE_N: ${AI_MAX_CASE_N:-1000000}
+      AI_MAX_JOB_BYTES: ${AI_MAX_JOB_BYTES:-67108864}
+      AI_STAGED_TESTDATA_ROOT: /app/testdata/ai-staging
+    volumes:
+      - testdata:/app/testdata
+      - ./lang:/app/lang
+    depends_on:
+      postgres:
+        condition: service_healthy
+      judge:
+        condition: service_started
+    restart: unless-stopped
+
   judge-worker:
     build:
       context: .

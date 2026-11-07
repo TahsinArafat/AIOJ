@@ -23,6 +23,8 @@ import (
 	"github.com/tahsinarafat/aioj/internal/feature"
 	"github.com/tahsinarafat/aioj/internal/generate"
 	"github.com/tahsinarafat/aioj/internal/hack"
+	"github.com/tahsinarafat/aioj/internal/harness"
+	"github.com/tahsinarafat/aioj/internal/harness/problemgen"
 	"github.com/tahsinarafat/aioj/internal/judge"
 	"github.com/tahsinarafat/aioj/internal/judge/executor"
 	"github.com/tahsinarafat/aioj/internal/mail"
@@ -42,7 +44,7 @@ import (
 
 func main() {
 	cfgPath := flag.String("config", "config.yaml", "path to config file")
-	mode := flag.String("mode", "server", "run mode: server|judge-worker|ai-worker")
+	mode := flag.String("mode", "server", "run mode: server|judge-worker|ai-worker|ai-harness")
 	flag.Parse()
 
 	cfg, err := config.Load(*cfgPath)
@@ -330,6 +332,55 @@ func main() {
 		}
 		startAIWorkers()
 		slog.Info("running in ai-worker mode, waiting for generation jobs")
+		quit := make(chan os.Signal, 1)
+		signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+		<-quit
+		cancel()
+		return
+	}
+
+	// The harness runs the multi-turn generator pipeline: the model calls
+	// tools, the tools materialize test data by executing generated code inside
+	// go-judge. It is a separate mode (and, in the shipped compose file, a
+	// separate container) so a long, token-heavy run cannot compete with API
+	// traffic. AI_HARNESS_ENABLED gates it.
+	if *mode == "ai-harness" {
+		if !cfg.AI.Enabled || !cfg.AI.Harness {
+			log.Fatal("ai-harness mode requires AI_ENABLED=true and AI_HARNESS_ENABLED=true")
+		}
+		problemgen.MaxN = cfg.AI.MaxCaseN
+		runner, err := problemgen.NewJudgeRunner(execClient, cfg.LangDir)
+		if err != nil {
+			log.Fatalf("ai harness: %v", err)
+		}
+		harnessWorker := &problemgen.Worker{
+			Jobs:       aiGenerationStore,
+			Runner:     runner,
+			Transcript: postgres.NewHarnessTranscript(db),
+			Staging:    cfg.AI.StagedTestdataRoot,
+			MaxBytes:   cfg.AI.MaxJobBytes,
+			Budget:     problemgen.DefaultBudget(0),
+			Resolve: func(ctx context.Context, modelID *string) (harness.Model, error) {
+				m, err := aiModelStore.GetDefault(ctx)
+				if modelID != nil {
+					m, err = aiModelStore.GetByID(ctx, *modelID)
+				}
+				if err != nil || m == nil {
+					return nil, fmt.Errorf("no AI model is enabled")
+				}
+				return ai.NewWithOptions(m.Endpoint, m.APIKey, m.ModelName, ai.ClientOptions{
+					Mode:                m.StructuredOutputMode,
+					Timeout:             time.Duration(m.RequestTimeoutSeconds) * time.Second,
+					MaxOutputTokens:     m.MaxOutputTokens,
+					AllowPrivateNetwork: m.AllowPrivateNetwork,
+				}), nil
+			},
+		}
+		if err := harnessWorker.Ready(); err != nil {
+			log.Fatalf("ai harness: %v", err)
+		}
+		go harnessWorker.Run(ctx)
+		slog.Info("running in ai-harness mode, waiting for generation jobs")
 		quit := make(chan os.Signal, 1)
 		signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 		<-quit

@@ -205,6 +205,15 @@ type AIConfig struct {
 	MaxResponseBytes    int64  `yaml:"max_response_bytes"`
 	RetentionDays       int    `yaml:"retention_days"`
 	StagedTestdataRoot  string `yaml:"staged_testdata_root"`
+	// Harness drives the multi-turn generator pipeline. MaxCaseN bounds the
+	// largest test case: the judge loads a whole input into memory, so an
+	// unbounded n is a host-memory risk. MaxJobBytes bounds total materialized
+	// data per job. RepairTurns caps how many times the loop may retry after a
+	// failed gate.
+	Harness     bool  `yaml:"harness"`
+	MaxCaseN    int   `yaml:"max_case_n"`
+	MaxJobBytes int64 `yaml:"max_job_bytes"`
+	RepairTurns int   `yaml:"repair_turns"`
 }
 
 func Load(path string) (*Config, error) {
@@ -283,6 +292,19 @@ func Load(path string) (*Config, error) {
 	if v := os.Getenv("AI_STAGED_TESTDATA_ROOT"); v != "" {
 		cfg.AI.StagedTestdataRoot = v
 	}
+	if v := os.Getenv("AI_HARNESS_ENABLED"); v != "" {
+		cfg.AI.Harness = strings.EqualFold(v, "true") || v == "1"
+	}
+	if v := os.Getenv("AI_MAX_CASE_N"); v != "" {
+		cfg.AI.MaxCaseN = atoi(v)
+	}
+	if v := os.Getenv("AI_MAX_JOB_BYTES"); v != "" {
+		n, _ := strconv.ParseInt(v, 10, 64)
+		cfg.AI.MaxJobBytes = n
+	}
+	if v := os.Getenv("AI_REPAIR_TURNS"); v != "" {
+		cfg.AI.RepairTurns = atoi(v)
+	}
 	if v := os.Getenv("AI_ENABLED"); v != "" {
 		cfg.AI.Enabled = strings.EqualFold(v, "true") || v == "1"
 	}
@@ -300,6 +322,15 @@ func Load(path string) (*Config, error) {
 	}
 	if cfg.AI.StagedTestdataRoot == "" {
 		cfg.AI.StagedTestdataRoot = "./testdata/ai-staging"
+	}
+	if cfg.AI.MaxCaseN <= 0 {
+		cfg.AI.MaxCaseN = 1_000_000
+	}
+	if cfg.AI.MaxJobBytes <= 0 {
+		cfg.AI.MaxJobBytes = 64 << 20
+	}
+	if cfg.AI.RepairTurns <= 0 {
+		cfg.AI.RepairTurns = 2
 	}
 	if v := os.Getenv("CSRF_SECRET"); v != "" {
 		cfg.Auth.CSRFSecret = v

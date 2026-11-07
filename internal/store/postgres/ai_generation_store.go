@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/tahsinarafat/aioj/internal/model"
 	"time"
 )
@@ -84,6 +85,29 @@ func (s *AIGenerationStore) Complete(ctx context.Context, id, token string, prop
 	_, err := s.db.ExecContext(ctx, `UPDATE ai_generation_jobs SET status='ready',stage='ready',progress=100,proposal=$3,validation_report=$4,prompt_tokens=$5,completion_tokens=$6,latency_ms=$7,finished_at=NOW(),heartbeat_at=NOW() WHERE id=$1 AND claim_token=$2`, id, token, proposal, validation, promptTokens, completionTokens, latencyMS)
 	return err
 }
+
+// SetManifest stores the case manifest a harness run produced and marks the job
+// ready for review. A run that stopped on a budget or failed a gate stores the
+// manifest too, so the admin can see what was built and why it was rejected.
+func (s *AIGenerationStore) SetManifest(ctx context.Context, id, token string, manifest, report json.RawMessage, ready bool, turns int) error {
+	status := "validation_failed"
+	if ready {
+		status = "ready"
+	}
+	_, err := s.db.ExecContext(ctx, `
+		UPDATE ai_generation_jobs
+		SET status = $3, stage = $3, progress = 100,
+		    case_manifest = $4, validation_report = $5, turn_count = $6,
+		    harness_version = 'problemgen-v1',
+		    finished_at = NOW(), heartbeat_at = NOW()
+		WHERE id = $1 AND claim_token = $2 AND status = 'running'`,
+		id, token, status, nullableJSON(manifest), nullableJSON(report), turns)
+	if err != nil {
+		return fmt.Errorf("ai jobs: set manifest: %w", err)
+	}
+	return nil
+}
+
 func (s *AIGenerationStore) Fail(ctx context.Context, id, token, code, message string, validation json.RawMessage) error {
 	_, err := s.db.ExecContext(ctx, `UPDATE ai_generation_jobs SET status=CASE WHEN $5 IS NULL THEN 'failed' ELSE 'validation_failed' END,stage='failed',error_code=$3,error_message=$4,validation_report=$5,finished_at=NOW() WHERE id=$1 AND claim_token=$2`, id, token, code, message, nullableJSON(validation))
 	return err
