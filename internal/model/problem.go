@@ -23,6 +23,10 @@ type Problem struct {
 	Description          string          `json:"description"`
 	InputFormat          string          `json:"input_format,omitempty"`
 	OutputFormat         string          `json:"output_format,omitempty"`
+	// Constraints is a LaTeX/Markdown block of the problem's numeric bounds,
+	// rendered as its own section on the problem page (Codeforces style). It is
+	// separate from Description so the bounds are always marked as constraints.
+	Constraints          string          `json:"constraints,omitempty"`
 	Hint                 string          `json:"hint,omitempty"`
 	SampleCases          []SampleCase    `json:"sample_cases"`
 	TimeLimit            int             `json:"time_limit"`
@@ -83,6 +87,7 @@ type CreateProblemRequest struct {
 	Description          string          `json:"description"`
 	InputFormat          string          `json:"input_format,omitempty"`
 	OutputFormat         string          `json:"output_format,omitempty"`
+	Constraints          string          `json:"constraints,omitempty"`
 	Hint                 string          `json:"hint,omitempty"`
 	TimeLimit            int             `json:"time_limit"`
 	MemoryLimit          int             `json:"memory_limit"`

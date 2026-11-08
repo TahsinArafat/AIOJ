@@ -145,7 +145,7 @@ interface ProblemData {
     id: string; slug: string; title?: string; description?: string; hint?: string;
     source?: string; difficulty?: string; problem_type?: string; scoring_mode?: string;
     interactive?: boolean; time_limit: number; memory_limit: number;
-    input_format?: string; output_format?: string; pdf?: string;
+    input_format?: string; output_format?: string; constraints?: string; pdf?: string;
     tags?: string[]; sample_cases?: SampleCase[];
 }
 interface RunResult { status: string; stdout?: string; stderr?: string; compile_output?: string; expected?: string; passed?: boolean | null; time_used: number; memory_used: number }
@@ -636,6 +636,9 @@ export default function ProblemDetail() {
                         {problem.output_format && (
                             <StatementSection title="Output format" body={problem.output_format} />
                         )}
+                        {problem.constraints && (
+                            <StatementSection title="Constraints" body={problem.constraints} />
+                        )}
                         {/* This block is `problem.hint`, not the constraints — it used to
                             render under a "Constraints" heading and mislead readers. */}
                         {problem.hint && (
@@ -662,7 +665,13 @@ export default function ProblemDetail() {
                                         </div>
                                     </div>
                                 </div>
-                                {sc.explanation && <p className="text-xs text-muted mt-1">{sc.explanation}</p>}
+                                {sc.explanation && (
+                                    <div className="prose prose-sm mt-1 max-w-none text-xs text-muted">
+                                        <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+                                            {sc.explanation}
+                                        </ReactMarkdown>
+                                    </div>
+                                )}
                             </div>
                         ))}
                     </div>

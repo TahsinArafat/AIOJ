@@ -134,6 +134,7 @@ func (h *ProblemHandler) Update(w http.ResponseWriter, r *http.Request) {
 	p.Difficulty = req.Difficulty
 	p.InputFormat = req.InputFormat
 	p.OutputFormat = req.OutputFormat
+	p.Constraints = req.Constraints
 	p.Hint = req.Hint
 	p.SampleCases = req.SampleCases
 	p.TestCaseScore = req.TestCaseScore
@@ -287,6 +288,7 @@ func (h *ProblemHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Description:          req.Description,
 		InputFormat:          req.InputFormat,
 		OutputFormat:         req.OutputFormat,
+		Constraints:          req.Constraints,
 		Hint:                 req.Hint,
 		TimeLimit:            req.TimeLimit,
 		MemoryLimit:          req.MemoryLimit,

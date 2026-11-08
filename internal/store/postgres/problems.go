@@ -53,14 +53,14 @@ func (s *ProblemStore) Create(ctx context.Context, p *model.Problem) error {
 	defer tx.Rollback()
 
 	err = tx.QueryRowContext(ctx, `INSERT INTO problems
-		(id,slug,title,description,input_format,output_format,hint,sample_cases,
+		(id,slug,title,description,constraints,input_format,output_format,hint,sample_cases,
 		 time_limit,memory_limit,difficulty,tags,visible,testdata_path,testcase_score,
 		 spj,spj_language,spj_source_code,spj_version,source,remote_id,created_by,
 		 checker_type,float_epsilon,interactive,interactor_language,interactor_source_code,
 		 scoring_mode,subtask_aggregation,ai_generated)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31)
 		RETURNING created_at,updated_at`,
-		p.ID, p.Slug, p.Title, p.Description, p.InputFormat, p.OutputFormat, p.Hint, samples,
+		p.ID, p.Slug, p.Title, p.Description, p.Constraints, p.InputFormat, p.OutputFormat, p.Hint, samples,
 		p.TimeLimit, p.MemoryLimit, p.Difficulty, pq.Array(p.Tags), p.Visible, p.TestdataPath, scores,
 		p.SPJ, p.SPJLanguage, p.SPJSourceCode, p.SPJVersion, p.Source, p.RemoteID, p.CreatedBy,
 		p.CheckerType, p.FloatEpsilon, p.Interactive, p.InteractorLanguage, p.InteractorSourceCode,
@@ -96,14 +96,14 @@ func (s *ProblemStore) getBy(ctx context.Context, field, value string) (*model.P
 	var samples, scores []byte
 	var tags []string
 	err := s.db.QueryRowContext(ctx, fmt.Sprintf(`SELECT
-		id,slug,title,description,input_format,output_format,hint,sample_cases,
+		id,slug,title,description,COALESCE(constraints,''),input_format,output_format,hint,sample_cases,
 		time_limit,memory_limit,difficulty,tags,visible,testdata_path,testcase_score,
 		spj,spj_language,spj_source_code,spj_version,checker_type,float_epsilon,submission_count,accepted_count,
 		source,remote_id,COALESCE(created_by::text,''),created_at,updated_at,
 		interactive,COALESCE(interactor_language,''),COALESCE(interactor_source_code,''),
 		COALESCE(scoring_mode,'complete'),COALESCE(subtask_aggregation,'min'),
 		COALESCE(ai_generated,false) FROM problems WHERE %s=$1`, field), value).Scan(
-		&p.ID, &p.Slug, &p.Title, &p.Description, &p.InputFormat, &p.OutputFormat, &p.Hint, &samples,
+		&p.ID, &p.Slug, &p.Title, &p.Description, &p.Constraints, &p.InputFormat, &p.OutputFormat, &p.Hint, &samples,
 		&p.TimeLimit, &p.MemoryLimit, &p.Difficulty, pq.Array(&tags), &p.Visible, &p.TestdataPath, &scores,
 		&p.SPJ, &p.SPJLanguage, &p.SPJSourceCode, &p.SPJVersion, &p.CheckerType, &p.FloatEpsilon, &p.SubmissionCount, &p.AcceptedCount,
 		&p.Source, &p.RemoteID, &p.CreatedBy, &p.CreatedAt, &p.UpdatedAt,
@@ -166,12 +166,12 @@ func (s *ProblemStore) Update(ctx context.Context, id string, p *model.Problem) 
 		return fmt.Errorf("marshal testcase_score: %w", err)
 	}
 	_, err = s.db.ExecContext(ctx, `UPDATE problems SET
-		title=$2, description=$3, input_format=$4, output_format=$5, hint=$6, sample_cases=$7,
-		time_limit=$8, memory_limit=$9, difficulty=$10, tags=$11, visible=$12,
-		testdata_path=$13, testcase_score=$14, spj=$15, spj_language=$16, spj_source_code=$17, checker_type=$18, float_epsilon=$19,
-		interactive=$20, interactor_language=$21, interactor_source_code=$22,
-		scoring_mode=$23, subtask_aggregation=$24, updated_at=NOW() WHERE id=$1`,
-		id, p.Title, p.Description, p.InputFormat, p.OutputFormat, p.Hint, samples,
+		title=$2, description=$3, constraints=$4, input_format=$5, output_format=$6, hint=$7, sample_cases=$8,
+		time_limit=$9, memory_limit=$10, difficulty=$11, tags=$12, visible=$13,
+		testdata_path=$14, testcase_score=$15, spj=$16, spj_language=$17, spj_source_code=$18, checker_type=$19, float_epsilon=$20,
+		interactive=$21, interactor_language=$22, interactor_source_code=$23,
+		scoring_mode=$24, subtask_aggregation=$25, updated_at=NOW() WHERE id=$1`,
+		id, p.Title, p.Description, p.Constraints, p.InputFormat, p.OutputFormat, p.Hint, samples,
 		p.TimeLimit, p.MemoryLimit, p.Difficulty, pq.Array(p.Tags), p.Visible, p.TestdataPath,
 		scores, p.SPJ, p.SPJLanguage, p.SPJSourceCode, p.CheckerType, p.FloatEpsilon,
 		p.Interactive, p.InteractorLanguage, p.InteractorSourceCode,

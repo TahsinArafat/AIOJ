@@ -44,19 +44,19 @@ Work in this order:
 
 A well-formed competitive programming statement MUST follow these rules:
 
-**Constraints block (mandatory):**
-The description MUST end with a paragraph headed "**Constraints**" (bold, on its
-own line) that lists every bound set by set_constraints. Example:
+**Constraints block (mandatory, separate field):**
+Pass the numeric bounds in the dedicated constraints field of set_statement as
+a LaTeX block, one bound per line. It renders as its own "Constraints" section
+between Output format and Notes. Every bound declared in set_constraints MUST
+appear here. Do NOT repeat the bounds inside the description.
 
-  **Constraints**
+Example value of the constraints field:
 
   $1 \le n \le 2 \cdot 10^5$
 
   $1 \le a_i \le 10^7$
 
-  Time limit: 2 seconds. Memory limit: 256 MB.
-
-If the constraints paragraph is missing, finalize will fail.
+If the constraints field is empty, set_statement and finalize will fail.
 
 **The hint field MUST be empty for contest problems.**
 Leave the hint as an empty string "". The hint field renders as a "Notes" section
@@ -73,8 +73,8 @@ mechanically, but never *how* to solve the general case.
 **Codeforces statement style:**
 - State the problem scenario first (1–3 short paragraphs).
 - State what the solver must compute or output.
-- Include an explicit **Constraints** block as above (mandatory).
-- Input format and output format are separate paragraphs — do not merge them into
+- Put the bounds in the dedicated constraints field (mandatory), not the description.
+- Input format and output format are separate fields — do not merge them into
   the description.
 - Samples must have correct input/output matching the reference solution.
 - Do NOT include pseudocode, recurrences, or complexity analysis in the statement.
@@ -191,13 +191,13 @@ func (p *Pipeline) Run(ctx context.Context, jobID string, brief string) (*Manife
 	report.Checks = append(report.Checks, ws.CheckSamples(ctx, tools.statement.Samples)...)
 	report.Checks = append(report.Checks, ws.CheckLimits(ctx)...)
 
-	// Statement quality: constraints block and clean hint.
+	// Statement quality: constraints field present and clean hint.
 	if tools.statement.Title != "" {
-		hasConstraints := strings.Contains(tools.statement.Description, "Constraint")
+		hasConstraints := strings.TrimSpace(tools.statement.Constraints) != ""
 		report.Checks = append(report.Checks, Check{
-			Name:    "constraints_in_statement",
+			Name:    "constraints_declared",
 			Passed:  hasConstraints,
-			Message: map[bool]string{true: "description contains a Constraints section", false: "description is missing a **Constraints** paragraph"}[hasConstraints],
+			Message: map[bool]string{true: "constraints block is present", false: "the constraints field is empty"}[hasConstraints],
 		})
 		if strings.TrimSpace(tools.statement.Hint) != "" {
 			report.Checks = append(report.Checks, Check{

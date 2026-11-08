@@ -21,6 +21,7 @@ import (
 type proposalDoc struct {
 	Title             string            `json:"title"`
 	Description       string            `json:"description"`
+	Constraints       string            `json:"constraints"`
 	InputFormat       string            `json:"input_format"`
 	OutputFormat      string            `json:"output_format"`
 	Hint              string            `json:"hint"`
@@ -55,6 +56,7 @@ func proposalJSON(m Manifest) (json.RawMessage, error) {
 	doc := proposalDoc{
 		Title:             m.Statement.Title,
 		Description:       m.Statement.Description,
+		Constraints:       m.Statement.Constraints,
 		InputFormat:       m.Statement.InputFormat,
 		OutputFormat:      m.Statement.OutputFormat,
 		Hint:              m.Statement.Hint,

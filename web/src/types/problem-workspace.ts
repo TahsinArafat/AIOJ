@@ -17,6 +17,8 @@ export interface ProblemFormState {
   description: string
   inputFormat: string
   outputFormat: string
+  /** LaTeX bounds block; renders as its own Constraints section. */
+  constraints: string
   hint: string
   timeLimit: number
   memoryLimit: number
@@ -49,6 +51,7 @@ export function createDefaultFormState(): ProblemFormState {
     description: '',
     inputFormat: '',
     outputFormat: '',
+    constraints: '',
     hint: '',
     timeLimit: 1000,
     memoryLimit: 262144,

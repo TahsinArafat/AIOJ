@@ -68,6 +68,7 @@ func (s *ApplyService) Apply(ctx context.Context, job *model.AIGenerationJob, ac
 	if selected["statement"] {
 		problem.Title = p.Title
 		problem.Description = p.Description
+		problem.Constraints = p.Constraints
 		problem.InputFormat = p.InputFormat
 		problem.OutputFormat = p.OutputFormat
 		problem.Hint = p.Hint

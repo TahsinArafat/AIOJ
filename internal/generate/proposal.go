@@ -34,6 +34,7 @@ type ValidationReport struct {
 type Proposal struct {
 	Title               string              `json:"title"`
 	Description         string              `json:"description"`
+	Constraints         string              `json:"constraints"`
 	InputFormat         string              `json:"input_format"`
 	OutputFormat        string              `json:"output_format"`
 	Hint                string              `json:"hint"`
@@ -81,6 +82,7 @@ func ValidateProposal(p *Proposal, artifact string) ValidationReport {
 	wt := artifact == "full_problem" || artifact == "tests"
 	if ws {
 		add("statement", p.Title != "" && p.Description != "" && p.InputFormat != "" && p.OutputFormat != "", "title, statement, input and output formats are required")
+		add("constraints", strings.TrimSpace(p.Constraints) != "", "a constraints block listing the numeric bounds is required")
 		add("samples", len(p.SampleCases) >= 1 && len(p.SampleCases) <= 3, "one to three samples required")
 	}
 	if wsol {
@@ -131,10 +133,11 @@ func ProposalJSONSchema() map[string]any {
 	return map[string]any{
 		"type":                 "object",
 		"additionalProperties": false,
-		"required":             []string{"title", "description", "input_format", "output_format"},
+		"required":             []string{"title", "description", "constraints", "input_format", "output_format"},
 		"properties": map[string]any{
 			"title":              stringField("Problem title"),
-			"description":        stringField("Full problem statement"),
+			"description":        stringField("Full problem statement (scenario and task only; do NOT include the numeric bounds here)"),
+			"constraints":        stringField("The numeric bounds as a LaTeX block, one per line, e.g. $1 \\le n \\le 2 \\cdot 10^5$"),
 			"input_format":       stringField("Description of the input format"),
 			"output_format":      stringField("Description of the output format"),
 			"hint":               stringField("Optional short hint"),

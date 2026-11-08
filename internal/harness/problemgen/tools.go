@@ -76,10 +76,11 @@ func (t *Tools) Tools() []ai.Tool {
 			}, "time_limit_ms", "memory_limit_kb")),
 
 		ai.NewTool("set_statement",
-			"Write the problem statement. Samples are verified against the reference solution, so they must be correct. Write mathematics as $...$ LaTeX (KaTeX renders it); backticks render as literal monospace text, never as math. IMPORTANT: (1) The description MUST end with a **Constraints** paragraph listing every declared bound. (2) Leave hint empty — it renders as a Notes section visible to contestants and must NOT contain the solution approach or algorithm.",
+			"Write the problem statement. Samples are verified against the reference solution, so they must be correct. Write mathematics as $...$ LaTeX (KaTeX renders it); backticks render as literal monospace text, never as math. IMPORTANT: (1) Put the numeric bounds in the dedicated `constraints` field as a LaTeX block — it renders as its own Constraints section; do NOT repeat them in the description. (2) Leave hint empty — it renders as a Notes section visible to contestants and must NOT contain the solution approach or algorithm.",
 			object(map[string]any{
 				"title":         str("Short problem title."),
-				"description":   str("Full Markdown statement. Must include a **Constraints** paragraph at the end listing every bound from set_constraints. Mathematical notation must be $...$ LaTeX. Do NOT reveal the solution algorithm or key insight."),
+				"description":   str("Full Markdown statement (scenario and task only). Mathematical notation must be $...$ LaTeX. Do NOT put the numeric bounds here — use the constraints field. Do NOT reveal the solution algorithm or key insight."),
+				"constraints":   str("The numeric bounds as a LaTeX block, one bound per line, e.g. \"$1 \\\\le n \\\\le 2 \\\\cdot 10^5$\\n\\n$1 \\\\le a_i \\\\le 10^7$\". Every bound declared in set_constraints must appear here."),
 				"input_format":  str("Input format description."),
 				"output_format": str("Output format description."),
 				"hint":          str("Leave EMPTY. The hint field renders as a Notes section visible to contestants. Do not put the solution approach, algorithm, or editorial content here."),
@@ -88,9 +89,9 @@ func (t *Tools) Tools() []ai.Tool {
 				"samples": arrayOf(object(map[string]any{
 					"input":       str("Sample input."),
 					"output":      str("Expected output."),
-					"explanation": str("Optional: explain why the output is correct mechanically. Do NOT reveal the general algorithm or approach."),
+					"explanation": str("Optional: explain why the output is correct mechanically (LaTeX allowed). Do NOT reveal the general algorithm or approach."),
 				}, "input", "output")),
-			}, "title", "description", "input_format", "output_format", "tags", "difficulty", "samples")),
+			}, "title", "description", "constraints", "input_format", "output_format", "tags", "difficulty", "samples")),
 
 		ai.NewTool("set_generator_shapes",
 			"Declare the input shapes the generator supports (for example random, sorted, reverse, star, line). The case matrix runs every tier against every shape.",
@@ -248,6 +249,7 @@ func (t *Tools) setStatement(args map[string]any) (harness.Result, error) {
 	st := Statement{
 		Title:        strArg(args, "title"),
 		Description:  strArg(args, "description"),
+		Constraints:  strArg(args, "constraints"),
 		InputFormat:  strArg(args, "input_format"),
 		OutputFormat: strArg(args, "output_format"),
 		Hint:         strArg(args, "hint"),
@@ -263,13 +265,13 @@ func (t *Tools) setStatement(args map[string]any) (harness.Result, error) {
 		return harness.Result{}, fmt.Errorf("difficulty must be easy, medium or hard")
 	}
 
-	// Enforce that the description contains a Constraints section. A statement
-	// without declared bounds is incomplete; contestants cannot solve what they
-	// cannot constrain.
-	if !strings.Contains(st.Description, "Constraint") {
+	// Constraints live in their own field and render as a dedicated section. A
+	// statement without declared bounds is incomplete, so this is required.
+	if strings.TrimSpace(st.Constraints) == "" {
 		return harness.Result{}, fmt.Errorf(
-			"the description must contain a **Constraints** paragraph listing every numeric bound (n_min, n_max, value_min, value_max). " +
-				"Add it at the end of the description, e.g.:\n\n**Constraints**\n\n$1 \\le n \\le 2 \\cdot 10^5$\n\n$1 \\le a_i \\le 10^7$")
+			"the constraints field is required: list every numeric bound as LaTeX, one per line, e.g. " +
+				"\"$1 \\le n \\le 2 \\cdot 10^5$\" and \"$1 \\le a_i \\le 10^7$\". " +
+				"These must match the bounds you passed to set_constraints.")
 	}
 
 	// Warn if the hint is non-empty — it renders as a Notes section visible to
@@ -514,14 +516,14 @@ func (t *Tools) finalize(ctx context.Context) (harness.Result, error) {
 		report.Checks = append(report.Checks, Check{Name: "cases", Passed: false, Message: "no cases materialized"})
 	}
 
-	// Statement quality gates: check that the description has a Constraints
-	// block and that the hint field is empty (not a solution spoiler).
+	// Statement quality gates: the constraints field must be present, and the
+	// hint must be empty (not a solution spoiler).
 	if t.statement.Title != "" {
-		hasConstraints := strings.Contains(t.statement.Description, "Constraint")
+		hasConstraints := strings.TrimSpace(t.statement.Constraints) != ""
 		report.Checks = append(report.Checks, Check{
-			Name:    "constraints_in_statement",
+			Name:    "constraints_declared",
 			Passed:  hasConstraints,
-			Message: map[bool]string{true: "description contains a Constraints section", false: "description is missing a **Constraints** paragraph — add one listing every declared bound"}[hasConstraints],
+			Message: map[bool]string{true: "constraints block is present", false: "the constraints field is empty — add a LaTeX bounds block listing every declared bound"}[hasConstraints],
 		})
 		if strings.TrimSpace(t.statement.Hint) != "" {
 			report.Checks = append(report.Checks, Check{

@@ -402,6 +402,7 @@ export interface CreateProblemRequest {
     description: string
     input_format?: string
     output_format?: string
+    constraints?: string
     hint?: string
     time_limit: number
     memory_limit: number
@@ -798,6 +799,8 @@ export interface Problem {
     description: string
     input_format?: string
     output_format?: string
+    /** LaTeX/Markdown bounds block, rendered as its own Constraints section. */
+    constraints?: string
     hint?: string
     sample_cases: SampleCase[]
     time_limit: number

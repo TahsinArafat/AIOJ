@@ -4,7 +4,7 @@ import CheckerTab from './CheckerTab'
 import type { ProblemFormState } from '../../types/problem-workspace'
 
 const baseState: ProblemFormState = {
-  title: '', description: '', inputFormat: '', outputFormat: '', hint: '',
+  title: '', description: '', inputFormat: '', outputFormat: '', constraints: '', hint: '',
   timeLimit: 1000, memoryLimit: 262144, difficulty: 'easy', tags: '',
   sampleCases: [], testcases: [],
   checkerType: 'exact',

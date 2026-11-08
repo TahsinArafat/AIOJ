@@ -11,6 +11,7 @@ func readyManifest() Manifest {
 		Statement: Statement{
 			Title:        "Example",
 			Description:  "Do the thing.",
+			Constraints:  "$1 \\le n \\le 1000$",
 			InputFormat:  "n then n integers",
 			OutputFormat: "one integer",
 			Tags:         []string{"greedy"},
@@ -55,12 +56,18 @@ func TestProposalJSONIsApplyableForReadyManifest(t *testing.T) {
 		GeneratorLanguage string   `json:"generator_language"`
 		SampleCases       []Sample `json:"sample_cases"`
 		Seeds             []int64  `json:"seeds"`
+		Constraints       string   `json:"constraints"`
 	}
 	if err := json.Unmarshal(raw, &got); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
 	if got.Title != "Example" || got.Description != "Do the thing." {
 		t.Fatalf("statement not carried over: %+v", got)
+	}
+	// The constraints block must reach the apply path; without it the created
+	// problem has no Constraints section on its page.
+	if got.Constraints != "$1 \\le n \\le 1000$" {
+		t.Fatalf("constraints not carried over: %q", got.Constraints)
 	}
 	if got.TimeLimitMs != 1500 || got.MemoryLimitKB != 262144 {
 		t.Fatalf("limits not carried over: %+v", got)

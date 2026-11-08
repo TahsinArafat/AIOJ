@@ -940,6 +940,17 @@ export default function ContestProblem() {
                                             </div>
                                         </div>
                                     )}
+
+                                    {problem.constraints && (
+                                        <div>
+                                            <h3 className="font-semibold text-sm text-ink-soft uppercase tracking-wide mb-2">Constraints</h3>
+                                            <div className="prose prose-sm max-w-none text-ink-soft bg-surface-2/20 rounded-lg p-4 border border-hairline">
+                                                <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+                                                    {problem.constraints}
+                                                </ReactMarkdown>
+                                            </div>
+                                        </div>
+                                    )}
                                 </>
                             )}
 

@@ -8,6 +8,7 @@ const baseState: ProblemFormState = {
   description: 'Description here',
   inputFormat: 'Two ints',
   outputFormat: 'Sum',
+  constraints: '1 \\le n \\le 10',
   hint: 'Think',
   timeLimit: 1000,
   memoryLimit: 262144,

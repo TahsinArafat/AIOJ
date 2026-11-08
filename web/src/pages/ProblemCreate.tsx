@@ -8,6 +8,7 @@ export default function ProblemCreate() {
     const [form, setForm] = useState({
         slug: '', title: '', description: '', difficulty: 'easy',
         time_limit: 1000, memory_limit: 262144, tags: '', input_format: '', output_format: '',
+        constraints: '',
     })
     const [error, setError] = useState('')
     const [submitting, setSubmitting] = useState(false)
@@ -37,6 +38,7 @@ export default function ProblemCreate() {
                 difficulty: form.difficulty, time_limit: form.time_limit, memory_limit: form.memory_limit,
                 tags: form.tags.split(',').map((t: string) => t.trim()).filter(Boolean),
                 input_format: form.input_format, output_format: form.output_format,
+                constraints: form.constraints,
             })
             nav('/setter')
         } catch (err) {
@@ -114,6 +116,13 @@ export default function ProblemCreate() {
                     <label htmlFor="problem-output-format" className="block text-sm font-medium text-ink-soft mb-1">Output Format</label>
                     <textarea id="problem-output-format" rows={2} value={form.output_format} onChange={e => setForm(p => ({...p, output_format: e.target.value}))}
                         className="w-full border border-hairline-strong rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)]" />
+                </div>
+                <div>
+                    <label htmlFor="problem-constraints" className="block text-sm font-medium text-ink-soft mb-1">Constraints</label>
+                    <textarea id="problem-constraints" rows={2} value={form.constraints} onChange={e => setForm(p => ({...p, constraints: e.target.value}))}
+                        placeholder="e.g. $1 \le n \le 2\cdot10^5$"
+                        className="w-full border border-hairline-strong rounded-md px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)]" />
+                    <p className="mt-1 text-xs text-muted">LaTeX bounds, one per line. Rendered as its own section on the problem page.</p>
                 </div>
                 <button type="submit" disabled={submitting}
                     className="bg-brand text-on-brand px-6 py-2 rounded hover:bg-brand-hover disabled:opacity-50 transition-colors">

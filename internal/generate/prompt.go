@@ -29,7 +29,8 @@ Respond with ONLY a valid JSON object matching exactly this schema (no markdown 
 
 {
   "title": "string — short catchy problem title",
-  "description": "string — full Markdown problem statement including all constraints",
+  "description": "string — full Markdown problem statement (scenario and task only; do NOT put the numeric bounds here)",
+  "constraints": "string — the numeric bounds as a LaTeX block, one per line, e.g. $1 \\le n \\le 2\\cdot10^5$",
   "input_format": "string — describes the input format (lines/values)",
   "output_format": "string — describes the expected output",
   "hint": "string — optional clarifying hint; empty string if none",
@@ -60,6 +61,7 @@ Respond with ONLY a valid JSON object matching exactly this schema (no markdown 
 
 Rules:
 - difficulty must be "easy" for rating ≤ 1400, "medium" for ≤ 1900, "hard" for ≥ 2000.
+- constraints must list every numeric bound as a LaTeX block (rendered as its own section); do NOT repeat the bounds inside description.
 - sample_cases must contain at least 1 and at most 3 examples.
 - solution_code must be compilable C++17 and produce the correct answer for the sample cases.
 - editorial_content must explain the core insight, NOT just describe the solution code.

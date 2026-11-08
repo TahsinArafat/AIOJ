@@ -52,7 +52,7 @@ func happyScript() [][]ai.ToolCall {
 		{tc("3", "set_generator_shapes", `{"shapes":["random","reverse"]}`)},
 		{tc("4", "write_generator", `{"language":"cpp-gpp-64","source":"GENERATOR"}`)},
 		{tc("5", "write_solution", `{"language":"cpp-gpp-64","source":"SOLUTION"}`)},
-		{tc("6", "set_statement", "{\"title\":\"Echo\",\"description\":\"Print the first integer.\\n\\n**Constraints**\\n\\n$1 \\\\\\\\le n \\\\\\\\le 2000$, $-1 \\\\\\\\le a_i \\\\\\\\le 1000$\",\"input_format\":\"n\",\"output_format\":\"n\",\"tags\":[\"implementation\"],\"difficulty\":\"easy\",\"samples\":[{\"input\":\"3 1 2 3\",\"output\":\"3\"}]}")},
+		{tc("6", "set_statement", "{\"title\":\"Echo\",\"description\":\"Print the first integer.\",\"constraints\":\"$1 \\\\\\\\le n \\\\\\\\le 2000$\\n\\n$-1 \\\\\\\\le a_i \\\\\\\\le 1000$\",\"input_format\":\"n\",\"output_format\":\"n\",\"tags\":[\"implementation\"],\"difficulty\":\"easy\",\"samples\":[{\"input\":\"3 1 2 3\",\"output\":\"3\"}]}")},
 		{tc("7", "materialize_matrix", `{}`)},
 		{tc("8", "finalize", `{}`)},
 	}

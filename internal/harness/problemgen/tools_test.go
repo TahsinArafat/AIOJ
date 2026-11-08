@@ -30,7 +30,7 @@ func buildProblem(t *testing.T, tools *Tools) {
 		{"set_generator_shapes", `{"shapes":["random","reverse"]}`},
 		{"write_generator", `{"language":"cpp-gpp-64","source":"GENERATOR"}`},
 		{"write_solution", `{"language":"cpp-gpp-64","source":"SOLUTION"}`},
-		{"set_statement", `{"title":"Echo","description":"Print the first integer.\n\n**Constraints**\n\n$1 \\le n \\le 1000$\n\n$-1 \\le a_i \\le 1000$","input_format":"n","output_format":"n","tags":["implementation"],"difficulty":"easy","samples":[{"input":"3 1 2 3","output":"3"}]}`},
+		{"set_statement", `{"title":"Echo","description":"Print the first integer.","constraints":"$1 \\le n \\le 1000$\\n\\n$-1 \\le a_i \\le 1000$","input_format":"n","output_format":"n","tags":["implementation"],"difficulty":"easy","samples":[{"input":"3 1 2 3","output":"3"}]}`},
 		{"materialize_matrix", `{}`},
 	}
 	for _, s := range steps {
@@ -146,7 +146,7 @@ func TestFinalizeBlocksWithoutAMaxCase(t *testing.T) {
 	if _, err := run(t, tools, "write_solution", `{"language":"cpp-gpp-64","source":"SOLUTION"}`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := run(t, tools, "set_statement", `{"title":"Echo","description":"d\\n\\n**Constraints**\\n\\n$1 \\\\le n \\\\le 1000$","input_format":"i","output_format":"o","tags":["t"],"difficulty":"easy","samples":[{"input":"3","output":"3"}]}`); err != nil {
+	if _, err := run(t, tools, "set_statement", `{"title":"Echo","description":"d","constraints":"$1 \\\\le n \\\\le 1000$","input_format":"i","output_format":"o","tags":["t"],"difficulty":"easy","samples":[{"input":"3","output":"3"}]}`); err != nil {
 		t.Fatal(err)
 	}
 	// Only a small case: the constraint never gets exercised.
@@ -163,11 +163,46 @@ func TestFinalizeBlocksWithoutAMaxCase(t *testing.T) {
 	}
 }
 
+// A statement without a constraints block is incomplete: the problem page would
+// have no Constraints section and contestants would have no bounds to reason
+// about. set_statement must reject it at the moment the model writes it.
+func TestSetStatementRequiresConstraints(t *testing.T) {
+	tools := newTestTools(t)
+	_, err := run(t, tools, "set_statement",
+		`{"title":"Echo","description":"d","input_format":"i","output_format":"o","tags":["t"],"difficulty":"easy","samples":[{"input":"3","output":"3"}]}`)
+	if err == nil {
+		t.Fatal("set_statement accepted a statement with no constraints")
+	}
+	if !strings.Contains(err.Error(), "constraints field is required") {
+		t.Fatalf("error should name the missing constraints field: %v", err)
+	}
+
+	// And a whitespace-only block is not a declaration either.
+	if _, err := run(t, tools, "set_statement",
+		`{"title":"Echo","description":"d","constraints":"   ","input_format":"i","output_format":"o","tags":["t"],"difficulty":"easy","samples":[{"input":"3","output":"3"}]}`); err == nil {
+		t.Fatal("set_statement accepted a blank constraints block")
+	}
+}
+
+// The hint renders as a Notes section contestants can read, so a non-empty hint
+// is a publication blocker rather than a warning.
+func TestFinalizeBlocksOnAHintSpoiler(t *testing.T) {
+	tools := newTestTools(t)
+	buildProblem(t, tools)
+	if _, err := run(t, tools, "set_statement", `{"title":"Echo","description":"d","constraints":"$1 \\\\le n \\\\le 1000$","hint":"Use Moebius inversion.","input_format":"i","output_format":"o","tags":["t"],"difficulty":"easy","samples":[{"input":"3 1 2 3","output":"3"}]}`); err != nil {
+		t.Fatal(err)
+	}
+	_, err := run(t, tools, "finalize", `{}`)
+	if err == nil || !strings.Contains(err.Error(), "hint_empty") {
+		t.Fatalf("err = %v, want a hint_empty failure", err)
+	}
+}
+
 func TestFinalizeBlocksOnAWrongSample(t *testing.T) {
 	tools := newTestTools(t)
 	buildProblem(t, tools)
 	// Rewrite the statement with a sample the reference cannot reproduce.
-	if _, err := run(t, tools, "set_statement", `{"title":"Echo","description":"d\\n\\n**Constraints**\\n\\n$1 \\\\le n \\\\le 1000$","input_format":"i","output_format":"o","tags":["t"],"difficulty":"easy","samples":[{"input":"3 1 2 3","output":"999"}]}`); err != nil {
+	if _, err := run(t, tools, "set_statement", `{"title":"Echo","description":"d","constraints":"$1 \\\\le n \\\\le 1000$","input_format":"i","output_format":"o","tags":["t"],"difficulty":"easy","samples":[{"input":"3 1 2 3","output":"999"}]}`); err != nil {
 		t.Fatal(err)
 	}
 	_, err := run(t, tools, "finalize", `{}`)
@@ -325,7 +360,7 @@ func TestCrosscheckCatchesAWrongReferenceSolution(t *testing.T) {
 	if _, err := run(t, tools, "write_brute", `{"language":"cpp-gpp-64","source":"BRUTE"}`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := run(t, tools, "set_statement", `{"title":"Echo","description":"d\\n\\n**Constraints**\\n\\n$1 \\\\le n \\\\le 1000$","input_format":"i","output_format":"o","tags":["t"],"difficulty":"easy","samples":[{"input":"3","output":"3"}]}`); err != nil {
+	if _, err := run(t, tools, "set_statement", `{"title":"Echo","description":"d","constraints":"$1 \\\\le n \\\\le 1000$","input_format":"i","output_format":"o","tags":["t"],"difficulty":"easy","samples":[{"input":"3","output":"3"}]}`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := run(t, tools, "materialize_matrix", `{}`); err != nil {

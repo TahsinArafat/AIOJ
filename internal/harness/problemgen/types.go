@@ -161,14 +161,19 @@ type Sample struct {
 
 // Statement is the human-facing part of the problem.
 type Statement struct {
-	Title        string   `json:"title"`
-	Description  string   `json:"description"`
-	InputFormat  string   `json:"input_format"`
-	OutputFormat string   `json:"output_format"`
-	Hint         string   `json:"hint,omitempty"`
-	Tags         []string `json:"tags"`
-	Difficulty   string   `json:"difficulty"`
-	Samples      []Sample `json:"samples"`
+	Title        string `json:"title"`
+	Description  string `json:"description"`
+	InputFormat  string `json:"input_format"`
+	OutputFormat string `json:"output_format"`
+	// Constraints is the human-readable LaTeX bounds block, rendered as its own
+	// section on the problem page. It is kept separate from Description so the
+	// bounds are always presented as constraints (Codeforces style) rather than
+	// buried in prose.
+	Constraints string   `json:"constraints"`
+	Hint        string   `json:"hint,omitempty"`
+	Tags        []string `json:"tags"`
+	Difficulty  string   `json:"difficulty"`
+	Samples     []Sample `json:"samples"`
 }
 
 // Check is one gate result.

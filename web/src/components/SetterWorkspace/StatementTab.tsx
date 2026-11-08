@@ -163,10 +163,22 @@ export default function StatementTab({
 
           <div>
             <label className="block text-xs font-semibold text-muted uppercase mb-1">Constraints</label>
+            <p className="mb-1 text-xs text-muted-soft">
+              One bound per line, e.g. <code className="font-mono">$1 \le n \le 2\cdot10^5$</code>. Rendered as its own section on the problem page.
+            </p>
+            <VisualEditorField
+              content={formState.constraints}
+              onChange={(markdown) => onUpdate('constraints', markdown)}
+              placeholder="e.g. $1 \le n \le 2\cdot10^5$"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-muted uppercase mb-1">Notes / Hint (optional)</label>
             <VisualEditorField
               content={formState.hint}
               onChange={(markdown) => onUpdate('hint', markdown)}
-              placeholder="Add constraints..."
+              placeholder="Optional clarification shown under Notes. Do not reveal the solution."
             />
           </div>
         </div>
@@ -174,7 +186,7 @@ export default function StatementTab({
         <div>
           <label className="block text-xs font-semibold text-muted uppercase mb-1">Live Preview</label>
           <div className="prose prose-sm max-w-none bg-surface-2 border border-hairline rounded-lg p-4 max-h-[600px] overflow-y-auto">
-            {formState.description || formState.inputFormat || formState.outputFormat || formState.hint ? (
+            {formState.description || formState.inputFormat || formState.outputFormat || formState.constraints || formState.hint ? (
               <div className="space-y-4">
                 {formState.description && (
                   <div>
@@ -200,9 +212,17 @@ export default function StatementTab({
                     </ReactMarkdown>
                   </div>
                 )}
-                {formState.hint && (
+                {formState.constraints && (
                   <div>
                     <h4 className="text-xs font-bold text-muted-soft uppercase tracking-wider mb-2">Constraints</h4>
+                    <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+                      {formState.constraints}
+                    </ReactMarkdown>
+                  </div>
+                )}
+                {formState.hint && (
+                  <div>
+                    <h4 className="text-xs font-bold text-muted-soft uppercase tracking-wider mb-2">Notes</h4>
                     <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
                       {formState.hint}
                     </ReactMarkdown>
