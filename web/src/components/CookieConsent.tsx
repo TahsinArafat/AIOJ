@@ -21,8 +21,9 @@ export default function CookieConsent() {
         >
             <div className="flex items-start gap-3">
                 <div className="flex-1 text-sm text-ink-soft">
-                    AIOJ uses essential cookies for authentication and analytics cookies
-                    to improve the service. See our{' '}
+                    AIOJ uses the cookies and browser storage needed to keep you signed in
+                    and protect your session. There are no advertising or cross-site tracking
+                    cookies. Optional analytics runs only after you accept. See our{' '}
                     <a href="/legal/privacy" className="underline">
                         Privacy Policy
                     </a>
