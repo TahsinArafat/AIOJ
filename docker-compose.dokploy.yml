@@ -1,0 +1,386 @@
+# AIOJ — Dokploy-optimized Compose
+# =================================
+# Use THIS file in Dokploy (Compose -> docker-compose.dokploy.yml).
+# Dokploy's Traefik is the ONLY public entrypoint (80/443). Do NOT also run
+# the Caddy service from docker-compose.yml — it would fight Traefik for 80/443.
+#
+# What changed vs docker-compose.yml (optimizations for Dokploy/Traefik):
+#   1. No host `ports:` at all. Dokploy/Traefik routes to the container port
+#      via Docker labels, so nothing is published directly on the host.
+#   2. Traefik labels on `frontend` only (Host + websecure + Let's Encrypt).
+#      backend/postgres/redis/judge stay internal-only (expose / sandbox net).
+#   3. Monitoring (prometheus/grafana) moved behind the `monitor` profile so
+#      a fresh Dokploy deploy does not spend RAM on them.
+#   4. vjudge browsers + ai-harness stay behind their profiles (off by default).
+#   5. One-shot `seeder` service (profile `seed`) creates the first admin.
+#      There is NO auto-admin in production — you run it once, explicitly.
+#   6. Healthchecks + restart + mem limits + json-file log rotation.
+#
+# Required Dokploy Environment Variables (set in Dokploy UI, NOT committed):
+#   DOMAIN                 your public domain, e.g. aioj.example.com
+#   DB_PASSWORD            openssl rand -hex 32
+#   JWT_SECRET             openssl rand -hex 32   (>=32 chars, else backend exits)
+#   REDIS_PASSWORD         openssl rand -hex 32
+#   METRICS_TOKEN          openssl rand -hex 32
+#   CSRF_SECRET            openssl rand -hex 32
+#   OAUTH_STATE_SECRET     openssl rand -hex 32
+#   SEED_ADMIN_PASSWORD    strong password for the first admin (seed profile only)
+#   PUBLIC_ORIGIN          https://<DOMAIN>
+#   MAIL_PUBLIC_URL        https://<DOMAIN>
+#   MAIL_DRIVER/MAIL_HOST/MAIL_PORT/MAIL_USERNAME/MAIL_PASSWORD/MAIL_FROM
+#   PAPER_CERT_EMAIL       Let's Encrypt email for Traefik (if not set globally)
+#
+# Deploy:
+#   1. Dokploy -> Compose -> select this file -> set env vars -> Deploy
+#   2. Create the first admin (one time):
+#        docker compose -f docker-compose.dokploy.yml --profile seed run --rm seeder
+#      (Dokploy: run the same command via "Advanced > Console/Terminal" or
+#       a one-off `docker compose run`. Then change the password in-app.)
+#   3. Optional profiles:
+#        --profile ai       -> ai-harness (AI problem generation)
+#        --profile vjudge   -> cf-bypass / cf-submit / atcoder-submit (heavy, +1GB)
+#        --profile monitor  -> prometheus + grafana
+#
+# Notes:
+#   - Migrations run automatically on backend startup (cmd/aioj: m.Up()).
+#     No manual `make migrate-up` needed.
+#   - `judge` needs privileged + cgroup:host (criyle/go-judge >=1.11). Keep it.
+#   - DNS: A record for DOMAIN -> VPS IP before first deploy (Let's Encrypt).
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: aioj
+      POSTGRES_USER: aioj
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set in Dokploy env}
+    command: >
+      postgres
+      -c shared_buffers=64MB
+      -c effective_cache_size=128MB
+      -c max_connections=50
+      -c work_mem=4MB
+    volumes:
+      - pgdata:/var/lib/postgresql
+    expose:
+      - "5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aioj"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  judge:
+    build:
+      context: .
+      dockerfile: Dockerfile.judge
+    privileged: true
+    cgroup: host
+    networks:
+      - sandbox
+    expose:
+      - "5050"
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?REDIS_PASSWORD must be set in Dokploy env}"]
+    volumes:
+      - redisdata:/data
+    expose:
+      - "6379"
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      AIOJ_ENV: ${AIOJ_ENV:-production}
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: aioj
+      DB_USER: aioj
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set in Dokploy env}
+      JUDGE_ENDPOINT: http://judge:5050
+      JUDGE_CONCURRENCY: ${JUDGE_CONCURRENCY:-2}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in Dokploy env (openssl rand -hex 32)}
+      CSRF_SECRET: ${CSRF_SECRET:?CSRF_SECRET must be set in Dokploy env}
+      OAUTH_STATE_SECRET: ${OAUTH_STATE_SECRET:-}
+      METRICS_TOKEN: ${METRICS_TOKEN:?METRICS_TOKEN must be set in Dokploy env}
+      LANG_DIR: /app/lang
+      REDIS_URL: ${REDIS_URL:-redis:6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in Dokploy env}
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-https://${DOMAIN:?DOMAIN must be set in Dokploy env}}
+      MAIL_DRIVER: ${MAIL_DRIVER:-noop}
+      MAIL_HOST: ${MAIL_HOST:-}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-noreply@${DOMAIN:?DOMAIN must be set in Dokploy env}}
+      MAIL_PUBLIC_URL: ${MAIL_PUBLIC_URL:-https://${DOMAIN:?DOMAIN must be set in Dokploy env}}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      GITHUB_REDIRECT_URL: ${GITHUB_REDIRECT_URL:-https://${DOMAIN:?DOMAIN must be set in Dokploy env}/api/auth/oauth/github/callback}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URL: ${GOOGLE_REDIRECT_URL:-https://${DOMAIN:?DOMAIN must be set in Dokploy env}/api/auth/oauth/google/callback}
+      AI_ENABLED: ${AI_ENABLED:-false}
+      AI_HARNESS_ENABLED: ${AI_HARNESS_ENABLED:-false}
+      AI_CREDENTIAL_MASTER_KEY: ${AI_CREDENTIAL_MASTER_KEY:-}
+      CF_SUBMIT_URL: ${CF_SUBMIT_URL:-http://host.docker.internal:8003}
+      FLARESOLVERR_URL: ${FLARESOLVERR_URL:-http://cf-bypass:8191}
+      ATCODER_SUBMIT_URL: ${ATCODER_SUBMIT_URL:-http://host.docker.internal:8004}
+    expose:
+      - "8080"
+    networks:
+      - default
+      - sandbox
+    volumes:
+      - testdata:/app/testdata
+      - backups:/app/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+      judge:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/api/health >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 20s
+    mem_limit: 512m
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  judge-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: /app/aioj --mode=judge-worker
+    environment:
+      AIOJ_ENV: ${AIOJ_ENV:-production}
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: aioj
+      DB_USER: aioj
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set in Dokploy env}
+      JUDGE_ENDPOINT: http://judge:5050
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in Dokploy env}
+      REDIS_URL: ${REDIS_URL:-redis:6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in Dokploy env}
+      LANG_DIR: /app/lang
+      JUDGE_CONCURRENCY: ${JUDGE_CONCURRENCY:-2}
+      JUDGE_MIN_FREE_MEM_MB: ${JUDGE_MIN_FREE_MEM_MB:-512}
+      JUDGE_MAX_LOAD_PER_CPU: ${JUDGE_MAX_LOAD_PER_CPU:-1.5}
+      CF_SUBMIT_URL: ${CF_SUBMIT_URL:-http://host.docker.internal:8003}
+    networks:
+      - default
+      - sandbox
+    volumes:
+      - testdata:/app/testdata
+    depends_on:
+      postgres:
+        condition: service_healthy
+    mem_limit: 2g
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  frontend:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    expose:
+      - "80"
+    depends_on:
+      backend:
+        condition: service_started
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+    labels:
+      # Traefik (Dokploy) — the only public route. web/nginx.conf inside this
+      # container already proxies /api/, /api/ws, /api/generate/, /api/ai/,
+      # /sitemap.xml and /feed/* to backend:8080, so Traefik only needs /.
+      - "traefik.enable=true"
+      - "traefik.docker.network=dokploy-network"
+      # HTTPS (Let's Encrypt via Dokploy's certresolver)
+      - "traefik.http.routers.aioj.rule=Host(`${DOMAIN:?DOMAIN must be set}`)"
+      - "traefik.http.routers.aioj.entrypoints=websecure"
+      - "traefik.http.routers.aioj.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.aioj.service=aioj-frontend"
+      - "traefik.http.services.aioj-frontend.loadbalancer.server.port=80"
+      # Long AI jobs + WebSockets: match web/nginx.conf timeouts (300s/3600s)
+      - "traefik.http.routers.aioj.respondingTimeouts.readTimeout=300s"
+      - "traefik.http.routers.aioj.respondingTimeouts.writeTimeout=300s"
+      - "traefik.http.routers.aioj.respondingTimeouts.idleTimeout=3600s"
+      # HTTP -> HTTPS redirect
+      - "traefik.http.routers.aioj-http.rule=Host(`${DOMAIN:?DOMAIN must be set}`)"
+      - "traefik.http.routers.aioj-http.entrypoints=web"
+      - "traefik.http.routers.aioj-http.middlewares=aioj-https-redirect"
+      - "traefik.http.routers.aioj-http.service=aioj-frontend"
+      - "traefik.http.middlewares.aioj-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.aioj-https-redirect.redirectscheme.permanent=true"
+
+  # -------------------------------------------------------------------------
+  # One-shot first-admin + demo problem seeder. NOT started on deploy.
+  #   docker compose -f docker-compose.dokploy.yml --profile seed run --rm seeder
+  # Env (Dokploy): SEED_ADMIN_USERNAME (default: ai), SEED_ADMIN_PASSWORD (required),
+  #                SEED_PROBLEM_SLUG (default: hello)
+  # It registers the user, promotes to admin directly in Postgres (there is no
+  # bootstrap-admin API), then creates the "Hello, AIOJ!" problem + 1 testcase.
+  # Idempotent: safe to re-run. AIOJ_ENV is forced to production here, so the
+  # demo password fallback is disabled — SEED_ADMIN_PASSWORD is mandatory.
+  # -------------------------------------------------------------------------
+  seeder:
+    profiles: ["seed"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    entrypoint: ["/app/seed"]
+    command: []
+    environment:
+      AIOJ_ENV: production
+      BACKEND_URL: http://backend:8080
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: aioj
+      DB_USER: aioj
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set in Dokploy env}
+      SEED_ADMIN_USERNAME: ${SEED_ADMIN_USERNAME:-ai}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:?SEED_ADMIN_PASSWORD must be set (one-time seed)}
+      SEED_PROBLEM_SLUG: ${SEED_PROBLEM_SLUG:-hello}
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  # -------------------------------------------------------------------------
+  # Optional profiles (off by default to save RAM on Dokploy)
+  # -------------------------------------------------------------------------
+  ai-harness:
+    profiles: ["ai"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: /app/aioj --mode=ai-harness
+    environment:
+      AIOJ_ENV: ${AIOJ_ENV:-production}
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: aioj
+      DB_USER: aioj
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set in Dokploy env}
+      JUDGE_ENDPOINT: http://judge:5050
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in Dokploy env}
+      AI_ENABLED: ${AI_ENABLED:-false}
+      AI_HARNESS_ENABLED: "true"
+      AI_CREDENTIAL_MASTER_KEY: ${AI_CREDENTIAL_MASTER_KEY:?AI_CREDENTIAL_MASTER_KEY required for ai profile}
+      AI_STAGED_TESTDATA_ROOT: /app/testdata/ai-staging
+    networks:
+      - default
+      - sandbox
+    volumes:
+      - testdata:/app/testdata
+    depends_on:
+      postgres:
+        condition: service_healthy
+      judge:
+        condition: service_started
+    restart: unless-stopped
+
+  cf-bypass:
+    profiles: ["vjudge"]
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    expose:
+      - "8191"
+    mem_limit: 512m
+    restart: unless-stopped
+
+  cf-submit:
+    profiles: ["vjudge"]
+    build:
+      context: ./deploy/cf-submit
+      dockerfile: Dockerfile
+    network_mode: host
+    environment:
+      - PORT=8003
+      - CF_PROXY=${CF_PROXY:-}
+    mem_limit: 768m
+    restart: unless-stopped
+
+  atcoder-submit:
+    profiles: ["vjudge"]
+    build:
+      context: ./deploy/atcoder-submit
+      dockerfile: Dockerfile
+    expose:
+      - "8004"
+    environment:
+      - PORT=8004
+    mem_limit: 512m
+    restart: unless-stopped
+
+  prometheus:
+    profiles: ["monitor"]
+    image: prom/prometheus:latest
+    volumes:
+      - ./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./deploy/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - promdata:/prometheus
+    expose:
+      - "9090"
+    environment:
+      METRICS_TOKEN: ${METRICS_TOKEN:?METRICS_TOKEN must be set in Dokploy env}
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--config.expand-env"
+    restart: unless-stopped
+
+  grafana:
+    profiles: ["monitor"]
+    image: grafana/grafana:latest
+    volumes:
+      - ./deploy/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./deploy/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - grafdata:/var/lib/grafana
+    expose:
+      - "3000"
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD must be set (monitor profile)}
+    restart: unless-stopped
+
+networks:
+  sandbox:
+    internal: true
+
+volumes:
+  pgdata:
+  redisdata:
+  testdata:
+  promdata:
+  grafdata:
+  backups:
