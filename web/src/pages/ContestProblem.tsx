@@ -12,6 +12,7 @@ import { lazy } from 'react'
 const CodeEditor = lazy(() => import('../components/CodeEditor'))
 import { Copy, Check, Lightbulb, ClipboardList, BarChart3, FileText, Download } from 'lucide-react'
 import { useToast } from '../components/Toast'
+import { SubmissionStatusPanel } from '../components/SubmissionStatusPanel'
 import { errorMessage } from '../lib/errors'
 
 // Derived from the API so these track the real response shapes without
@@ -284,9 +285,12 @@ function HintSection({ hint }: { hint: string }) {
     )
 }
 
-function SubmissionResult({ result }: { result: SubmissionView }) {
-    if (!result) return null
-
+/**
+ * Receipt for the submission made on this page. The id and the live verdict
+ * come from the shared panel so a contest submission and a practice one look
+ * and behave the same.
+ */
+function SubmissionResult({ result, polling }: { result: SubmissionView; polling: boolean }) {
     if (result.error) {
         return (
             <div className="p-4 bg-bad/10 border border-bad/30 rounded-lg">
@@ -298,76 +302,22 @@ function SubmissionResult({ result }: { result: SubmissionView }) {
         )
     }
 
-    const isPending = result.status === 'pending' || result.status === 'judging'
-    const statusKey = (result.status || result.verdict || '').toLowerCase()
-    const label = STATUS_LABELS[result.status || ''] || STATUS_LABELS[statusKey] || result.status || 'Submitted'
-    const colorClass = STATUS_COLORS[result.status || ''] || STATUS_COLORS[statusKey] || 'bg-surface-3/30 text-ink border-hairline-strong'
+    // A result without an id cannot be linked or polled — nothing to show.
+    if (!result.id) return null
 
     return (
-        <div className="p-4 bg-surface border border-hairline rounded-lg space-y-3">
-            <div className="flex items-center justify-between">
-                <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border ${colorClass}`}>
-                    {isPending && (
-                        <svg className="animate-spin -ml-1 mr-2 h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                        </svg>
-                    )}
-                    {label}
-                </span>
-                {result.id && (
-                    <Link
-                        to={`/submissions/${result.id}`}
-                        className="text-xs text-brand hover:text-brand hover:underline font-medium"
-                    >
-                        View Details →
-                    </Link>
-                )}
-            </div>
-
-            {result.id && (
-                <div className="text-xs text-muted">
-                    <span className="font-medium">Submission ID:</span>{' '}
-                    <Link to={`/submissions/${result.id}`} className="font-mono text-brand hover:underline">
-                        {result.id.substring(0, 12)}
-                    </Link>
-                </div>
-            )}
-
-            <div className="flex flex-wrap gap-4 text-xs text-muted">
-                {result.time_used != null && (
-                    <div>
-                        <span className="font-medium text-ink-soft">Time:</span>{' '}
-                        {typeof result.time_used === 'number' ? `${result.time_used} ms` : result.time_used}
-                    </div>
-                )}
-                {result.memory_used != null && (
-                    <div>
-                        <span className="font-medium text-ink-soft">Memory:</span>{' '}
-                        {typeof result.memory_used === 'number' ? `${Math.round(result.memory_used / 1024)} MB` : result.memory_used}
-                    </div>
-                )}
-                {result.score != null && (
-                    <div>
-                        <span className="font-medium text-ink-soft">Score:</span> {result.score}
-                    </div>
-                )}
-                {result.language && (
-                    <div>
-                        <span className="font-medium text-ink-soft">Language:</span> {result.language}
-                    </div>
-                )}
-            </div>
-
-            {result.status === 'ce' && result.compile_output && (
-                <div className="mt-2">
-                    <div className="text-xs font-semibold text-muted mb-1">Compile Output:</div>
-                    <pre className="bg-code text-bad-on-code text-xs p-3 rounded-md overflow-x-auto font-mono max-h-40">
-                        {result.compile_output}
-                    </pre>
-                </div>
-            )}
-        </div>
+        <SubmissionStatusPanel
+            polling={polling}
+            submission={{
+                id: result.id,
+                status: result.status || result.verdict || 'pending',
+                language: result.language,
+                time_used: typeof result.time_used === 'number' ? result.time_used : null,
+                memory_used: result.memory_used ?? null,
+                score: typeof result.score === 'number' ? result.score : null,
+                compile_output: result.compile_output,
+            }}
+        />
     )
 }
 
@@ -484,6 +434,8 @@ export default function ContestProblem() {
     const [code, setCode] = useState('')
     const [submitting, setSubmitting] = useState(false)
     const [result, setResult] = useState<SubmissionView | null>(null)
+    // True while the poller is still chasing a verdict for the submission above.
+    const [polling, setPolling] = useState(false)
     const [lastSubmitTime, setLastSubmitTime] = useState(0)
     const isMounted = useRef(true)
 
@@ -680,7 +632,10 @@ export default function ContestProblem() {
                 contest_id: contestId,
             })
             if (!isMounted.current) return
+            // The POST resolves before the judge has touched the row: show the
+            // id and the pending verdict now, then let the poller refine it.
             setResult(res)
+            setPolling(true)
 
             // Poll for verdict
             let retries = 0
@@ -697,11 +652,15 @@ export default function ContestProblem() {
                     if ((updated.status === 'pending' || updated.status === 'judging') && retries < maxRetries) {
                         retries++
                         poll()
+                    } else {
+                        setPolling(false)
                     }
                 } catch {
                     if (retries < maxRetries && isMounted.current) {
                         retries++
                         poll()
+                    } else if (isMounted.current) {
+                        setPolling(false)
                     }
                 }
             }
@@ -1026,6 +985,10 @@ export default function ContestProblem() {
                                     </button>
                                 </div>
                             </div>
+                            {/* Above the editor so the submission id and the live
+                                verdict are on screen the moment Submit is pressed. */}
+                            {result && <SubmissionResult result={result} polling={polling} />}
+
                             <CodeEditor
                                 language={language}
                                 value={code}
@@ -1033,8 +996,6 @@ export default function ContestProblem() {
                                 height="400px"
                                 ariaLabel="Solution source code"
                             />
-
-                            {result && <SubmissionResult result={result} />}
 
                             {sampleResults.length > 0 && (
                                 <div className="border border-hairline rounded-lg overflow-hidden bg-surface shadow-sm">

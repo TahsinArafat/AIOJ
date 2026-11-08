@@ -12,12 +12,14 @@ const CodeEditor = lazy(() => import('../components/CodeEditor'))
 import AddEditorialModal from '../components/AddEditorialModal'
 import CommentSection from '../components/CommentSection'
 import { EmptyState } from '../components/EmptyState'
+import { SubmissionStatusPanel, type SubmissionStatusData } from '../components/SubmissionStatusPanel'
 import { Download, Copy, Check, Timer, MemoryStick, type LucideIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '../components/Toast'
 import { Badge, type BadgeTone } from '../components/ui/Badge'
-import { DEFAULT_LANGUAGE, LANGUAGE_OPTIONS, languageTemplate } from '../lib/languages'
+import { DEFAULT_LANGUAGE, LANGUAGE_OPTIONS, languageName, languageTemplate } from '../lib/languages'
 import { Skeleton } from '../components/ui/PageHeader'
+import { VerdictBadge } from '../components/ui/VerdictBadge'
 
 function useIsDesktop(breakpoint = 768) {
     const [isDesktop, setIsDesktop] = useState(
@@ -86,28 +88,6 @@ function decodeRole(): string | null {
     }
 }
 
-const STATUS_COLORS: Record<string, string> = {
-    ac: 'text-ok', success: 'text-ok',
-    wa: 'text-bad',
-    tle: 'text-warn', TLE: 'text-warn',
-    mle: 'text-orange-600 dark:text-orange-400', MLE: 'text-orange-600 dark:text-orange-400',
-    re: 'text-bad', RE: 'text-bad',
-    ce: 'text-accent', CE: 'text-accent',
-    pending: 'text-blue-500 dark:text-blue-400', judging: 'text-brand',
-    se: 'text-muted', SE: 'text-muted',
-}
-
-const STATUS_LABELS: Record<string, string> = {
-    ac: 'Accepted', success: 'Accepted',
-    wa: 'Wrong Answer',
-    tle: 'Time Limit Exceeded', TLE: 'Time Limit Exceeded',
-    mle: 'Memory Limit Exceeded', MLE: 'Memory Limit Exceeded',
-    re: 'Runtime Error', RE: 'Runtime Error',
-    ce: 'Compile Error', CE: 'Compile Error',
-    pending: 'Pending', judging: 'Judging...',
-    se: 'System Error', SE: 'System Error',
-}
-
 const DIFFICULTY_TONE: Record<string, BadgeTone> = {
     easy: 'ok',
     medium: 'warn',
@@ -172,7 +152,9 @@ export default function ProblemDetail() {
     const [lang, setLang] = useState(DEFAULT_LANGUAGE)
     const [languages, setLanguages] = useState(LANGUAGE_OPTIONS)
     const [code, setCode] = useState('')
-    const [result, setResult] = useState<RunResult | null>(null)
+    const [result, setResult] = useState<SubmissionStatusData | null>(null)
+    // True while the poller is still chasing a verdict for the submission above.
+    const [pollingResult, setPollingResult] = useState(false)
     const [submitting, setSubmitting] = useState(false)
     const [customInput, setCustomInput] = useState('')
     const [customOutput, setCustomOutput] = useState<RunResult | null>(null)
@@ -404,6 +386,7 @@ export default function ProblemDetail() {
         setLastSubmitTime(now)
         setSubmitting(true)
         setResult(null)
+        setPollingResult(false)
         try {
             const apiCall = isUpsolving
                 ? api.submissions.createUpsolving({
@@ -418,9 +401,15 @@ export default function ProblemDetail() {
                     source_code: code,
                 })
             const res = await apiCall
-            if (isMountedRef.current) {
-                setResult(res)
-            }
+            if (!isMountedRef.current) return
+
+            // The POST resolves as soon as the row exists (status `pending`), so
+            // surface the id and verdict right now instead of waiting for the
+            // first poll — the user needs to know which submission they made.
+            setResult(res)
+            setPollingResult(true)
+            setMySubs(prev => [res, ...prev.filter(s => s.id !== res.id)])
+            toast.success(`Submitted #${res.id.substring(0, 8)} — judging…`)
 
             let retries = 0
             const maxRetries = 60
@@ -433,14 +422,22 @@ export default function ProblemDetail() {
                     const updated = await api.submissions.get(res.id)
                     if (!isMountedRef.current) return
                     setResult(updated)
+                    // Keep the list row in step with the live verdict.
+                    setMySubs(prev => prev.map(s => s.id === updated.id
+                        ? { ...s, status: updated.status, time_used: updated.time_used, memory_used: updated.memory_used }
+                        : s))
                     if ((updated.status === 'pending' || updated.status === 'judging') && retries < maxRetries) {
                         retries++
                         poll()
+                    } else {
+                        setPollingResult(false)
                     }
                 } catch {
                     if ((retries < maxRetries) && isMountedRef.current) {
                         retries++
                         poll()
+                    } else if (isMountedRef.current) {
+                        setPollingResult(false)
                     }
                 }
             }
@@ -798,28 +795,9 @@ export default function ProblemDetail() {
                                                         {s.id?.substring(0, 8)}...
                                                     </Link>
                                                 </td>
-                                                <td className="px-4 py-2 text-muted">{s.language}</td>
-                                                <td className="px-4 py-2 font-semibold">
-                                                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${s.status === 'ac' ? 'text-ok bg-ok/10' :
-                                                        s.status === 'wa' ? 'text-bad bg-bad/10' :
-                                                            s.status === 'tle' ? 'text-warn bg-warn/10' :
-                                                                s.status === 'mle' ? 'text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20' :
-                                                                    s.status === 're' ? 'text-bad bg-bad/10' :
-                                                                        s.status === 'ce' ? 'text-accent bg-violet-500/10' :
-                                                                            s.status === 'pending' ? 'text-blue-500 dark:text-blue-400 bg-brand-soft' :
-                                                                                s.status === 'judging' ? 'text-brand bg-brand-soft' :
-                                                                                    'text-muted bg-surface-2'
-                                                        }`}>
-                                                        {s.status === 'ac' ? 'Accepted' :
-                                                            s.status === 'wa' ? 'Wrong Answer' :
-                                                                s.status === 'tle' ? 'Time Limit Exceeded' :
-                                                                    s.status === 'mle' ? 'Memory Limit Exceeded' :
-                                                                        s.status === 're' ? 'Runtime Error' :
-                                                                            s.status === 'ce' ? 'Compile Error' :
-                                                                                s.status === 'pending' ? 'Pending' :
-                                                                                    s.status === 'judging' ? 'Judging...' :
-                                                                                        s.status}
-                                                    </span>
+                                                <td className="px-4 py-2 text-muted">{languageName(s.language)}</td>
+                                                <td className="px-4 py-2">
+                                                    <VerdictBadge status={s.status} />
                                                 </td>
                                                 <td className="px-4 py-2 text-muted">{s.time_used > 0 ? `${s.time_used}ms` : '—'}</td>
                                                 <td className="px-4 py-2 text-muted">{s.memory_used > 0 ? `${Math.round(s.memory_used / 1024)}MB` : '—'}</td>
@@ -877,29 +855,15 @@ export default function ProblemDetail() {
                         </button>
                     </div>
                 </div>
+                {/* Submission receipt. Sits above the editor so the id and the
+                    live verdict are on screen the instant Submit is pressed. */}
+                {result && <SubmissionStatusPanel submission={result} polling={pollingResult} />}
                 <CodeEditor
                     language={lang}
                     value={code}
                     onChange={handleCodeChange}
                     height={isDesktop ? "400px" : "250px"}
                 />
-                {result && (
-                    <div className="border border-hairline rounded p-3 text-sm">
-                        <div className="flex justify-between items-center">
-                            <span className={`font-semibold ${STATUS_COLORS[result.status] || ''}`}>
-                                {STATUS_LABELS[result.status] || result.status}
-                            </span>
-                            {result.time_used > 0 && (
-                                <span className="text-muted text-xs">
-                                    {result.time_used}ms / {Math.round(result.memory_used / 1024)}MB
-                                </span>
-                            )}
-                        </div>
-                        {result.compile_output && (
-                            <pre className="mt-2 text-xs text-bad bg-bad/10 rounded p-2 overflow-x-auto">{result.compile_output}</pre>
-                        )}
-                    </div>
-                )}
 
                 {/* Sample Test Results */}
                 {sampleResults.length > 0 && (
