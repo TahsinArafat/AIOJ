@@ -283,7 +283,7 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
     }
 }
 
-import type { AIBrief, AIBriefPreset, AIGenerationJob, AIModel, APIKey, ActivityItem, AdminBulkAction, AdminBulkResponse, AdminFeature, AdminUserDetail, AdminUserQuery, AdminAuthMethods, AdminUserRow, AuthMethods, AuthResponse, AuthSessionResponse, BackupFile, BlogListItem, BlogPost, BotAccount, Clarification, Class, ClassListItem, ClassMember, Comment, Contest, ContestDetailResponse, ContestNotice, ContestPermission, ContestProblem, ContestRegistration, ContestSubmissionsResponse, DetectedTool, Editorial, FeaturePolicy, Group, GroupListItem, GroupMember, GroupPendingInvite, GymContest, GymData, Hack, HackResult, HackSubmission, LanguageConfig, Notification, NotificationPreferences, OAuthUsernameCheck, OnsiteBatchUser, Organization, OrganizationListItem, OrganizationMember, PendingInvite, PendingRemoteSubmission, PlagiarismPairDetail, PlagiarismReport, Problem, ProblemI18n, ProblemListItem, ProblemPermission, ProblemStats, PublicProfile, RankingEntry, RatingHistoryEntry, RemoteLanguage, ResolvedFeature, ScoreboardData, SetterApplication, Submission, Team, TeamListItem, TeamMember, TestResult, TrainingPlan, TrainingPlanDetail, TrainingPlanEnrollment, TrainingPlanProblem, TrainingPlanProgress, TrainingPlanSection, User, UserAchievement, UserProblemStats, UserProfile, VirtualContest, VirtualStatusResponse, WeakTagsRecommendations, Webhook } from '../types/api'
+import type { AIBrief, AIBriefPreset, AIGenerationJob, AIModel, APIKey, ActivityItem, AdminBulkAction, AdminBulkResponse, AdminFeature, AdminUserDetail, AdminUserQuery, AdminAuthMethods, AdminUserRow, AuthMethods, AuthResponse, AuthSessionResponse, BackupFile, BlogListItem, BlogPost, BotAccount, Clarification, Class, ClassListItem, ClassMember, Comment, Contest, ContestDetailResponse, ContestNotice, ContestPermission, ContestProblem, ContestRegistration, ContestSubmissionsResponse, DetectedTool, Editorial, FeaturePolicy, Group, GroupListItem, GroupMember, GroupPendingInvite, GymContest, GymData, Hack, HackResult, HackSubmission, LanguageConfig, Notification, NotificationPreferences, OAuthUsernameCheck, OnsiteBatchUser, Organization, OrganizationListItem, OrganizationMember, PendingInvite, PendingRemoteSubmission, PlagiarismPairDetail, PlagiarismReport, Problem, ProblemI18n, ProblemListItem, ProblemPermission, ProblemStats, PublicProfile, RankingEntry, RatingHistoryEntry, RemoteLanguage, ResolvedFeature, ScoreboardData, SetterApplication, Submission, Team, TeamListItem, TeamMember, TestcaseFile, TestcaseFileContent, TestResult, TrainingPlan, TrainingPlanDetail, TrainingPlanEnrollment, TrainingPlanProblem, TrainingPlanProgress, TrainingPlanSection, User, UserAchievement, UserProblemStats, UserProfile, VirtualContest, VirtualStatusResponse, WeakTagsRecommendations, Webhook } from '../types/api'
 
 export const api = {
     auth: {
@@ -431,6 +431,36 @@ export const api = {
                 }
             }
             return res.json()
+        },
+        /** Every file in the problem's testdata directory, with role and pair. */
+        listTestcases: (slug: string) =>
+            request<{ files: TestcaseFile[] }>(`/problems/${slug}/testcases`),
+        getTestcase: (slug: string, name: string) =>
+            request<TestcaseFileContent>(`/problems/${slug}/testcases/${encodeURIComponent(name)}`),
+        saveTestcase: (slug: string, name: string, content: string) =>
+            request<{ status: string; name: string }>(`/problems/${slug}/testcases/${encodeURIComponent(name)}`, {
+                method: 'PUT',
+                body: JSON.stringify({ content }),
+            }),
+        deleteTestcase: (slug: string, name: string) =>
+            request<null>(`/problems/${slug}/testcases/${encodeURIComponent(name)}`, { method: 'DELETE' }),
+        /** Fetches with the bearer token, then hands the bytes to the browser. */
+        downloadTestcase: async (slug: string, name: string) => {
+            const token = getAccessToken()
+            const res = await fetch(BASE + `/problems/${slug}/testcases/${encodeURIComponent(name)}?download=1`, {
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
+            })
+            if (!res.ok) {
+                const text = await res.text()
+                throw new Error(text || `HTTP ${res.status}`)
+            }
+            const blob = await res.blob()
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = name
+            a.click()
+            URL.revokeObjectURL(url)
         },
         importProblem: async (file: File) => {
             const formData = new FormData()

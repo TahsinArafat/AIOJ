@@ -13,6 +13,7 @@ vi.mock('../lib/api', () => ({
       update: vi.fn().mockResolvedValue({}),
       getPermissions: vi.fn().mockResolvedValue({ data: [] }),
       delete: vi.fn().mockResolvedValue({}),
+      listTestcases: vi.fn().mockResolvedValue({ files: [] }),
     },
   },
   getAccessToken: vi.fn().mockReturnValue('mock-token'),
@@ -48,6 +49,7 @@ beforeEach(() => {
     ; (api.problems.get as Mock).mockResolvedValue(mockProblem)
     ; (api.problems.update as Mock).mockResolvedValue({})
     ; (api.problems.getPermissions as Mock).mockResolvedValue({ data: [] })
+    ; (api.problems.listTestcases as Mock).mockResolvedValue({ files: [] })
     ; (api.problems.listI18n as Mock | undefined)?.mockResolvedValue?.([])
   // Workspace persists active tab in location.hash — reset so each test starts on Statement.
   window.location.hash = ''
@@ -92,7 +94,7 @@ test('switches tabs when clicked', async () => {
   // Click test cases tab
   fireEvent.click(screen.getByText('Test Cases / Data'))
   await waitFor(() => {
-    expect(screen.getByText('Upload Testcase Package (ZIP)')).toBeInTheDocument()
+    expect(screen.getByText('Test Data Files')).toBeInTheDocument()
   })
 
   // Click checker tab

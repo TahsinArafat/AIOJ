@@ -7,6 +7,7 @@ import { useDocumentTitle } from '../lib/documentTitle'
 import { api, getAccessToken } from '../lib/api'
 import { useConfirm } from '../components/ConfirmDialog'
 import type { ProblemFormState, TestCase, Collaborator } from '../types/problem-workspace'
+import type { TestcaseFile, TestcaseFileContent } from '../types/api'
 import StatementTab from '../components/SetterWorkspace/StatementTab'
 import TestCasesTab from '../components/SetterWorkspace/TestCasesTab'
 import CheckerTab from '../components/SetterWorkspace/CheckerTab'
@@ -100,6 +101,8 @@ useDocumentTitle(problem ? `${problem.title} — setter` : null)
   const [newTestCase, setNewTestCase] = useState<TestCase>({ input_name: '', output_name: '', score: 10 })
   const [batchScore, setBatchScore] = useState<number>(10)
   const [batchApplying, setBatchApplying] = useState(false)
+  const [testcaseFiles, setTestcaseFiles] = useState<TestcaseFile[]>([])
+  const [testcaseFilesLoading, setTestcaseFilesLoading] = useState(false)
 
   // Permissions supplementary state
   const [collaborators, setCollaborators] = useState<Collaborator[]>([])
@@ -176,6 +179,25 @@ useDocumentTitle(problem ? `${problem.title} — setter` : null)
   useEffect(() => {
     queueMicrotask(loadProblem)
   }, [slug]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const loadTestcaseFiles = async (problemSlug: string) => {
+    setTestcaseFilesLoading(true)
+    try {
+      const res = await api.problems.listTestcases(problemSlug)
+      setTestcaseFiles(res.files || [])
+    } catch (err) {
+      setError(errorMessage(err) || 'Failed to load test data files')
+    } finally {
+      setTestcaseFilesLoading(false)
+    }
+  }
+
+  // Loaded when the tab is shown rather than with the problem: every other tab
+  // works without this listing, and it needs a round trip to the data dir.
+  useEffect(() => {
+    if (!slug || activeTab !== 'testcases') return
+    queueMicrotask(() => loadTestcaseFiles(slug))
+  }, [slug, activeTab])
 
   const handleSave = async (overrides?: Partial<ProblemFormState>) => {
     if (!problem) return
@@ -262,12 +284,145 @@ useDocumentTitle(problem ? `${problem.title} — setter` : null)
     setError(null)
     setSuccess(null)
     const file = e.target.files[0]
+    // Clear the input so re-uploading the same package fires another change event.
+    e.target.value = ''
     try {
       await api.problems.uploadTestcases(problem.slug as string, file)
       setSuccess('Testcase package uploaded successfully!')
       loadProblem()
+      loadTestcaseFiles(problem.slug as string)
     } catch (err) {
       setError(errorMessage(err) || 'Failed to upload testcase package')
+    }
+  }
+
+  const handleLoadTestcaseFile = async (name: string): Promise<TestcaseFileContent | null> => {
+    if (!problem) return null
+    setError(null)
+    setSuccess(null)
+    try {
+      return await api.problems.getTestcase(problem.slug as string, name)
+    } catch (err) {
+      setError(errorMessage(err) || `Failed to open ${name}`)
+      return null
+    }
+  }
+
+  const handleSaveTestcaseFile = async (name: string, content: string): Promise<boolean> => {
+    if (!problem) return false
+    setError(null)
+    setSuccess(null)
+    try {
+      await api.problems.saveTestcase(problem.slug as string, name, content)
+      setSuccess(`${name} saved.`)
+      loadTestcaseFiles(problem.slug as string)
+      return true
+    } catch (err) {
+      setError(errorMessage(err) || `Failed to save ${name}`)
+      return false
+    }
+  }
+
+  const handleCreateTestcasePair = async (pair: {
+    stem: string
+    input: string
+    output: string
+    score: number
+  }): Promise<boolean> => {
+    if (!problem) return false
+    const stem = pair.stem.trim().replace(/\.(in|input|txt|out|output|ans|sol)$/i, '')
+    if (!stem) {
+      setError('Test case name is required')
+      return false
+    }
+    const inputName = `${stem}.in`
+    const outputName = `${stem}.out`
+    setError(null)
+    setSuccess(null)
+
+    const updated = [
+      ...formState.testcases.filter(tc => tc.input_name !== inputName && tc.output_name !== outputName),
+      { input_name: inputName, output_name: outputName, score: Number(pair.score) || 0 },
+    ]
+    const slug = problem.slug as string
+    try {
+      await api.problems.saveTestcase(slug, inputName, pair.input)
+      await api.problems.saveTestcase(slug, outputName, pair.output)
+      setFormState(prev => ({ ...prev, testcases: updated }))
+      await api.problems.update(slug, buildPayload({ testcases: updated }))
+      setSuccess(`Test case ${stem} created with ${inputName} / ${outputName}.`)
+      loadTestcaseFiles(slug)
+      return true
+    } catch (err) {
+      setError(errorMessage(err) || 'Failed to create test case')
+      return false
+    }
+  }
+
+  const handleDeleteTestcaseFile = async (name: string) => {
+    if (!problem) return
+    if (!(await confirm({
+      message: `Delete ${name} from the problem's test data? A score row that uses this file is removed too. This cannot be undone.`,
+      confirmLabel: 'Delete file',
+      variant: 'danger',
+    }))) return
+    setError(null)
+    setSuccess(null)
+    const slug = problem.slug as string
+    const remaining = formState.testcases.filter(tc => tc.input_name !== name && tc.output_name !== name)
+    try {
+      await api.problems.deleteTestcase(slug, name)
+      if (remaining.length !== formState.testcases.length) {
+        setFormState(prev => ({ ...prev, testcases: remaining }))
+        await api.problems.update(slug, buildPayload({ testcases: remaining }))
+      }
+      setSuccess(`${name} deleted.`)
+      loadTestcaseFiles(slug)
+    } catch (err) {
+      setError(errorMessage(err) || `Failed to delete ${name}`)
+    }
+  }
+
+  const handleDownloadTestcaseFile = async (name: string) => {
+    if (!problem) return
+    setError(null)
+    try {
+      await api.problems.downloadTestcase(problem.slug as string, name)
+    } catch (err) {
+      setError(errorMessage(err) || `Failed to download ${name}`)
+    }
+  }
+
+  const handleDownloadAllTestcases = async () => {
+    if (!problem) return
+    setError(null)
+    try {
+      const resp = await fetch(api.problems.exportProblemUrl(problem.slug as string), {
+        headers: { Authorization: `Bearer ${getAccessToken()}` },
+      })
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+      const blob = await resp.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${problem.slug}.zip`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      setError(errorMessage(err) || 'Failed to download test data')
+    }
+  }
+
+  const handleUpdateTestCaseScore = async (index: number, score: number) => {
+    if (!problem) return
+    setError(null)
+    setSuccess(null)
+    const updated = formState.testcases.map((tc, i) => (i === index ? { ...tc, score } : tc))
+    setFormState(prev => ({ ...prev, testcases: updated }))
+    try {
+      await api.problems.update(problem.slug as string, buildPayload({ testcases: updated }))
+    } catch (err) {
+      setError(errorMessage(err) || 'Failed to save testcase scores')
     }
   }
 
@@ -481,15 +636,25 @@ useDocumentTitle(problem ? `${problem.title} — setter` : null)
           {activeTab === 'testcases' && (
             <TestCasesTab
               testcases={formState.testcases}
+              files={testcaseFiles}
+              filesLoading={testcaseFilesLoading}
               newTestCase={newTestCase}
               batchScore={batchScore}
               batchApplying={batchApplying}
               onAdd={handleAddTestCaseScore}
               onRemove={handleRemoveTestCaseScore}
+              onScoreChange={handleUpdateTestCaseScore}
               onBatchSet={handleBatchSetScores}
               onUpload={handleUploadTestcases}
               onNewTestCaseChange={setNewTestCase}
               onBatchScoreChange={setBatchScore}
+              onReloadFiles={() => problem && loadTestcaseFiles(problem.slug as string)}
+              onLoadFile={handleLoadTestcaseFile}
+              onSaveFile={handleSaveTestcaseFile}
+              onCreatePair={handleCreateTestcasePair}
+              onDeleteFile={handleDeleteTestcaseFile}
+              onDownloadFile={handleDownloadTestcaseFile}
+              onDownloadAll={handleDownloadAllTestcases}
             />
           )}
 

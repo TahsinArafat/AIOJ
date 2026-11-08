@@ -214,8 +214,25 @@ func (b *BatchRunner) applyChecker(
 
 // buildRunArgs constructs the shell command arguments for running the compiled
 // (or interpreted) contestant code, redirecting stdin/stdout/stderr.
+//
+// The interpreted branch is chosen from the language config, never from
+// CompileResult: CompileContestant reports Success with an empty artefact map
+// for a language that has no compile step, so deciding on cr.Success ran
+// `python3`/`pypy3` with no script at all. The interpreter then read the test
+// input as its own program: an empty input produced empty output and every
+// Python, PyPy and Node submission was judged Wrong Answer, while the samples
+// (which build their command in the handler) passed.
 func buildRunArgs(langCfg *compiler.LangConfig, cr *compiler.CompileResult) []string {
 	srcName := "Main" + langCfg.Extensions[0]
+
+	if langCfg.CompileCmd == "" {
+		if langCfg.Runtime != "" {
+			rtParts := strings.Fields(langCfg.Runtime)
+			runCmd := strings.Join(rtParts, " ") + " " + srcName + " < input.txt > output.txt 2> error.txt"
+			return []string{"/bin/sh", "-c", runCmd}
+		}
+		return []string{"/bin/sh", "-c", "./Main < input.txt > output.txt 2> error.txt"}
+	}
 
 	if cr != nil && cr.Success {
 		if langCfg.Runtime != "" {
@@ -237,12 +254,8 @@ func buildRunArgs(langCfg *compiler.LangConfig, cr *compiler.CompileResult) []st
 		return []string{"/bin/sh", "-c", runCmd}
 	}
 
-	// Interpreted (no compilation step).
-	if langCfg.Runtime != "" {
-		rtParts := strings.Fields(langCfg.Runtime)
-		runCmd := strings.Join(rtParts, " ") + " " + srcName + " < input.txt > output.txt 2> error.txt"
-		return []string{"/bin/sh", "-c", runCmd}
-	}
+	// A compile step was configured but produced no artefact. The worker
+	// rejects this as CE before running, so this is only a safe fallback.
 	return []string{"/bin/sh", "-c", "./Main < input.txt > output.txt 2> error.txt"}
 }
 

@@ -1168,6 +1168,24 @@ export interface TestCaseScore {
     subtask_score?: number
 }
 
+/** One file in a problem's testdata directory. */
+export interface TestcaseFile {
+    name: string
+    size: number
+    /** Derived from the extension on the server. */
+    role: 'input' | 'output' | 'other'
+    /** Counterpart file sharing the stem, when one exists. */
+    pair?: string
+}
+
+export interface TestcaseFileContent {
+    name: string
+    size: number
+    content: string
+    /** Non-UTF-8 bytes: download-only, the editor cannot represent them. */
+    binary: boolean
+}
+
 export interface TrainingPlan {
     id: string
     title: string
