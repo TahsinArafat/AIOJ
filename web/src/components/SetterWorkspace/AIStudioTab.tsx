@@ -101,7 +101,19 @@ export default function AIStudioTab({ problemId, problemUpdatedAt, onApplied, on
         })
     }, [problemId])
 
-    // Poll while running.
+    // The server runs one generation per setter. A job started from another
+    // problem never shows up in this tab — the per-problem lookup below cannot
+    // see it — so it is fetched explicitly. Without this the click looked safe
+    // and failed with a limit error that named nothing the setter could find.
+    const [activeJobs, setActiveJobs] = useState<AIGenerationJob[]>([])
+
+    const refreshActive = () => {
+        api.ai.listJobs(0, 20)
+            .then(r => setActiveJobs((r.data || []).filter(j => j.status === 'queued' || j.status === 'running')))
+            .catch(() => {})
+    }
+
+    useEffect(() => { refreshActive() }, [])
     useEffect(() => {
         if (!job || !['queued', 'running'].includes(job.status)) return
         const id = window.setInterval(() => api.ai.getJob(job.id).then(setJob).catch(() => {}), 1500)
@@ -121,7 +133,8 @@ export default function AIStudioTab({ problemId, problemUpdatedAt, onApplied, on
             if (s === 'editorial') return !!p.editorial_title || !!p.editorial_content
             return false
         })
-        setSelected(withContent)
+        // deferred a microtask: selection lands pre-paint (react-hooks/set-state-in-effect)
+        queueMicrotask(() => setSelected(withContent))
     }, [job?.status, job?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
     const updateBrief = (patch: Partial<AIBrief>) => setBrief(b => ({ ...b, ...patch }))
@@ -137,6 +150,23 @@ export default function AIStudioTab({ problemId, problemUpdatedAt, onApplied, on
                 brief,
             })
             setJob(newJob)
+            refreshActive()
+        } catch (e) {
+            setError(e instanceof Error ? e.message : String(e))
+        }
+    }
+
+    // Cancelling frees the setter's slot on the server immediately, so reflect
+    // it here too. Refetching would show 'running' again until the worker
+    // notices (up to a second), and the Generate button would stay blocked with
+    // no visible reason.
+    const cancelCurrent = async () => {
+        if (!job) return
+        setError('')
+        try {
+            await api.ai.cancelJob(job.id)
+            setJob(j => (j ? { ...j, status: 'cancelled' } : j))
+            setActiveJobs(list => list.filter(j => j.id !== job.id))
         } catch (e) {
             setError(e instanceof Error ? e.message : String(e))
         }
@@ -161,7 +191,18 @@ export default function AIStudioTab({ problemId, problemUpdatedAt, onApplied, on
     }
 
     const proposal: AIProposal | undefined = job?.proposal
-    const canStart = connections.length > 0 && brief.tags.length > 0
+    // Gate the button on the same rule the server enforces, so the click cannot
+    // walk into a limit error. The form stays editable; only starting a run is
+    // blocked.
+    const blocking = activeJobs[0] ?? null
+    const runningCount = activeJobs.filter(j => j.status === 'running').length
+    const queuedCount = activeJobs.filter(j => j.status === 'queued').length
+    const canStart = connections.length > 0 && brief.tags.length > 0 && !blocking
+    const blockedReason = blocking
+        ? `A generation is already ${blocking.status} (${blocking.stage.replaceAll('_', ' ')}). Cancel it from AI Jobs to start another.`
+        : brief.tags.length === 0
+            ? 'Pick at least one topic.'
+            : 'Connect an AI model first.'
     const artifactDef = ARTIFACTS.find(a => a.id === artifact)!
     const applySections = ARTIFACT_SECTIONS[job?.artifact_type as ArtifactId] ?? []
 
@@ -250,11 +291,14 @@ export default function AIStudioTab({ problemId, problemUpdatedAt, onApplied, on
                             {isNew ? 'Generate problem' : `Generate ${artifactDef.label}`}
                         </button>
                         {!canStart && (
-                            <span className="text-xs text-muted">
-                                {brief.tags.length === 0 ? 'Pick at least one topic.' : 'Connect an AI model first.'}
-                            </span>
+                            <span className="text-xs text-muted">{blockedReason}</span>
                         )}
                     </div>
+                    {activeJobs.length > 0 && (
+                        <p className="text-xs text-muted">
+                            {runningCount} running, {queuedCount} queued · limit 1 running, 3 queued
+                        </p>
+                    )}
                 </div>
             )}
 
@@ -293,7 +337,7 @@ export default function AIStudioTab({ problemId, problemUpdatedAt, onApplied, on
                     {(job.status === 'running' || job.status === 'queued') ? (
                         <button
                             type="button"
-                            onClick={() => api.ai.cancelJob(job.id).then(() => api.ai.getJob(job.id).then(setJob))}
+                            onClick={cancelCurrent}
                             className="min-h-11 cursor-pointer rounded border border-hairline-strong px-4"
                         >
                             Cancel

@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/tahsinarafat/aioj/internal/ai"
@@ -30,6 +31,14 @@ type CreateJobRequest struct {
 	ActorIsAdmin bool
 }
 
+// Concurrency limits per actor. The harness holds a judge slot and a provider
+// budget for the length of a run, so only one job may run at a time; the queue
+// is bounded so one setter cannot monopolise the worker.
+const (
+	maxRunningPerActor = 1
+	maxQueuedPerActor  = 3
+)
+
 func (s *JobService) Create(ctx context.Context, actorID string, req CreateJobRequest) (*model.AIGenerationJob, error) {
 	normalized, err := req.Brief.Normalize()
 	if err != nil {
@@ -47,8 +56,9 @@ func (s *JobService) Create(ctx context.Context, actorID string, req CreateJobRe
 	if err != nil {
 		return nil, err
 	}
-	if running >= 1 || queued >= 3 {
-		return nil, fmt.Errorf("AI generation limit reached")
+	if running >= maxRunningPerActor || queued >= maxQueuedPerActor {
+		blocking, _ := s.Jobs.ActiveJobByActor(ctx, actorID)
+		return nil, errors.New(limitMessage(running, queued, blocking))
 	}
 	if req.ProblemID != nil {
 		p, err := s.Problems.GetByID(ctx, *req.ProblemID)
@@ -70,6 +80,23 @@ func (s *JobService) Create(ctx context.Context, actorID string, req CreateJobRe
 		return nil, err
 	}
 	return job, nil
+}
+
+// limitMessage explains which limit was hit and, when known, which job is in the
+// way, so the setter can act instead of guessing. A job started from a different
+// problem blocks a new one and nothing else in this flow surfaces it.
+//
+// Pure so it can be tested without a store.
+func limitMessage(running, queued int, blocking *model.AIGenerationJob) string {
+	if running >= maxRunningPerActor {
+		if blocking != nil {
+			return fmt.Sprintf("you already have a generation running (%s, stage %s). "+
+				"Wait for it to finish or cancel it, then start this one", blocking.ID, blocking.Stage)
+		}
+		return "you already have a generation running. Wait for it to finish or cancel it, then start this one"
+	}
+	return fmt.Sprintf("you already have %d generations queued (limit %d). "+
+		"Wait for one to run or cancel one", queued, maxQueuedPerActor)
 }
 
 type JobWorker struct {

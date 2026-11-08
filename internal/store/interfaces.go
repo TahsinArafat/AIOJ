@@ -520,7 +520,12 @@ type AIGenerationStore interface {
 	ListAll(ctx context.Context, actorID, status string, offset, limit int) ([]model.AIGenerationJob, int, error)
 	// AdminRequestCancel cancels any job regardless of actor (admin use only).
 	AdminRequestCancel(ctx context.Context, id string) (bool, error)
+	// CountActiveByActor reports the actor's in-flight jobs. Jobs the actor has
+	// already asked to cancel are excluded: they no longer hold a slot.
 	CountActiveByActor(ctx context.Context, actorID string) (running, queued int, err error)
+	// ActiveJobByActor returns the in-flight job holding the actor's slot, so a
+	// limit error can name it. Nil when nothing is in flight.
+	ActiveJobByActor(ctx context.Context, actorID string) (*model.AIGenerationJob, error)
 	ClaimNext(ctx context.Context, claimToken string) (*model.AIGenerationJob, error)
 	Heartbeat(ctx context.Context, id, claimToken, stage string, progress int) error
 	Complete(ctx context.Context, id, claimToken string, proposal, validation json.RawMessage, promptTokens, completionTokens, latencyMS int) error

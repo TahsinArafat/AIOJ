@@ -150,9 +150,27 @@ func (s *AIGenerationStore) AdminRequestCancel(ctx context.Context, id string) (
 	return n == 1, nil
 }
 
+// CountActiveByActor counts the actor's in-flight jobs.
+//
+// A job the actor has asked to cancel no longer holds a slot. Cancelling only
+// sets cancel_requested_at and leaves status='running' until the worker observes
+// it, so counting on status alone kept the slot occupied and made an immediate
+// retry fail with "limit reached" right after a successful cancel.
 func (s *AIGenerationStore) CountActiveByActor(ctx context.Context, actorID string) (running, queued int, err error) {
-	err = s.db.QueryRowContext(ctx, `SELECT COUNT(*) FILTER (WHERE status='running'),COUNT(*) FILTER (WHERE status='queued') FROM ai_generation_jobs WHERE actor_id=$1 AND status IN ('running','queued')`, actorID).Scan(&running, &queued)
+	err = s.db.QueryRowContext(ctx, `SELECT COUNT(*) FILTER (WHERE status='running'),COUNT(*) FILTER (WHERE status='queued') FROM ai_generation_jobs WHERE actor_id=$1 AND status IN ('running','queued') AND cancel_requested_at IS NULL`, actorID).Scan(&running, &queued)
 	return
+}
+
+// ActiveJobByActor returns the in-flight job that is holding the actor's slot,
+// preferring a running job over a queued one and the oldest within each.
+//
+// This exists so the limit error can name the job that is actually in the way: a
+// job started from a different problem blocks a new one, and nothing else in
+// this flow surfaces it.
+func (s *AIGenerationStore) ActiveJobByActor(ctx context.Context, actorID string) (*model.AIGenerationJob, error) {
+	return scanAIJob(s.db.QueryRowContext(ctx, `SELECT `+aiJobColumns+` FROM ai_generation_jobs
+		WHERE actor_id=$1 AND status IN ('running','queued') AND cancel_requested_at IS NULL
+		ORDER BY (status='running') DESC, created_at ASC LIMIT 1`, actorID))
 }
 func (s *AIGenerationStore) ClaimNext(ctx context.Context, token string) (*model.AIGenerationJob, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
