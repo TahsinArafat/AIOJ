@@ -24,53 +24,67 @@ the "Instance"). It does not cover third-party sites we link to, including the
 remote judges you can submit to.
 
 The **operator** of this Instance — the person or organisation that deploys and
-administers it — decides why and how personal data is processed. The operator's contact details are the ones
-published for this Instance (its documentation, footer, about page, or your
-administrator). Where
-this policy says "we", it means that operator.
+administers it — decides why and how personal data is processed. The operator's
+contact details are the ones published for this Instance (its documentation,
+footer, about page, or your administrator). Where this policy says "we", it means
+that operator.
 
 If your organisation runs AIOJ for you (for example a class or a private contest
 group), that organisation may have its own policy that adds to this one. Their
 policy prevails for data they control.
 
+**This policy is public.** You can read it without an account, and it is not
+behind a login or an app install. The same is true of our
+[Terms of Service](/legal/terms) and
+[DMCA / Copyright Policy](/legal/dmca).
+
 ## 2. What we collect
 
 | Category | What it includes |
 |---|---|
-| **Account** | Username, email address, password hash (bcrypt with a per-user salt — never the password itself), role, account timestamps, email-verification state. If you enable two-factor authentication, a TOTP secret and hashed backup codes. If you sign in with GitHub or Google, the provider's subject identifier and the profile fields you consent to share (such as email and avatar). |
+| **Account** | Username, email address, password hash (bcrypt with a per-user salt — never the password itself), role, account timestamps, email-verification state. If you enable two-factor authentication, a TOTP secret and hashed one-time backup codes. If you sign in with GitHub or Google, the provider's subject identifier and the profile fields you consent to share (such as email and avatar). |
 | **Profile** | Display name, bio, country, avatar URL, links, preferred language and theme. |
 | **Activity** | Submissions (source code, language, verdict, per-test timing and memory), code runs, hacks and counter-tests, contest registrations and standings, rating history, virtual contests, problems and contests you author, comments, blogs, editorials, clarifications, teams, groups, classes, friendships, achievements. |
-| **Integrations** | API keys (stored hashed), webhook endpoints and delivery records, and remote-judge bot linkage. |
+| **Settings** | Notification preferences (which events email you and which appear in-app), API keys (stored hashed), webhook endpoints and delivery records, and remote-judge bot linkage. |
 | **AI-assisted tooling** | Prompts and generated output when you use problem-generation features. Generation records are kept only for the configured retention window (14 days by default) unless you save the result. |
 | **Technical** | IP address, user agent, request path, response status, and timestamps in server logs; IP address and actor in the admin audit log (administrative actions only). These support rate limiting, abuse prevention, and security investigations. |
-| **Browser storage** | Access and refresh tokens, a CSRF token cookie, your cookie-consent choice, and UI preferences (theme, language). See [Cookies and local storage](#5-cookies-and-local-storage). |
+| **Browser storage** | Access and refresh tokens, a CSRF token cookie, your cookie-consent choice, and UI preferences (theme, language, editor layout). See [Cookies and local storage](#6-cookies-and-local-storage). |
 
-We do not intentionally collect special-category data (health, religion,
-political opinions, biometrics, sexual orientation, and so on). Please do not
-post it.
+## 3. What we do not collect, and what we do not do
 
-## 3. What we do not do
+**Data we do not ask for and do not want.** Do not post special-category data
+(health, religion, political opinions, biometrics, sexual orientation) or anyone
+else's personal information. If you do, you are responsible for it, and we may
+remove it.
+
+**Things we do not do with your data:**
 
 - We do **not** sell, rent, or trade personal data.
 - We do **not** run advertising or cross-site tracking, and we do not embed
   third-party ad pixels, social widgets, or session-replay scripts.
 - We do **not** use your submissions, blogs, editorials, or messages to train
   models, ours or anyone else's.
+- We do **not** build a shadow profile from your browsing on other sites. There
+  is no advertising identifier attached to your account.
 - We do **not** read your code except as needed to judge it, to run a plagiarism
   check that you or a contest organiser triggered, or to investigate abuse.
 - We do **not** publish private content. What other people can see is decided by
   the visibility settings on each item; see
-  [Public content](#7-public-content-and-search-engines).
+  [Public content and search engines](#8-public-content-and-search-engines).
+- We do **not** send marketing email. Every message we send is transactional or a
+  notification you asked for; see
+  [Email, notifications and your choices](#13-email-notifications-and-your-choices).
 
 ## 4. Why we use your data
 
 | Purpose | Data used | Legal basis (where GDPR/UK GDPR applies) |
 |---|---|---|
-| Create and secure your account, sign you in, deliver notifications | Account, profile, browser storage | Performance of a contract |
+| Create and secure your account, sign you in, keep your session alive | Account, browser storage | Performance of a contract |
 | Compile and judge submissions, run contests, score and rate participants | Activity, technical | Performance of a contract |
+| Deliver contest reminders, rating changes, problem updates, and comment replies you subscribed to | Account, settings | Performance of a contract |
 | Detect cheating and plagiarism, defend contests from abuse | Activity, technical | Legitimate interests (fair competition) and contract |
 | Rate-limit, block attacks, investigate security incidents | Technical, account | Legitimate interests (security) and legal obligation |
-| Send service and security email (verification, password reset, breach notice) | Account | Contract and legal obligation |
+| Send account email (verification, password reset, two-factor changes, security notices) | Account | Contract and legal obligation |
 | Answer support requests and appeals | Whatever you send us | Legitimate interests (support) or consent |
 | Optional product analytics | Aggregated usage events | **Consent only** — nothing runs before you accept |
 | Comply with law and enforce our terms | Any of the above | Legal obligation and legitimate interests |
@@ -80,7 +94,45 @@ by automated means. Automated judging decides whether a program is correct, not
 whether you are entitled to a service. Contest disqualifications are reviewed by
 a human.
 
-## 5. Cookies and local storage
+## 5. Device permissions and app stores
+
+AIOJ is a web application. It runs in your browser, and **it requests no device
+permissions.**
+
+- We do **not** access your location (precise or approximate), contacts, camera,
+  microphone, photos or media library, files outside the ones you pick, SMS,
+  call logs, calendar, health data, or body sensors.
+- We do **not** read your installed applications or your advertising ID, and we
+  do **not** ask for access to "all files" on your device.
+- When you choose to upload something — a problem statement, a test-case archive,
+  an avatar — your browser's file picker hands us exactly the file you selected.
+  That is a user-initiated transfer, not background access.
+- Notifications are delivered inside the app over an authenticated WebSocket
+  while you are signed in. AIOJ does not ask for system push-notification
+  permission.
+- If a companion mobile or desktop build of AIOJ is published for an app store,
+  this section is the permission declaration that applies to it: it declares no
+  sensitive permissions. Any build that needs more must update this policy first.
+
+### Data categories at a glance
+
+This table maps what the Service collects to the categories used by app-store
+data-safety forms. It describes the software's default behaviour; an operator may
+disable optional integrations.
+
+| Data type | Collected | Linked to your identity | Used for | Shared with third parties |
+|---|---|---|---|---|
+| Email address, username, display name | Yes | Yes | Account and sign-in | Only the mail provider that delivers account email |
+| Password | Stored only as a salted bcrypt hash | Yes | Authentication | No |
+| Source code and submissions | Yes | Yes | Judging, standings, plagiarism checks | Only the remote platform you explicitly submit to (virtual judge) |
+| Contest and practice activity, ratings | Yes | Yes | Scoring, standings, profile | No |
+| Content you post (blogs, comments, editorials, problems) | Yes | Yes | Publishing and discussion | Public, if you publish it |
+| IP address and user agent | Yes | Yes, in logs | Security, rate limiting, abuse prevention | Only the hosting/monitoring provider |
+| Crash and error diagnostics | Only when an operator enables Sentry | Limited | Stability | The configured error-monitoring provider |
+| Analytics events | Only after you accept the banner | Aggregated | Product improvement | No |
+| Location, contacts, health, biometrics, advertising ID | **No** | — | — | — |
+
+## 6. Cookies and local storage
 
 We use the minimum needed to keep you signed in and the site working. There are
 **no third-party cookies** and no tracking cookies.
@@ -101,9 +153,10 @@ makes the banner appear again.
 
 Because sign-in tokens are kept in browser storage, treat a shared or public
 computer as untrusted: always sign out, and never paste a token into a script or
-a bug report.
+a bug report. Signing out revokes the refresh token on the server as well as
+clearing it locally.
 
-## 6. When data leaves this Instance
+## 7. When data leaves this Instance
 
 We share data only with the services needed to run AIOJ, and only the minimum
 each one needs. Depending on how the operator has configured the Instance, that
@@ -133,9 +186,10 @@ can include:
   or to protect users from harm. We aim to notify you unless we are legally
   barred from doing so.
 
-We never share data for advertising or for someone else's marketing.
+We never share data for advertising or for someone else's marketing, and we do
+not disclose your email address to other users.
 
-## 7. Public content and search engines
+## 8. Public content and search engines
 
 A contest platform is partly public by design. The following are visible to
 anyone, including people who are not signed in:
@@ -155,7 +209,7 @@ personal information you are not prepared to make public.**
 Private submissions, draft problems, hidden test data, and direct messages (where
 the Instance provides them) are not included in the sitemap or feeds.
 
-## 8. How long we keep data
+## 9. How long we keep data
 
 - **Account and profile data** — while your account exists.
 - **Submissions, results, and rating history** — while your account exists,
@@ -174,13 +228,17 @@ the Instance provides them) are not included in the sitemap or feeds.
 - **Legal holds** — data may be preserved longer where law or a live dispute
   requires it.
 
-## 9. How we protect it
+We do not keep a second copy for analytics, and we do not retain data "just in
+case" after you delete your account.
+
+## 10. How we protect it
 
 - Passwords are stored as salted bcrypt hashes (cost 12). There are no
   plaintext or reversible password stores, and OAuth-only accounts have no
   password at all.
-- Sessions use short-lived signed access tokens and revocable refresh tokens.
-  Signing out revokes the refresh token server-side, not just in your browser.
+- Sessions use short-lived signed access tokens (15 minutes by default) and
+  revocable refresh tokens. Signing out revokes the refresh token server-side,
+  not just in your browser, and a password reset revokes every session.
 - Two-factor authentication (TOTP plus one-time backup codes) is available for
   every account.
 - Submitted code executes in a cgroup-isolated sandbox with CPU, memory, and
@@ -196,17 +254,26 @@ privately to the operator instead of publishing it, and never include real user
 data or working credentials in a report. Do not put secrets, API keys, or
 personal data in submitted code — submissions are stored and may be public.
 
-## 10. Your rights and choices
+## 11. Security incidents
+
+If we become aware of a breach that affects your personal data, we will notify
+you without undue delay — by email to the address on your account and by a
+notice in the interface — describing what happened, what data was involved, what
+we have done, and what you should do (for example, reset your password and
+revoke API keys).
+
+Where the law requires it, we also notify the competent supervisory authority.
+Because the AIOJ project does not operate your Instance, breach notifications
+for a self-hosted deployment come from that deployment's operator.
+
+## 12. Your rights and choices
 
 Depending on where you live, you may have some or all of the following rights:
 
 - **Access and portability.** Settings → *Export my data* returns a JSON snapshot
   of your account, profile, and submission statistics
   (`GET /api/users/me/export`).
-- **Deletion.** Settings → *Delete account* removes your account and cascades to
-  the content you own (`DELETE /api/users/me`). It requires your password when
-  your account has one, and an explicit confirmation. **Deletion is not
-  reversible.**
+- **Deletion.** See [Deleting your account](#deleting-your-account) below.
 - **Correction.** Edit your profile and account settings directly. If a field is
   locked, ask the operator.
 - **Withdraw consent.** Change your analytics choice through the cookie banner;
@@ -224,7 +291,38 @@ Some data cannot be removed on request: a contest result that other users'
 ratings depend on, a resolved cheating finding, or records we must keep by law.
 Where that applies, we will explain why and minimise what remains.
 
-## 11. Children
+### Deleting your account
+
+Two paths, both permanent:
+
+1. **In the app:** sign in → Settings → *Delete account* → confirm. You may be
+   asked for your password if your account has one. This removes your account and
+   the content you own (`DELETE /api/users/me`).
+2. **By request:** contact the operator from the email address on your account.
+   We verify ownership before acting.
+
+Deletion is immediate for live data and **cannot be undone**. Content you made
+public may remain in search-engine caches and in copies other people saved.
+Submissions that stand in a finished contest may be retained in anonymised or
+minimised form so that standings and ratings stay correct — see
+[How long we keep data](#9-how-long-we-keep-data).
+
+## 13. Email, notifications and your choices
+
+**Account email is not optional.** We must be able to send you address
+verification, password resets, two-factor change confirmations, and security
+notices. If you block these, you may lose access to your account.
+
+**Notification email is optional.** In Settings → Notifications you choose
+whether to receive email for contest reminders, rating changes, problem updates,
+and blog comments, and separately which of those appear in the app. Every
+non-essential email has a matching switch, and turning one off does not affect
+your account or contest access.
+
+We do not send marketing or promotional email, and we do not share your address
+with advertisers.
+
+## 14. Children
 
 AIOJ is not directed at children under 13. You must be at least 13 to create an
 account; in the European Economic Area and the United Kingdom, the digital
@@ -237,31 +335,38 @@ required consent, we will delete the account and its data. Teachers and
 organisers running AIOJ for minors are responsible for obtaining the consents
 their law requires.
 
-## 12. International transfers
+## 15. International transfers
 
 The Instance stores data where the operator hosts it, which may not be your
 country. Some providers listed in
-[When data leaves this Instance](#6-when-data-leaves-this-instance) process data
+[When data leaves this Instance](#7-when-data-leaves-this-instance) process data
 in other countries. Where required, the operator relies on appropriate
 safeguards such as standard contractual clauses or an adequacy decision. Ask the
 operator for details of the safeguards that apply to this Instance.
 
-## 13. Changes to this policy
+## 16. Changes to this policy
 
 We may update this policy to reflect new features or new law. The date at the top
 always shows the current version. For material changes we will post an in-app
 notice or send an email before the change takes effect. If you disagree with a
 change, you can export your data and delete your account.
 
-## 14. Contact
+Earlier versions are available from the operator on request, and every version
+of this document is kept in the project's public source repository.
 
-- **Privacy questions, access, and deletion requests:** the contact details published
-  for this Instance (documentation, footer, or your administrator).
+## 17. Contact
+
+- **Privacy questions, access, and deletion requests:** the contact details
+  published for this Instance (documentation, footer, about page, or your
+  administrator).
 - **Security reports:** the operator's security contact, or the AIOJ project's
   private vulnerability channel for bugs in the software itself.
 - **Complaints:** the operator first, then your local supervisory authority.
 
-## 15. If you run this software for other people
+We aim to acknowledge privacy requests within 5 working days and to resolve them
+within 30 days.
+
+## 18. If you run this software for other people
 
 Operators of self-hosted instances are independent data controllers. You must
 publish your own identity and contact details, adopt a policy that matches the

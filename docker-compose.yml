@@ -227,8 +227,14 @@ services:
 
   frontend:
     build:
-      context: ./web
-      dockerfile: Dockerfile
+      # Repo root, not ./web: the build compiles the legal documents from
+      # internal/api/handler/legal so the static policy pages and the API serve
+      # the same text. .dockerignore keeps node_modules/dist out of the context.
+      context: .
+      dockerfile: web/Dockerfile
+      args:
+        # Baked into the prerendered legal pages as canonical/og:url.
+        PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-}
     ports:
       - "80:80"
     depends_on:

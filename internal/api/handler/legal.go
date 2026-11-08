@@ -19,6 +19,30 @@ var legalDocs = map[string]bool{
 	"dmca":             true,
 }
 
+// LegalPaths are the public routes that render the legal documents. The
+// frontend prerenders each one to static HTML at build time (see
+// web/src/prerender/legalEntry.tsx) so crawlers and app-store reviewers see the
+// policy text without executing JavaScript.
+var LegalPaths = []string{"/legal/terms", "/legal/privacy", "/legal/dmca"}
+
+// LegalSitemapURLs lists the legal pages for /sitemap.xml.
+//
+// They are static and always public, so unlike the store-backed sections they
+// cannot fail. Priority is low — these pages explain the service, they are not
+// what people search for — but being in the sitemap is what lets a compliance
+// crawler discover them from the homepage.
+func LegalSitemapURLs(origin string) []SitemapURL {
+	origin = NormalizeOrigin(origin)
+	if origin == "" {
+		return nil
+	}
+	out := make([]SitemapURL, 0, len(LegalPaths))
+	for _, p := range LegalPaths {
+		out = append(out, SitemapURL{Location: origin + p, ChangeFreq: "yearly", Priority: "0.3"})
+	}
+	return out
+}
+
 type LegalHandler struct{}
 
 // Serve returns the markdown body for one legal document.

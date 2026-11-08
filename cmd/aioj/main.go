@@ -599,6 +599,8 @@ func main() {
 						{Name: "problems", URLs: toURLs(problems)},
 						{Name: "contests", URLs: toURLs(contests)},
 						{Name: "users", URLs: toURLs(users)},
+						// Static pages: always present, no store to fail.
+						{Name: "legal", URLs: handler.LegalSitemapURLs(origin)},
 					}, nil
 				})
 				return sections

@@ -25,6 +25,10 @@ export default defineConfig({
         },
     },
     server: {
+        // `src/pages/legal/legalSources.ts` globs the served markdown from
+        // `internal/api/handler/legal/`, which is outside this package root.
+        // Without this the dev server refuses those reads.
+        fs: { allow: [path.resolve(__dirname, '..')] },
         proxy: {
             '/api': 'http://localhost:8080',
             '/ws': { target: 'ws://localhost:8080', ws: true },

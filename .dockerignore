@@ -13,6 +13,9 @@ web/e2e/artifacts
 web/test-results
 web/playwright-report
 *.md
+# ...except the legal documents: the frontend build compiles them into the
+# bundle and prerenders them, so the API and the static pages share one copy.
+!internal/api/handler/legal/*.md
 __pycache__
 *.pyc
 .env
