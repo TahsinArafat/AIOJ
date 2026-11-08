@@ -228,6 +228,8 @@ docker compose exec postgres psql -U aioj -d aioj \
 
 6. **Sample cases**: The API accepts `sample_cases: null` — this is fine. The problem store stores them as JSONB.
 
+7. **Link previews**: The page title is set from JavaScript (`web/src/lib/documentTitle.ts`), which the crawlers behind link previews (Telegram, Slack, Discord, WhatsApp, X, LinkedIn, Facebook) never run — every share used to show "AIOJ — Online Judge" with no image. nginx now sends those user agents to `/meta/<path>` (`internal/api/handler/meta.go`), which server-renders the entity's title, description, canonical and `og:image`; the fallback card is `web/public/og-default.png` (regenerate with `web/scripts/render-og-default.mjs`). Search engines are deliberately excluded — they render JS and need the app HTML. If a share still shows the generic title, check the `$aioj_link_preview_bot` map in `web/nginx.conf` and that `PUBLIC_ORIGIN` is set, since `og:image` must be absolute.
+
 ---
 
 ## File Index

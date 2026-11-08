@@ -123,6 +123,16 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 		r.Get("/api/legal/{doc}", d.Legal.Serve)
 	}
 
+	// Crawler-facing HTML for link previews. nginx rewrites social-network user
+	// agents from /problems/hello to /meta/problems/hello; browsers never reach
+	// these routes. The static "problems" child is registered so it wins over
+	// the catch-all, which serves every other route's site default card.
+	if d.Meta != nil {
+		r.Get("/meta", d.Meta.Page)
+		r.Get("/meta/*", d.Meta.Page)
+		r.Get("/meta/problems/{slug}", d.Meta.Problem)
+	}
+
 	// Public sitemap for crawlers. Built from the same public-visibility rules
 	// the problem/contest APIs apply, so it never advertises an auth-gated URL.
 	if d.Sitemap != nil {

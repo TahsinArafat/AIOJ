@@ -95,6 +95,7 @@ func main() {
 	problemStore := postgres.NewProblemStore(db)
 	problemI18nStore := postgres.NewProblemI18nStore(db)
 	sitemapStore := postgres.NewSitemapStore(db)
+	problemMetaStore := postgres.NewProblemMetaStore(db)
 	feedStore := postgres.NewFeedStore(db)
 	submissionStore := postgres.NewSubmissionStore(db)
 	contestStore := postgres.NewContestStore(db)
@@ -570,6 +571,30 @@ func main() {
 		DevMail:       devMailH,
 		Problem:       problemH,
 		ProblemI18n:   problemI18nH,
+		// Link-preview cards for /meta/<path>. Social crawlers do not run
+		// JavaScript, so the SPA's client-set title never reaches them — this is
+		// what gives a shared problem link its own title, description and image.
+		Meta: &handler.MetaHandler{
+			Origin: func() string { return os.Getenv("PUBLIC_ORIGIN") },
+			ProblemCard: func(ctx context.Context, slug string) (*handler.ShareCard, error) {
+				m, err := problemMetaStore.GetBySlug(ctx, slug)
+				if err != nil {
+					return nil, err
+				}
+				// Private problems stay invisible to crawlers: a nil card makes
+				// the handler answer 404 rather than leak the title.
+				if m == nil || !m.Visible {
+					return nil, nil
+				}
+				return &handler.ShareCard{
+					Title:       m.Title,
+					Description: m.Description,
+					Path:        "/problems/" + m.Slug,
+					Kind:        "article",
+					Facts:       shareCardFacts(m),
+				}, nil
+			},
+		},
 		// Each section is gathered independently, and the error is carried out
 		// in the SitemapSection rather than logged and dropped. Dropping it is
 		// what previously turned a query against a non-existent column into a
@@ -822,6 +847,31 @@ func main() {
 	defer shutCancel()
 	srv.Shutdown(shutCtx)
 	judgeQueue.Close()
+}
+
+// shareCardFacts renders the short labels under a problem's link preview:
+// difficulty, limits and the first few tags. A preview body is a couple of
+// lines, so this keeps to what a solver scanning a shared link cares about.
+func shareCardFacts(m *postgres.ProblemMeta) []string {
+	facts := make([]string, 0, 4)
+	if d := strings.TrimSpace(m.Difficulty); d != "" {
+		r := []rune(d)
+		facts = append(facts, strings.ToUpper(string(r[0]))+string(r[1:]))
+	}
+	if m.TimeLimit > 0 {
+		facts = append(facts, fmt.Sprintf("%.1f s", float64(m.TimeLimit)/1000))
+	}
+	if m.MemoryLimit > 0 {
+		facts = append(facts, fmt.Sprintf("%d MB", m.MemoryLimit))
+	}
+	if len(m.Tags) > 0 {
+		tags := m.Tags
+		if len(tags) > 4 {
+			tags = tags[:4]
+		}
+		facts = append(facts, strings.Join(tags, ", "))
+	}
+	return facts
 }
 
 // truncateForFeed bounds a problem statement for feed readers, which often

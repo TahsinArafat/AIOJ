@@ -26,7 +26,12 @@ type Deps struct {
 	// ContestFeed returns items for the contests Atom feed, plus any fetch error.
 	ContestFeed func(ctx context.Context) ([]handler.FeedItem, error)
 	// CommentFeed returns items for the comments Atom feed, plus any fetch error.
-	CommentFeed    func(ctx context.Context) ([]handler.FeedItem, error)
+	CommentFeed func(ctx context.Context) ([]handler.FeedItem, error)
+	// Meta renders the crawler-facing copy of an app route with per-page
+	// Open Graph tags. nginx routes social-network user agents to it, because
+	// those crawlers do not execute JavaScript and so never see the SPA's
+	// client-set page title.
+	Meta           *handler.MetaHandler
 	Submission     *handler.SubmissionHandler
 	Contest        *handler.ContestHandler
 	ContestProblem *handler.ContestProblemHandler

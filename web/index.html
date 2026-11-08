@@ -11,6 +11,48 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="AIOJ" />
     <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+    <meta
+      name="description"
+      content="AIOJ is an online judge for competitive programming: solve problems, join contests, and track your rating."
+    />
+
+    <!--
+      Link previews. The crawlers behind them (Telegram, Slack, Discord,
+      WhatsApp, X, LinkedIn, Facebook) do not run JavaScript, so the per-page
+      title the app sets at runtime is invisible to them — every share used to
+      show "AIOJ — Online Judge" over a solid colour block.
+
+      Per-problem cards are now server-rendered at /meta/<path> by
+      internal/api/handler/meta.go, and nginx sends social crawlers there. These
+      tags are the fallback for every route that has no entity of its own.
+
+      The image URLs start with the SITE_ORIGIN placeholder, filled in at build
+      time from PUBLIC_ORIGIN (see vite.config.ts): og:image must be absolute
+      for every platform. No canonical tag
+      here on purpose — the SPA answers every route from this one file, so a
+      static canonical would tell search engines that all pages are duplicates
+      of whichever URL it named.
+    -->
+    <meta property="og:site_name" content="AIOJ" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="AIOJ — Online Judge" />
+    <meta
+      property="og:description"
+      content="AIOJ is an online judge for competitive programming: solve problems, join contests, and track your rating."
+    />
+    <meta property="og:image" content="%SITE_ORIGIN%/og-default.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="AIOJ — Online Judge" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="AIOJ — Online Judge" />
+    <meta
+      name="twitter:description"
+      content="AIOJ is an online judge for competitive programming: solve problems, join contests, and track your rating."
+    />
+    <meta name="twitter:image" content="%SITE_ORIGIN%/og-default.png" />
+
     <title>AIOJ — Online Judge</title>
     <script>
       (function () {
