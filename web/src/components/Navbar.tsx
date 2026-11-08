@@ -10,7 +10,7 @@ import type { LucideIcon } from 'lucide-react'
 import {
     Code2, Trophy, Dumbbell, BookOpen, Users, UserCheck,
     MessageSquare, BarChart3, Settings, LogOut, User, FileCode,
-    Bell, Key, ChevronDown, Menu, X, Building2, GraduationCap, Sun, Moon, Terminal
+    Bell, Key, ChevronDown, Menu, X, Building2, GraduationCap, Sun, Moon, Terminal, Activity
 } from 'lucide-react'
 
 function decodeRole(): string | null {
@@ -154,6 +154,7 @@ export default function Navbar() {
                                         {show.contests && <NavLink to="/contests" icon={Trophy}>Contests</NavLink>}
                                         {show.gym && <NavLink to="/gym" icon={Dumbbell}>Gym</NavLink>}
                                         {show.practice && <NavLink to="/practice" icon={BookOpen}>Practice</NavLink>}
+                                        {show.submissions && <NavLink to="/status" icon={Activity}>Status</NavLink>}
                                     </NavDropdown>
                                 )}
                                 {showCommunity && (
@@ -291,6 +292,7 @@ export default function Navbar() {
                             {show.gym && <MobileLink to="/gym" icon={Dumbbell}>Gym</MobileLink>}
                             {show.practice && <MobileLink to="/practice" icon={BookOpen}>Practice</MobileLink>}
                             {show.problems && <MobileLink to="/problems" icon={Code2}>Problems</MobileLink>}
+                            {show.submissions && <MobileLink to="/status" icon={Activity}>Status</MobileLink>}
                             {show.ide && <MobileLink to="/ide" icon={Terminal}>IDE</MobileLink>}
 
                             {showCommunity && (

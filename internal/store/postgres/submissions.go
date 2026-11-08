@@ -74,10 +74,12 @@ func (s *SubmissionStore) GetByID(ctx context.Context, id string) (*model.Submis
 		`SELECT id,problem_id,user_id,COALESCE(contest_id::text,''),language,source_code,source_code_gz,code_size,
 		        status,score,time_used,memory_used,compile_output,judge_result,
 		        judged_by,created_at,judged_at,submission_type,remote_id,remote_url,
-		        COALESCE(bot_id,''),COALESCE(bot_slug,''),COALESCE(is_upsolving,false) FROM submissions WHERE id=$1`, id).Scan(
+		        COALESCE(bot_id,''),COALESCE(bot_slug,''),COALESCE(is_upsolving,false),
+		        COALESCE(judge_error,'') FROM submissions WHERE id=$1`, id).Scan(
 		&sub.ID, &sub.ProblemID, &sub.UserID, &cid, &sub.Language, &sub.SourceCode, &compressed, &sub.CodeSize,
 		&sub.Status, &sub.Score, &sub.TimeUsed, &sub.MemoryUsed, &co, &jr,
-		&sub.JudgedBy, &sub.CreatedAt, &ja, &sub.SubmissionType, &remoteID, &remoteURL, &botID, &botSlug, &sub.IsUpsolving)
+		&sub.JudgedBy, &sub.CreatedAt, &ja, &sub.SubmissionType, &remoteID, &remoteURL, &botID, &botSlug, &sub.IsUpsolving,
+		&sub.JudgeError)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -285,13 +287,21 @@ func (s *SubmissionStore) updateResult(ctx context.Context, id, claimToken strin
 	}
 	defer tx.Rollback()
 
+	// A System Error's message is the judge's own failure text, not compiler
+	// output: keep it in judge_error so the UI never shows it as if the
+	// contestant's code failed to compile, and so setters can read it.
+	judgeError := ""
+	if status == model.StatusSE {
+		judgeError = compileOutput
+	}
 	query := `UPDATE submissions
 	             SET status=$1,score=$2,time_used=$3,memory_used=$4,compile_output=$5,judge_result=$6,judged_at=$7,
-	                 judging_started_at=NULL,judging_claim_token=NULL
+	                 judge_error=$9, judging_started_at=NULL,judging_claim_token=NULL
 	           WHERE id=$8`
-	args := []interface{}{status, score, timeUsed, memoryUsed, compileOutput, jr, time.Now(), id}
+	args := []interface{}{status, score, timeUsed, memoryUsed, compileOutput, jr, time.Now(), id, judgeError}
 	if claimToken != "" {
-		query += ` AND status='judging' AND judging_claim_token=$9`
+		// $9 is judge_error; the claim token takes the next slot.
+		query += ` AND status='judging' AND judging_claim_token=$10`
 		args = append(args, claimToken)
 	}
 	res, err := tx.ExecContext(ctx, query, args...)
@@ -635,10 +645,228 @@ func (s *SubmissionStore) ResetForRejudge(ctx context.Context, ids []string) err
 		       time_used = 0,
 		       memory_used = 0,
 		       compile_output = '',
-		       judge_result = NULL,
+		       judge_error = '',
+		       -- judge_result is JSONB NOT NULL DEFAULT '[]': writing NULL here
+		       -- made every rejudge fail with a not-null violation.
+		       judge_result = '[]'::jsonb,
 		       judging_started_at = NULL,
 		       judging_claim_token = NULL,
 		       judged_at = NULL
 		 WHERE id IN (`+strings.Join(placeholders, ",")+`)`, args...)
 	return err
+}
+
+// submissionListColumns is the projection shared by the listing queries that
+// have to name the submitter and the problem. Kept in one place so the scan
+// order below cannot drift from the SELECT.
+const submissionListColumns = `s.id,s.user_id,COALESCE(u.username,''),
+	COALESCE(p.slug,''),COALESCE(p.title,''),
+	s.language,s.status,s.score,s.time_used,s.memory_used,s.created_at,s.submission_type,
+	COALESCE(s.contest_id::text,''),COALESCE(s.is_upsolving,false),COALESCE(s.judge_error,'')`
+
+func scanSubmissionList(rows *sql.Rows) ([]model.Submission, error) {
+	var items []model.Submission
+	for rows.Next() {
+		var sub model.Submission
+		if err := rows.Scan(&sub.ID, &sub.UserID, &sub.Username,
+			&sub.ProblemSlug, &sub.ProblemTitle,
+			&sub.Language, &sub.Status, &sub.Score, &sub.TimeUsed, &sub.MemoryUsed, &sub.CreatedAt, &sub.SubmissionType,
+			&sub.ContestID, &sub.IsUpsolving, &sub.JudgeError); err != nil {
+			return nil, err
+		}
+		items = append(items, sub)
+	}
+	if items == nil {
+		items = []model.Submission{}
+	}
+	return items, rows.Err()
+}
+
+// ListByProblemManage lists one problem's submissions for its setters.
+func (s *SubmissionStore) ListByProblemManage(ctx context.Context, problemID string, offset, limit int, filter model.SubmissionFilter) ([]model.Submission, int, error) {
+	where := "s.problem_id=$1"
+	args := []interface{}{problemID}
+	argIdx := 2
+	add := func(clause string, v interface{}) {
+		where += fmt.Sprintf(" AND "+clause+"=$%d", argIdx)
+		args = append(args, v)
+		argIdx++
+	}
+	if filter.UserID != "" {
+		add("s.user_id", filter.UserID)
+	}
+	if filter.Username != "" {
+		where += fmt.Sprintf(" AND LOWER(u.username)=LOWER($%d)", argIdx)
+		args = append(args, filter.Username)
+		argIdx++
+	}
+	if filter.ContestID != "" {
+		add("s.contest_id", filter.ContestID)
+	}
+	if filter.Language != "" {
+		add("s.language", filter.Language)
+	}
+	if filter.Status != "" {
+		add("s.status", filter.Status)
+	}
+
+	const joins = ` FROM submissions s
+		LEFT JOIN users u ON s.user_id = u.id
+		LEFT JOIN problems p ON s.problem_id = p.id`
+	var total int
+	if err := s.db.QueryRowContext(ctx, "SELECT COUNT(*)"+joins+" WHERE "+where, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	args = append(args, offset, limit)
+	rows, err := s.db.QueryContext(ctx,
+		fmt.Sprintf(`SELECT %s%s WHERE %s ORDER BY s.created_at DESC, s.id OFFSET $%d LIMIT $%d`,
+			submissionListColumns, joins, where, argIdx, argIdx+1), args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	items, err := scanSubmissionList(rows)
+	return items, total, err
+}
+
+// ListPublic lists submissions site-wide for the status page.
+//
+// Visibility is decided in SQL: an anonymous reader only sees submissions of
+// visible problems that are not inside a contest that is still running (a
+// live contest's verdicts would leak the problem set). A signed-in reader also
+// sees their own rows — including hidden problems and live contests — so their
+// status page never hides work they just submitted. Admins (ShowAll) skip
+// both restrictions.
+func (s *SubmissionStore) ListPublic(ctx context.Context, offset, limit int, filter model.PublicSubmissionFilter) ([]model.Submission, int, error) {
+	const joins = ` FROM submissions s
+		LEFT JOIN users u ON s.user_id = u.id
+		LEFT JOIN problems p ON s.problem_id = p.id
+		LEFT JOIN contests c ON s.contest_id = c.id`
+
+	args := []interface{}{}
+	conds := []string{}
+	next := func(v interface{}) string {
+		args = append(args, v)
+		return fmt.Sprintf("$%d", len(args))
+	}
+
+	const openToPublic = "COALESCE(p.visible,false) = true AND (c.id IS NULL OR NOW() >= c.end_time)"
+	switch {
+	case filter.ShowAll:
+	case filter.ViewerID != "":
+		conds = append(conds, fmt.Sprintf("(s.user_id = %s OR (%s))", next(filter.ViewerID), openToPublic))
+	default:
+		conds = append(conds, "("+openToPublic+")")
+	}
+
+	if filter.ProblemSlug != "" {
+		conds = append(conds, "p.slug = "+next(filter.ProblemSlug))
+	}
+	if filter.ProblemID != "" {
+		conds = append(conds, "s.problem_id = "+next(filter.ProblemID))
+	}
+	if filter.UserID != "" {
+		conds = append(conds, "s.user_id = "+next(filter.UserID))
+	}
+	if filter.Username != "" {
+		conds = append(conds, "LOWER(u.username) = LOWER("+next(filter.Username)+")")
+	}
+	if filter.ContestID != "" {
+		conds = append(conds, "s.contest_id = "+next(filter.ContestID))
+	}
+	if filter.Language != "" {
+		conds = append(conds, "s.language = "+next(filter.Language))
+	}
+	if filter.Status != "" {
+		conds = append(conds, "s.status = "+next(filter.Status))
+	}
+
+	where := strings.Join(conds, " AND ")
+	var total int
+	if err := s.db.QueryRowContext(ctx, "SELECT COUNT(*)"+joins+" WHERE "+where, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	// ORDER BY id as a tiebreaker: created_at is not unique, and without it two
+	// rows sharing a timestamp could swap places between pages.
+	args = append(args, limit, offset)
+	rows, err := s.db.QueryContext(ctx,
+		fmt.Sprintf(`SELECT %s%s WHERE %s ORDER BY s.created_at DESC, s.id LIMIT $%d OFFSET $%d`,
+			submissionListColumns, joins, where, len(args)-1, len(args)), args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	items, err := scanSubmissionList(rows)
+	// The status page is public: judge failure text stays with admins and the
+	// problem's setters, who read it from the setter listing instead.
+	for i := range items {
+		items[i].JudgeError = ""
+	}
+	return items, total, err
+}
+
+// ListIDsForProblemRejudge returns the judged local submissions of a problem.
+func (s *SubmissionStore) ListIDsForProblemRejudge(ctx context.Context, problemID string, filter model.SubmissionFilter) ([]string, error) {
+	query := `
+		SELECT s.id
+		  FROM submissions s
+		  JOIN problems p ON p.id = s.problem_id
+		 WHERE s.problem_id = $1
+		   AND s.status NOT IN ('pending', 'judging')
+		   AND COALESCE(s.remote_id, '') = ''
+		   AND COALESCE(p.source, 'local') IN ('', 'local')`
+	args := []interface{}{problemID}
+	if filter.ContestID != "" {
+		args = append(args, filter.ContestID)
+		query += ` AND s.contest_id = $2`
+	}
+	query += ` ORDER BY s.created_at ASC`
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+// RecomputeProblemCounts rebuilds the denormalised counters from the table.
+func (s *SubmissionStore) RecomputeProblemCounts(ctx context.Context, problemID string) error {
+	_, err := s.db.ExecContext(ctx, `
+		UPDATE problems p
+		   SET submission_count = (SELECT COUNT(*) FROM submissions s WHERE s.problem_id = p.id),
+		       accepted_count   = (SELECT COUNT(*) FROM submissions s WHERE s.problem_id = p.id AND s.status = 'ac')
+		 WHERE p.id = $1`, problemID)
+	return err
+}
+
+// ListRecentFailures returns the newest System Error submissions with the
+// judge's failure text, for the admin troubleshooting panel.
+func (s *SubmissionStore) ListRecentFailures(ctx context.Context, limit int) ([]model.Submission, error) {
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	rows, err := s.db.QueryContext(ctx,
+		fmt.Sprintf(`SELECT %s
+		  FROM submissions s
+		  LEFT JOIN users u ON s.user_id = u.id
+		  LEFT JOIN problems p ON s.problem_id = p.id
+		 WHERE s.status = 'se'
+		 ORDER BY s.created_at DESC
+		 LIMIT $1`, submissionListColumns), limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanSubmissionList(rows)
 }

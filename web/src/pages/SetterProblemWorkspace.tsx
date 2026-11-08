@@ -15,6 +15,7 @@ import SettingsTab from '../components/SetterWorkspace/SettingsTab'
 import EditorialTab from '../components/SetterWorkspace/EditorialTab'
 import TranslationsTab from '../components/SetterWorkspace/TranslationsTab'
 import AIStudioTab from '../components/SetterWorkspace/AIStudioTab'
+import SubmissionsTab from '../components/SetterWorkspace/SubmissionsTab'
 
 function decodeRole(): string | null {
   const token = localStorage.getItem('access_token')
@@ -40,11 +41,11 @@ export default function SetterProblemWorkspace() {
 
 const [problem, setProblem] = useState<LoadedProblem | null>(null)
 useDocumentTitle(problem ? `${problem.title} — setter` : null)
-  type WorkspaceTab = 'statement' | 'testcases' | 'checker' | 'permissions' | 'settings' | 'editorial' | 'translations' | 'ai'
+  type WorkspaceTab = 'statement' | 'testcases' | 'checker' | 'submissions' | 'permissions' | 'settings' | 'editorial' | 'translations' | 'ai'
 
   const [activeTab, setActiveTab] = useState<WorkspaceTab>(() => {
     const hash = window.location.hash.replace('#', '') as WorkspaceTab
-    const validTabs: WorkspaceTab[] = ['statement', 'testcases', 'checker', 'permissions', 'settings', 'editorial', 'translations', 'ai']
+    const validTabs: WorkspaceTab[] = ['statement', 'testcases', 'checker', 'submissions', 'permissions', 'settings', 'editorial', 'translations', 'ai']
     return validTabs.includes(hash) ? hash : 'statement'
   })
   const role = decodeRole()
@@ -58,7 +59,7 @@ useDocumentTitle(problem ? `${problem.title} — setter` : null)
     }
     const onHashChange = () => {
       const next = window.location.hash.replace('#', '') as WorkspaceTab
-      const valid: WorkspaceTab[] = ['statement', 'testcases', 'checker', 'permissions', 'settings', 'editorial', 'translations', 'ai']
+      const valid: WorkspaceTab[] = ['statement', 'testcases', 'checker', 'submissions', 'permissions', 'settings', 'editorial', 'translations', 'ai']
       if (valid.includes(next)) setActiveTab(next)
     }
     window.addEventListener('hashchange', onHashChange)
@@ -425,6 +426,12 @@ useDocumentTitle(problem ? `${problem.title} — setter` : null)
             Checker / Special Judge
           </button>
           <button
+            onClick={() => setActiveTab('submissions')}
+            className={`px-4 py-3 text-left shrink-0 whitespace-nowrap border-r lg:border-r-0 lg:border-b border-hairline font-medium ${activeTab === 'submissions' ? 'bg-brand-soft text-brand border-l-4 border-l-blue-600' : 'text-muted hover:bg-surface-2 hover:text-ink dark:hover:text-white'}`}
+          >
+            Submissions
+          </button>
+          <button
             onClick={() => setActiveTab('permissions')}
             className={`px-4 py-3 text-left shrink-0 whitespace-nowrap border-r lg:border-r-0 lg:border-b border-hairline font-medium ${activeTab === 'permissions' ? 'bg-brand-soft text-brand border-l-4 border-l-blue-600' : 'text-muted hover:bg-surface-2 hover:text-ink dark:hover:text-white'}`}
           >
@@ -493,6 +500,10 @@ useDocumentTitle(problem ? `${problem.title} — setter` : null)
               onUpdate={updateField}
               onSave={handleSaveChecker}
             />
+          )}
+
+          {activeTab === 'submissions' && (
+            <SubmissionsTab problemSlug={problem.slug as string} />
           )}
 
           {activeTab === 'permissions' && (

@@ -16,6 +16,9 @@ import (
 type mockProblemStore struct {
 	createErr error
 	getBySlug *model.Problem
+	// access maps "userID/problemID" -> access level. A nil map means nobody
+	// has access anywhere, which is what the import tests rely on.
+	access map[string]string
 }
 
 func (m *mockProblemStore) Create(_ context.Context, _ *model.Problem) error { return m.createErr }
@@ -43,7 +46,27 @@ func (m *mockProblemStore) RemovePermission(_ context.Context, _, _ string) erro
 func (m *mockProblemStore) GetPermissions(_ context.Context, _ string) ([]model.ProblemPermission, error) {
 	return nil, nil
 }
-func (m *mockProblemStore) HasAccess(_ context.Context, _, _ string, _ ...string) bool { return false }
+func (m *mockProblemStore) HasAccess(_ context.Context, problemID, userID string, required ...string) bool {
+	level, ok := m.access[userID+"/"+problemID]
+	if !ok {
+		return false
+	}
+	for _, req := range required {
+		if level == req {
+			return true
+		}
+	}
+	return false
+}
+func (m *mockProblemStore) ListAccessLevels(_ context.Context, userID string, problemIDs []string) (map[string]string, error) {
+	out := make(map[string]string, len(problemIDs))
+	for _, id := range problemIDs {
+		if level, ok := m.access[userID+"/"+id]; ok {
+			out[id] = level
+		}
+	}
+	return out, nil
+}
 func (m *mockProblemStore) GetRecommendations(_ context.Context, _ string, _ int) (*model.RecommendationsResponse, error) {
 	return nil, nil
 }

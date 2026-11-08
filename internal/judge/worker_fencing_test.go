@@ -79,6 +79,20 @@ func (f *fencingStore) ListForBulkRejudge(context.Context, string, string) ([]st
 	return nil, nil
 }
 func (f *fencingStore) ResetForRejudge(context.Context, []string) error { return nil }
+func (f *fencingStore) ListByProblemManage(context.Context, string, int, int, model.SubmissionFilter) ([]model.Submission, int, error) {
+	return nil, 0, nil
+}
+func (f *fencingStore) ListPublic(context.Context, int, int, model.PublicSubmissionFilter) ([]model.Submission, int, error) {
+	return nil, 0, nil
+}
+func (f *fencingStore) ListIDsForProblemRejudge(context.Context, string, model.SubmissionFilter) ([]string, error) {
+	return nil, nil
+}
+func (f *fencingStore) RecomputeProblemCounts(context.Context, string) error { return nil }
+func (f *fencingStore) ListRecentFailures(context.Context, int) ([]model.Submission, error) {
+	return nil, nil
+}
+
 func (f *fencingStore) ListPendingWithContext(context.Context, int) ([]store.PendingSubmissionInfo, error) {
 	return nil, nil
 }

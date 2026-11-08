@@ -115,3 +115,33 @@ test('shows not-found state when the submission is missing', async () => {
 
     await waitFor(() => expect(screen.getByText('Submission not found.')).toBeInTheDocument())
 })
+
+// A contestant who reports "judge system error" has nothing to act on; the
+// judge's own failure text is what explains it, and only privileged viewers
+// receive it (the API strips it for the submitter).
+test('shows the judge error text when the API provides it', async () => {
+    vi.mocked(api.submissions.get).mockResolvedValue(
+        baseSubmission({
+            status: 'se',
+            judge_error: 'execution client error: dial tcp judge:5050: connection refused',
+            judged_at: new Date().toISOString(),
+        }) as never
+    )
+
+    renderPage()
+
+    await waitFor(() => expect(screen.getByText('Judge error')).toBeInTheDocument())
+    expect(screen.getByText(/dial tcp judge:5050/)).toBeInTheDocument()
+    // It must not be presented as the contestant's compile failure.
+    expect(screen.queryByText('Compile error')).not.toBeInTheDocument()
+})
+
+test('a submitter without judge access sees the generic note only', async () => {
+    vi.mocked(api.submissions.get).mockResolvedValue(baseSubmission({ status: 'se' }) as never)
+
+    renderPage()
+
+    await waitFor(() => expect(screen.getByText(/A system error means the judge itself failed/)).toBeInTheDocument())
+    expect(screen.queryByText('Judge error')).not.toBeInTheDocument()
+    expect(screen.getByText(/setters and site admins can see the failure details/)).toBeInTheDocument()
+})

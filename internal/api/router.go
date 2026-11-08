@@ -271,7 +271,17 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 			r.With(middleware.AuthMiddleware(jwtManager)).Put("/{lang}", problemI18nH.Upsert)
 			r.With(middleware.AuthMiddleware(jwtManager)).Delete("/{lang}", problemI18nH.Delete)
 		})
-		r.Get("/{slug}/submissions", submissionH.ListByProblem)
+		// A problem's submission list. `/` stays readable without an account;
+		// `/manage` and `/rejudge` are the setter's own view and actions.
+		r.Route("/{slug}/submissions", func(r chi.Router) {
+			r.Get("/", submissionH.ListByProblem)
+			r.Group(func(r chi.Router) {
+				r.Use(middleware.AuthMiddleware(jwtManager))
+				r.Use(gate(feature.KeySetterWorkspace))
+				r.Get("/manage", submissionH.ListByProblemManage)
+				r.Post("/rejudge", submissionH.RejudgeProblemSubmissions)
+			})
+		})
 		r.Get("/{slug}/language-limits", langLimitH.List)
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.AuthMiddleware(jwtManager))
@@ -301,14 +311,19 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 
 	r.Route("/api/submissions", func(r chi.Router) {
 		r.Use(gate(feature.KeySubmissions))
-		r.Use(middleware.AuthMiddleware(jwtManager))
-		r.Post("/", submissionH.Create)
-		r.Post("/upsolving", submissionH.CreateUpsolving)
-		r.Post("/run", submissionH.CustomRun)
-		r.Get("/", submissionH.ListByUser)
-		r.Get("/{id}", submissionH.GetByID)
-		r.Post("/{id}/retry-remote", submissionH.RetryRemote)
-		r.Post("/{id}/recheck-remote", submissionH.RecheckRemote)
+		// The site-wide status page is readable without an account, so it is
+		// registered outside the authenticated group below.
+		r.With(middleware.OptionalAuthMiddleware(jwtManager)).Get("/all", submissionH.ListAll)
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.AuthMiddleware(jwtManager))
+			r.Post("/", submissionH.Create)
+			r.Post("/upsolving", submissionH.CreateUpsolving)
+			r.Post("/run", submissionH.CustomRun)
+			r.Get("/", submissionH.ListByUser)
+			r.Get("/{id}", submissionH.GetByID)
+			r.Post("/{id}/retry-remote", submissionH.RetryRemote)
+			r.Post("/{id}/recheck-remote", submissionH.RecheckRemote)
+		})
 	})
 
 	r.Route("/api/contests", func(r chi.Router) {
@@ -486,6 +501,7 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 
 		r.Route("/submissions", func(r chi.Router) {
 			r.Get("/pending-remote", adminSubH.ListPendingRemote)
+			r.Get("/failed", adminSubH.ListFailed)
 			r.Post("/rejudge-bulk", adminSubH.RejudgeBulk)
 			r.Post("/{id}/rejudge", adminSubH.Rejudge)
 			r.Post("/{id}/refresh", adminSubH.ForceRefresh)

@@ -382,3 +382,28 @@ func (s *ProblemStore) ListByCreatedBy(ctx context.Context, userID string, offse
 	}
 	return items, total, nil
 }
+
+// ListAccessLevels returns the user's access level for each requested problem.
+// Problems with no permission row are absent from the map.
+func (s *ProblemStore) ListAccessLevels(ctx context.Context, userID string, problemIDs []string) (map[string]string, error) {
+	levels := make(map[string]string, len(problemIDs))
+	if userID == "" || len(problemIDs) == 0 {
+		return levels, nil
+	}
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT problem_id::text, access_level FROM problem_permissions
+		  WHERE user_id = $1 AND problem_id = ANY($2)`,
+		userID, pq.Array(problemIDs))
+	if err != nil {
+		return levels, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var problemID, level string
+		if err := rows.Scan(&problemID, &level); err != nil {
+			return levels, err
+		}
+		levels[problemID] = level
+	}
+	return levels, rows.Err()
+}

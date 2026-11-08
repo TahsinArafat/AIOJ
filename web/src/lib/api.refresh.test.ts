@@ -96,3 +96,61 @@ describe('api token refresh', () => {
         expect(fetchMock.mock.calls.filter(c => String(c[0]).includes('/auth/refresh'))).toHaveLength(0)
     })
 })
+
+/**
+ * Rotation is one-time-use, and localStorage is shared by every tab. A tab
+ * that refreshes replaces the stored token; any other tab is now holding a
+ * spent one. Presenting it must not end the session — the client has to adopt
+ * whatever the winning tab stored and carry on.
+ */
+describe('api token refresh across tabs', () => {
+    test('prefers the token stored by another tab over the stale memory copy', async () => {
+        // Another tab rotated before this one got to it.
+        localStorage.setItem('refresh_token', 'rotated-by-other-tab')
+        fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+            if (url.includes('/auth/refresh')) {
+                return jsonResponse({ access_token: 'fresh-access', refresh_token: 'fresh-refresh' })
+            }
+            const auth = (init?.headers as Record<string, string> | undefined)?.Authorization
+            return auth === 'Bearer fresh-access' ? jsonResponse({ count: 0 }) : jsonResponse({ error: 'expired' }, 401)
+        })
+
+        await api.notifications.unreadCount()
+
+        const refreshCalls = fetchMock.mock.calls.filter(c => String(c[0]).includes('/auth/refresh'))
+        expect(JSON.parse(refreshCalls[0][1].body)).toEqual({ refresh_token: 'rotated-by-other-tab' })
+        expect(localStorage.getItem('refresh_token')).toBe('fresh-refresh')
+    })
+
+    test('a token spent by a concurrent refresh falls back to the newer stored one', async () => {
+        let refreshAttempts = 0
+        fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+            if (url.includes('/auth/refresh')) {
+                refreshAttempts++
+                if (refreshAttempts === 1) {
+                    // The other tab won the race and rotated while we were asking.
+                    localStorage.setItem('refresh_token', 'winner-token')
+                    return jsonResponse({ error: 'invalid refresh token' }, 401)
+                }
+                return jsonResponse({ access_token: 'fresh-access', refresh_token: 'fresh-refresh' })
+            }
+            const auth = (init?.headers as Record<string, string> | undefined)?.Authorization
+            return auth === 'Bearer fresh-access' ? jsonResponse({ count: 0 }) : jsonResponse({ error: 'expired' }, 401)
+        })
+
+        await api.notifications.unreadCount()
+
+        expect(refreshAttempts).toBe(2)
+        expect(getAccessToken()).toBe('fresh-access')
+        expect(localStorage.getItem('refresh_token')).toBe('fresh-refresh')
+    })
+
+    test('a signed-out browser stays signed out', async () => {
+        // Another tab signed out: nothing is stored, and the memory copy is gone.
+        clearTokens()
+        fetchMock.mockImplementation(async () => jsonResponse({ error: 'expired' }, 401))
+
+        await expect(api.notifications.unreadCount()).rejects.toThrow()
+        expect(fetchMock.mock.calls.filter(c => String(c[0]).includes('/auth/refresh'))).toHaveLength(0)
+    })
+})

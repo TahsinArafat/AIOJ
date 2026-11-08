@@ -58,11 +58,36 @@ export function setTokens(a: string, r: string) {
 }
 
 export function clearTokens() {
+    const wasSignedIn = accessToken !== null || refreshToken !== null
     accessToken = null
     refreshToken = null
     localStorage.removeItem('access_token')
     localStorage.removeItem('refresh_token')
-    notifyAuthChange()
+    if (wasSignedIn) notifyAuthChange()
+}
+
+function readStoredRefreshToken(): string | null {
+    return localStorage.getItem('refresh_token')
+}
+
+/**
+ * Keep this tab's copy of the tokens in step with every other tab.
+ *
+ * Refresh tokens rotate: the tab that refreshes replaces the stored token, and
+ * every other tab is still holding the copy that was just spent. Without this
+ * listener those tabs sit on a dead token and present it at the next 401 —
+ * which the server rejects, and which used to sign the whole browser out.
+ */
+if (typeof window !== 'undefined') {
+    window.addEventListener('storage', event => {
+        // key is null when another tab calls localStorage.clear().
+        if (event.key === null || event.key === 'access_token' || event.key === 'refresh_token') {
+            const wasSignedIn = accessToken !== null
+            accessToken = localStorage.getItem('access_token')
+            refreshToken = localStorage.getItem('refresh_token')
+            if ((accessToken !== null) !== wasSignedIn) notifyAuthChange()
+        }
+    })
 }
 
 /**
@@ -135,20 +160,37 @@ async function ensureCsrfToken(): Promise<string> {
 let refreshInFlight: Promise<boolean> | null = null
 
 async function refreshAccessToken(): Promise<boolean> {
-    if (!refreshToken) return false
     if (refreshInFlight) return refreshInFlight
 
     refreshInFlight = (async () => {
         try {
-            const res = await fetch(BASE + '/auth/refresh', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': await ensureCsrfToken() },
-                body: JSON.stringify({ refresh_token: refreshToken }),
-            })
-            if (!res.ok) return false
-            const data = await res.json()
-            setTokens(data.access_token, data.refresh_token)
-            return true
+            const csrf = await ensureCsrfToken()
+            const attempted = new Set<string>()
+            // Two passes over the candidates. The first offers the token stored
+            // right now (freshest across tabs), then the copy this tab holds in
+            // memory. The second re-reads storage: another tab may have rotated
+            // the token while the first pass was in flight, and adopting its
+            // result is the difference between continuing and a bogus sign-out.
+            for (let pass = 0; pass < 2; pass++) {
+                for (const token of [readStoredRefreshToken(), refreshToken]) {
+                    if (!token || attempted.has(token)) continue
+                    attempted.add(token)
+                    const res = await fetch(BASE + '/auth/refresh', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
+                        body: JSON.stringify({ refresh_token: token }),
+                    })
+                    if (res.ok) {
+                        const data = await res.json()
+                        setTokens(data.access_token, data.refresh_token)
+                        return true
+                    }
+                    // Anything but "this token is spent" is not a rotation race:
+                    // stop and let the caller report the real failure.
+                    if (res.status !== 401) return false
+                }
+            }
+            return false
         } catch {
             return false
         } finally {
@@ -175,7 +217,7 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
 
     let res = await fetch(BASE + path, { ...opts, headers })
 
-    if (res.status === 401 && refreshToken) {
+    if (res.status === 401 && (refreshToken || readStoredRefreshToken())) {
         if (await refreshAccessToken()) {
             headers['Authorization'] = `Bearer ${accessToken}`
             res = await fetch(BASE + path, { ...opts, headers })
@@ -319,6 +361,21 @@ export const api = {
         update: (slug: string, d: unknown) => request<Problem>(`/problems/${slug}`, { method: 'PUT', body: JSON.stringify(d) }),
         delete: (slug: string) => request<{ status: string }>(`/problems/${slug}`, { method: 'DELETE' }),
         getPermissions: (slug: string) => request<{ data: ProblemPermission[] }>(`/problems/${slug}/permissions`),
+        /** Setter view of a problem's submissions (names the submitter). */
+        submissions: (slug: string, offset = 0, limit = 50, filters?: { handle?: string; status?: string; language?: string; contestId?: string }) => {
+            const qs = new URLSearchParams({ offset: String(offset), limit: String(limit) });
+            if (filters?.handle) qs.set('handle', filters.handle);
+            if (filters?.status) qs.set('status', filters.status);
+            if (filters?.language) qs.set('language', filters.language);
+            if (filters?.contestId) qs.set('contest_id', filters.contestId);
+            return request<{ data: Submission[]; total: number }>(`/problems/${slug}/submissions/manage?${qs.toString()}`);
+        },
+        /** Rejudge one submission, a whole contest's, or every judged row. */
+        rejudgeSubmissions: (slug: string, d: { submission_id?: string; contest_id?: string } = {}) =>
+            request<{ enqueued: number; total: number }>(`/problems/${slug}/submissions/rejudge`, {
+                method: 'POST',
+                body: JSON.stringify(d),
+            }),
         addPermission: (slug: string, username: string, accessLevel: string) =>
             request<{ status: string }>(`/problems/${slug}/permissions`, {
                 method: 'POST',
@@ -463,6 +520,30 @@ export const api = {
         get: (id: string) => request<Submission>(`/submissions/${id}`),
         retryRemote: (id: string) => request<{ status: string }>(`/submissions/${id}/retry-remote`, { method: 'POST' }),
         recheckRemote: (id: string) => request<{ status: string }>(`/submissions/${id}/recheck-remote`, { method: 'POST' }),
+        /** Site-wide status page. Filters mirror the query parameters. */
+        listAll: (params: {
+            offset?: number;
+            limit?: number;
+            handle?: string;
+            problem?: string;
+            problemId?: string;
+            contestId?: string;
+            userId?: string;
+            language?: string;
+            status?: string;
+        } = {}) => {
+            const qs = new URLSearchParams();
+            qs.set('offset', String(params.offset ?? 0));
+            qs.set('limit', String(params.limit ?? 50));
+            if (params.handle) qs.set('handle', params.handle);
+            if (params.problem) qs.set('problem', params.problem);
+            if (params.problemId) qs.set('problem_id', params.problemId);
+            if (params.contestId) qs.set('contest_id', params.contestId);
+            if (params.userId) qs.set('user_id', params.userId);
+            if (params.language) qs.set('language', params.language);
+            if (params.status) qs.set('status', params.status);
+            return request<{ data: Submission[]; total: number }>(`/submissions/all?${qs.toString()}`);
+        },
         list: (offset = 0, limit = 20, problemId?: string, contestId?: string) => {
             let url = `/submissions?offset=${offset}&limit=${limit}`;
             if (problemId) url += `&problem_id=${problemId}`;
@@ -574,6 +655,9 @@ export const api = {
         submissions: {
             pendingRemote: () =>
                 request<{ data: PendingRemoteSubmission[]; total: number }>('/admin/submissions/pending-remote'),
+            /** Recent System Error submissions with the judge's failure text. */
+            failed: (limit = 50) =>
+                request<{ data: Submission[]; total: number }>(`/admin/submissions/failed?limit=${limit}`),
             rejudge: (id: string) =>
                 request<{ status: string }>(`/admin/submissions/${id}/rejudge`, { method: 'POST' }),
             refresh: (id: string) =>

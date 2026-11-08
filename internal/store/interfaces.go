@@ -81,6 +81,10 @@ type ProblemStore interface {
 	RemovePermission(ctx context.Context, problemID, userID string) error
 	GetPermissions(ctx context.Context, problemID string) ([]model.ProblemPermission, error)
 	HasAccess(ctx context.Context, problemID, userID string, requiredLevels ...string) bool
+	// ListAccessLevels returns the user's access level per problem, omitting
+	// problems they have no permission row for. One query for a whole page of
+	// submissions instead of one HasAccess call per row.
+	ListAccessLevels(ctx context.Context, userID string, problemIDs []string) (map[string]string, error)
 	GetRecommendations(ctx context.Context, userID string, currentRating int) (*model.RecommendationsResponse, error)
 }
 
@@ -101,6 +105,24 @@ type SubmissionStore interface {
 	ListByUser(ctx context.Context, userID string, offset, limit int, problemID, contestID string) ([]model.Submission, int, error)
 	ListPublicByUser(ctx context.Context, userID string, offset, limit int) ([]model.Submission, int, error)
 	ListByContest(ctx context.Context, contestID string, offset, limit int, filter model.SubmissionFilter) ([]model.Submission, int, error)
+	// ListByProblemManage is the setter-facing problem listing: unlike
+	// ListByProblem it carries the submitter's username and the problem's
+	// slug/title, and honours the setter filters (user, contest, verdict, …).
+	ListByProblemManage(ctx context.Context, problemID string, offset, limit int, filter model.SubmissionFilter) ([]model.Submission, int, error)
+	// ListPublic is the site-wide status page. Rows the viewer may not see —
+	// hidden problems, submissions from a contest that is still running — are
+	// filtered in SQL so they never reach the response.
+	ListPublic(ctx context.Context, offset, limit int, filter model.PublicSubmissionFilter) ([]model.Submission, int, error)
+	// ListIDsForProblemRejudge returns judged local submissions of one problem,
+	// optionally narrowed to a contest, for a batch rejudge.
+	ListIDsForProblemRejudge(ctx context.Context, problemID string, filter model.SubmissionFilter) ([]string, error)
+	// ListRecentFailures returns the newest System Error submissions with the
+	// judge's failure text, for admins triaging a broken judge or problem.
+	ListRecentFailures(ctx context.Context, limit int) ([]model.Submission, error)
+	// RecomputeProblemCounts rebuilds problems.submission_count/accepted_count
+	// from the submissions table. Rejudging does not touch those counters, so
+	// they are recomputed once per batch instead of being double-counted.
+	RecomputeProblemCounts(ctx context.Context, problemID string) error
 	UpdateStatus(ctx context.Context, id string, status model.SubmissionStatus)
 	UpdateResult(ctx context.Context, id string, status model.SubmissionStatus, score, timeUsed, memoryUsed int, compileOutput string, results []model.TestCaseResult) error
 	// ClaimPending atomically acquires a pending submission for one judge

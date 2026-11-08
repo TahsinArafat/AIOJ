@@ -555,6 +555,9 @@ func main() {
 	}
 	healthH.QueueDepth = judgeQueue.Len
 	auditH := handler.NewAuditLogHandler(auditStore)
+	// Setters can rejudge their own problem's submissions, so those actions
+	// have to land in the same audit trail as the admin endpoints.
+	submissionH.WithAudit(auditH)
 
 	router := api.NewRouter(api.Deps{
 		Auth:          authH,

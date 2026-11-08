@@ -38,6 +38,7 @@ interface SubmissionRecord {
     id: string; problem_id: string; language: string; status: string;
     score?: number; time_used: number; memory_used: number; code_size?: number;
     created_at: string; source_code?: string; compile_output?: string;
+    judge_error?: string; judged_at?: string | null;
     is_remote?: boolean; remote_id?: string; remote_url?: string;
     judge_result?: JudgeCase[];
 }
@@ -221,6 +222,29 @@ export default function SubmissionDetail() {
                 </Card>
             )}
 
+            {/* A system error is the platform's failure, so its text is served
+                to admins, the problem's setters and contest judges only. The
+                submitter sees the generic note at the bottom of the page. */}
+            {sub.status === 'se' && sub.judge_error && (
+                <Card className="border-bad/30">
+                    <CardHeader
+                        title="Judge error"
+                        description="The judge failed before it could produce a verdict. This is a platform problem, not a defect in the solution."
+                    />
+                    <pre className="max-h-64 overflow-auto bg-code px-5 py-4 font-mono text-xs leading-relaxed text-code-ink whitespace-pre-wrap">
+                        {sub.judge_error}
+                    </pre>
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-hairline px-5 py-3">
+                        <p className="text-xs text-muted">
+                            {sub.judged_at ? `Failed ${new Date(sub.judged_at).toLocaleString()}` : 'Not judged'}
+                        </p>
+                        <Button variant="secondary" size="sm" onClick={() => setPollTrigger(prev => prev + 1)}>
+                            Reload
+                        </Button>
+                    </div>
+                </Card>
+            )}
+
             {/* ── Tabs ── */}
             <div role="tablist" aria-label="Submission detail" className="flex gap-1 border-b border-hairline">
                 {tabs.map(t => (
@@ -272,6 +296,7 @@ export default function SubmissionDetail() {
             {meta.tone === 'neutral' && sub.status === 'se' && (
                 <p className="text-xs text-muted">
                     A system error means the judge itself failed, not your solution. Re-submitting usually resolves it.
+                    {!sub.judge_error && ' The problem setters and site admins can see the failure details.'}
                 </p>
             )}
         </div>

@@ -35,6 +35,7 @@ const Practice = lazy(() => import('./pages/Practice'))
 const VirtualContest = lazy(() => import('./pages/VirtualContest'))
 const RatingHistory = lazy(() => import('./pages/RatingHistory'))
 const Submissions = lazy(() => import('./pages/Submissions'))
+const AllSubmissions = lazy(() => import('./pages/AllSubmissions'))
 const SubmissionDetail = lazy(() => import('./pages/SubmissionDetail'))
 const GymList = lazy(() => import('./pages/GymList'))
 const GymDetail = lazy(() => import('./pages/GymDetail'))
@@ -424,6 +425,7 @@ function AppShell() {
                     <Route path="/auth/2fa/verify" element={<TwoFactorVerify />} />
                     <Route path="/notifications" element={<FeatureGate feature="notifications"><Notifications /></FeatureGate>} />
                     <Route path="/submissions" element={<FeatureGate feature="submissions"><Submissions /></FeatureGate>} />
+                    <Route path="/status" element={<FeatureGate feature="submissions"><AllSubmissions /></FeatureGate>} />
                     <Route path="/submissions/:id" element={<FeatureGate feature="submissions"><SubmissionDetail /></FeatureGate>} />
                     <Route path="/admin" element={<AdminDashboard />} />
                     <Route path="/setter" element={<FeatureGate feature="setter_workspace"><SetterPanel /></FeatureGate>} />

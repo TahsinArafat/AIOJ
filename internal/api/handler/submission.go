@@ -54,6 +54,14 @@ type SubmissionHandler struct {
 	// each request was wasted disk I/O.  Languages only change on restart.
 	langsOnce sync.Once
 	langs     map[string]*compiler.LangConfig
+	// audit records setter-initiated rejudges; optional.
+	audit *AuditLogHandler
+}
+
+// WithAudit attaches the audit recorder. Call it after NewSubmissionHandler.
+func (h *SubmissionHandler) WithAudit(a *AuditLogHandler) *SubmissionHandler {
+	h.audit = a
+	return h
 }
 
 func NewSubmissionHandler(sub store.SubmissionStore, prob store.ProblemStore, contest store.ContestStore,
@@ -383,6 +391,13 @@ func (h *SubmissionHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// The judge's own failure text is an internal detail: admins, the problem's
+	// setters and contest judges get it, the contestant keeps the generic
+	// "the judge failed" message.
+	if !h.canSeeJudgeInternals(r, sub) {
+		sub.JudgeError = ""
+	}
+
 	prob, err := h.probStore.GetByID(r.Context(), sub.ProblemID)
 	if err == nil && prob != nil && prob.Source != "" && prob.Source != "local" {
 		sub.IsRemote = true
@@ -685,6 +700,26 @@ func compareOutput(status, stdout, expected string) *bool {
 	return &result
 }
 
+// canSeeJudgeInternals reports whether the caller may read the judge's failure
+// text for a submission. Unlike hasSubmissionAccess, the submitter is excluded:
+// a system error is the platform's problem, not theirs to debug.
+func (h *SubmissionHandler) canSeeJudgeInternals(r *http.Request, sub *model.Submission) bool {
+	claims := middleware.GetUserClaims(r)
+	if claims == nil {
+		return false
+	}
+	if claims.Role == "admin" {
+		return true
+	}
+	if h.probStore.HasAccess(r.Context(), sub.ProblemID, claims.UserID, "owner", "co_author") {
+		return true
+	}
+	if sub.ContestID != "" {
+		return h.contestStore.HasAccess(r.Context(), sub.ContestID, claims.UserID, "manager", "judge")
+	}
+	return false
+}
+
 func (h *SubmissionHandler) hasSubmissionAccess(r *http.Request, sub *model.Submission) bool {
 	claims := middleware.GetUserClaims(r)
 	if claims == nil {
@@ -702,7 +737,8 @@ func (h *SubmissionHandler) hasSubmissionAccess(r *http.Request, sub *model.Subm
 			return true
 		}
 	}
-	return false
+	// A problem's own setters review the solutions submitted to it.
+	return h.probStore.HasAccess(r.Context(), sub.ProblemID, claims.UserID, "owner", "co_author")
 }
 
 func (h *SubmissionHandler) RetryRemote(w http.ResponseWriter, r *http.Request) {

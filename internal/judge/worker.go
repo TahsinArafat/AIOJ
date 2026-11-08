@@ -326,6 +326,13 @@ func (wp *WorkerPool) runAndFinalize(ctx context.Context, sub *model.Submission,
 		_ = wp.balloonStore.CreateRequest(ctx, sub.ContestID, sub.ID, sub.UserID, sub.ProblemID)
 	}
 	wp.probStore.UpdateCounts(ctx, prob.ID, 1, boolToInt(out.FinalStatus == model.StatusAC))
+	if out.FinalStatus == model.StatusSE {
+		// The verdict row keeps this text for admins and the problem's setters;
+		// the log keeps it for whoever is watching the worker.
+		slog.Error("judgment failed with system error", "id", sub.ID, "problem", prob.ID,
+			"contest", sub.ContestID, "error", compileOutput)
+		return
+	}
 	slog.Info("judged", "id", sub.ID, "verdict", out.FinalStatus)
 }
 

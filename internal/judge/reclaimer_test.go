@@ -110,6 +110,20 @@ func (f *fakeSubStore) ListForBulkRejudge(context.Context, string, string) ([]st
 	return nil, nil
 }
 func (f *fakeSubStore) ResetForRejudge(context.Context, []string) error { return nil }
+func (f *fakeSubStore) ListByProblemManage(context.Context, string, int, int, model.SubmissionFilter) ([]model.Submission, int, error) {
+	return nil, 0, nil
+}
+func (f *fakeSubStore) ListPublic(context.Context, int, int, model.PublicSubmissionFilter) ([]model.Submission, int, error) {
+	return nil, 0, nil
+}
+func (f *fakeSubStore) ListIDsForProblemRejudge(context.Context, string, model.SubmissionFilter) ([]string, error) {
+	return nil, nil
+}
+func (f *fakeSubStore) RecomputeProblemCounts(context.Context, string) error { return nil }
+func (f *fakeSubStore) ListRecentFailures(context.Context, int) ([]model.Submission, error) {
+	return nil, nil
+}
+
 func (f *fakeSubStore) ListPendingWithContext(_ context.Context, limit int) ([]store.PendingSubmissionInfo, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()

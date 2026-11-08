@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -48,6 +49,25 @@ func (h *AdminSubmissionHandler) ListPendingRemote(w http.ResponseWriter, r *htt
 	subs, err := h.subStore.GetPendingRemoteSubmissions(r.Context())
 	if err != nil {
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+	respondJSON(w, http.StatusOK, map[string]interface{}{"data": subs, "total": len(subs)})
+}
+
+// ListFailed returns the newest System Error submissions with the judge's own
+// failure text. This is the "why did it crash" view: a contestant only ever
+// sees "System Error", so without this the cause lived in the worker's stdout.
+//
+// GET /api/admin/submissions/failed?limit=50
+func (h *AdminSubmissionHandler) ListFailed(w http.ResponseWriter, r *http.Request) {
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	subs, err := h.subStore.ListRecentFailures(r.Context(), limit)
+	if err != nil {
+		slog.Error("list judge failures", "error", err)
+		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to list failures"})
 		return
 	}
 	respondJSON(w, http.StatusOK, map[string]interface{}{"data": subs, "total": len(subs)})

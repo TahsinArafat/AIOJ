@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -315,9 +316,17 @@ func (h *OAuthCallbackHandler) issueJSON(w http.ResponseWriter, r *http.Request,
 }
 
 func (h *OAuthCallbackHandler) mint(r *http.Request, u *model.User) *model.AuthResponse {
-	access, _ := h.JWT.GenerateAccessTokenWithState(u.ID, u.Username, u.Role, u.MustChangePassword)
+	access, err := h.JWT.GenerateAccessTokenWithState(u.ID, u.Username, u.Role, u.MustChangePassword)
+	if err != nil {
+		slog.Error("oauth: generate access token failed", "user_id", u.ID, "error", err)
+	}
 	raw, hashed := h.JWT.GenerateRefreshToken()
-	_ = h.Refresh.Create(r.Context(), u.ID, hashed, time.Now().Add(h.JWT.RefreshTTL()))
+	// A refresh token that was never persisted looks valid to the client but
+	// fails the first time it is used, so the session dies at the access
+	// token's expiry with no clue why. Log it like the password path does.
+	if err := h.Refresh.Create(r.Context(), u.ID, hashed, time.Now().Add(h.JWT.RefreshTTL())); err != nil {
+		slog.Error("oauth: persist refresh token failed", "user_id", u.ID, "error", err)
+	}
 	return &model.AuthResponse{AccessToken: access, RefreshToken: raw, User: u}
 }
 

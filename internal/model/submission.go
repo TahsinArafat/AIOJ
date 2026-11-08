@@ -55,17 +55,29 @@ type Submission struct {
 	TimeUsed       int              `json:"time_used"`
 	MemoryUsed     int              `json:"memory_used"`
 	CompileOutput  string           `json:"compile_output,omitempty"`
-	JudgeResult    []TestCaseResult `json:"judge_result,omitempty"`
-	JudgedBy       string           `json:"judged_by"`
-	RemoteID       string           `json:"remote_id,omitempty"`
-	RemoteURL      string           `json:"remote_url,omitempty"`
-	BotID          string           `json:"bot_id,omitempty"`
-	BotSlug        string           `json:"bot_slug,omitempty"`
-	IsRemote       bool             `json:"is_remote"`
-	RemoteOJ       string           `json:"remote_oj,omitempty"`
-	IsUpsolving    bool             `json:"is_upsolving"`
-	CreatedAt      time.Time        `json:"created_at"`
-	JudgedAt       *time.Time       `json:"judged_at,omitempty"`
+	// JudgeError is the judge's own failure text for a System Error verdict.
+	// Only admins and the problem's setters receive it; the contestant sees the
+	// generic "the judge failed" message.
+	JudgeError  string           `json:"judge_error,omitempty"`
+	JudgeResult []TestCaseResult `json:"judge_result,omitempty"`
+	JudgedBy    string           `json:"judged_by"`
+	RemoteID    string           `json:"remote_id,omitempty"`
+	RemoteURL   string           `json:"remote_url,omitempty"`
+	BotID       string           `json:"bot_id,omitempty"`
+	BotSlug     string           `json:"bot_slug,omitempty"`
+	IsRemote    bool             `json:"is_remote"`
+	RemoteOJ    string           `json:"remote_oj,omitempty"`
+	IsUpsolving bool             `json:"is_upsolving"`
+	// ProblemSlug/ProblemTitle are filled by listings that join problems, so a
+	// status table can name the problem without a second lookup per row.
+	ProblemSlug  string `json:"problem_slug,omitempty"`
+	ProblemTitle string `json:"problem_title,omitempty"`
+	// CanView / CanRejudge are per-viewer capabilities computed by the handler;
+	// they are never stored.
+	CanView    bool       `json:"can_view,omitempty"`
+	CanRejudge bool       `json:"can_rejudge,omitempty"`
+	CreatedAt  time.Time  `json:"created_at"`
+	JudgedAt   *time.Time `json:"judged_at,omitempty"`
 }
 
 type SubmitRequest struct {
@@ -90,4 +102,19 @@ type SubmissionFilter struct {
 	ProblemID string
 	Language  string
 	Status    string
+	// ContestID, Username and IDs are honoured by the problem-scoped listings
+	// (ListByProblemManage, ListIDsForProblemRejudge); ListByContest ignores them.
+	ContestID string
+	Username  string
+	IDs       []string
+}
+
+// PublicSubmissionFilter drives the site-wide status page.
+type PublicSubmissionFilter struct {
+	SubmissionFilter
+	ProblemSlug string
+	// ViewerID is always allowed to see their own rows. ShowAll (admins) lifts
+	// the hidden-problem and running-contest restrictions entirely.
+	ViewerID string
+	ShowAll  bool
 }

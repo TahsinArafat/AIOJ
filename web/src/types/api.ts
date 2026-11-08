@@ -1046,6 +1046,8 @@ export interface Submission {
     time_used: number
     memory_used: number
     compile_output?: string
+    /** The judge's own failure text for a System Error; admins/setters only. */
+    judge_error?: string
     judge_result?: TestCaseResult[]
     judged_by: string
     remote_id?: string
@@ -1054,6 +1056,13 @@ export interface Submission {
     bot_slug?: string
     is_remote: boolean
     remote_oj?: string
+    is_upsolving?: boolean
+    /** Filled by the submission listings so a status table can name the problem. */
+    problem_slug?: string
+    problem_title?: string
+    /** Per-viewer capabilities: may this viewer open / rejudge this row? */
+    can_view?: boolean
+    can_rejudge?: boolean
     created_at: string
     judged_at?: string | null
 }
