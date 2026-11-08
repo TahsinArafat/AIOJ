@@ -100,6 +100,18 @@ services:
       MAIL_DRIVER: ${MAIL_DRIVER:-catcher}
       MAIL_FROM: ${MAIL_FROM:-noreply@aioj.com}
       MAIL_PUBLIC_URL: ${MAIL_PUBLIC_URL:-http://localhost:8081}
+      # OAuth sign-in. Empty client_id disables the provider, so these are safe
+      # to leave blank. The redirect URL must be byte-identical to the one
+      # registered in the provider's console, or the provider rejects the
+      # exchange with redirect_uri_mismatch. It is derived here rather than in
+      # the app because the app's fallback is MAIL_PUBLIC_URL (localhost in a
+      # fresh checkout), which would send production users to localhost:8081.
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      GITHUB_REDIRECT_URL: ${GITHUB_REDIRECT_URL:-${PUBLIC_ORIGIN:-http://localhost:8081}/api/auth/oauth/github/callback}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URL: ${GOOGLE_REDIRECT_URL:-${PUBLIC_ORIGIN:-http://localhost:8081}/api/auth/oauth/google/callback}
       # AI model management: credential encryption key is required whenever an
       # API key is stored. Generate with: openssl rand -base64 32
       AI_ENABLED: ${AI_ENABLED:-false}
