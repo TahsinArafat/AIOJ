@@ -62,9 +62,10 @@ func TestListTestcasesPairsFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, content := range map[string]string{
-		"01.in":    "1 2\n",
-		"01.out":   "3\n",
-		"notes.md": "unpaired\n",
+		"01.in":         "1 2\n",
+		"01.out":        "3\n",
+		"notes.md":      "unpaired\n",
+		".testcase-tmp": "leftover from a crashed save",
 	} {
 		if err := os.WriteFile(filepath.Join(probDir, name), []byte(content), 0644); err != nil {
 			t.Fatal(err)

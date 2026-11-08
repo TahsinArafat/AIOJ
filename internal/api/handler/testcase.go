@@ -158,6 +158,11 @@ func (h *TestcaseHandler) List(w http.ResponseWriter, r *http.Request) {
 		if entry.IsDir() {
 			continue
 		}
+		// Hidden entries are ours, not the setter's: a crashed inline save can
+		// leave a ".testcase-*" temp file behind.
+		if strings.HasPrefix(entry.Name(), ".") {
+			continue
+		}
 		info, err := entry.Info()
 		if err != nil {
 			continue

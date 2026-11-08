@@ -311,6 +311,10 @@ export default function TestCasesTab({
                   <Td>
                     <div className="flex items-center gap-1">
                       <input
+                        // Uncontrolled + committed on blur, so typing does not
+                        // PUT per keystroke. The key remounts the field when the
+                        // stored score changes elsewhere (batch apply).
+                        key={`${tc.input_name}-${tc.score}`}
                         aria-label={`Score for ${tc.input_name}`}
                         type="number"
                         min={0}
