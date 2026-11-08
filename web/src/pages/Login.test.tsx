@@ -9,6 +9,10 @@ vi.mock('../lib/api', () => ({
         auth: {
             login: vi.fn(),
             verify2FA: vi.fn(),
+            // The login page asks which sign-in methods this instance offers.
+            // Default here: password only, so the OAuth assertions below are
+            // about explicit provider switches rather than the fallback.
+            methods: vi.fn(),
         },
     },
     setTokens: vi.fn(),
@@ -16,6 +20,9 @@ vi.mock('../lib/api', () => ({
 
 beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(api.auth.methods).mockResolvedValue({
+        data: { password_registration: true, google: false, github: false },
+    } as never)
 })
 
 function renderPage() {
@@ -56,5 +63,42 @@ test('surfaces a login error and keeps the form on screen', async () => {
     fireEvent.click(screen.getByRole('button', { name: 'Login' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('invalid credentials')
+    expect(screen.getByRole('button', { name: 'Login' })).toBeInTheDocument()
+})
+
+test('hides every OAuth button when no provider is available', async () => {
+    renderPage()
+
+    // The divider that separates the form from the provider buttons must go too,
+    // or the page ends on a stray rule.
+    await waitFor(() => expect(api.auth.methods).toHaveBeenCalled())
+    await waitFor(() => {
+        expect(screen.queryByRole('link', { name: /Continue with Google/i })).not.toBeInTheDocument()
+        expect(screen.queryByRole('link', { name: /Continue with GitHub/i })).not.toBeInTheDocument()
+    })
+})
+
+test('shows only the providers the instance offers', async () => {
+    vi.mocked(api.auth.methods).mockResolvedValue({
+        data: { password_registration: true, google: true, github: false },
+    } as never)
+
+    renderPage()
+
+    expect(await screen.findByRole('link', { name: /Continue with Google/i })).toHaveAttribute(
+        'href',
+        '/api/auth/oauth/google/start',
+    )
+    expect(screen.queryByRole('link', { name: /Continue with GitHub/i })).not.toBeInTheDocument()
+})
+
+test('still offers a way in when the methods request fails', async () => {
+    // Failing open matters: an instance with password registration closed would
+    // otherwise present a login page with no usable control at all.
+    vi.mocked(api.auth.methods).mockRejectedValue(new Error('network down'))
+
+    renderPage()
+
+    expect(await screen.findByRole('link', { name: /Continue with Google/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Login' })).toBeInTheDocument()
 })

@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { OAuthButtons } from '../components/OAuthButtons'
+import { hasOAuthProvider, useAuthMethods } from '../lib/authMethods'
 
 /**
  * Auth settings hub: security (2FA), connected OAuth accounts, and pointers
@@ -7,6 +9,7 @@ import { useTranslation } from 'react-i18next'
  */
 export default function Settings() {
     const { t } = useTranslation()
+    const { methods } = useAuthMethods()
 
     return (
         <div className="max-w-2xl mx-auto space-y-6">
@@ -33,23 +36,12 @@ export default function Settings() {
                 </div>
             </section>
 
-            <section className="bg-surface border border-hairline rounded-lg p-6">
-                <h2 className="text-lg font-semibold mb-4">Connected accounts</h2>
-                <div className="flex flex-col sm:flex-row gap-3">
-                    <a
-                        href="/api/auth/oauth/github/start"
-                        className="px-3 py-2 rounded border border-hairline-strong text-sm text-center hover:bg-surface-2"
-                    >
-                        {t('auth.linkGitHub')}
-                    </a>
-                    <a
-                        href="/api/auth/oauth/google/start"
-                        className="px-3 py-2 rounded border border-hairline-strong text-sm text-center hover:bg-surface-2"
-                    >
-                        {t('auth.linkGoogle')}
-                    </a>
-                </div>
-            </section>
+            {hasOAuthProvider(methods) && (
+                <section className="bg-surface border border-hairline rounded-lg p-6">
+                    <h2 className="text-lg font-semibold mb-4">Connected accounts</h2>
+                    <OAuthButtons methods={methods} />
+                </section>
+            )}
 
             <section className="bg-surface border border-bad/30 dark:border-red-900 rounded-lg p-6">
                 <h2 className="text-lg font-semibold text-bad mb-2">

@@ -88,11 +88,14 @@ type Deps struct {
 	TwoFAVerify     *handler.TwoFactorVerifyHandler
 	OAuthStart      *handler.OAuthStartHandler
 	OAuthCallback   *handler.OAuthCallbackHandler
-	Legal           *handler.LegalHandler
-	UsersExport     *handler.UsersExportHandler
-	UsersDeletion   *handler.UsersDeletionHandler
-	CSRFSecret      string
-	AIEnabled       bool
+	// AuthMethods reports which sign-in methods are usable, and serves the
+	// admin switches behind them.
+	AuthMethods   *handler.AuthMethodsHandler
+	Legal         *handler.LegalHandler
+	UsersExport   *handler.UsersExportHandler
+	UsersDeletion *handler.UsersDeletionHandler
+	CSRFSecret    string
+	AIEnabled     bool
 	// MetricsToken guards /metrics. Empty means only an admin access token can
 	// scrape it (anonymous scraping is never allowed).
 	MetricsToken string

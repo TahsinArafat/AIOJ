@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api, setTokens } from '../lib/api'
-import { AuthAlert, AuthLayout } from '../components/AuthLayout'
+import { AuthAlert, AuthDivider, AuthLayout } from '../components/AuthLayout'
 import { Button } from '../components/ui/Button'
 import { Field, Input } from '../components/ui/Field'
+import { OAuthButtons } from '../components/OAuthButtons'
+import { hasOAuthProvider, useAuthMethods } from '../lib/authMethods'
 
 export default function Register() {
     const [form, setForm] = useState({ username: '', email: '', password: '' })
@@ -11,6 +13,13 @@ export default function Register() {
     const [loading, setLoading] = useState(false)
     const [sent, setSent] = useState(false)
     const [resent, setResent] = useState(false)
+    const { methods, loading: methodsLoading } = useAuthMethods()
+
+    // null (still loading, or the request failed) counts as enabled: the
+    // backend rejects a disabled registration with a clear message, and a
+    // spinner here would be worse than a form that might refuse.
+    const passwordOpen = methods?.password_registration !== false
+    const oauthOpen = hasOAuthProvider(methods)
 
     const handle = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -58,16 +67,45 @@ export default function Register() {
         )
     }
 
+    const footer = (
+        <>
+            Already have an account?{' '}
+            <Link to="/login" className="font-medium text-brand hover:underline">Login</Link>
+        </>
+    )
+
+    // An admin can close password registration. When that happens the page must
+    // explain why instead of showing a form the API will reject.
+    if (!passwordOpen) {
+        return (
+            <AuthLayout
+                title="Registration closed"
+                subtitle="This instance does not accept new accounts with an email address and password."
+                footer={footer}
+            >
+                {oauthOpen ? (
+                    <>
+                        <p className="mb-4 text-sm leading-relaxed text-muted">
+                            You can still create an account with one of these providers.
+                        </p>
+                        <OAuthButtons methods={methods} />
+                    </>
+                ) : (
+                    <p className="text-sm leading-relaxed text-muted">
+                        New sign-ups are currently disabled. Please contact the site administrator if you
+                        need an account, or <Link to="/login" className="font-medium text-brand hover:underline">sign in</Link> if
+                        you already have one.
+                    </p>
+                )}
+            </AuthLayout>
+        )
+    }
+
     return (
         <AuthLayout
             title="Register"
             subtitle="Free, self-hosted, and yours to run."
-            footer={
-                <>
-                    Already have an account?{' '}
-                    <Link to="/login" className="font-medium text-brand hover:underline">Login</Link>
-                </>
-            }
+            footer={footer}
         >
             {err && <AuthAlert>{err}</AuthAlert>}
             <form onSubmit={handle} className="space-y-4">
@@ -108,6 +146,13 @@ export default function Register() {
                     {loading ? 'Creating account…' : 'Register'}
                 </Button>
             </form>
+
+            {!methodsLoading && oauthOpen && (
+                <>
+                    <AuthDivider />
+                    <OAuthButtons methods={methods} />
+                </>
+            )}
         </AuthLayout>
     )
 }

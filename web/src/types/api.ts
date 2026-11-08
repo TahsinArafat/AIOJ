@@ -1561,6 +1561,28 @@ export interface ResolvedFeature {
     message?: string
 }
 
+// ── Sign-in methods (internal/authmethod) ────────────────────────────────────
+
+/**
+ * What the login and register forms may offer. Mirrors
+ * authmethod.Availability: an OAuth provider is only true when it is both
+ * switched on by an admin AND this deployment has credentials for it.
+ */
+export interface AuthMethods {
+    password_registration: boolean
+    google: boolean
+    github: boolean
+}
+
+/** GET /api/admin/auth-methods: the switches plus why one may be unusable. */
+export interface AdminAuthMethods {
+    settings: { password_registration: boolean; google: boolean; github: boolean }
+    /** Whether the deployment holds credentials. A switch can be on but dead. */
+    configured: { google: boolean; github: boolean }
+    default: { password_registration: boolean; google: boolean; github: boolean }
+    customized: boolean
+}
+
 /** One entry of GET /api/admin/features. */
 export interface AdminFeature {
     key: string

@@ -16,6 +16,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
 	"github.com/tahsinarafat/aioj/internal/auth"
+	"github.com/tahsinarafat/aioj/internal/authmethod"
 	"github.com/tahsinarafat/aioj/internal/mail"
 	"github.com/tahsinarafat/aioj/internal/model"
 	"github.com/tahsinarafat/aioj/internal/store"
@@ -34,7 +35,15 @@ type AuthHandler struct {
 	mailTpl           *template.Template
 	publicURL         string
 	mailFrom          string
+	// methods gates email/password registration. Nil means "no gate", so the
+	// handler keeps working in tests that construct it as a literal.
+	methods *authmethod.Resolver
 }
+
+// SetAuthMethods installs the sign-in method resolver. Kept as a setter rather
+// than a constructor parameter: NewAuthHandler already takes eleven arguments
+// and every existing test builds the struct directly.
+func (h *AuthHandler) SetAuthMethods(m *authmethod.Resolver) { h.methods = m }
 
 func NewAuthHandler(
 	users store.UserStore,
@@ -58,6 +67,12 @@ func NewAuthHandler(
 }
 
 func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
+	// Checked before the body is read: a disabled method should not invite a
+	// client to submit a password at all.
+	if h.methods != nil && !h.methods.Available(r.Context(), authmethod.KeyPasswordRegistration) {
+		http.Error(w, "registration with a password is disabled on this instance", http.StatusForbidden)
+		return
+	}
 	var req model.RegisterRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid body", http.StatusBadRequest)

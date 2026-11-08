@@ -19,6 +19,7 @@ import (
 	"github.com/tahsinarafat/aioj/internal/api"
 	"github.com/tahsinarafat/aioj/internal/api/handler"
 	"github.com/tahsinarafat/aioj/internal/auth"
+	"github.com/tahsinarafat/aioj/internal/authmethod"
 	"github.com/tahsinarafat/aioj/internal/config"
 	"github.com/tahsinarafat/aioj/internal/feature"
 	"github.com/tahsinarafat/aioj/internal/generate"
@@ -519,8 +520,20 @@ func main() {
 	if len(stateSecret) == 0 {
 		stateSecret = []byte(cfg.Auth.CSRFSecret)
 	}
+	// Sign-in methods. "Configured" is what this deployment can actually do
+	// (an OAuth provider with no client id cannot work), and it is read from
+	// the providers themselves rather than from the raw config, so the two can
+	// never disagree.
+	authMethods := authmethod.NewResolver(settingsStore, authmethod.Configured{
+		Google: oauthProviders["google"].Config().ClientID != "",
+		GitHub: oauthProviders["github"].Config().ClientID != "",
+	})
+	authMethodsH := &handler.AuthMethodsHandler{Methods: authMethods}
+	authH.SetAuthMethods(authMethods)
+
 	oauthStartH := &handler.OAuthStartHandler{
 		Providers: oauthProviders, StateSecret: stateSecret, StateTTL: 10 * time.Minute,
+		Methods: authMethods,
 	}
 	oauthCallbackH := &handler.OAuthCallbackHandler{
 		Users: userStore, Links: oauthLinkStore, Providers: oauthProviders,
@@ -549,6 +562,7 @@ func main() {
 		TwoFAVerify:   twoFAVerifyH,
 		OAuthStart:    oauthStartH,
 		OAuthCallback: oauthCallbackH,
+		AuthMethods:   authMethodsH,
 		Legal:         &handler.LegalHandler{},
 		UsersExport:   &handler.UsersExportHandler{Data: handler.NewUserDataAggregator(userStore, submissionStore)},
 		UsersDeletion: &handler.UsersDeletionHandler{Users: userStore, Deleter: handler.NewUserCascadeDeleter(db)},

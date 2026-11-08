@@ -201,6 +201,11 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 		r.Get("/api/dev/mail", d.DevMail.List)
 		r.Delete("/api/dev/mail", d.DevMail.Clear)
 	}
+	if d.AuthMethods != nil {
+		// Public: the login and register forms need this before there is a
+		// session, to know which fields and provider buttons to render.
+		r.Get("/api/auth/methods", d.AuthMethods.Public)
+	}
 	if d.OAuthStart != nil {
 		r.Get("/api/auth/oauth/{provider}/start", d.OAuthStart.Start)
 	}
@@ -415,6 +420,13 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 			r.Get("/{key}", settingsH.Get)
 			r.Delete("/{key}", settingsH.Delete)
 		})
+
+		if d.AuthMethods != nil {
+			r.Route("/auth-methods", func(r chi.Router) {
+				r.Get("/", d.AuthMethods.AdminGet)
+				r.Put("/", d.AuthMethods.AdminSet)
+			})
+		}
 
 		// Feature gates are never themselves gated: locking the admin out of
 		// the panel that reopens a feature would be unrecoverable without SQL.
