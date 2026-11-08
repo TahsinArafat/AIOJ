@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { api } from '../lib/api'
 import { useDocumentTitle } from '../lib/documentTitle'
 import CommentSection from '../components/CommentSection'
+import MarkdownContent from '../components/MarkdownContent'
 
 interface EditorialDetailData { title: string; username?: string; created_at: string; is_official?: boolean; approach?: string; content?: string; solution_code?: string; solution_language?: string; time_complexity?: string; space_complexity?: string }
 
@@ -35,11 +36,11 @@ export default function EditorialDetail() {
                 {editorial.approach && (
                     <div className="mb-4 p-3 bg-brand-soft rounded-lg">
                         <span className="text-xs font-semibold text-brand uppercase tracking-wide">Approach:</span>
-                        <p className="mt-1 text-sm text-blue-800">{editorial.approach}</p>
+                        <MarkdownContent inline content={editorial.approach} className="mt-1 text-sm text-blue-800" />
                     </div>
                 )}
 
-                <div className="prose max-w-none text-ink mb-8">{editorial.content}</div>
+                <MarkdownContent content={editorial.content} className="prose max-w-none text-ink mb-8" />
 
                 {editorial.solution_code && (
                     <div className="mb-8">
@@ -57,13 +58,13 @@ export default function EditorialDetail() {
                         {editorial.time_complexity && (
                             <div className="bg-surface-2 px-4 py-2 rounded-lg">
                                 <span className="text-xs text-muted uppercase tracking-wide">Time:</span>
-                                <span className="ml-2 font-mono font-semibold text-ink-soft">{editorial.time_complexity}</span>
+                                <MarkdownContent inline content={editorial.time_complexity} className="ml-2 font-mono font-semibold text-ink-soft" />
                             </div>
                         )}
                         {editorial.space_complexity && (
                             <div className="bg-surface-2 px-4 py-2 rounded-lg">
                                 <span className="text-xs text-muted uppercase tracking-wide">Space:</span>
-                                <span className="ml-2 font-mono font-semibold text-ink-soft">{editorial.space_complexity}</span>
+                                <MarkdownContent inline content={editorial.space_complexity} className="ml-2 font-mono font-semibold text-ink-soft" />
                             </div>
                         )}
                     </div>

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { api } from '../lib/api'
+import MarkdownContent from './MarkdownContent'
 
 interface EditorialFormProps {
   problemId: string
@@ -17,6 +18,7 @@ export default function EditorialForm({ problemId, isUserAdmin, onSuccess, onCan
   const [timeComplexity, setTimeComplexity] = useState('')
   const [spaceComplexity, setSpaceComplexity] = useState('')
   const [isOfficial, setIsOfficial] = useState(false)
+  const [showPreview, setShowPreview] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -76,15 +78,29 @@ export default function EditorialForm({ problemId, isUserAdmin, onSuccess, onCan
       </div>
 
       <div>
-        <label className="block font-medium text-ink-soft mb-1">Editorial Content (Markdown Supported) *</label>
-        <textarea aria-label="Editorial Content (Markdown Supported)"
-          value={content}
-          onChange={e => setContent(e.target.value)}
-          rows={6}
-          required
-          className="w-full border rounded px-3 py-2 bg-surface dark:border-gray-700 font-mono"
-          placeholder="Detailed explanation, proofs, cases..."
-        />
+        <div className="flex items-center justify-between mb-1">
+          <label className="block font-medium text-ink-soft">Editorial Content (Markdown + LaTeX) *</label>
+          <button type="button" onClick={() => setShowPreview(v => !v)} className="text-xs text-brand hover:underline">
+            {showPreview ? 'Write' : 'Preview'}
+          </button>
+        </div>
+        {showPreview ? (
+          <div aria-label="Editorial content preview" className="prose max-w-none text-ink border rounded p-3 bg-surface dark:border-gray-700 min-h-32">
+            {content.trim()
+              ? <MarkdownContent content={content} />
+              : <p className="text-muted-soft italic">Nothing to preview yet.</p>}
+          </div>
+        ) : (
+          <textarea aria-label="Editorial Content (Markdown + LaTeX)"
+            value={content}
+            onChange={e => setContent(e.target.value)}
+            rows={6}
+            required
+            className="w-full border rounded px-3 py-2 bg-surface dark:border-gray-700 font-mono"
+            placeholder="Detailed explanation, proofs, cases... Use $...$ for inline math and $$...$$ for display math."
+          />
+        )}
+        <p className="mt-1 text-xs text-muted">Markdown and LaTeX math are rendered when the editorial is viewed.</p>
       </div>
 
       <div className="grid grid-cols-2 gap-4">

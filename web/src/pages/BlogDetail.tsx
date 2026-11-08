@@ -3,11 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { api, getAccessToken } from '../lib/api'
 import { useDocumentTitle } from '../lib/documentTitle'
 import CommentSection from '../components/CommentSection'
-import ReactMarkdown from 'react-markdown'
-import remarkMath from 'remark-math'
-import remarkGfm from 'remark-gfm'
-import rehypeKatex from 'rehype-katex'
-import 'katex/dist/katex.min.css'
+import MarkdownContent from '../components/MarkdownContent'
 import { useConfirm } from '../components/ConfirmDialog'
 import { useToast } from '../components/Toast'
 
@@ -49,6 +45,7 @@ export default function BlogDetail() {
     const [editTitle, setEditTitle] = useState('')
     const [editContent, setEditContent] = useState('')
     const [editTags, setEditTags] = useState('')
+    const [showPreview, setShowPreview] = useState(false)
 
     useEffect(() => {
         if (!id) return
@@ -73,6 +70,7 @@ export default function BlogDetail() {
         setEditTitle(post.title)
         setEditContent(post.content)
         setEditTags(post.tags?.join(', ') || '')
+        setShowPreview(false)
         setEditing(false) // toggle off/on
         setTimeout(() => setEditing(true), 0)
     }
@@ -127,13 +125,27 @@ export default function BlogDetail() {
                         />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium mb-1">Content (Markdown supported)</label>
-                        <textarea aria-label="Content (Markdown supported)"
-                            value={editContent}
-                            onChange={e => setEditContent(e.target.value)}
-                            rows={12}
-                            className="w-full border border-hairline-strong bg-transparent rounded p-2 text-sm font-mono"
-                        />
+                        <div className="flex items-center justify-between mb-1">
+                            <label className="block text-sm font-medium">Content (Markdown + LaTeX supported)</label>
+                            <button type="button" onClick={() => setShowPreview(v => !v)}
+                                className="text-xs text-brand hover:underline">
+                                {showPreview ? 'Write' : 'Preview'}
+                            </button>
+                        </div>
+                        {showPreview ? (
+                            <div aria-label="Content preview" className="prose max-w-none text-ink border border-hairline-strong rounded p-3 min-h-48">
+                                {editContent.trim()
+                                    ? <MarkdownContent content={editContent} />
+                                    : <p className="text-muted-soft italic">Nothing to preview yet.</p>}
+                            </div>
+                        ) : (
+                            <textarea aria-label="Content (Markdown + LaTeX supported)"
+                                value={editContent}
+                                onChange={e => setEditContent(e.target.value)}
+                                rows={12}
+                                className="w-full border border-hairline-strong bg-transparent rounded p-2 text-sm font-mono"
+                            />
+                        )}
                     </div>
                     <div className="flex gap-2 justify-end">
                         <button onClick={() => setEditing(false)} className="px-4 py-2 border border-hairline-strong rounded text-sm hover:bg-surface-2">Cancel</button>
@@ -162,11 +174,7 @@ export default function BlogDetail() {
                             </div>
                         )}
                     </div>
-                    <div className="prose max-w-none text-ink">
-                        <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
-                            {post.content}
-                        </ReactMarkdown>
-                    </div>
+                    <MarkdownContent content={post.content} className="prose max-w-none text-ink" />
 
                     {getAccessToken() && (
                         <div className="flex items-center gap-4 mt-8 pt-4 border-t border-hairline">
