@@ -17,8 +17,9 @@
 #   3. Monitoring (prometheus/grafana) moved behind the `monitor` profile so
 #      a fresh Dokploy deploy does not spend RAM on them.
 #   4. vjudge browsers + ai-harness stay behind their profiles (off by default).
-#   5. One-shot `seeder` service (profile `seed`) creates the first admin.
-#      There is NO auto-admin in production — you run it once, explicitly.
+#   5. The `seeder` runs AUTOMATICALLY on every deploy and creates the first
+#      admin from SEED_ADMIN_PASSWORD (skips cleanly when unset). No terminal
+#      or `docker compose run` needed.
 #   6. Healthchecks + restart + mem limits + json-file log rotation.
 #
 # Required Dokploy Environment Variables (set in Dokploy UI, NOT committed):
@@ -31,7 +32,12 @@
 #   METRICS_TOKEN          openssl rand -hex 32
 #   CSRF_SECRET            openssl rand -hex 32
 #   OAUTH_STATE_SECRET     openssl rand -hex 32
-#   SEED_ADMIN_PASSWORD    strong password for the first admin (seed profile only)
+#   SEED_ADMIN_USERNAME    first admin username (default: ai)
+#   SEED_ADMIN_PASSWORD    password for the first admin. Must be >=12 chars with
+#                          upper + lower + digit + symbol, else the API rejects
+#                          the registration and no admin is created.
+#   SEED_ADMIN_RESET_PASSWORD  true = overwrite an existing admin's password
+#                          once (repair path); leave false normally.
 #   PUBLIC_ORIGIN          https://<DOMAIN>
 #   MAIL_PUBLIC_URL        https://<DOMAIN>
 #   MAIL_DRIVER/MAIL_HOST/MAIL_PORT/MAIL_USERNAME/MAIL_PASSWORD/MAIL_FROM
@@ -39,10 +45,12 @@
 #
 # Deploy:
 #   1. Dokploy -> Compose -> select this file -> set env vars -> Deploy
-#   2. Create the first admin (one time):
-#        docker compose -f docker-compose.dokploy.yml --profile seed run --rm seeder
-#      (Dokploy: run the same command via "Advanced > Console/Terminal" or
-#       a one-off `docker compose run`. Then change the password in-app.)
+#   2. The first admin is created by the `seeder` service during that same
+#      deploy — no terminal needed. Log in with SEED_ADMIN_USERNAME /
+#      SEED_ADMIN_PASSWORD, then change the password in the UI.
+#      If login fails with "invalid credentials", the account already existed
+#      with a different password: set SEED_ADMIN_RESET_PASSWORD=true and
+#      redeploy once, then set it back to false.
 #   3. Optional profiles:
 #        --profile ai       -> ai-harness (AI problem generation)
 #        --profile vjudge   -> cf-bypass / cf-submit / atcoder-submit (heavy, +1GB)
@@ -255,22 +263,42 @@ services:
       - "traefik.docker.network=dokploy-network"
 
   # -------------------------------------------------------------------------
-  # One-shot first-admin + demo problem seeder. NOT started on deploy.
-  #   docker compose -f docker-compose.dokploy.yml --profile seed run --rm seeder
-  # Env (Dokploy): SEED_ADMIN_USERNAME (default: ai), SEED_ADMIN_PASSWORD (required),
-  #                SEED_PROBLEM_SLUG (default: hello)
-  # It registers the user, promotes to admin directly in Postgres (there is no
-  # bootstrap-admin API), then creates the "Hello, AIOJ!" problem + 1 testcase.
-  # Idempotent: safe to re-run. AIOJ_ENV is forced to production here, so the
-  # demo password fallback is disabled — SEED_ADMIN_PASSWORD is mandatory.
+  # First-admin + demo problem seeder. Runs AUTOMATICALLY on every deploy.
+  #
+  # It used to sit behind `profiles: ["seed"]`, which meant a normal Dokploy
+  # deploy never created the first admin: the only account on a fresh database
+  # was the migration-seeded `admin` / `admin_secret`, and logging in as
+  # SEED_ADMIN_USERNAME returned 401 because that row did not exist. A profile
+  # also required `docker compose run`, which is not always reachable from a
+  # hosted Dokploy panel. It now runs itself.
+  #
+  # Two safety properties make "run on every deploy" safe:
+  #   1. It is gated on SEED_ADMIN_PASSWORD. Unset -> the container logs that
+  #      it skipped and exits 0, so a stack without a seed password still
+  #      deploys normally (it must not be a required `${...:?}` variable here,
+  #      or a missing value would abort the whole compose file).
+  #   2. It is idempotent and never overwrites a password unless
+  #      SEED_ADMIN_RESET_PASSWORD=true. Without that flag an existing account
+  #      with a different password is reported, not rewritten, so a deploy can
+  #      never clobber a password an operator changed in the UI.
+  #
+  # Env: SEED_ADMIN_USERNAME (default ai), SEED_ADMIN_PASSWORD (>=12 chars with
+  #      upper+lower+digit+symbol), SEED_ADMIN_RESET_PASSWORD (true = repair a
+  #      mismatched password once, then set it back to false),
+  #      SEED_PROBLEM_SLUG (default hello).
   # -------------------------------------------------------------------------
   seeder:
-    profiles: ["seed"]
     build:
       context: .
       dockerfile: Dockerfile
-    entrypoint: ["/app/seed"]
-    command: []
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        if [ -z "$$SEED_ADMIN_PASSWORD" ]; then
+          echo 'seed: SEED_ADMIN_PASSWORD not set — skipping first-admin bootstrap'
+          exit 0
+        fi
+        exec /app/seed
     environment:
       AIOJ_ENV: production
       BACKEND_URL: http://backend:8080
@@ -280,11 +308,16 @@ services:
       DB_USER: aioj
       DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set in Dokploy env}
       SEED_ADMIN_USERNAME: ${SEED_ADMIN_USERNAME:-ai}
-      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:?SEED_ADMIN_PASSWORD must be set (one-time seed)}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
+      SEED_ADMIN_RESET_PASSWORD: ${SEED_ADMIN_RESET_PASSWORD:-false}
       SEED_PROBLEM_SLUG: ${SEED_PROBLEM_SLUG:-hello}
     depends_on:
       backend:
         condition: service_healthy
+    restart: "no"
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
 
   # -------------------------------------------------------------------------
   # Optional profiles (off by default to save RAM on Dokploy)

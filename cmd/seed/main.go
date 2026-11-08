@@ -23,6 +23,7 @@ func main() {
 		AdminPass:        envOr("SEED_ADMIN_PASSWORD", ""),
 		ProblemSlug:      envOr("SEED_PROBLEM_SLUG", "hello"),
 		AllowDefaultPass: dev,
+		ResetPassword:    isTrue(envOr("SEED_ADMIN_RESET_PASSWORD", "")),
 	}
 	if dev && cfg.AdminPass == "" {
 		fmt.Fprintln(os.Stderr, "seed: AIOJ_ENV=development — using the built-in demo admin password; "+
@@ -43,4 +44,9 @@ func envOr(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+func isTrue(v string) bool {
+	v = strings.TrimSpace(v)
+	return v == "1" || strings.EqualFold(v, "true") || strings.EqualFold(v, "yes")
 }

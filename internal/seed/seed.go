@@ -21,6 +21,7 @@ import (
 	// binary that does not go through that package — without this the seeder
 	// dies with `unknown driver "postgres"`.
 	_ "github.com/lib/pq"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // Config is every knob the sim needs. Every field is optional; fillDefaults
@@ -36,6 +37,18 @@ type Config struct {
 	// environment: in production an explicit password is required, because the
 	// default is published in this repository.
 	AllowDefaultPass bool
+
+	// ResetPassword makes the seeder authoritative for the admin's password:
+	// when the account already exists but the configured password does not
+	// match it, the stored hash is replaced (and must_change_password cleared)
+	// instead of failing with 401.
+	//
+	// Off by default on purpose. A seeder that silently rewrote the hash on
+	// every run would let a deploy clobber a password an operator had already
+	// changed in the UI, which is a security regression, not a convenience.
+	// Set SEED_ADMIN_RESET_PASSWORD=true for the one deploy that repairs a
+	// stale/broken account, then set it back to false.
+	ResetPassword bool
 
 	// DSN is used for exactly one write: promoting the first user to admin.
 	// There is no bootstrap-admin endpoint in the product (PUT
@@ -115,8 +128,9 @@ func Seed(ctx context.Context, cfg Config) (Result, error) {
 	}
 
 	// 1. Register the admin (or log back in if it already exists — the
-	// idempotent path, not an error).
-	token, created, err := registerOrLogin(ctx, client, base, cfg.AdminUser, cfg.AdminPass)
+	// idempotent path, not an error). With ResetPassword set, a mismatched
+	// password on an existing account is repaired rather than reported as 401.
+	token, created, err := registerOrLogin(ctx, client, base, cfg)
 	if err != nil {
 		return res, err
 	}
@@ -157,7 +171,9 @@ func Seed(ctx context.Context, cfg Config) (Result, error) {
 
 // --- auth ----------------------------------------------------------------
 
-func registerOrLogin(ctx context.Context, c *http.Client, base, user, pass string) (token string, created bool, err error) {
+func registerOrLogin(ctx context.Context, c *http.Client, base string, cfg Config) (token string, created bool, err error) {
+	user, pass := cfg.AdminUser, cfg.AdminPass
+
 	// Try login first. This keeps seeding idempotent when the account already
 	// exists (including databases created before the password policy changed),
 	// and avoids making registration the first request on every rerun.
@@ -181,8 +197,21 @@ func registerOrLogin(ctx context.Context, c *http.Client, base, user, pass strin
 		return t, resp.StatusCode == http.StatusCreated, err
 	}
 	if resp.StatusCode == http.StatusConflict {
-		t, err := login(ctx, c, base, user, pass)
-		return t, false, err
+		// The username is taken but the configured password did not work.
+		// Repairing it requires an explicit opt-in; otherwise re-running the
+		// seeder with a different SEED_ADMIN_PASSWORD would quietly rewrite
+		// an operator's password on every deploy.
+		if !cfg.ResetPassword {
+			_, loginErr := login(ctx, c, base, user, pass)
+			return "", false, fmt.Errorf("seed: user %q already exists with a different "+
+				"password — set SEED_ADMIN_RESET_PASSWORD=true once to overwrite it "+
+				"(got: %v)", user, loginErr)
+		}
+		if rerr := resetPassword(ctx, cfg); rerr != nil {
+			return "", false, rerr
+		}
+		t, lerr := login(ctx, c, base, user, pass)
+		return t, false, lerr
 	}
 	b, _ := io.ReadAll(resp.Body)
 	return "", false, apiError{resp.StatusCode, string(b)}
@@ -220,9 +249,12 @@ func tokenFrom(resp *http.Response) (string, error) {
 	return tr.AccessToken, nil
 }
 
-// --- admin promotion (the single DB write) --------------------------------
+// --- admin promotion / password repair (the DB writes) ---------------------
 
-func promoteAdmin(ctx context.Context, cfg Config) (bool, error) {
+// openDB connects using Config.DSN when set, otherwise the same DB_* env the
+// server uses. Returns nil (no error) in the unit-test path where there is
+// nothing to connect to.
+func openDB(cfg Config) (*sql.DB, error) {
 	dsn := cfg.DSN
 	if dsn == "" {
 		dsn = fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
@@ -230,11 +262,56 @@ func promoteAdmin(ctx context.Context, cfg Config) (bool, error) {
 			envOr("DB_USER", "aioj"), envOr("DB_PASSWORD", "aioj_secret"),
 			envOr("DB_NAME", "aioj"))
 	}
-	if dsn == "" {
+	return sql.Open("postgres", dsn)
+}
+
+// bcryptCost mirrors internal/auth.bcryptCost. A hash written here must be
+// indistinguishable from one the API produced, otherwise a seed-created admin
+// silently costs a different amount of time to verify than a registered user.
+const bcryptCost = 12
+
+// resetPassword makes the configured password authoritative for the admin.
+// It only runs when ResetPassword is enabled, and it clears
+// must_change_password so the repaired account can use the whole API instead
+// of being pinned to the profile page.
+func resetPassword(ctx context.Context, cfg Config) error {
+	db, err := openDB(cfg)
+	if err != nil {
+		return fmt.Errorf("seed: open db: %w", err)
+	}
+	defer db.Close()
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(cfg.AdminPass), bcryptCost)
+	if err != nil {
+		return fmt.Errorf("seed: hash password: %w", err)
+	}
+	res, err := db.ExecContext(ctx,
+		`UPDATE users
+		    SET password_hash = $1,
+		        role = 'admin',
+		        must_change_password = FALSE,
+		        email_verified = TRUE,
+		        email_verified_at = COALESCE(email_verified_at, NOW())
+		  WHERE username = $2`, string(hash), cfg.AdminUser)
+	if err != nil {
+		return fmt.Errorf("seed: reset password: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("seed: rows affected: %w", err)
+	}
+	if n == 0 {
+		return fmt.Errorf("seed: reset password: user %q not found", cfg.AdminUser)
+	}
+	return nil
+}
+
+func promoteAdmin(ctx context.Context, cfg Config) (bool, error) {
+	if cfg.DSN == "" && envOr("DB_HOST", "") == "" {
 		// Nothing to connect to (unit-test path): assume already admin.
 		return false, nil
 	}
-	db, err := sql.Open("postgres", dsn)
+	db, err := openDB(cfg)
 	if err != nil {
 		return false, fmt.Errorf("seed: open db: %w", err)
 	}

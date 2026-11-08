@@ -453,6 +453,39 @@ This tunnels traffic through SSH — the admin panels are only accessible from y
 
 ---
 
+### First admin on Dokploy (no terminal needed)
+
+A fresh database only gets the migration-seeded account: `admin` / `admin_secret`,
+flagged `must_change_password`. While that flag is set, every endpoint except
+`/api/users/me`, `/api/users/profile/*`, `/api/auth/refresh`, `/api/auth/logout`
+and `/api/auth/2fa/*` answers 403 — which looks like "login is broken" but is the
+restriction working as designed. Log in with it and change the password.
+
+To get your own admin instead, `docker-compose.dokploy.yml` ships a `seeder`
+service that runs **automatically on every deploy**. Set these env vars in Dokploy
+and redeploy:
+
+```env
+SEED_ADMIN_USERNAME=ai
+SEED_ADMIN_PASSWORD=YourStrongPass123!   # >=12 chars, upper + lower + digit + symbol
+```
+
+The password policy is enforced by `internal/auth/password.go`; a password missing
+any character class fails registration with `400 password does not meet complexity
+requirements` and **no user is created**.
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| Seeder logs `skipping first-admin bootstrap` | `SEED_ADMIN_PASSWORD` empty | set it, redeploy |
+| Login returns `401 invalid credentials` but the user exists | the row already exists with a different password (the seeder never overwrites) | set `SEED_ADMIN_RESET_PASSWORD=true`, redeploy once, then set it back to `false` |
+| Seeder exits `400 password does not meet complexity requirements` | password has no digit/symbol/upper, or is <12 chars | pick a compliant password |
+| `429 rate limit exceeded` on login | `StrictAuth`: 1 req / 5s, burst 5, per IP+path | wait 5 seconds |
+
+`SEED_ADMIN_RESET_PASSWORD` exists because the alternative — rewriting the hash on
+every deploy — would silently undo a password changed in the UI.
+
+---
+
 ### Port Reference (Production)
 
 When deployed behind Caddy, Nginx, or NPM, only these ports should be open to the internet:
