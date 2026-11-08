@@ -3,6 +3,7 @@ import { errorMessage } from '../lib/errors'
 import { PageHeader } from '../components/ui/PageHeader'
 import { buttonClass } from '../components/ui/buttonStyles'
 import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useDocumentTitle } from '../lib/documentTitle'
 import { api, getAccessToken } from '../lib/api'
 import { useConfirm } from '../components/ConfirmDialog'
 import type { ProblemFormState, TestCase, Collaborator } from '../types/problem-workspace'
@@ -38,6 +39,7 @@ export default function SetterProblemWorkspace() {
 }
 
 const [problem, setProblem] = useState<LoadedProblem | null>(null)
+useDocumentTitle(problem ? `${problem.title} — setter` : null)
   type WorkspaceTab = 'statement' | 'testcases' | 'checker' | 'permissions' | 'settings' | 'editorial' | 'translations' | 'ai'
 
   const [activeTab, setActiveTab] = useState<WorkspaceTab>(() => {

@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { api } from '../lib/api'
+import { useDocumentTitle } from '../lib/documentTitle'
 import { EmptyState } from '../components/EmptyState'
 import RatingBadge from '../components/RatingBadge'
 import RatingGraph from '../components/RatingGraph'
@@ -142,6 +143,9 @@ export default function UserPublicProfile() {
   const { username } = useParams<{ username: string }>()
   const [tab, setTab] = useState<Tab>('profile')
   const [user, setUser] = useState<UserProfile | null>(null)
+  // The handle is in the URL, so the tab can identify the profile before the
+  // request resolves; the display name would be nicer but is not available yet.
+  useDocumentTitle(username ? `${username} — profile` : null)
   const [ratingHistory, setRatingHistory] = useState<RatingEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)

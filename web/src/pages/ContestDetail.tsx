@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { api, getAccessToken } from '../lib/api'
+import { useDocumentTitle } from '../lib/documentTitle'
 import { usePageVisible } from '../hooks/usePageVisible'
 import DivisionBadge from '../components/DivisionBadge'
 import { ContestStatusBadge, ContestFormatBadge, ContestTypeBadge } from '../components/contest/ContestBadges'
@@ -223,6 +224,9 @@ export default function ContestDetail() {
     const isAdmin = role === 'admin' || role === 'owner'
 
     const [contest, setContest] = useState<ContestInfo | null>(null)
+    // The route map only knows it is a contest; the real title arrives with
+    // the fetch and replaces "Contest" in the tab.
+    useDocumentTitle(contest?.title)
     const [problems, setProblems] = useState<ProblemRow[]>([])
     const [loading, setLoading] = useState(true)
     const [activeTab, setActiveTab] = useState<Tab>(() => {

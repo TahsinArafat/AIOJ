@@ -4,6 +4,7 @@ import { errorMessage } from '../lib/errors'
 import { EmptyState } from '../components/EmptyState'
 import { useParams, Link } from 'react-router-dom'
 import { api, getAccessToken } from '../lib/api'
+import { useDocumentTitle } from '../lib/documentTitle'
 import { useToast } from '../components/Toast'
 
 export default function OrganizationDetail() {
@@ -16,6 +17,7 @@ export default function OrganizationDetail() {
 }
 
 const [org, setOrg] = useState<OrgInfo | null>(null)
+useDocumentTitle(org?.name)
 	const [classes, setClasses] = useState<ClassInfo[]>([])
 	const [members, setMembers] = useState<ClassMember[]>([])
 	const [loading, setLoading] = useState(true)

@@ -11,6 +11,7 @@ import BackupsPanel from './admin/BackupsPanel'
 import AIModelsPanel from './admin/AIModelsPanel'
 import FeaturesPanel from './admin/FeaturesPanel'
 import AIJobsPage from './AIJobsPage'
+import { useDocumentTitle } from '../lib/documentTitle'
 
 type AdminTab = 'users' | 'applications' | 'bots' | 'languages' | 'remote-languages' | 'submissions' | 'settings' | 'backups' | 'ai-models' | 'ai-jobs' | 'features'
 
@@ -51,6 +52,11 @@ export default function AdminDashboard() {
         window.addEventListener('hashchange', onHashChange)
         return () => window.removeEventListener('hashchange', onHashChange)
     }, [activeTab])
+
+    // The tab is the address (#users, #settings, …), so the tab strip names the
+    // panel rather than repeating "Admin" for every one of them.
+    const activeLabel = tabs.find(t => t.key === activeTab)?.label ?? 'Admin'
+    useDocumentTitle(`${activeLabel} · Admin`)
 
     return (
         <div>

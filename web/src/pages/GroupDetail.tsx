@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { EmptyState } from '../components/EmptyState'
 import { api, getAccessToken } from '../lib/api'
+import { useDocumentTitle } from '../lib/documentTitle'
 import { useConfirm } from '../components/ConfirmDialog'
 import { useToast } from '../components/Toast'
 import { errorMessage } from '../lib/errors'
@@ -35,6 +36,7 @@ export default function GroupDetail() {
     const { id } = useParams<{ id: string }>()
     const navigate = useNavigate()
     const [group, setGroup] = useState<GroupInfo | null>(null)
+    useDocumentTitle(group?.name)
     const [members, setMembers] = useState<GroupMemberRow[]>([])
     const [isMember, setIsMember] = useState(false)
     const [currentUserRole, setCurrentUserRole] = useState<string | null>(null)

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { ExternalLink, RefreshCw } from 'lucide-react'
 import { api } from '../lib/api'
+import { useDocumentTitle } from '../lib/documentTitle'
 import { resolveProblemSlug, resolveProblemTitle } from '../lib/problemSlugResolver'
 import { languageName } from '../lib/languages'
 import { useToast } from '../components/Toast'
@@ -48,6 +49,8 @@ export default function SubmissionDetail() {
     const [loading, setLoading] = useState(true)
     const [problemSlug, setProblemSlug] = useState<string | null>(null)
     const [problemTitle, setProblemTitle] = useState<string | null>(null)
+    // Prefer the problem name (what a reader recognises) over the submission id.
+    useDocumentTitle(problemTitle)
     const [activeTab, setActiveTab] = useState<'overview' | 'code' | 'tests'>('overview')
     const [actionLoading, setActionLoading] = useState(false)
     const [pollTrigger, setPollTrigger] = useState(0)

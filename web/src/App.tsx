@@ -25,6 +25,7 @@ const SetterProblemWorkspace = lazy(() => import('./pages/SetterProblemWorkspace
 const Profile = lazy(() => import('./pages/Profile'))
 const ProblemCreate = lazy(() => import('./pages/ProblemCreate'))
 import Navbar from './components/Navbar'
+import { DocumentTitle } from './components/DocumentTitle'
 import ActivityFeed from './components/ActivityFeed'
 import { buttonClass } from './components/ui/buttonStyles'
 import { Badge } from './components/ui/Badge'
@@ -380,6 +381,11 @@ function AppShell() {
                 }
             >
                 <Suspense fallback={<RouteFallback />}>
+                {/* Rendered before <Routes> on purpose: sibling effects run in
+                    source order, so the route-level title is applied first and a
+                    page's own useDocumentTitle can refine it (e.g. the problem
+                    name) in the same commit. */}
+                <DocumentTitle />
                 <Routes>
                     <Route path="/" element={<Home />} />
                     <Route path="/problems" element={<FeatureGate feature="problems"><ProblemList /></FeatureGate>} />

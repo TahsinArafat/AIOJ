@@ -8,6 +8,7 @@ import { LANGUAGE_OPTIONS } from '../lib/languages'
 import rehypeKatex from 'rehype-katex'
 import 'katex/dist/katex.min.css'
 import { api, getAccessToken } from '../lib/api'
+import { useDocumentTitle } from '../lib/documentTitle'
 import { lazy } from 'react'
 const CodeEditor = lazy(() => import('../components/CodeEditor'))
 import { Copy, Check, Lightbulb, ClipboardList, BarChart3, FileText, Download } from 'lucide-react'
@@ -415,6 +416,7 @@ export default function ContestProblem() {
     const { contestId, index } = useParams<{ contestId: string; index: string }>()
     const [problem, setProblem] = useState<LoadedProblem | null>(null)
     const [contest, setContest] = useState<LoadedContest | null>(null)
+    useDocumentTitle(problem?.title)
     const [canSubmit, setCanSubmit] = useState(true)
     const [upsolvingDisabled, setUpsolvingDisabled] = useState(false)
     const [statementHidden, setStatementHidden] = useState(false)

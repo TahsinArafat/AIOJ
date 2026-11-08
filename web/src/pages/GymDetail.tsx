@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { api, getAccessToken, contestSlug } from '../lib/api'
+import { useDocumentTitle } from '../lib/documentTitle'
 import { useToast } from '../components/Toast'
 import { EmptyState } from '../components/EmptyState'
 import { AlertTriangle } from 'lucide-react'
@@ -15,6 +16,7 @@ export default function GymDetail() {
     const toast = useToast()
     const { id } = useParams<{ id: string }>()
     const [gym, setGym] = useState<GymData | null>(null)
+    useDocumentTitle(gym?.contest_title)
     const [loading, setLoading] = useState(true)
     const [solved, setSolved] = useState(false)
 

@@ -237,6 +237,77 @@ body {
     font-size: 0.875em !important;
 }
 
+/* ── Prose in dark mode ───────────────────────────────────────────────────────
+   The typography plugin's palette is keyed to `prose-invert`, which has to be
+   opted into per element. Most statement/editorial/blog surfaces here are
+   written as plain `prose` and rely on a `text-*` utility for their body copy,
+   so every element *without* such a utility kept the light palette — near-black
+   slate on a dark canvas.
+
+   The visible symptom was inline code: `bg-surface-3` (#212a37 in dark) with
+   the plugin's slate-900 text, roughly 1.2:1 — effectively invisible. Rather
+   than fix that one call site, map the whole palette to the theme tokens under
+   `.dark .prose` (specificity 0,2,0, so it wins over the plugin's `.prose`).
+   `prose-invert` still works: its own block sets the same variables later and
+   resolves to the same tokens.
+   ──────────────────────────────────────────────────────────────────────────── */
+.dark .prose {
+    --tw-prose-body: var(--ink-soft);
+    --tw-prose-headings: var(--ink);
+    --tw-prose-lead: var(--muted);
+    --tw-prose-links: var(--primary);
+    --tw-prose-bold: var(--ink);
+    --tw-prose-counters: var(--muted);
+    --tw-prose-bullets: var(--border-strong);
+    --tw-prose-hr: var(--border);
+    --tw-prose-quotes: var(--ink-soft);
+    --tw-prose-quote-borders: var(--border-strong);
+    --tw-prose-captions: var(--muted);
+    --tw-prose-kbd: var(--ink);
+    --tw-prose-code: var(--ink);
+    --tw-prose-pre-code: var(--code-ink);
+    --tw-prose-pre-bg: var(--code-bg);
+    --tw-prose-th-borders: var(--border-strong);
+    --tw-prose-td-borders: var(--border);
+}
+
+/* Code blocks keep the app's fixed dark surface in both themes (that is what
+   --code-bg is for), instead of the plugin's own gray-800. A snippet then looks
+   the same in light and dark, and its foreground is the matching --code-ink. */
+.prose {
+    --tw-prose-code: var(--ink);
+    --tw-prose-pre-bg: var(--code-bg);
+    --tw-prose-pre-code: var(--code-ink);
+}
+
+/* Inline code, in both themes, is a token pair rather than the plugin's
+   inherited colour. Any statement that styles its own `code` (e.g. with
+   `bg-surface-3`) then cannot end up with an unreadable foreground: the
+   background and the text always move together.
+
+   `:not(pre code)` excludes fenced blocks, which get the dark `--code-bg`
+   surface from `pre` instead. */
+.prose :where(code):not(:where(pre *, [class~="not-prose"], [class~="not-prose"] *)) {
+    background-color: var(--surface-3);
+    color: var(--ink);
+    font-weight: 500;
+    padding: 0.1em 0.35em;
+    border-radius: 0.28em;
+}
+
+/* Code blocks keep a fixed dark surface in both themes (see --code-bg), so
+   their text is always the light --code-ink regardless of theme. */
+.prose :where(pre) {
+    color: var(--code-ink);
+}
+
+.prose :where(pre code) {
+    color: inherit;
+    background-color: transparent;
+    padding: 0;
+    font-weight: inherit;
+}
+
 /* Respect the OS "reduce motion" accessibility setting. The app uses ~240
    transition/animate utilities; this collapses them all to near-zero duration
    without needing to touch individual components. Durations are not set to 0

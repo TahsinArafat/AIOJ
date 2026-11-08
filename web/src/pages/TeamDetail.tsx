@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { errorMessage } from '../lib/errors'
 import { useParams, useNavigate } from 'react-router-dom'
 import { api, getAccessToken } from '../lib/api'
+import { useDocumentTitle } from '../lib/documentTitle'
 import { EmptyState } from '../components/EmptyState'
 import RatingBadge from '../components/RatingBadge'
 import { useConfirm } from '../components/ConfirmDialog'
@@ -46,6 +47,7 @@ interface TeamInfo {
 }
 
 const [team, setTeam] = useState<TeamInfo | null>(null)
+useDocumentTitle(team?.name)
     const [members, setMembers] = useState<TeamMember[]>([])
     const [isMember, setIsMember] = useState(false)
     const [currentUserRole, setCurrentUserRole] = useState<string | null>(null)

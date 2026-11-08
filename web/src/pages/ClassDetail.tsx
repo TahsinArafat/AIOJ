@@ -3,10 +3,12 @@ import type { ClassMember, ClassInfo } from '../types/community'
 import { errorMessage } from '../lib/errors'
 import { useParams, Link } from 'react-router-dom'
 import { api, getAccessToken } from '../lib/api'
+import { useDocumentTitle } from '../lib/documentTitle'
 
 export default function ClassDetail() {
 	const { id } = useParams<{ id: string }>()
 	const [c, setC] = useState<ClassInfo | null>(null)
+	useDocumentTitle(c?.name)
 	const [members, setMembers] = useState<ClassMember[]>([])
 	const [loading, setLoading] = useState(true)
 	const [isTeacher, setIsTeacher] = useState(false)

@@ -20,6 +20,7 @@ import { Badge, type BadgeTone } from '../components/ui/Badge'
 import { DEFAULT_LANGUAGE, LANGUAGE_OPTIONS, languageName, languageTemplate } from '../lib/languages'
 import { Skeleton } from '../components/ui/PageHeader'
 import { VerdictBadge } from '../components/ui/VerdictBadge'
+import { useDocumentTitle } from '../lib/documentTitle'
 
 function useIsDesktop(breakpoint = 768) {
     const [isDesktop, setIsDesktop] = useState(
@@ -144,6 +145,9 @@ export default function ProblemDetail() {
     const { i18n } = useTranslation()
     // Translation for the active UI language, if the setter supplied one.
     const [translation, setTranslation] = useState<ProblemTranslation | null>(null)
+    // Tab title carries the problem name once it loads; until then the route
+    // map's "Problem" stays, rather than blanking the tab mid-fetch.
+    useDocumentTitle(problem?.title)
 
     // The description to actually show: the translation when the setter supplied
     // one for the active language, otherwise the problem's default. Centralised
@@ -619,7 +623,7 @@ export default function ProblemDetail() {
                                             if (isBlock) {
                                                 return <code className={className}>{children}</code>
                                             }
-                                            return <code className="bg-surface-3 px-1.5 py-0.5 rounded text-sm font-mono">{children}</code>
+                                            return <code className="bg-surface-3 px-1.5 py-0.5 rounded text-sm font-mono text-ink">{children}</code>
                                         }
                                     }}
                                 >

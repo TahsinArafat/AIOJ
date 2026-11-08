@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { api, getAccessToken } from '../lib/api'
+import { useDocumentTitle } from '../lib/documentTitle'
 import CommentSection from '../components/CommentSection'
 import ReactMarkdown from 'react-markdown'
 import remarkMath from 'remark-math'
@@ -40,6 +41,7 @@ export default function BlogDetail() {
     const { id } = useParams<{ id: string }>()
     const navigate = useNavigate()
     const [post, setPost] = useState<BlogPost | null>(null)
+    useDocumentTitle(post?.title)
     const [loading, setLoading] = useState(true)
     const [vote, setVote] = useState(0)
 
