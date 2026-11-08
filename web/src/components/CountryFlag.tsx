@@ -28,6 +28,28 @@ function isoFrom(country: string): string | null {
   return null
 }
 
+/**
+ * Country names a picker can offer, sorted for scanning.
+ *
+ * Profile used a free-text country box, so a typo silently produced a public
+ * profile with no flag; the options come from the same table the flags do, so
+ * every option is guaranteed to render one.
+ */
+export const COUNTRY_NAMES: string[] = (() => { // eslint-disable-line react-refresh/only-export-components -- static list stays next to the flag table
+  // One entry per country: the table holds aliases ("USA", "UK", "Korea" next
+  // to "South Korea") that would otherwise appear twice in a picker with the
+  // same flag. The first spelling wins, aliases stay usable for lookups.
+  const seen = new Set<string>()
+  const names: string[] = []
+  for (const [name, iso] of Object.entries(NAME_TO_ISO)) {
+    if (!/^[A-Z][a-z]/.test(name)) continue // skip short aliases like USA / UK
+    if (seen.has(iso)) continue
+    seen.add(iso)
+    names.push(name)
+  }
+  return names.sort((a, b) => a.localeCompare(b))
+})()
+
 /** Flag emoji for a country name/code, or null when unknown. */
 export function flagEmoji(country: string): string | null { // eslint-disable-line react-refresh/only-export-components -- pure helper stays co-located with its component
   const iso = isoFrom(country)

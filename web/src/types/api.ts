@@ -1272,6 +1272,9 @@ export interface UserProblemStats {
 
 export interface UserProfile {
     user_id: string
+    /** The owner's own account email; never returned for other users. */
+    email: string
+    created_at: string
     rating: number
     max_rating: number
     contest_count: number

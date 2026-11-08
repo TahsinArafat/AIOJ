@@ -132,70 +132,66 @@ func (s *UserStore) GetPublicProfile(ctx context.Context, username string) (*mod
 	return &p, nil
 }
 
+// profileColumns is the one column list GetProfile reads, shared by the initial
+// read and the re-read after the profile row is lazily created. The two copies
+// had already drifted: `max_rating` and `contest_count` were added to the table
+// (migration 000003) and to model.UserProfile, but never selected, so the API
+// reported 0 for both no matter what the rating service had written.
+const profileColumns = `
+	SELECT
+		up.user_id,
+		u.email,
+		COALESCE(up.rating, 0),
+		COALESCE(up.max_rating, 0),
+		COALESCE(up.contest_count, 0),
+		-- Live counts, not the stored columns: nothing in the codebase ever
+		-- writes user_profiles.problems_solved / .submissions, so the stored
+		-- values are 0 for every account no matter how much it has submitted.
+		-- idx_submissions_user_status_problem covers both counts.
+		COALESCE((SELECT COUNT(DISTINCT s.problem_id) FROM submissions s
+		          WHERE s.user_id = u.id AND s.status = 'ac'), 0),
+		COALESCE((SELECT COUNT(*) FROM submissions s WHERE s.user_id = u.id), 0),
+		COALESCE(up.bio, ''),
+		COALESCE(up.avatar_url, ''),
+		COALESCE(up.first_name, ''),
+		COALESCE(up.last_name, ''),
+		COALESCE(up.country, ''),
+		COALESCE(up.city, ''),
+		COALESCE(up.organization, ''),
+		COALESCE(up.github_url, ''),
+		COALESCE(up.show_email, false),
+		COALESCE(up.show_tags, true),
+		u.created_at
+	FROM user_profiles up
+	JOIN users u ON u.id = up.user_id
+	WHERE up.user_id = $1
+`
+
 func (s *UserStore) GetProfile(ctx context.Context, userID string) (*model.UserProfile, error) {
 	var p model.UserProfile
-	err := s.db.QueryRowContext(ctx, `
-		SELECT
-			up.user_id,
-			COALESCE(up.rating, 0),
-			COALESCE(up.problems_solved, 0),
-			COALESCE(up.submissions, 0),
-			COALESCE(up.bio, ''),
-			COALESCE(up.avatar_url, ''),
-			COALESCE(up.first_name, ''),
-			COALESCE(up.last_name, ''),
-			COALESCE(up.country, ''),
-			COALESCE(up.city, ''),
-			COALESCE(up.organization, ''),
-			COALESCE(up.github_url, ''),
-			COALESCE(up.show_email, false),
-			COALESCE(up.show_tags, true)
-		FROM user_profiles up
-		WHERE up.user_id = $1
-	`, userID).Scan(
-		&p.UserID,
-		&p.Rating, &p.ProblemsSolved, &p.Submissions,
-		&p.Bio, &p.AvatarURL,
-		&p.FirstName, &p.LastName, &p.Country, &p.City, &p.Organization, &p.GithubURL,
-		&p.ShowEmail, &p.ShowTags,
-	)
-	if err == sql.ErrNoRows {
-		_, insertErr := s.db.ExecContext(ctx,
-			`INSERT INTO user_profiles (user_id, rating, problems_solved, submissions, bio, max_rating, contest_count)
-			 VALUES ($1, 0, 0, 0, '', 0, 0) ON CONFLICT (user_id) DO NOTHING`,
-			userID)
-		if insertErr != nil {
-			return nil, insertErr
-		}
-		err = s.db.QueryRowContext(ctx, `
-			SELECT
-				up.user_id,
-				COALESCE(up.rating, 0),
-				COALESCE(up.problems_solved, 0),
-				COALESCE(up.submissions, 0),
-				COALESCE(up.bio, ''),
-				COALESCE(up.avatar_url, ''),
-				COALESCE(up.first_name, ''),
-				COALESCE(up.last_name, ''),
-				COALESCE(up.country, ''),
-				COALESCE(up.city, ''),
-				COALESCE(up.organization, ''),
-				COALESCE(up.github_url, ''),
-				COALESCE(up.show_email, false),
-				COALESCE(up.show_tags, true)
-			FROM user_profiles up
-			WHERE up.user_id = $1
-		`, userID).Scan(
-			&p.UserID,
-			&p.Rating, &p.ProblemsSolved, &p.Submissions,
+	scan := func(row *sql.Row) error {
+		return row.Scan(
+			&p.UserID, &p.Email,
+			&p.Rating, &p.MaxRating, &p.ContestCount, &p.ProblemsSolved, &p.Submissions,
 			&p.Bio, &p.AvatarURL,
 			&p.FirstName, &p.LastName, &p.Country, &p.City, &p.Organization, &p.GithubURL,
 			&p.ShowEmail, &p.ShowTags,
+			&p.CreatedAt,
 		)
-		if err != nil {
-			return nil, err
+	}
+
+	err := scan(s.db.QueryRowContext(ctx, profileColumns, userID))
+	if err == sql.ErrNoRows {
+		// Repair path: an account whose profile row is missing (registration
+		// creates it, but older rows predate that) gets one, then we re-read
+		// through the same column list so the shape cannot diverge.
+		if _, insertErr := s.db.ExecContext(ctx,
+			`INSERT INTO user_profiles (user_id, rating, problems_solved, submissions, bio, max_rating, contest_count)
+			 VALUES ($1, 0, 0, 0, '', 0, 0) ON CONFLICT (user_id) DO NOTHING`,
+			userID); insertErr != nil {
+			return nil, insertErr
 		}
-		return &p, nil
+		err = scan(s.db.QueryRowContext(ctx, profileColumns, userID))
 	}
 	if err != nil {
 		return nil, err

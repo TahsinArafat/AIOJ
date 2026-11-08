@@ -18,22 +18,27 @@ type User struct {
 }
 
 type UserProfile struct {
-	UserID         string `json:"user_id"`
-	Rating         int    `json:"rating"`
-	MaxRating      int    `json:"max_rating"`
-	ContestCount   int    `json:"contest_count"`
-	ProblemsSolved int    `json:"problems_solved"`
-	Submissions    int    `json:"submissions"`
-	Bio            string `json:"bio,omitempty"`
-	AvatarURL      string `json:"avatar_url,omitempty"`
-	FirstName      string `json:"first_name,omitempty"`
-	LastName       string `json:"last_name,omitempty"`
-	Country        string `json:"country,omitempty"`
-	City           string `json:"city,omitempty"`
-	Organization   string `json:"organization,omitempty"`
-	GithubURL      string `json:"github_url,omitempty"`
-	ShowEmail      bool   `json:"show_email"`
-	ShowTags       bool   `json:"show_tags"`
+	UserID string `json:"user_id"`
+	// Email and CreatedAt live on `users`, not `user_profiles`, and are read
+	// for the owner's own settings page (never for another user: the public
+	// shape is PublicProfile, which honours show_email).
+	Email          string    `json:"email"`
+	CreatedAt      time.Time `json:"created_at"`
+	Rating         int       `json:"rating"`
+	MaxRating      int       `json:"max_rating"`
+	ContestCount   int       `json:"contest_count"`
+	ProblemsSolved int       `json:"problems_solved"`
+	Submissions    int       `json:"submissions"`
+	Bio            string    `json:"bio,omitempty"`
+	AvatarURL      string    `json:"avatar_url,omitempty"`
+	FirstName      string    `json:"first_name,omitempty"`
+	LastName       string    `json:"last_name,omitempty"`
+	Country        string    `json:"country,omitempty"`
+	City           string    `json:"city,omitempty"`
+	Organization   string    `json:"organization,omitempty"`
+	GithubURL      string    `json:"github_url,omitempty"`
+	ShowEmail      bool      `json:"show_email"`
+	ShowTags       bool      `json:"show_tags"`
 }
 
 // EmailVerificationToken is a one-shot link token for verifying an email.
