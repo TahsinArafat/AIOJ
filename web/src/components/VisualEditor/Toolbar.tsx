@@ -55,11 +55,9 @@ export default function Toolbar({ editor }: ToolbarProps) {
   const [showMathDialog, setShowMathDialog] = useState(false)
 
   const insertMath = (latex: string, displayMode: boolean) => {
-    if (displayMode) {
-      editor.chain().focus().insertContent(`$$${latex}$$`).run()
-    } else {
-      editor.chain().focus().insertContent(`$${latex}$`).run()
-    }
+    // A math node, not `$...$` text: text is escaped by the markdown converter
+    // on save, which turns `\le` into `\\le` — rendered as "l e".
+    editor.chain().focus().insertContent({ type: 'math', attrs: { latex, displayMode } }).run()
     setShowMathDialog(false)
   }
 

@@ -346,10 +346,13 @@ export function AIBriefForm({
                 </div>
                 <label className="block text-xs text-muted">
                     Constraint guidance
-                    <input
+                    {/* Prose that lands in the generator prompt: one bound or
+                        caution per line has to survive as separate lines. */}
+                    <textarea
                         value={brief.constraint_guidance ?? ''}
                         disabled={disabled}
                         onChange={e => onChange({ constraint_guidance: e.target.value })}
+                        rows={2}
                         placeholder="e.g. N up to 2e5; avoid constraints that let brute force pass"
                         className={field}
                     />

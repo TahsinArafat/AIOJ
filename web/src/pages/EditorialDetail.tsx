@@ -36,7 +36,9 @@ export default function EditorialDetail() {
                 {editorial.approach && (
                     <div className="mb-4 p-3 bg-brand-soft rounded-lg">
                         <span className="text-xs font-semibold text-brand uppercase tracking-wide">Approach:</span>
-                        <MarkdownContent inline content={editorial.approach} className="mt-1 text-sm text-blue-800" />
+                        {/* Authored in a multi-line textarea: rendering it inline
+                            flattened the paragraphs into one run-on line. */}
+                        <MarkdownContent content={editorial.approach} className="prose prose-sm max-w-none mt-1 text-sm text-blue-800" />
                     </div>
                 )}
 

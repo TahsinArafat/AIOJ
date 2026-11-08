@@ -13,6 +13,7 @@ const baseState: ProblemFormState = {
   timeLimit: 1000,
   memoryLimit: 262144,
   difficulty: 'easy',
+  rating: 1500,
   tags: 'math, ad-hoc',
   sampleCases: [{ input: '1 2', output: '3', explanation: '' }],
   testcases: [],
@@ -77,4 +78,30 @@ test('removes a sample case', () => {
   fireEvent.click(removeButton)
 
   expect(onUpdate).toHaveBeenCalledWith('sampleCases', [])
+})
+
+test('rating is editable and reports the new value', () => {
+  const onUpdate = vi.fn()
+  render(<StatementTab formState={baseState} onUpdate={onUpdate} onSave={vi.fn()} saving={false} uploadingImage={false} onImageUpload={vi.fn()} />)
+
+  const ratingInput = screen.getByLabelText('Rating')
+  expect(ratingInput).toHaveValue(1500)
+
+  fireEvent.change(ratingInput, { target: { value: '2100' } })
+  expect(onUpdate).toHaveBeenCalledWith('rating', 2100)
+})
+
+// The problem page renders sample explanations as markdown, so a single-line
+// input could not hold the paragraphs authors write.
+test('sample explanation accepts more than one line', () => {
+  const onUpdate = vi.fn()
+  render(<StatementTab formState={baseState} onUpdate={onUpdate} onSave={vi.fn()} saving={false} uploadingImage={false} onImageUpload={vi.fn()} />)
+
+  const explanation = screen.getByLabelText('Explanation (optional)')
+  expect(explanation.tagName).toBe('TEXTAREA')
+
+  fireEvent.change(explanation, { target: { value: 'line one\nline two' } })
+  expect(onUpdate).toHaveBeenCalledWith('sampleCases', [
+    { input: '1 2', output: '3', explanation: 'line one\nline two' },
+  ])
 })

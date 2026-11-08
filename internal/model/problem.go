@@ -32,6 +32,7 @@ type Problem struct {
 	TimeLimit            int             `json:"time_limit"`
 	MemoryLimit          int             `json:"memory_limit"`
 	Difficulty           string          `json:"difficulty"`
+	Rating               int             `json:"rating"` // 0 = unrated
 	Tags                 []string        `json:"tags,omitempty"`
 	Visible              bool            `json:"visible"`
 	TestdataPath         string          `json:"-"`
@@ -63,6 +64,7 @@ type ProblemListItem struct {
 	Slug            string   `json:"slug"`
 	Title           string   `json:"title"`
 	Difficulty      string   `json:"difficulty"`
+	Rating          int      `json:"rating"`
 	Tags            []string `json:"tags"`
 	SubmissionCount int      `json:"submission_count"`
 	AcceptedCount   int      `json:"accepted_count"`
@@ -92,6 +94,7 @@ type CreateProblemRequest struct {
 	TimeLimit            int             `json:"time_limit"`
 	MemoryLimit          int             `json:"memory_limit"`
 	Difficulty           string          `json:"difficulty"`
+	Rating               int             `json:"rating"`
 	Tags                 []string        `json:"tags,omitempty"`
 	SampleCases          []SampleCase    `json:"sample_cases,omitempty"`
 	TestCaseScore        []TestCaseScore `json:"testcase_score,omitempty"`

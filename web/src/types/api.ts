@@ -825,6 +825,8 @@ export interface Problem {
     time_limit: number
     memory_limit: number
     difficulty: string
+    /** Codeforces-scale rating; 0 means unrated. */
+    rating: number
     tags?: string[]
     visible: boolean
     testcase_score?: TestCaseScore[]
@@ -864,6 +866,7 @@ export interface ProblemListItem {
     slug: string
     title: string
     difficulty: string
+    rating: number
     tags: string[]
     submission_count: number
     accepted_count: number

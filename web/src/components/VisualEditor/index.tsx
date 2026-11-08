@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
@@ -5,30 +6,10 @@ import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
 import { common, createLowlight } from 'lowlight'
 import Toolbar from './Toolbar'
 import MathExtension from './MathExtension'
-import TurndownService from 'turndown'
+import { htmlToMarkdown, markdownToHtml } from '../../lib/markdown'
 import './styles.css'
 
 const lowlight = createLowlight(common)
-
-const turndownService = new TurndownService({
-  headingStyle: 'atx',
-  codeBlockStyle: 'fenced',
-})
-
-turndownService.addRule('math', {
-  filter: (node) => {
-    return node.classList?.contains('math-node') || node.nodeName === 'MATH'
-  },
-  replacement: (_content, node) => {
-    const latex = node.getAttribute('data-latex') || node.textContent
-    const displayMode = node.classList?.contains('math-block')
-    return displayMode ? `$$${latex}$$` : `$${latex}$`
-  },
-})
-
-function htmlToMarkdown(html: string): string {
-  return turndownService.turndown(html)
-}
 
 interface VisualEditorProps {
   content: string
@@ -37,6 +18,11 @@ interface VisualEditorProps {
 }
 
 export default function VisualEditor({ content, onChange, placeholder }: VisualEditorProps) {
+  // Last markdown this editor produced. Anything else arriving through
+  // `content` was written from outside — an inserted image, an applied AI
+  // draft — and has to be re-seeded instead of being ignored.
+  const emitted = useRef(content)
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -50,13 +36,23 @@ export default function VisualEditor({ content, onChange, placeholder }: VisualE
       }),
       MathExtension,
     ],
-    content: content,
+    // The editor parses `content` as HTML, so markdown has to be converted
+    // first — otherwise every newline collapses and the next save persists the
+    // flattened statement.
+    content: markdownToHtml(content),
     onUpdate: ({ editor }) => {
       const html = editor.getHTML()
       const markdown = htmlToMarkdown(html)
+      emitted.current = markdown
       onChange(markdown)
     },
   })
+
+  useEffect(() => {
+    if (!editor || content === emitted.current) return
+    emitted.current = content
+    editor.commands.setContent(markdownToHtml(content), { emitUpdate: false })
+  }, [content, editor])
 
   if (!editor) return null
 

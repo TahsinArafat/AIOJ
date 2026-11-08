@@ -41,8 +41,18 @@ const MathExtension = Node.create({
 
   addAttributes() {
     return {
-      latex: { default: '' },
-      displayMode: { default: false },
+      latex: {
+        default: '',
+        parseHTML: (element: HTMLElement) => element.getAttribute('data-latex') ?? '',
+        renderHTML: (attributes: { latex: string }) => ({ 'data-latex': attributes.latex }),
+      },
+      displayMode: {
+        default: false,
+        parseHTML: (element: HTMLElement) => element.getAttribute('data-display-mode') === 'true',
+        renderHTML: (attributes: { displayMode: boolean }) => ({
+          'data-display-mode': attributes.displayMode ? 'true' : 'false',
+        }),
+      },
     }
   },
 
@@ -50,8 +60,11 @@ const MathExtension = Node.create({
     return [{ tag: 'math' }]
   },
 
-  renderHTML({ HTMLAttributes }) {
-    return ['math', mergeAttributes(HTMLAttributes)]
+  renderHTML({ node, HTMLAttributes }) {
+    // The TeX is kept as text content as well as an attribute: an element with
+    // no text at all reads as blank to the HTML-to-markdown pass, which drops it
+    // before any rule can turn it back into `$...$`.
+    return ['math', mergeAttributes(HTMLAttributes), node.attrs.latex]
   },
 
   addNodeView() {

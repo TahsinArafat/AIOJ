@@ -1,9 +1,8 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
-import remarkMath from 'remark-math'
-import remarkGfm from 'remark-gfm'
 import rehypeKatex from 'rehype-katex'
+import { richTextRemarkPlugins } from '../lib/markdown'
 import 'katex/dist/katex.min.css'
 import { api, getAccessToken } from '../lib/api'
 import ProblemStats from '../components/ProblemStats'
@@ -13,7 +12,7 @@ import AddEditorialModal from '../components/AddEditorialModal'
 import CommentSection from '../components/CommentSection'
 import { EmptyState } from '../components/EmptyState'
 import { SubmissionStatusPanel, type SubmissionStatusData } from '../components/SubmissionStatusPanel'
-import { Download, Copy, Check, Timer, MemoryStick, type LucideIcon } from 'lucide-react'
+import { Download, Copy, Check, Timer, MemoryStick, Gauge, type LucideIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '../components/Toast'
 import { Badge, type BadgeTone } from '../components/ui/Badge'
@@ -102,7 +101,7 @@ function StatementSection({ title, body }: { title: string; body: string }) {
         <section>
             <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted">{title}</h3>
             <div className="prose prose-sm max-w-none text-[14px] leading-[1.65] text-ink-soft">
-                <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+                <ReactMarkdown remarkPlugins={richTextRemarkPlugins} rehypePlugins={[rehypeKatex]}>
                     {body}
                 </ReactMarkdown>
             </div>
@@ -125,7 +124,7 @@ interface ProblemTranslation { language: string; title?: string | null; descript
 interface SampleCase { input: string; output: string; explanation?: string }
 interface ProblemData {
     id: string; slug: string; title?: string; description?: string; hint?: string;
-    source?: string; difficulty?: string; problem_type?: string; scoring_mode?: string;
+    source?: string; difficulty?: string; rating?: number; problem_type?: string; scoring_mode?: string;
     interactive?: boolean; time_limit: number; memory_limit: number;
     input_format?: string; output_format?: string; constraints?: string; pdf?: string;
     tags?: string[]; sample_cases?: SampleCase[];
@@ -530,6 +529,9 @@ export default function ProblemDetail() {
                                 </Badge>
                             </span>
                         )}
+                        {(problem.rating ?? 0) > 0 && (
+                            <Limit icon={Gauge} label="Rating" value={String(problem.rating)} />
+                        )}
                         {problem.tags && problem.tags.length > 0 && (
                             <span className="flex flex-wrap items-center gap-1.5">
                                 <span className="text-muted">Tags</span>
@@ -618,7 +620,7 @@ export default function ProblemDetail() {
                         ) : (
                             <div className="prose prose-sm max-w-none text-ink text-[14px] leading-[1.6]">
                                 <ReactMarkdown
-                                    remarkPlugins={[remarkGfm, remarkMath]}
+                                    remarkPlugins={richTextRemarkPlugins}
                                     rehypePlugins={[rehypeKatex]}
                                     components={{
                                         code(props) {
@@ -672,7 +674,7 @@ export default function ProblemDetail() {
                                 </div>
                                 {sc.explanation && (
                                     <div className="prose prose-sm mt-1 max-w-none text-xs text-muted">
-                                        <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+                                        <ReactMarkdown remarkPlugins={richTextRemarkPlugins} rehypePlugins={[rehypeKatex]}>
                                             {sc.explanation}
                                         </ReactMarkdown>
                                     </div>

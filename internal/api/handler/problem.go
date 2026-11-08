@@ -132,6 +132,7 @@ func (h *ProblemHandler) Update(w http.ResponseWriter, r *http.Request) {
 	p.TimeLimit = req.TimeLimit
 	p.MemoryLimit = req.MemoryLimit
 	p.Difficulty = req.Difficulty
+	p.Rating = max(req.Rating, 0)
 	p.InputFormat = req.InputFormat
 	p.OutputFormat = req.OutputFormat
 	p.Constraints = req.Constraints
@@ -293,6 +294,7 @@ func (h *ProblemHandler) Create(w http.ResponseWriter, r *http.Request) {
 		TimeLimit:            req.TimeLimit,
 		MemoryLimit:          req.MemoryLimit,
 		Difficulty:           req.Difficulty,
+		Rating:               max(req.Rating, 0),
 		Tags:                 req.Tags,
 		SampleCases:          req.SampleCases,
 		TestCaseScore:        req.TestCaseScore,

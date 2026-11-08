@@ -42,6 +42,11 @@ func (s *ApplyService) Apply(ctx context.Context, job *model.AIGenerationJob, ac
 	if json.Unmarshal(job.Proposal, &p) != nil {
 		return nil, fmt.Errorf("proposal is invalid")
 	}
+	// The brief carries the setter's target rating; the proposal only describes
+	// the authored content. A job without a readable brief is not fatal: the
+	// problem simply stays unrated.
+	var brief Request
+	_ = json.Unmarshal(job.NormalizedBrief, &brief)
 	selected := map[string]bool{}
 	for _, v := range req.Sections {
 		selected[v] = true
@@ -80,6 +85,12 @@ func (s *ApplyService) Apply(ctx context.Context, job *model.AIGenerationJob, ac
 		problem.MemoryLimit = problemMemoryLimitKB(p)
 		problem.Difficulty = p.Difficulty
 		problem.Tags = p.Tags
+		// The harness never invents a rating, it aims at the one on the brief.
+		// Apply it here, or every AI-created problem lands unrated and drops out
+		// of the problem list's rating filter.
+		if brief.Rating > 0 {
+			problem.Rating = brief.Rating
+		}
 	}
 	isNew := job.ProblemID == nil
 	if isNew {

@@ -6,7 +6,7 @@ import { PageHeader } from '../components/ui/PageHeader'
 export default function ProblemCreate() {
     const nav = useNavigate()
     const [form, setForm] = useState({
-        slug: '', title: '', description: '', difficulty: 'easy',
+        slug: '', title: '', description: '', difficulty: 'easy', rating: 0,
         time_limit: 1000, memory_limit: 262144, tags: '', input_format: '', output_format: '',
         constraints: '',
     })
@@ -35,7 +35,8 @@ export default function ProblemCreate() {
         try {
             await api.problems.create({
                 slug: form.slug, title: form.title, description: form.description,
-                difficulty: form.difficulty, time_limit: form.time_limit, memory_limit: form.memory_limit,
+                difficulty: form.difficulty, rating: form.rating,
+                time_limit: form.time_limit, memory_limit: form.memory_limit,
                 tags: form.tags.split(',').map((t: string) => t.trim()).filter(Boolean),
                 input_format: form.input_format, output_format: form.output_format,
                 constraints: form.constraints,
@@ -83,13 +84,19 @@ export default function ProblemCreate() {
                     <textarea id="problem-description" required rows={6} value={form.description} onChange={e => setForm(p => ({...p, description: e.target.value}))}
                         className="w-full border border-hairline-strong rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)]" />
                 </div>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                     <div>
                         <label htmlFor="problem-difficulty" className="block text-sm font-medium text-ink-soft mb-1">Difficulty</label>
                         <select id="problem-difficulty" value={form.difficulty} onChange={e => setForm(p => ({...p, difficulty: e.target.value}))}
                             className="w-full border border-hairline-strong rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)]">
                             <option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option>
                         </select>
+                    </div>
+                    <div>
+                        <label htmlFor="problem-rating" className="block text-sm font-medium text-ink-soft mb-1">Rating</label>
+                        <input id="problem-rating" type="number" min={0} max={3500} step={100} placeholder="0 = unrated"
+                            value={form.rating} onChange={e => setForm(p => ({...p, rating: +e.target.value}))}
+                            className="w-full border border-hairline-strong rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)]" />
                     </div>
                     <div>
                         <label htmlFor="problem-time-limit-ms" className="block text-sm font-medium text-ink-soft mb-1">Time Limit (ms)</label>

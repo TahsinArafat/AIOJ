@@ -61,7 +61,7 @@ const PLATFORM_LABEL: Record<string, string> = {
     qoj: 'QOJ',
 }
 
-interface ProblemRow { title?: string; slug?: string; difficulty?: string; source?: string; tags?: string[]; accepted_count?: number; submission_count?: number }
+interface ProblemRow { title?: string; slug?: string; difficulty?: string; rating?: number; source?: string; tags?: string[]; accepted_count?: number; submission_count?: number }
 
 function acceptance(p: ProblemRow): string {
     const total = p.submission_count || 0
@@ -315,11 +315,14 @@ export default function ProblemList() {
                                                 <Badge tone="neutral">{PLATFORM_LABEL[p.source || 'local'] || p.source}</Badge>
                                             </Td>
                                             <Td>
-                                                {p.difficulty ? (
-                                                    <Badge tone={DIFFICULTY_TONE[p.difficulty] || 'neutral'}>{p.difficulty}</Badge>
-                                                ) : (
-                                                    <span className="text-muted-soft">—</span>
-                                                )}
+                                                <span className="flex items-center gap-1.5">
+                                                    {p.difficulty ? (
+                                                        <Badge tone={DIFFICULTY_TONE[p.difficulty] || 'neutral'}>{p.difficulty}</Badge>
+                                                    ) : (
+                                                        <span className="text-muted-soft">—</span>
+                                                    )}
+                                                    {p.rating ? <span className="tnum text-xs text-muted">{p.rating}</span> : null}
+                                                </span>
                                             </Td>
                                             <Td className="max-w-[18rem]">
                                                 <span className="line-clamp-1 text-xs text-muted">
@@ -360,6 +363,7 @@ export default function ProblemList() {
                                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
                                     <Badge tone="neutral">{PLATFORM_LABEL[p.source || 'local'] || p.source}</Badge>
                                     {p.difficulty && <Badge tone={DIFFICULTY_TONE[p.difficulty] || 'neutral'}>{p.difficulty}</Badge>}
+                                    {p.rating ? <span className="tnum text-xs text-muted">{p.rating}</span> : null}
                                     <span className="tnum ml-auto text-xs text-muted">
                                         {p.accepted_count}/{p.submission_count}
                                     </span>

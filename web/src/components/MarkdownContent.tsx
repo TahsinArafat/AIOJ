@@ -1,7 +1,6 @@
 import ReactMarkdown, { type Components } from 'react-markdown'
-import remarkMath from 'remark-math'
-import remarkGfm from 'remark-gfm'
 import rehypeKatex from 'rehype-katex'
+import { richTextRemarkPlugins } from '../lib/markdown'
 import 'katex/dist/katex.min.css'
 
 interface MarkdownContentProps {
@@ -30,7 +29,7 @@ export default function MarkdownContent({ content, className, inline = false }: 
 
     const markdown = (
         <ReactMarkdown
-            remarkPlugins={[remarkGfm, remarkMath]}
+            remarkPlugins={richTextRemarkPlugins}
             rehypePlugins={[rehypeKatex]}
             components={inline ? inlineComponents : undefined}
         >

@@ -23,6 +23,8 @@ export interface ProblemFormState {
   timeLimit: number
   memoryLimit: number
   difficulty: string
+  /** Codeforces-scale rating; 0 means unrated. */
+  rating: number
   tags: string
   sampleCases: { input: string; output: string; explanation?: string | null }[]
 
@@ -56,6 +58,7 @@ export function createDefaultFormState(): ProblemFormState {
     timeLimit: 1000,
     memoryLimit: 262144,
     difficulty: 'easy',
+    rating: 0,
     tags: '',
     sampleCases: [],
     testcases: [],

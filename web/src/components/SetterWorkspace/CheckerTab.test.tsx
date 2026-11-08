@@ -5,7 +5,7 @@ import type { ProblemFormState } from '../../types/problem-workspace'
 
 const baseState: ProblemFormState = {
   title: '', description: '', inputFormat: '', outputFormat: '', constraints: '', hint: '',
-  timeLimit: 1000, memoryLimit: 262144, difficulty: 'easy', tags: '',
+  timeLimit: 1000, memoryLimit: 262144, difficulty: 'easy', rating: 1500, tags: '',
   sampleCases: [], testcases: [],
   checkerType: 'exact',
   floatEpsilon: 1e-6,

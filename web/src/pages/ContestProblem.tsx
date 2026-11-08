@@ -1,11 +1,10 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
-import remarkMath from 'remark-math'
-import remarkGfm from 'remark-gfm'
 import { EmptyState } from '../components/EmptyState'
 import { LANGUAGE_OPTIONS } from '../lib/languages'
 import rehypeKatex from 'rehype-katex'
+import { richTextRemarkPlugins } from '../lib/markdown'
 import 'katex/dist/katex.min.css'
 import { api, getAccessToken } from '../lib/api'
 import { useDocumentTitle } from '../lib/documentTitle'
@@ -251,7 +250,7 @@ function SampleCase({ sample, index }: { sample: SampleCaseData; index: number }
                 <div className="border-t border-hairline bg-brand-soft px-4 py-3">
                     <div className="text-xs font-semibold text-brand uppercase tracking-wide mb-1">Explanation</div>
                     <div className="prose prose-sm max-w-none text-ink-soft">
-                        <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+                        <ReactMarkdown remarkPlugins={richTextRemarkPlugins} rehypePlugins={[rehypeKatex]}>
                             {sample.explanation}
                         </ReactMarkdown>
                     </div>
@@ -276,7 +275,7 @@ function HintSection({ hint }: { hint: string }) {
             {expanded && (
                 <div className="px-4 py-3 bg-surface border-t border-warn/30">
                     <div className="prose prose-sm max-w-none text-ink-soft">
-                        <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+                        <ReactMarkdown remarkPlugins={richTextRemarkPlugins} rehypePlugins={[rehypeKatex]}>
                             {hint}
                         </ReactMarkdown>
                     </div>
@@ -874,7 +873,7 @@ export default function ContestProblem() {
                                         </div>
                                     ) : (
                                         <div className="prose prose-sm max-w-none text-ink leading-relaxed">
-                                            <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+                                            <ReactMarkdown remarkPlugins={richTextRemarkPlugins} rehypePlugins={[rehypeKatex]}>
                                                 {problem.description}
                                             </ReactMarkdown>
                                         </div>
@@ -884,7 +883,7 @@ export default function ContestProblem() {
                                         <div>
                                             <h3 className="font-semibold text-sm text-ink-soft uppercase tracking-wide mb-2">Input Format</h3>
                                             <div className="prose prose-sm max-w-none text-ink-soft bg-surface-2/20 rounded-lg p-4 border border-hairline">
-                                                <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+                                                <ReactMarkdown remarkPlugins={richTextRemarkPlugins} rehypePlugins={[rehypeKatex]}>
                                                     {problem.input_format}
                                                 </ReactMarkdown>
                                             </div>
@@ -895,7 +894,7 @@ export default function ContestProblem() {
                                         <div>
                                             <h3 className="font-semibold text-sm text-ink-soft uppercase tracking-wide mb-2">Output Format</h3>
                                             <div className="prose prose-sm max-w-none text-ink-soft bg-surface-2/20 rounded-lg p-4 border border-hairline">
-                                                <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+                                                <ReactMarkdown remarkPlugins={richTextRemarkPlugins} rehypePlugins={[rehypeKatex]}>
                                                     {problem.output_format}
                                                 </ReactMarkdown>
                                             </div>
@@ -906,7 +905,7 @@ export default function ContestProblem() {
                                         <div>
                                             <h3 className="font-semibold text-sm text-ink-soft uppercase tracking-wide mb-2">Constraints</h3>
                                             <div className="prose prose-sm max-w-none text-ink-soft bg-surface-2/20 rounded-lg p-4 border border-hairline">
-                                                <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+                                                <ReactMarkdown remarkPlugins={richTextRemarkPlugins} rehypePlugins={[rehypeKatex]}>
                                                     {problem.constraints}
                                                 </ReactMarkdown>
                                             </div>

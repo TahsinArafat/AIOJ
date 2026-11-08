@@ -362,12 +362,16 @@ export const api = {
             }),
     },
     problems: {
-        list: (offset = 0, limit = 20, filters?: { difficulty?: string; tags?: string[]; search?: string; source?: string }) => {
+        list: (offset = 0, limit = 20, filters?: { difficulty?: string; tags?: string[]; search?: string; source?: string; rating?: string; sort?: string }) => {
             let url = `/problems?offset=${offset}&limit=${limit}`;
             if (filters?.difficulty) url += `&difficulty=${filters.difficulty}`;
             if (filters?.tags?.length) url += `&tags=${filters.tags.join(',')}`;
             if (filters?.search) url += `&search=${encodeURIComponent(filters.search)}`;
             if (filters?.source) url += `&source=${encodeURIComponent(filters.source)}`;
+            // The handler reads `rating`/`sort`; neither used to be sent, so the
+            // rating filter and every sort option were silently ignored.
+            if (filters?.rating) url += `&rating=${encodeURIComponent(filters.rating)}`;
+            if (filters?.sort) url += `&sort=${encodeURIComponent(filters.sort)}`;
             return request<{ data: ProblemListItem[]; total: number }>(url);
         },
         listMy: (offset = 0, limit = 20) => request<{ data: ProblemListItem[]; total: number }>(`/problems/my?offset=${offset}&limit=${limit}`),

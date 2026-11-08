@@ -1,8 +1,7 @@
 import { lazy, Suspense, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
-import remarkMath from 'remark-math'
-import remarkGfm from 'remark-gfm'
 import rehypeKatex from 'rehype-katex'
+import { richTextRemarkPlugins } from '../../lib/markdown'
 import 'katex/dist/katex.min.css'
 import type { ProblemFormState } from '../../types/problem-workspace'
 
@@ -78,7 +77,7 @@ export default function StatementTab({
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div>
           <label className="block text-xs font-semibold text-muted uppercase mb-1">Difficulty</label>
           <select aria-label="Difficulty"
@@ -90,6 +89,20 @@ export default function StatementTab({
             <option value="medium">Medium</option>
             <option value="hard">Hard</option>
           </select>
+        </div>
+        <div>
+          <label className="block text-xs font-semibold text-muted uppercase mb-1">Rating</label>
+          <input aria-label="Rating"
+            type="number"
+            min={0}
+            max={3500}
+            step={100}
+            value={formState.rating}
+            onChange={e => onUpdate('rating', Number(e.target.value))}
+            placeholder="e.g. 1500"
+            className="w-full border border-hairline-strong rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)] bg-surface text-ink"
+          />
+          <p className="mt-1 text-xs text-muted-soft">0 = unrated. Filters on the problem list.</p>
         </div>
         <div>
           <label className="block text-xs font-semibold text-muted uppercase mb-1">Time Limit (ms)</label>
@@ -191,7 +204,7 @@ export default function StatementTab({
                 {formState.description && (
                   <div>
                     <h4 className="text-xs font-bold text-muted-soft uppercase tracking-wider mb-2">Description</h4>
-                    <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+                    <ReactMarkdown remarkPlugins={richTextRemarkPlugins} rehypePlugins={[rehypeKatex]}>
                       {formState.description}
                     </ReactMarkdown>
                   </div>
@@ -199,7 +212,7 @@ export default function StatementTab({
                 {formState.inputFormat && (
                   <div>
                     <h4 className="text-xs font-bold text-muted-soft uppercase tracking-wider mb-2">Input Format</h4>
-                    <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+                    <ReactMarkdown remarkPlugins={richTextRemarkPlugins} rehypePlugins={[rehypeKatex]}>
                       {formState.inputFormat}
                     </ReactMarkdown>
                   </div>
@@ -207,7 +220,7 @@ export default function StatementTab({
                 {formState.outputFormat && (
                   <div>
                     <h4 className="text-xs font-bold text-muted-soft uppercase tracking-wider mb-2">Output Format</h4>
-                    <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+                    <ReactMarkdown remarkPlugins={richTextRemarkPlugins} rehypePlugins={[rehypeKatex]}>
                       {formState.outputFormat}
                     </ReactMarkdown>
                   </div>
@@ -215,7 +228,7 @@ export default function StatementTab({
                 {formState.constraints && (
                   <div>
                     <h4 className="text-xs font-bold text-muted-soft uppercase tracking-wider mb-2">Constraints</h4>
-                    <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+                    <ReactMarkdown remarkPlugins={richTextRemarkPlugins} rehypePlugins={[rehypeKatex]}>
                       {formState.constraints}
                     </ReactMarkdown>
                   </div>
@@ -223,7 +236,7 @@ export default function StatementTab({
                 {formState.hint && (
                   <div>
                     <h4 className="text-xs font-bold text-muted-soft uppercase tracking-wider mb-2">Notes</h4>
-                    <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+                    <ReactMarkdown remarkPlugins={richTextRemarkPlugins} rehypePlugins={[rehypeKatex]}>
                       {formState.hint}
                     </ReactMarkdown>
                   </div>
@@ -290,14 +303,16 @@ export default function StatementTab({
             </div>
             <div>
               <label className="block text-xs font-medium text-muted mb-1">Explanation (optional)</label>
-              <input aria-label="Explanation (optional)"
-                type="text"
+              {/* Rendered as markdown on the problem page, so it has to accept
+                  more than one line. */}
+              <textarea aria-label="Explanation (optional)"
                 value={sc.explanation ?? ''}
                 onChange={e => {
                   const updated = [...formState.sampleCases]
                   updated[i] = { ...updated[i], explanation: e.target.value }
                   onUpdate('sampleCases', updated)
                 }}
+                rows={2}
                 className="w-full text-sm border border-hairline-strong rounded px-2 py-1.5 focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)] bg-surface"
               />
             </div>

@@ -54,14 +54,14 @@ func (s *ProblemStore) Create(ctx context.Context, p *model.Problem) error {
 
 	err = tx.QueryRowContext(ctx, `INSERT INTO problems
 		(id,slug,title,description,constraints,input_format,output_format,hint,sample_cases,
-		 time_limit,memory_limit,difficulty,tags,visible,testdata_path,testcase_score,
+		 time_limit,memory_limit,difficulty,rating,tags,visible,testdata_path,testcase_score,
 		 spj,spj_language,spj_source_code,spj_version,source,remote_id,created_by,
 		 checker_type,float_epsilon,interactive,interactor_language,interactor_source_code,
 		 scoring_mode,subtask_aggregation,ai_generated)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32)
 		RETURNING created_at,updated_at`,
 		p.ID, p.Slug, p.Title, p.Description, p.Constraints, p.InputFormat, p.OutputFormat, p.Hint, samples,
-		p.TimeLimit, p.MemoryLimit, p.Difficulty, pq.Array(p.Tags), p.Visible, p.TestdataPath, scores,
+		p.TimeLimit, p.MemoryLimit, p.Difficulty, p.Rating, pq.Array(p.Tags), p.Visible, p.TestdataPath, scores,
 		p.SPJ, p.SPJLanguage, p.SPJSourceCode, p.SPJVersion, p.Source, p.RemoteID, p.CreatedBy,
 		p.CheckerType, p.FloatEpsilon, p.Interactive, p.InteractorLanguage, p.InteractorSourceCode,
 		p.ScoringMode, p.SubtaskAggregation, p.AIGenerated,
@@ -97,14 +97,14 @@ func (s *ProblemStore) getBy(ctx context.Context, field, value string) (*model.P
 	var tags []string
 	err := s.db.QueryRowContext(ctx, fmt.Sprintf(`SELECT
 		id,slug,title,description,COALESCE(constraints,''),input_format,output_format,hint,sample_cases,
-		time_limit,memory_limit,difficulty,tags,visible,testdata_path,testcase_score,
+		time_limit,memory_limit,difficulty,COALESCE(rating,0),tags,visible,testdata_path,testcase_score,
 		spj,spj_language,spj_source_code,spj_version,checker_type,float_epsilon,submission_count,accepted_count,
 		source,remote_id,COALESCE(created_by::text,''),created_at,updated_at,
 		interactive,COALESCE(interactor_language,''),COALESCE(interactor_source_code,''),
 		COALESCE(scoring_mode,'complete'),COALESCE(subtask_aggregation,'min'),
 		COALESCE(ai_generated,false) FROM problems WHERE %s=$1`, field), value).Scan(
 		&p.ID, &p.Slug, &p.Title, &p.Description, &p.Constraints, &p.InputFormat, &p.OutputFormat, &p.Hint, &samples,
-		&p.TimeLimit, &p.MemoryLimit, &p.Difficulty, pq.Array(&tags), &p.Visible, &p.TestdataPath, &scores,
+		&p.TimeLimit, &p.MemoryLimit, &p.Difficulty, &p.Rating, pq.Array(&tags), &p.Visible, &p.TestdataPath, &scores,
 		&p.SPJ, &p.SPJLanguage, &p.SPJSourceCode, &p.SPJVersion, &p.CheckerType, &p.FloatEpsilon, &p.SubmissionCount, &p.AcceptedCount,
 		&p.Source, &p.RemoteID, &p.CreatedBy, &p.CreatedAt, &p.UpdatedAt,
 		&p.Interactive, &p.InteractorLanguage, &p.InteractorSourceCode,
@@ -125,7 +125,7 @@ func (s *ProblemStore) List(ctx context.Context, offset, limit int) ([]model.Pro
 	var total int
 	s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM problems WHERE visible=true`).Scan(&total)
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id,slug,title,difficulty,tags,submission_count,accepted_count,source
+		`SELECT id,slug,title,difficulty,COALESCE(rating,0),tags,submission_count,accepted_count,source
 		 FROM problems WHERE visible=true ORDER BY created_at DESC OFFSET $1 LIMIT $2`, offset, limit)
 	if err != nil {
 		return nil, 0, err
@@ -135,7 +135,7 @@ func (s *ProblemStore) List(ctx context.Context, offset, limit int) ([]model.Pro
 	for rows.Next() {
 		var item model.ProblemListItem
 		var tags []string
-		rows.Scan(&item.ID, &item.Slug, &item.Title, &item.Difficulty, pq.Array(&tags),
+		rows.Scan(&item.ID, &item.Slug, &item.Title, &item.Difficulty, &item.Rating, pq.Array(&tags),
 			&item.SubmissionCount, &item.AcceptedCount, &item.Source)
 		item.Tags = tags
 		items = append(items, item)
@@ -167,12 +167,12 @@ func (s *ProblemStore) Update(ctx context.Context, id string, p *model.Problem) 
 	}
 	_, err = s.db.ExecContext(ctx, `UPDATE problems SET
 		title=$2, description=$3, constraints=$4, input_format=$5, output_format=$6, hint=$7, sample_cases=$8,
-		time_limit=$9, memory_limit=$10, difficulty=$11, tags=$12, visible=$13,
-		testdata_path=$14, testcase_score=$15, spj=$16, spj_language=$17, spj_source_code=$18, checker_type=$19, float_epsilon=$20,
-		interactive=$21, interactor_language=$22, interactor_source_code=$23,
-		scoring_mode=$24, subtask_aggregation=$25, updated_at=NOW() WHERE id=$1`,
+		time_limit=$9, memory_limit=$10, difficulty=$11, rating=$12, tags=$13, visible=$14,
+		testdata_path=$15, testcase_score=$16, spj=$17, spj_language=$18, spj_source_code=$19, checker_type=$20, float_epsilon=$21,
+		interactive=$22, interactor_language=$23, interactor_source_code=$24,
+		scoring_mode=$25, subtask_aggregation=$26, updated_at=NOW() WHERE id=$1`,
 		id, p.Title, p.Description, p.Constraints, p.InputFormat, p.OutputFormat, p.Hint, samples,
-		p.TimeLimit, p.MemoryLimit, p.Difficulty, pq.Array(p.Tags), p.Visible, p.TestdataPath,
+		p.TimeLimit, p.MemoryLimit, p.Difficulty, p.Rating, pq.Array(p.Tags), p.Visible, p.TestdataPath,
 		scores, p.SPJ, p.SPJLanguage, p.SPJSourceCode, p.CheckerType, p.FloatEpsilon,
 		p.Interactive, p.InteractorLanguage, p.InteractorSourceCode,
 		p.ScoringMode, p.SubtaskAggregation)
@@ -306,7 +306,7 @@ func (s *ProblemStore) ListWithFilter(ctx context.Context, offset, limit int, di
 		orderClause = "p.title ASC"
 	}
 
-	selectQuery := fmt.Sprintf(`SELECT p.id, p.slug, p.title, p.difficulty, p.tags, p.submission_count, p.accepted_count, p.source
+	selectQuery := fmt.Sprintf(`SELECT p.id, p.slug, p.title, p.difficulty, COALESCE(p.rating,0), p.tags, p.submission_count, p.accepted_count, p.source
 		FROM problems p WHERE %s ORDER BY %s OFFSET $%d LIMIT $%d`, whereClause, orderClause, argIdx, argIdx+1)
 	args = append(args, offset, limit)
 
@@ -320,7 +320,7 @@ func (s *ProblemStore) ListWithFilter(ctx context.Context, offset, limit int, di
 	for rows.Next() {
 		var item model.ProblemListItem
 		var tagArr []string
-		rows.Scan(&item.ID, &item.Slug, &item.Title, &item.Difficulty, pq.Array(&tagArr),
+		rows.Scan(&item.ID, &item.Slug, &item.Title, &item.Difficulty, &item.Rating, pq.Array(&tagArr),
 			&item.SubmissionCount, &item.AcceptedCount, &item.Source)
 		item.Tags = tagArr
 		items = append(items, item)
@@ -358,7 +358,7 @@ func (s *ProblemStore) ListByCreatedBy(ctx context.Context, userID string, offse
 		 WHERE p.created_by = $1 OR perm.user_id = $1`, userID).Scan(&total)
 
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT DISTINCT p.id, p.slug, p.title, p.difficulty, p.tags, p.submission_count, p.accepted_count, p.source, p.created_at
+		`SELECT DISTINCT p.id, p.slug, p.title, p.difficulty, COALESCE(p.rating,0), p.tags, p.submission_count, p.accepted_count, p.source, p.created_at
 		 FROM problems p
 		 LEFT JOIN problem_permissions perm ON p.id = perm.problem_id
 		 WHERE p.created_by = $1 OR perm.user_id = $1
@@ -372,7 +372,7 @@ func (s *ProblemStore) ListByCreatedBy(ctx context.Context, userID string, offse
 		var item model.ProblemListItem
 		var tags []string
 		var createdAt interface{}
-		rows.Scan(&item.ID, &item.Slug, &item.Title, &item.Difficulty, pq.Array(&tags),
+		rows.Scan(&item.ID, &item.Slug, &item.Title, &item.Difficulty, &item.Rating, pq.Array(&tags),
 			&item.SubmissionCount, &item.AcceptedCount, &item.Source, &createdAt)
 		item.Tags = tags
 		items = append(items, item)
