@@ -31,6 +31,14 @@ type JobStore interface {
 // deployment default", which is what the single-model case does.
 type ModelResolver func(ctx context.Context, modelID *string) (harness.Model, error)
 
+// Problems loads the existing problem a job targets.
+//
+// Narrower than store.ProblemStore so the worker stays testable and only
+// depends on the one read it actually performs.
+type Problems interface {
+	GetByID(ctx context.Context, id string) (*model.Problem, error)
+}
+
 // Worker drains generation jobs through the pipeline.
 //
 // It is the deployment seam: the same worker runs in-process under
@@ -41,6 +49,7 @@ type Worker struct {
 	Resolve    ModelResolver
 	Runner     Runner
 	Corpus     Corpus
+	Problems   Problems
 	Transcript harness.Transcript
 	Staging    string
 	MaxBytes   int64
@@ -50,6 +59,9 @@ type Worker struct {
 	// without a heartbeat before it is requeued.
 	Poll       time.Duration
 	StaleAfter time.Duration
+	// CancelPoll is how often a running job checks the store for a cancel
+	// request. Zero means one second.
+	CancelPoll time.Duration
 }
 
 // Run drains jobs until the context is cancelled.
@@ -105,6 +117,23 @@ func (w *Worker) processOne(ctx context.Context) {
 
 	_ = w.Jobs.Heartbeat(ctx, job.ID, token, "drafting", 10)
 
+	// A job on an existing problem must be generated against that problem.
+	// Before this the pipeline received only the operator's brief, so "improve
+	// this problem" produced an unrelated one and Apply overwrote the original.
+	prompt := brief.RenderFor(job.ArtifactType, nil)
+	if job.ProblemID != nil {
+		if w.Problems == nil {
+			_ = w.Jobs.Fail(ctx, job.ID, token, "problem_unavailable", "the problem to improve could not be loaded", nil)
+			return
+		}
+		existing, perr := w.Problems.GetByID(ctx, *job.ProblemID)
+		if perr != nil || existing == nil {
+			_ = w.Jobs.Fail(ctx, job.ID, token, "problem_unavailable", "the problem to improve could not be loaded", nil)
+			return
+		}
+		prompt = brief.RenderFor(job.ArtifactType, existing)
+	}
+
 	pipeline := &Pipeline{
 		Model:       model,
 		Runner:      w.Runner,
@@ -115,8 +144,23 @@ func (w *Worker) processOne(ctx context.Context) {
 		MaxBytes:    w.MaxBytes,
 	}
 
-	manifest, err := pipeline.Run(ctx, job.ID, brief.Render())
+	// A cancel request only flips a column; nothing in the pipeline reads it, so
+	// a running job used to spend every remaining turn and sandbox second before
+	// it noticed — which is exactly what "Cancel does nothing" looked like. Watch
+	// the flag and cancel the run context so the in-flight model call and sandbox
+	// execution are aborted instead of awaited.
+	runCtx, cancelRun := context.WithCancel(ctx)
+	defer cancelRun()
+	watchDone := make(chan struct{})
+	defer close(watchDone)
+	go w.watchCancel(ctx, job.ID, cancelRun, watchDone)
+
+	manifest, err := pipeline.Run(runCtx, job.ID, prompt)
 	if err != nil {
+		if cancelled, _ := w.Jobs.IsCancellationRequested(ctx, job.ID); cancelled {
+			_ = w.Jobs.MarkCancelled(ctx, job.ID, token)
+			return
+		}
 		_ = w.Jobs.Fail(ctx, job.ID, token, "pipeline_error", err.Error(), nil)
 		return
 	}
@@ -152,6 +196,33 @@ func (w *Worker) processOne(ctx context.Context) {
 		"job", job.ID, "ready", manifest.Report.Ready,
 		"cases", len(manifest.Cases), "turns", manifest.Usage.Turns,
 		"blocked", manifest.Report.Blocked)
+}
+
+// watchCancel stops a run as soon as the setter asks to cancel it.
+//
+// It polls the job row because the cancel flag lives in the database, not in
+// this process. The goroutine exits when the run finishes (done), the worker
+// shuts down (ctx), or a cancel is found.
+func (w *Worker) watchCancel(ctx context.Context, jobID string, cancel context.CancelFunc, done <-chan struct{}) {
+	interval := w.CancelPoll
+	if interval <= 0 {
+		interval = time.Second
+	}
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-done:
+			return
+		case <-ticker.C:
+			if cancelled, err := w.Jobs.IsCancellationRequested(ctx, jobID); err == nil && cancelled {
+				cancel()
+				return
+			}
+		}
+	}
 }
 
 // Turn accounting for the tool loop.

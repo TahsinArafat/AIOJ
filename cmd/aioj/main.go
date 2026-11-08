@@ -425,6 +425,7 @@ func main() {
 			Jobs:       aiGenerationStore,
 			Runner:     runner,
 			Corpus:     postgres.NewNoveltyCorpus(db),
+			Problems:   problemStore,
 			Transcript: postgres.NewHarnessTranscript(db),
 			Staging:    cfg.AI.StagedTestdataRoot,
 			MaxBytes:   cfg.AI.MaxJobBytes,

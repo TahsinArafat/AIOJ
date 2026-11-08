@@ -46,14 +46,16 @@ func ParseBrief(raw json.RawMessage) (Brief, error) {
 	return b, nil
 }
 
-// Render turns a brief into the user message the harness receives.
+// renderIntent is the operator's request as a bullet list, without a preamble.
 //
 // Only the operator's intent is passed through. The pipeline owns everything
 // that must be true of the output (tiers, determinism, limits), so the brief
 // cannot weaken the gates by asking for them to be skipped.
-func (b Brief) Render() string {
+//
+// Split out from the message as a whole so the same intent can be embedded in a
+// larger one (see RenderFor) without carrying a header that contradicts it.
+func (b Brief) renderIntent() string {
 	var sb strings.Builder
-	sb.WriteString("Build one competitive-programming problem with these specifications:\n")
 	if len(b.Tags) > 0 {
 		fmt.Fprintf(&sb, "- Topics: %s\n", strings.Join(b.Tags, ", "))
 	}
@@ -103,12 +105,34 @@ func (b Brief) Render() string {
 	if b.ConstraintGuidance != "" {
 		fmt.Fprintf(&sb, "- Constraint guidance: %s\n", b.ConstraintGuidance)
 	}
+	// TestCaseCount was collected by the brief form, validated to 1-100, and
+	// then never rendered — the harness silently ignored the requested size.
+	// The matrix is tiers x shapes x seeds_per_cell, so state both the target
+	// and how to reach it.
+	if b.TestCaseCount > 0 {
+		fmt.Fprintf(&sb, "- Target test-set size: about %d cases. materialize_matrix produces one case per "+
+			"(tier, shape) cell, so set seeds_per_cell to roughly %d to reach this count.\n",
+			b.TestCaseCount, seedsPerCellFor(b.TestCaseCount))
+	}
 	if b.HasSubtasks {
 		sb.WriteString("- Subtask scoring with partial credit.\n")
 	}
 	if b.AdditionalPrompt != "" {
 		fmt.Fprintf(&sb, "- Additional guidance: %s\n", b.AdditionalPrompt)
 	}
-	sb.WriteString("\nCall the tools to build it. Nothing is published until a human reviews the result.")
 	return sb.String()
+}
+
+// seedsPerCellFor sizes seeds_per_cell against the five matrix tiers, assuming a
+// conservative four shapes. The matrix is 5 x shapes cells, so this is an
+// estimate the model adjusts once it has chosen its shapes.
+func seedsPerCellFor(cases int) int {
+	seeds := cases / (len(TierOrder) * 4)
+	if seeds < 1 {
+		return 1
+	}
+	if seeds > 10 {
+		return 10
+	}
+	return seeds
 }

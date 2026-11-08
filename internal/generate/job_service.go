@@ -78,6 +78,9 @@ type JobWorker struct {
 	Poll    time.Duration
 	Timeout time.Duration
 	Sandbox *SandboxValidator
+	// CancelPoll is how often a running job checks the store for a cancel
+	// request. Zero means one second.
+	CancelPoll time.Duration
 }
 
 func (w *JobWorker) Run(ctx context.Context) {
@@ -110,6 +113,32 @@ func (w *JobWorker) Run(ctx context.Context) {
 		}
 	}
 }
+
+// watchCancel stops a run as soon as the setter asks to cancel it. The flag
+// lives in the database, so it is polled; the goroutine exits when the run
+// finishes (done), the worker shuts down (ctx), or a cancel is found.
+func (w *JobWorker) watchCancel(ctx context.Context, jobID string, cancel context.CancelFunc, done <-chan struct{}) {
+	interval := w.CancelPoll
+	if interval <= 0 {
+		interval = time.Second
+	}
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-done:
+			return
+		case <-ticker.C:
+			if cancelled, err := w.Jobs.IsCancellationRequested(ctx, jobID); err == nil && cancelled {
+				cancel()
+				return
+			}
+		}
+	}
+}
+
 func (w *JobWorker) processOne(ctx context.Context) bool {
 	token := uuid.NewString()
 	job, err := w.Jobs.ClaimNext(ctx, token)
@@ -137,9 +166,18 @@ func (w *JobWorker) processOne(ctx context.Context) bool {
 	client := ai.NewWithOptions(m.Endpoint, m.APIKey, m.ModelName, ai.ClientOptions{Mode: m.StructuredOutputMode, Timeout: time.Duration(m.RequestTimeoutSeconds) * time.Second, MaxOutputTokens: m.MaxOutputTokens, AllowPrivateNetwork: m.AllowPrivateNetwork})
 	runCtx, cancel := context.WithTimeout(ctx, w.Timeout)
 	defer cancel()
+	// A cancel request only flips a column; without watching it here the run
+	// kept going until the provider answered or the timeout expired.
+	watchDone := make(chan struct{})
+	defer close(watchDone)
+	go w.watchCancel(ctx, job.ID, cancel, watchDone)
 	start := time.Now()
 	result, err := client.CompleteJSON(runCtx, systemPrompt, buildUserPrompt(brief), ProposalJSONSchema())
 	if err != nil {
+		if cancelled, _ := w.Jobs.IsCancellationRequested(ctx, job.ID); cancelled {
+			_ = w.Jobs.MarkCancelled(ctx, job.ID, token)
+			return true
+		}
 		_ = w.Jobs.Fail(ctx, job.ID, token, "provider_error", "AI generation failed", nil)
 		return true
 	}
@@ -158,6 +196,10 @@ func (w *JobWorker) processOne(ctx context.Context) bool {
 		sandboxChecks, sandboxErr := w.Sandbox.Validate(runCtx, proposal, job.ID)
 		report.Checks = append(report.Checks, sandboxChecks...)
 		if sandboxErr != nil {
+			if cancelled, _ := w.Jobs.IsCancellationRequested(ctx, job.ID); cancelled {
+				_ = w.Jobs.MarkCancelled(ctx, job.ID, token)
+				return true
+			}
 			report.Valid = false
 			report.Checks = append(report.Checks, ValidationCheck{Name: "sandbox", Passed: false, Message: sandboxErr.Error()})
 			reportJSON, _ = json.Marshal(report)

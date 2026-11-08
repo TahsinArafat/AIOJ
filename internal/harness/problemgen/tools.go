@@ -133,6 +133,10 @@ func (t *Tools) Tools() []ai.Tool {
 				"seed":  integer("Seed passed to the generator."),
 				"n":     integer("Value of n to request."),
 				"shape": str("Shape name from set_generator_shapes."),
+				// The handler reads tier (and defaults it to medium), but the
+				// schema omitted it while declaring additionalProperties:false,
+				// so a model that passed a tier had its call rejected.
+				"tier": str("Optional tier label: min, small, medium, max or pathological. Defaults to medium."),
 			}, "seed", "n", "shape")),
 
 		ai.NewTool("materialize_matrix",
@@ -274,12 +278,14 @@ func (t *Tools) setStatement(args map[string]any) (harness.Result, error) {
 				"These must match the bounds you passed to set_constraints.")
 	}
 
-	// Warn if the hint is non-empty — it renders as a Notes section visible to
-	// contestants and is a common place for accidental solution spoilers.
-	warningMsg := ""
+	// The hint field renders as a Notes section visible to contestants, and
+	// finalize rejects a non-empty one. Fail here instead of warning: a warning
+	// let the model finish the whole pipeline and then discover it at finalize,
+	// costing a repair cycle for something knowable at write time.
 	if strings.TrimSpace(st.Hint) != "" {
-		warningMsg = "WARNING: the hint field is not empty. It renders as a Notes section visible to contestants. " +
-			"Remove any solution approach, algorithm, or key insight from the hint."
+		return harness.Result{}, fmt.Errorf(
+			"the hint field must be empty: it renders as a Notes section visible to contestants. " +
+				"Move any clarifying footnote into the description and drop the solution approach.")
 	}
 
 	raw, _ := args["samples"].([]any)
@@ -295,11 +301,7 @@ func (t *Tools) setStatement(args map[string]any) (harness.Result, error) {
 		st.Samples = append(st.Samples, s)
 	}
 	t.statement = st
-	result, _ := ok(map[string]any{"samples": len(st.Samples), "constraints_present": true})
-	if warningMsg != "" {
-		result.Content = mustJSON(map[string]any{"ok": true, "samples": len(st.Samples), "constraints_present": true, "warning": warningMsg})
-	}
-	return result, nil
+	return ok(map[string]any{"samples": len(st.Samples), "constraints_present": true})
 }
 
 func (t *Tools) setShapes(args map[string]any) (harness.Result, error) {
@@ -563,6 +565,9 @@ func (t *Tools) finalize(ctx context.Context) (harness.Result, error) {
 	report.Checks = append(report.Checks, t.ws.CheckSamples(ctx, t.statement.Samples)...)
 	report.Checks = append(report.Checks, t.ws.CheckLimits(ctx)...)
 	report.Checks = append(report.Checks, t.crosscheckBrute(ctx)...)
+	// novelty was a tool the model could skip, so near-duplicates could be
+	// published. Make it a gate: the model may choose the path, not the bar.
+	report.Checks = append(report.Checks, t.noveltyCheck(ctx)...)
 
 	for _, c := range report.Checks {
 		if !c.Passed {
@@ -576,6 +581,36 @@ func (t *Tools) finalize(ctx context.Context) (harness.Result, error) {
 		return harness.Result{}, fmt.Errorf("not ready:\n%s", strings.Join(failureMessages(report.Checks), "\n"))
 	}
 	return ok(map[string]any{"report": report})
+}
+
+// noveltyCheck fails when the problem is a near-duplicate of one already in the
+// corpus. The similarity threshold is the same one search_problems reports, so
+// the model and the gate agree on what "too similar" means.
+//
+// A corpus error fails closed: publishing a duplicate because the index was
+// momentarily unavailable is worse than making the setter retry.
+func (t *Tools) noveltyCheck(ctx context.Context) []Check {
+	if t.corpus == nil || strings.TrimSpace(t.statement.Title) == "" {
+		return nil
+	}
+	hits, err := t.corpus.Similar(ctx, t.statement.Title, t.statement.Description, 5)
+	if err != nil {
+		return []Check{{Name: "novelty", Passed: false, Message: "corpus search failed: " + err.Error()}}
+	}
+	var duplicates []string
+	for _, h := range hits {
+		if h.Similarity >= t.noveltyLimit {
+			duplicates = append(duplicates, fmt.Sprintf("%s (%.2f)", h.Slug, h.Similarity))
+		}
+	}
+	if len(duplicates) > 0 {
+		return []Check{{
+			Name:    "novelty",
+			Passed:  false,
+			Message: "too similar to existing problems: " + strings.Join(duplicates, ", ") + " — change the core idea rather than the wording",
+		}}
+	}
+	return []Check{{Name: "novelty", Passed: true, Message: "no near-duplicate found"}}
 }
 
 // crosscheckBrute compares the brute force against the reference on small

@@ -296,6 +296,12 @@ func (l *Loop) Run(ctx context.Context, jobID string, initial []ai.Message) (*Ou
 		}
 
 		for _, call := range res.ToolCalls {
+			// A turn can carry several calls. Checking the context only between
+			// turns would let a cancel wait for the whole batch — including
+			// sandbox runs — before it is noticed.
+			if ctx.Err() != nil {
+				return stop(StopCancelled), nil
+			}
 			if usage.ToolCalls >= budget.MaxToolCalls {
 				return stop(StopMaxToolCalls), nil
 			}

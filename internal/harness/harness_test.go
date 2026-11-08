@@ -304,6 +304,48 @@ func TestLoopResumesFromTheTranscript(t *testing.T) {
 	}
 }
 
+// cancellingTools cancels the run on its first call, so the rest of the batch
+// must not execute.
+type cancellingTools struct {
+	cancel context.CancelFunc
+	calls  int
+}
+
+func (c *cancellingTools) Tools() []ai.Tool {
+	return []ai.Tool{ai.NewTool("compile", "compile", map[string]any{"type": "object"})}
+}
+
+func (c *cancellingTools) Execute(_ context.Context, _ ai.ToolCall) (Result, error) {
+	c.calls++
+	c.cancel()
+	return Result{Content: `{"ok":true}`}, nil
+}
+
+func TestLoopStopsMidBatchWhenCancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	model := &scriptedModel{responses: []*ai.CompletionResult{
+		{ToolCalls: []ai.ToolCall{
+			toolCall("a", "compile", `{}`),
+			toolCall("b", "compile", `{}`),
+			toolCall("c", "compile", `{}`),
+		}},
+	}}
+	tools := &cancellingTools{cancel: cancel}
+
+	out, err := (&Loop{Model: model, Tools: tools}).Run(ctx, "j", nil)
+	if err != nil {
+		t.Fatalf("cancellation must not be an error: %v", err)
+	}
+	if out.StopReason != StopCancelled {
+		t.Fatalf("stop reason = %q, want %q", out.StopReason, StopCancelled)
+	}
+	// A cancel during a batch must stop the remaining calls instead of running
+	// them all first, which is what made the button feel dead.
+	if tools.calls != 1 {
+		t.Fatalf("tool calls = %d, want 1", tools.calls)
+	}
+}
+
 func TestLoopStopsWhenTheContextIsCancelled(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()

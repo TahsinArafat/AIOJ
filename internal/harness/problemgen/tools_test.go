@@ -185,16 +185,18 @@ func TestSetStatementRequiresConstraints(t *testing.T) {
 }
 
 // The hint renders as a Notes section contestants can read, so a non-empty hint
-// is a publication blocker rather than a warning.
-func TestFinalizeBlocksOnAHintSpoiler(t *testing.T) {
+// is a publication blocker. It is rejected when written rather than at finalize:
+// a warning let the model finish the whole pipeline before finding out, costing
+// a repair cycle for something knowable at write time.
+func TestSetStatementRejectsAHintSpoiler(t *testing.T) {
 	tools := newTestTools(t)
 	buildProblem(t, tools)
-	if _, err := run(t, tools, "set_statement", `{"title":"Echo","description":"d","constraints":"$1 \\\\le n \\\\le 1000$","hint":"Use Moebius inversion.","input_format":"i","output_format":"o","tags":["t"],"difficulty":"easy","samples":[{"input":"3 1 2 3","output":"3"}]}`); err != nil {
-		t.Fatal(err)
+	_, err := run(t, tools, "set_statement", `{"title":"Echo","description":"d","constraints":"$1 \\\\le n \\\\le 1000$","hint":"Use Moebius inversion.","input_format":"i","output_format":"o","tags":["t"],"difficulty":"easy","samples":[{"input":"3 1 2 3","output":"3"}]}`)
+	if err == nil {
+		t.Fatal("set_statement accepted a hint that spoils the solution")
 	}
-	_, err := run(t, tools, "finalize", `{}`)
-	if err == nil || !strings.Contains(err.Error(), "hint_empty") {
-		t.Fatalf("err = %v, want a hint_empty failure", err)
+	if !strings.Contains(err.Error(), "hint field must be empty") {
+		t.Fatalf("error should name the hint field: %v", err)
 	}
 }
 
