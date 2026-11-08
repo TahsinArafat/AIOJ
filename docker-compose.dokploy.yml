@@ -7,8 +7,13 @@
 # What changed vs docker-compose.yml (optimizations for Dokploy/Traefik):
 #   1. No host `ports:` at all. Dokploy/Traefik routes to the container port
 #      via Docker labels, so nothing is published directly on the host.
-#   2. Traefik labels on `frontend` only (Host + websecure + Let's Encrypt).
+#   2. Routing is done by a Dokploy UI domain on `frontend`:80 (Host
+#      <your-domain>, HTTPS/Let's Encrypt). No hand-written Traefik router
+#      labels -- a stale `${DOMAIN}` there silently 404s the whole site.
 #      backend/postgres/redis/judge stay internal-only (expose / sandbox net).
+#   2b. `frontend` joins the external `dokploy-network` so Traefik can reach
+#      it. Compose stacks must do this explicitly (Dokploy Applications get it
+#      automatically). Without it: 404 with a healthy nginx.
 #   3. Monitoring (prometheus/grafana) moved behind the `monitor` profile so
 #      a fresh Dokploy deploy does not spend RAM on them.
 #   4. vjudge browsers + ai-harness stay behind their profiles (off by default).
@@ -17,7 +22,9 @@
 #   6. Healthchecks + restart + mem limits + json-file log rotation.
 #
 # Required Dokploy Environment Variables (set in Dokploy UI, NOT committed):
-#   DOMAIN                 your public domain, e.g. aioj.example.com
+#   DOMAIN                 your public domain, e.g. aioj0.cyou — MUST match the
+#                          Dokploy UI domain exactly (used for links/OAuth, and
+#                          any Traefik label you add by hand)
 #   DB_PASSWORD            openssl rand -hex 32
 #   JWT_SECRET             openssl rand -hex 32   (>=32 chars, else backend exits)
 #   REDIS_PASSWORD         openssl rand -hex 32
@@ -228,28 +235,24 @@ services:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
     labels:
-      # Traefik (Dokploy) — the only public route. web/nginx.conf inside this
-      # container already proxies /api/, /api/ws, /api/generate/, /api/ai/,
-      # /sitemap.xml and /feed/* to backend:8080, so Traefik only needs /.
+      # ---------------------------------------------------------------------
+      # ROUTING IS OWNED BY DOKPLOY, NOT BY THIS FILE.
+      # ---------------------------------------------------------------------
+      # Do not hand-write `traefik.http.routers.*` labels here. Set the domain
+      # in the Dokploy UI instead:  Compose -> aioj -> frontend -> Domains ->
+      # Host `aioj0.cyou`, Path `/`, Port `80`, HTTPS on.
+      #
+      # Why: hand-written labels interpolate `${DOMAIN}` at deploy time. If
+      # DOMAIN is stale (e.g. the template default `aioj.example.com`), the
+      # router becomes `Host(aioj.example.com)` while you visit `aioj0.cyou`,
+      # and Traefik answers 404 -- with a perfectly healthy nginx container.
+      # Dokploy's UI domains are generated from what you actually typed, and
+      # are the same mechanism the working Dokploy Applications use.
+      #
+      # `enable` + `docker.network` are kept: they only tell Traefik which
+      # container to look at and which network to read its IP from.
       - "traefik.enable=true"
       - "traefik.docker.network=dokploy-network"
-      # HTTPS (Let's Encrypt via Dokploy's certresolver)
-      - "traefik.http.routers.aioj.rule=Host(`${DOMAIN:?DOMAIN must be set}`)"
-      - "traefik.http.routers.aioj.entrypoints=websecure"
-      - "traefik.http.routers.aioj.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.aioj.service=aioj-frontend"
-      - "traefik.http.services.aioj-frontend.loadbalancer.server.port=80"
-      # Long AI jobs + WebSockets: match web/nginx.conf timeouts (300s/3600s)
-      - "traefik.http.routers.aioj.respondingTimeouts.readTimeout=300s"
-      - "traefik.http.routers.aioj.respondingTimeouts.writeTimeout=300s"
-      - "traefik.http.routers.aioj.respondingTimeouts.idleTimeout=3600s"
-      # HTTP -> HTTPS redirect
-      - "traefik.http.routers.aioj-http.rule=Host(`${DOMAIN:?DOMAIN must be set}`)"
-      - "traefik.http.routers.aioj-http.entrypoints=web"
-      - "traefik.http.routers.aioj-http.middlewares=aioj-https-redirect"
-      - "traefik.http.routers.aioj-http.service=aioj-frontend"
-      - "traefik.http.middlewares.aioj-https-redirect.redirectscheme.scheme=https"
-      - "traefik.http.middlewares.aioj-https-redirect.redirectscheme.permanent=true"
 
   # -------------------------------------------------------------------------
   # One-shot first-admin + demo problem seeder. NOT started on deploy.
