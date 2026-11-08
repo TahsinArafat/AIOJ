@@ -76,19 +76,19 @@ func (t *Tools) Tools() []ai.Tool {
 			}, "time_limit_ms", "memory_limit_kb")),
 
 		ai.NewTool("set_statement",
-			"Write the problem statement. Samples are verified against the reference solution, so they must be correct. Write mathematics as $...$ LaTeX (KaTeX renders it); backticks render as literal monospace text, never as math.",
+			"Write the problem statement. Samples are verified against the reference solution, so they must be correct. Write mathematics as $...$ LaTeX (KaTeX renders it); backticks render as literal monospace text, never as math. IMPORTANT: (1) The description MUST end with a **Constraints** paragraph listing every declared bound. (2) Leave hint empty — it renders as a Notes section visible to contestants and must NOT contain the solution approach or algorithm.",
 			object(map[string]any{
 				"title":         str("Short problem title."),
-				"description":   str("Full Markdown statement. Mathematical notation must be $...$ LaTeX, e.g. $1 \\le n \\le 2\\cdot10^5$; do not use backticks for math."),
+				"description":   str("Full Markdown statement. Must include a **Constraints** paragraph at the end listing every bound from set_constraints. Mathematical notation must be $...$ LaTeX. Do NOT reveal the solution algorithm or key insight."),
 				"input_format":  str("Input format description."),
 				"output_format": str("Output format description."),
-				"hint":          str("Optional hint; may be empty."),
+				"hint":          str("Leave EMPTY. The hint field renders as a Notes section visible to contestants. Do not put the solution approach, algorithm, or editorial content here."),
 				"tags":          strings_("Algorithmic topics."),
 				"difficulty":    str("One of easy, medium, hard."),
 				"samples": arrayOf(object(map[string]any{
 					"input":       str("Sample input."),
 					"output":      str("Expected output."),
-					"explanation": str("Optional explanation."),
+					"explanation": str("Optional: explain why the output is correct mechanically. Do NOT reveal the general algorithm or approach."),
 				}, "input", "output")),
 			}, "title", "description", "input_format", "output_format", "tags", "difficulty", "samples")),
 
@@ -243,6 +243,7 @@ func (t *Tools) setLimits(args map[string]any) (harness.Result, error) {
 	return ok(map[string]any{"limits": l})
 }
 
+// setStatement validates and stores the statement.
 func (t *Tools) setStatement(args map[string]any) (harness.Result, error) {
 	st := Statement{
 		Title:        strArg(args, "title"),
@@ -262,6 +263,23 @@ func (t *Tools) setStatement(args map[string]any) (harness.Result, error) {
 		return harness.Result{}, fmt.Errorf("difficulty must be easy, medium or hard")
 	}
 
+	// Enforce that the description contains a Constraints section. A statement
+	// without declared bounds is incomplete; contestants cannot solve what they
+	// cannot constrain.
+	if !strings.Contains(st.Description, "Constraint") {
+		return harness.Result{}, fmt.Errorf(
+			"the description must contain a **Constraints** paragraph listing every numeric bound (n_min, n_max, value_min, value_max). " +
+				"Add it at the end of the description, e.g.:\n\n**Constraints**\n\n$1 \\le n \\le 2 \\cdot 10^5$\n\n$1 \\le a_i \\le 10^7$")
+	}
+
+	// Warn if the hint is non-empty — it renders as a Notes section visible to
+	// contestants and is a common place for accidental solution spoilers.
+	warningMsg := ""
+	if strings.TrimSpace(st.Hint) != "" {
+		warningMsg = "WARNING: the hint field is not empty. It renders as a Notes section visible to contestants. " +
+			"Remove any solution approach, algorithm, or key insight from the hint."
+	}
+
 	raw, _ := args["samples"].([]any)
 	if len(raw) > 3 {
 		return harness.Result{}, fmt.Errorf("at most 3 samples are allowed")
@@ -275,7 +293,11 @@ func (t *Tools) setStatement(args map[string]any) (harness.Result, error) {
 		st.Samples = append(st.Samples, s)
 	}
 	t.statement = st
-	return ok(map[string]any{"samples": len(st.Samples)})
+	result, _ := ok(map[string]any{"samples": len(st.Samples), "constraints_present": true})
+	if warningMsg != "" {
+		result.Content = mustJSON(map[string]any{"ok": true, "samples": len(st.Samples), "constraints_present": true, "warning": warningMsg})
+	}
+	return result, nil
 }
 
 func (t *Tools) setShapes(args map[string]any) (harness.Result, error) {
@@ -490,6 +512,24 @@ func (t *Tools) finalize(ctx context.Context) (harness.Result, error) {
 
 	if _, found := t.ws.largestCase(); !found {
 		report.Checks = append(report.Checks, Check{Name: "cases", Passed: false, Message: "no cases materialized"})
+	}
+
+	// Statement quality gates: check that the description has a Constraints
+	// block and that the hint field is empty (not a solution spoiler).
+	if t.statement.Title != "" {
+		hasConstraints := strings.Contains(t.statement.Description, "Constraint")
+		report.Checks = append(report.Checks, Check{
+			Name:    "constraints_in_statement",
+			Passed:  hasConstraints,
+			Message: map[bool]string{true: "description contains a Constraints section", false: "description is missing a **Constraints** paragraph — add one listing every declared bound"}[hasConstraints],
+		})
+		if strings.TrimSpace(t.statement.Hint) != "" {
+			report.Checks = append(report.Checks, Check{
+				Name:    "hint_empty",
+				Passed:  false,
+				Message: "the hint field is not empty; it renders as a Notes section visible to contestants and must not contain the solution approach. Clear it.",
+			})
+		}
 	}
 
 	// Coverage first: it is cheap and its failure explains most others.

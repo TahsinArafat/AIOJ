@@ -17,30 +17,59 @@ type Props = {
     onCreated?: (slug: string) => void
 }
 
-const artifacts = [
-    ['full_problem', 'Full package'],
-    ['statement', 'Statement & samples'],
-    ['tests', 'Tests & generator'],
-    ['solution', 'Reference solution'],
-    ['editorial', 'Editorial'],
+// Artifact types with labels and what sections they produce.
+const ARTIFACTS = [
+    { id: 'full_problem',  label: 'Full package',         desc: 'Statement, tests, generator & reference solution', sections: ['statement', 'solution', 'tests'] },
+    { id: 'statement',     label: 'Statement & samples',  desc: 'Rewrites the problem statement only', sections: ['statement'] },
+    { id: 'tests',         label: 'Tests & generator',    desc: 'Generates a new test suite and generator', sections: ['tests'] },
+    { id: 'solution',      label: 'Reference solution',   desc: 'Writes or replaces the reference solution', sections: ['solution'] },
+    { id: 'editorial',     label: 'Editorial',            desc: 'Authors an editorial for this problem', sections: ['editorial'] },
 ] as const
 
-function previewValue(v: unknown) {
-    return typeof v === 'string' ? v : JSON.stringify(v, null, 2)
+type ArtifactId = typeof ARTIFACTS[number]['id']
+
+/** Map each artifact to the apply section keys it can produce. */
+const ARTIFACT_SECTIONS: Record<ArtifactId, string[]> = {
+    full_problem: ['statement', 'solution', 'tests'],
+    statement:    ['statement'],
+    tests:        ['tests'],
+    solution:     ['solution'],
+    editorial:    ['editorial'],
+}
+
+/** Human-readable labels for the apply checkboxes. */
+const SECTION_LABELS: Record<string, string> = {
+    statement: 'Statement & samples',
+    solution:  'Reference solution',
+    tests:     'Test data & generator',
+    editorial: 'Editorial',
+}
+
+function previewValue(section: string, proposal: AIProposal) {
+    switch (section) {
+        case 'statement':
+            return JSON.stringify({ title: proposal.title, description: proposal.description }, null, 2)
+        case 'solution':
+            return proposal.solution_code || '(no solution code)'
+        case 'tests':
+            return JSON.stringify({ generator: proposal.generator_code, seeds: proposal.seeds }, null, 2)
+        case 'editorial':
+            return JSON.stringify({ title: proposal.editorial_title, content: proposal.editorial_content }, null, 2)
+        default:
+            return ''
+    }
 }
 
 export default function AIStudioTab({ problemId, problemUpdatedAt, onApplied, onCreated }: Props) {
     const isNew = !problemId
     const [connections, setConnections] = useState<AIModel[]>([])
     const [modelId, setModelId] = useState<string>('')
-    // A new problem must be generated as a whole package: the other artifact
-    // scopes only rewrite parts of an existing one.
-    const [artifact, setArtifact] = useState('full_problem')
+    // A new problem must be generated as a whole package.
+    // For existing problems default to nothing selected so the user has to actively choose the scope.
+    const [artifact, setArtifact] = useState<ArtifactId>(isNew ? 'full_problem' : 'statement')
     const [brief, setBrief] = useState<AIBrief>({ ...DEFAULT_BRIEF })
     const [job, setJob] = useState<AIGenerationJob | null>(null)
-    // A brand-new problem has no existing sections to merge with, so the
-    // statement must always be applied or the created problem has no content.
-    const [selected, setSelected] = useState<string[]>(['statement', 'solution', 'tests'])
+    const [selected, setSelected] = useState<string[]>([])
     const [error, setError] = useState('')
     const [appliedSlug, setAppliedSlug] = useState<string>('')
 
@@ -54,26 +83,46 @@ export default function AIStudioTab({ problemId, problemUpdatedAt, onApplied, on
             .catch(e => setError(String(e)))
     }, [])
 
-    // Resume the newest unfinished/reviewable job for this problem. Without this
-    // the tab always opened on a blank form, so a finished proposal was
-    // unreachable after a reload and could never be reviewed or applied.
+    // Resume the newest unfinished/reviewable job for this problem.
     useEffect(() => {
         if (!problemId) return
         queueMicrotask(() => {
             api.ai.problemJobs(problemId)
                 .then(r => {
                     const latest = (r.data || []).find(j => !['discarded', 'cancelled'].includes(j.status))
-                    if (latest) setJob(latest)
+                    if (latest) {
+                        setJob(latest)
+                        // Restore artifact picker to match the resumed job
+                        const art = latest.artifact_type as ArtifactId
+                        if (ARTIFACT_SECTIONS[art]) setArtifact(art)
+                    }
                 })
                 .catch(() => {})
         })
     }, [problemId])
 
+    // Poll while running.
     useEffect(() => {
         if (!job || !['queued', 'running'].includes(job.status)) return
         const id = window.setInterval(() => api.ai.getJob(job.id).then(setJob).catch(() => {}), 1500)
         return () => window.clearInterval(id)
     }, [job])
+
+    // When a job becomes ready, pre-select all sections that have content.
+    useEffect(() => {
+        if (!job || job.status !== 'ready' || !job.proposal) return
+        const art = (job.artifact_type as ArtifactId)
+        const candidateSections = ARTIFACT_SECTIONS[art] ?? []
+        const p = job.proposal
+        const withContent = candidateSections.filter(s => {
+            if (s === 'statement') return !!p.title
+            if (s === 'solution') return !!p.solution_code
+            if (s === 'tests') return !!p.generator_code
+            if (s === 'editorial') return !!p.editorial_title || !!p.editorial_content
+            return false
+        })
+        setSelected(withContent)
+    }, [job?.status, job?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
     const updateBrief = (patch: Partial<AIBrief>) => setBrief(b => ({ ...b, ...patch }))
 
@@ -81,12 +130,13 @@ export default function AIStudioTab({ problemId, problemUpdatedAt, onApplied, on
         setError('')
         setAppliedSlug('')
         try {
-            setJob(await api.ai.createJob({
+            const newJob = await api.ai.createJob({
                 problem_id: problemId,
                 ai_model_id: modelId || undefined,
                 artifact_type: isNew ? 'full_problem' : artifact,
                 brief,
-            }))
+            })
+            setJob(newJob)
         } catch (e) {
             setError(e instanceof Error ? e.message : String(e))
         }
@@ -96,6 +146,7 @@ export default function AIStudioTab({ problemId, problemUpdatedAt, onApplied, on
         if (!job) return
         setError('')
         try {
+            // For a new problem the statement section is mandatory.
             const sections = isNew && !selected.includes('statement') ? ['statement', ...selected] : selected
             const result = await api.ai.applyJob(job.id, sections, problemUpdatedAt)
             setJob(await api.ai.getJob(job.id))
@@ -111,6 +162,8 @@ export default function AIStudioTab({ problemId, problemUpdatedAt, onApplied, on
 
     const proposal: AIProposal | undefined = job?.proposal
     const canStart = connections.length > 0 && brief.tags.length > 0
+    const artifactDef = ARTIFACTS.find(a => a.id === artifact)!
+    const applySections = ARTIFACT_SECTIONS[job?.artifact_type as ArtifactId] ?? []
 
     return (
         <div className="space-y-5">
@@ -121,7 +174,7 @@ export default function AIStudioTab({ problemId, problemUpdatedAt, onApplied, on
                 <p className="text-sm text-muted">
                     {isNew
                         ? 'Describe the problem you want. The harness drafts it, generates test data, and validates the reference solution before you publish anything.'
-                        : 'Generate a reviewable proposal. Nothing is overwritten until you apply selected sections.'}
+                        : 'Generate a reviewable proposal for the selected scope. Nothing is overwritten until you apply selected sections.'}
                 </p>
             </div>
 
@@ -135,19 +188,36 @@ export default function AIStudioTab({ problemId, problemUpdatedAt, onApplied, on
 
             {!job && (
                 <div className="space-y-4">
+                    {/* Artifact scope picker — only shown for existing problems */}
                     {!isNew && (
-                        <div className="flex flex-wrap gap-2">
-                            {artifacts.map(([id, label]) => (
-                                <button
-                                    key={id}
-                                    type="button"
-                                    onClick={() => setArtifact(id)}
-                                    className={`min-h-11 cursor-pointer rounded border px-3 text-sm ${artifact === id ? 'border-brand bg-brand text-on-brand' : 'border-hairline-strong'}`}
-                                >
-                                    {label}
-                                </button>
-                            ))}
-                        </div>
+                        <fieldset className="rounded-xl border border-hairline bg-surface p-4">
+                            <legend className="px-2 text-sm font-semibold text-ink-soft">What do you want to generate?</legend>
+                            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                                {ARTIFACTS.filter(a => a.id !== 'full_problem').map(a => (
+                                    <label
+                                        key={a.id}
+                                        className={`flex cursor-pointer flex-col rounded-lg border p-3 transition-colors ${
+                                            artifact === a.id
+                                                ? 'border-brand bg-brand-soft'
+                                                : 'border-hairline-strong hover:border-muted-soft'
+                                        }`}
+                                    >
+                                        <input
+                                            type="radio"
+                                            name="artifact"
+                                            value={a.id}
+                                            checked={artifact === a.id}
+                                            onChange={() => setArtifact(a.id)}
+                                            className="sr-only"
+                                        />
+                                        <span className={`text-sm font-medium ${artifact === a.id ? 'text-brand' : 'text-ink'}`}>
+                                            {a.label}
+                                        </span>
+                                        <span className="mt-0.5 text-xs text-muted">{a.desc}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        </fieldset>
                     )}
 
                     <label className="block text-sm">
@@ -177,7 +247,7 @@ export default function AIStudioTab({ problemId, problemUpdatedAt, onApplied, on
                             onClick={start}
                             className="min-h-11 cursor-pointer rounded bg-brand px-5 text-on-brand disabled:opacity-50"
                         >
-                            {isNew ? 'Generate problem' : 'Generate proposal'}
+                            {isNew ? 'Generate problem' : `Generate ${artifactDef.label}`}
                         </button>
                         {!canStart && (
                             <span className="text-xs text-muted">
@@ -190,13 +260,24 @@ export default function AIStudioTab({ problemId, problemUpdatedAt, onApplied, on
 
             {job && (
                 <div className="space-y-4">
+                    {/* Progress card */}
                     <div className="rounded border border-hairline p-4">
-                        <div className="flex justify-between text-sm">
-                            <span className="font-medium capitalize">{job.stage.replaceAll('_', ' ')}</span>
+                        <div className="flex items-start justify-between text-sm">
+                            <div>
+                                <span className="font-medium capitalize">{job.stage.replaceAll('_', ' ')}</span>
+                                <span className="ml-2 text-xs text-muted-soft capitalize">
+                                    ({job.artifact_type.replaceAll('_', ' ')})
+                                </span>
+                            </div>
                             <span>{job.progress}%</span>
                         </div>
                         <div className="mt-2 h-2 rounded bg-surface-3">
-                            <div className="h-2 rounded bg-brand" style={{ width: `${job.progress}%` }} />
+                            <div
+                                className={`h-2 rounded transition-all ${
+                                    job.status === 'failed' || job.status === 'validation_failed' ? 'bg-bad' : 'bg-brand'
+                                }`}
+                                style={{ width: `${job.progress}%` }}
+                            />
                         </div>
                         <p className="mt-2 text-xs text-muted">
                             {job.status} · {job.prompt_tokens + job.completion_tokens} tokens · {job.latency_ms} ms
@@ -209,7 +290,7 @@ export default function AIStudioTab({ problemId, problemUpdatedAt, onApplied, on
                         </a>
                     </div>
 
-                    {job.status === 'running' || job.status === 'queued' ? (
+                    {(job.status === 'running' || job.status === 'queued') ? (
                         <button
                             type="button"
                             onClick={() => api.ai.cancelJob(job.id).then(() => api.ai.getJob(job.id).then(setJob))}
@@ -230,33 +311,41 @@ export default function AIStudioTab({ problemId, problemUpdatedAt, onApplied, on
                         </div>
                     )}
 
+                    {/* Apply section — scoped to what this artifact produces */}
                     {proposal && job.status === 'ready' && (
                         <div className="space-y-3">
                             <h3 className="font-medium">
-                                {isNew ? 'Review the generated problem' : 'Review proposed artifacts'}
+                                {isNew ? 'Review the generated problem' : `Review proposed ${job.artifact_type.replaceAll('_', ' ')}`}
                             </h3>
-                            {(['statement', 'solution', 'tests'] as const).map(section => (
-                                <label key={section} className="block rounded border border-hairline p-3">
-                                    <span className="flex items-center gap-2 font-medium">
-                                        <input
-                                            type="checkbox"
-                                            checked={selected.includes(section) || (isNew && section === 'statement')}
-                                            disabled={isNew && section === 'statement'}
-                                            onChange={e => setSelected(e.target.checked ? [...selected, section] : selected.filter(x => x !== section))}
-                                        />
-                                        {section}
-                                    </span>
-                                    <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap text-xs text-muted">
-                                        {previewValue(
-                                            section === 'statement'
-                                                ? { title: proposal.title, description: proposal.description }
-                                                : section === 'solution'
-                                                    ? proposal.solution_code
-                                                    : { generator: proposal.generator_code, seeds: proposal.seeds },
-                                        )}
-                                    </pre>
-                                </label>
-                            ))}
+                            {applySections.map(section => {
+                                // Check if the proposal actually has content for this section
+                                const hasContent =
+                                    section === 'statement' ? !!proposal.title :
+                                    section === 'solution' ? !!proposal.solution_code :
+                                    section === 'tests' ? !!proposal.generator_code :
+                                    section === 'editorial' ? (!!proposal.editorial_title || !!proposal.editorial_content) :
+                                    false
+                                if (!hasContent) return null
+                                const isForced = isNew && section === 'statement'
+                                return (
+                                    <label key={section} className="block rounded border border-hairline p-3 cursor-pointer hover:bg-surface-2">
+                                        <span className="flex items-center gap-2 font-medium">
+                                            <input
+                                                type="checkbox"
+                                                checked={selected.includes(section) || isForced}
+                                                disabled={isForced}
+                                                onChange={e => setSelected(e.target.checked
+                                                    ? [...selected, section]
+                                                    : selected.filter(x => x !== section))}
+                                            />
+                                            {SECTION_LABELS[section] || section}
+                                        </span>
+                                        <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap text-xs text-muted">
+                                            {previewValue(section, proposal)}
+                                        </pre>
+                                    </label>
+                                )
+                            })}
                             <div className="flex flex-wrap gap-2">
                                 <button type="button" onClick={apply} className="min-h-11 cursor-pointer rounded bg-brand px-4 text-on-brand">
                                     {isNew ? 'Create problem' : 'Apply selected'}
