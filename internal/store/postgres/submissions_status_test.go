@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"testing"
 	"time"
 
@@ -207,6 +208,11 @@ func TestListPublicVisibility(t *testing.T) {
 		if rows[0].ProblemSlug != f.visibleSlug || rows[0].ProblemTitle != "Visible Problem" {
 			t.Errorf("listing must carry the problem name, got slug=%q title=%q", rows[0].ProblemSlug, rows[0].ProblemTitle)
 		}
+		// problem_id drives the per-viewer permission lookup, so a row without it
+		// silently strips every setter's rejudge button.
+		if rows[0].ProblemID != f.visibleID {
+			t.Errorf("listing must carry problem_id, got %q want %q", rows[0].ProblemID, f.visibleID)
+		}
 		if rows[0].Username == "" {
 			t.Error("listing must carry the submitter's username")
 		}
@@ -253,6 +259,9 @@ func TestListByProblemManage(t *testing.T) {
 		}
 		if row.ProblemSlug != f.visibleSlug {
 			t.Errorf("row %s has slug %q", row.ID, row.ProblemSlug)
+		}
+		if row.ProblemID != f.visibleID {
+			t.Errorf("row %s has problem_id %q, want %q", row.ID, row.ProblemID, f.visibleID)
 		}
 	}
 
@@ -387,6 +396,22 @@ func TestSystemErrorKeepsJudgeErrorText(t *testing.T) {
 	}
 	if ac.JudgeError != "" {
 		t.Fatalf("an accepted submission must have no judge_error, got %q", ac.JudgeError)
+	}
+
+	// A runner-level failure (missing testdata) carries no worker error text:
+	// the reason is only in the per-case detail, and judge_error must still end
+	// up explanatory.
+	if err := store.UpdateResult(ctx, f.subs["practice_ac"], model.StatusSE, 0, 0, 0, "", []model.TestCaseResult{
+		{CaseName: "curated-001.in", Status: model.StatusSE, Detail: "failed to load input: no such file or directory"},
+	}); err != nil {
+		t.Fatalf("UpdateResult(case-level SE): %v", err)
+	}
+	caseErr, err := store.GetByID(ctx, f.subs["practice_ac"])
+	if err != nil {
+		t.Fatalf("GetByID(case-level SE): %v", err)
+	}
+	if !strings.Contains(caseErr.JudgeError, "curated-001.in: failed to load input") {
+		t.Fatalf("judge_error must fall back to the case detail, got %q", caseErr.JudgeError)
 	}
 
 	failures, err := store.ListRecentFailures(ctx, 10)

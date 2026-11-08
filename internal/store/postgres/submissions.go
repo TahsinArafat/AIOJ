@@ -293,6 +293,13 @@ func (s *SubmissionStore) updateResult(ctx context.Context, id, claimToken strin
 	judgeError := ""
 	if status == model.StatusSE {
 		judgeError = compileOutput
+		if judgeError == "" {
+			// Some system errors never reach the worker's error path: a missing
+			// testdata file, for instance, is reported per case. Falling back to
+			// the case details keeps judge_error explanatory instead of empty —
+			// an empty one is indistinguishable from "nothing was recorded".
+			judgeError = summarizeCaseFailures(results)
+		}
 	}
 	query := `UPDATE submissions
 	             SET status=$1,score=$2,time_used=$3,memory_used=$4,compile_output=$5,judge_result=$6,judged_at=$7,
@@ -659,7 +666,7 @@ func (s *SubmissionStore) ResetForRejudge(ctx context.Context, ids []string) err
 // submissionListColumns is the projection shared by the listing queries that
 // have to name the submitter and the problem. Kept in one place so the scan
 // order below cannot drift from the SELECT.
-const submissionListColumns = `s.id,s.user_id,COALESCE(u.username,''),
+const submissionListColumns = `s.id,s.user_id,s.problem_id,COALESCE(u.username,''),
 	COALESCE(p.slug,''),COALESCE(p.title,''),
 	s.language,s.status,s.score,s.time_used,s.memory_used,s.created_at,s.submission_type,
 	COALESCE(s.contest_id::text,''),COALESCE(s.is_upsolving,false),COALESCE(s.judge_error,'')`
@@ -668,7 +675,7 @@ func scanSubmissionList(rows *sql.Rows) ([]model.Submission, error) {
 	var items []model.Submission
 	for rows.Next() {
 		var sub model.Submission
-		if err := rows.Scan(&sub.ID, &sub.UserID, &sub.Username,
+		if err := rows.Scan(&sub.ID, &sub.UserID, &sub.ProblemID, &sub.Username,
 			&sub.ProblemSlug, &sub.ProblemTitle,
 			&sub.Language, &sub.Status, &sub.Score, &sub.TimeUsed, &sub.MemoryUsed, &sub.CreatedAt, &sub.SubmissionType,
 			&sub.ContestID, &sub.IsUpsolving, &sub.JudgeError); err != nil {
@@ -869,4 +876,23 @@ func (s *SubmissionStore) ListRecentFailures(ctx context.Context, limit int) ([]
 	}
 	defer rows.Close()
 	return scanSubmissionList(rows)
+}
+
+// summarizeCaseFailures turns per-case system errors into one readable line.
+// Capped so a problem with hundreds of broken cases does not write a wall of
+// text into the row.
+func summarizeCaseFailures(results []model.TestCaseResult) string {
+	const maxCases = 5
+	var lines []string
+	for _, r := range results {
+		if r.Status != model.StatusSE || r.Detail == "" {
+			continue
+		}
+		lines = append(lines, r.CaseName+": "+r.Detail)
+		if len(lines) == maxCases {
+			lines = append(lines, "…")
+			break
+		}
+	}
+	return strings.Join(lines, "\n")
 }
