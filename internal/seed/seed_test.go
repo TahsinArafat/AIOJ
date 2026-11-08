@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
@@ -113,5 +114,52 @@ func TestSeed_buildHelloTestcases(t *testing.T) {
 		if string(buf) != want[f.Name] {
 			t.Fatalf("%s = %q, want %q", f.Name, string(buf), want[f.Name])
 		}
+	}
+}
+
+// TestRegisterOrLogin_conflictWithoutResetNamesTheFlag pins the failure mode an
+// operator actually hits: the account exists, the env password no longer
+// matches, and reset is disabled. The old code surfaced a bare "api error 401";
+// the message must name the flag that fixes it.
+func TestRegisterOrLogin_conflictWithoutResetNamesTheFlag(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/auth/csrf":
+			w.WriteHeader(http.StatusNoContent)
+		case "/api/auth/login":
+			http.Error(w, "invalid credentials", http.StatusUnauthorized)
+		case "/api/auth/register":
+			http.Error(w, "username taken", http.StatusConflict)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg := Config{AdminUser: "ai", AdminPass: "Aioj-Admin-2026!", ResetPassword: false}
+
+	_, _, _, err = registerOrLogin(context.Background(),
+		&http.Client{Jar: jar}, server.URL, cfg)
+	if err == nil {
+		t.Fatal("expected an error for an existing user with a mismatched password")
+	}
+	if !strings.Contains(err.Error(), "SEED_ADMIN_RESET_PASSWORD") {
+		t.Fatalf("error must name SEED_ADMIN_RESET_PASSWORD, got: %v", err)
+	}
+}
+
+// TestResult_reportsPasswordReset: "the account existed but its password was
+// rewritten" has to be visible in the deploy log, separate from AdminCreated.
+func TestResult_reportsPasswordReset(t *testing.T) {
+	b, err := json.Marshal(Result{AdminPasswordReset: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), `"admin_password_reset":true`) {
+		t.Fatalf("Result JSON = %s, want admin_password_reset", b)
 	}
 }

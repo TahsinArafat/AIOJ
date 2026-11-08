@@ -476,13 +476,18 @@ requirements` and **no user is created**.
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| Seeder logs `skipping first-admin bootstrap` | `SEED_ADMIN_PASSWORD` empty | set it, redeploy |
-| Login returns `401 invalid credentials` but the user exists | the row already exists with a different password (the seeder never overwrites) | set `SEED_ADMIN_RESET_PASSWORD=true`, redeploy once, then set it back to `false` |
+| Seeder logs `skipping first-admin bootstrap` | `SEED_ADMIN_PASSWORD` empty | set it, recompose |
+| Login returns `401 invalid credentials` | the stored hash differs from `SEED_ADMIN_PASSWORD` and reset is disabled | set `SEED_ADMIN_RESET_PASSWORD=true` (or delete the line: it defaults to true), recompose |
 | Seeder exits `400 password does not meet complexity requirements` | password has no digit/symbol/upper, or is <12 chars | pick a compliant password |
 | `429 rate limit exceeded` on login | `StrictAuth`: 1 req / 5s, burst 5, per IP+path | wait 5 seconds |
 
-`SEED_ADMIN_RESET_PASSWORD` exists because the alternative — rewriting the hash on
-every deploy — would silently undo a password changed in the UI.
+`SEED_ADMIN_RESET_PASSWORD` defaults to **true**: `SEED_ADMIN_PASSWORD` is
+authoritative for the bootstrap account, so a deploy re-aligns a stale hash with
+it. A matching password never triggers a write, and the seeder logs
+`"admin_password_reset":true` when it does rewrite one. The consequence is that
+changing this admin's password in the UI is pointless while the flag is true —
+change it in the env instead, or set the flag to `false` to make the UI value
+survive deploys.
 
 ---
 

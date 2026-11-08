@@ -36,8 +36,9 @@
 #   SEED_ADMIN_PASSWORD    password for the first admin. Must be >=12 chars with
 #                          upper + lower + digit + symbol, else the API rejects
 #                          the registration and no admin is created.
-#   SEED_ADMIN_RESET_PASSWORD  true = overwrite an existing admin's password
-#                          once (repair path); leave false normally.
+#   SEED_ADMIN_RESET_PASSWORD  default true: SEED_ADMIN_PASSWORD is
+#                          authoritative for the bootstrap admin, so a stale
+#                          hash is repaired on deploy. false = never rewrite.
 #   PUBLIC_ORIGIN          https://<DOMAIN>
 #   MAIL_PUBLIC_URL        https://<DOMAIN>
 #   MAIL_DRIVER/MAIL_HOST/MAIL_PORT/MAIL_USERNAME/MAIL_PASSWORD/MAIL_FROM
@@ -48,9 +49,9 @@
 #   2. The first admin is created by the `seeder` service during that same
 #      deploy — no terminal needed. Log in with SEED_ADMIN_USERNAME /
 #      SEED_ADMIN_PASSWORD, then change the password in the UI.
-#      If login fails with "invalid credentials", the account already existed
-#      with a different password: set SEED_ADMIN_RESET_PASSWORD=true and
-#      redeploy once, then set it back to false.
+#      SEED_ADMIN_PASSWORD is authoritative for that bootstrap admin: if the
+#      account exists with a different (stale) password, the deploy repairs the
+#      hash. Log in with SEED_ADMIN_USERNAME / SEED_ADMIN_PASSWORD.
 #   3. Optional profiles:
 #        --profile ai       -> ai-harness (AI problem generation)
 #        --profile vjudge   -> cf-bypass / cf-submit / atcoder-submit (heavy, +1GB)
@@ -277,14 +278,17 @@ services:
   #      it skipped and exits 0, so a stack without a seed password still
   #      deploys normally (it must not be a required `${...:?}` variable here,
   #      or a missing value would abort the whole compose file).
-  #   2. It is idempotent and never overwrites a password unless
-  #      SEED_ADMIN_RESET_PASSWORD=true. Without that flag an existing account
-  #      with a different password is reported, not rewritten, so a deploy can
-  #      never clobber a password an operator changed in the UI.
+  #   2. It is idempotent, and SEED_ADMIN_RESET_PASSWORD defaults to TRUE: the
+  #      env password is authoritative for the first admin. A matching password
+  #      is a no-op, so this only fires when the stored hash is stale — the
+  #      "invalid credentials on a user that exists" case — which makes the
+  #      seeded env the single source of truth for the bootstrap account.
+  #      Set SEED_ADMIN_RESET_PASSWORD=false to invert that: the seeder then
+  #      reports the mismatch instead of repairing it, and a password changed
+  #      in the UI survives deploys.
   #
   # Env: SEED_ADMIN_USERNAME (default ai), SEED_ADMIN_PASSWORD (>=12 chars with
-  #      upper+lower+digit+symbol), SEED_ADMIN_RESET_PASSWORD (true = repair a
-  #      mismatched password once, then set it back to false),
+  #      upper+lower+digit+symbol), SEED_ADMIN_RESET_PASSWORD (default true),
   #      SEED_PROBLEM_SLUG (default hello).
   # -------------------------------------------------------------------------
   seeder:
@@ -309,7 +313,7 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set in Dokploy env}
       SEED_ADMIN_USERNAME: ${SEED_ADMIN_USERNAME:-ai}
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
-      SEED_ADMIN_RESET_PASSWORD: ${SEED_ADMIN_RESET_PASSWORD:-false}
+      SEED_ADMIN_RESET_PASSWORD: ${SEED_ADMIN_RESET_PASSWORD:-true}
       SEED_PROBLEM_SLUG: ${SEED_PROBLEM_SLUG:-hello}
     depends_on:
       backend:

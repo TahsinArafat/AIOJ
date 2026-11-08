@@ -43,11 +43,13 @@ type Config struct {
 	// match it, the stored hash is replaced (and must_change_password cleared)
 	// instead of failing with 401.
 	//
-	// Off by default on purpose. A seeder that silently rewrote the hash on
-	// every run would let a deploy clobber a password an operator had already
-	// changed in the UI, which is a security regression, not a convenience.
-	// Set SEED_ADMIN_RESET_PASSWORD=true for the one deploy that repairs a
-	// stale/broken account, then set it back to false.
+	// The zero value is false so a caller that constructs Config directly (the
+	// unit tests, any future embedder) never gets an implicit password write.
+	// Compose turns it on: docker-compose.dokploy.yml defaults
+	// SEED_ADMIN_RESET_PASSWORD to true, making the env password authoritative
+	// for the bootstrap admin. A matching password is still a no-op, so the
+	// write only happens when the stored hash is stale. Set it to false to make
+	// a password changed in the UI survive deploys instead.
 	ResetPassword bool
 
 	// DSN is used for exactly one write: promoting the first user to admin.
@@ -59,11 +61,17 @@ type Config struct {
 
 // Result records what the seeder actually did, so a caller can assert idempotence.
 type Result struct {
-	AdminCreated   bool     `json:"admin_created"`
-	AdminPromoted  bool     `json:"admin_promoted"`
-	ProblemCreated bool     `json:"problem_created"`
-	TestcaseCount  int      `json:"testcase_count"`
-	Errors         []string `json:"errors,omitempty"`
+	AdminCreated bool `json:"admin_created"`
+	// AdminPasswordReset reports that an existing admin's hash was replaced
+	// with SEED_ADMIN_PASSWORD. Only ever true with ResetPassword enabled, and
+	// reported separately from AdminCreated because "the account already
+	// existed but its password changed" is exactly the case an operator needs
+	// to see in the deploy log.
+	AdminPasswordReset bool     `json:"admin_password_reset"`
+	AdminPromoted      bool     `json:"admin_promoted"`
+	ProblemCreated     bool     `json:"problem_created"`
+	TestcaseCount      int      `json:"testcase_count"`
+	Errors             []string `json:"errors,omitempty"`
 }
 
 const (
@@ -130,11 +138,12 @@ func Seed(ctx context.Context, cfg Config) (Result, error) {
 	// 1. Register the admin (or log back in if it already exists — the
 	// idempotent path, not an error). With ResetPassword set, a mismatched
 	// password on an existing account is repaired rather than reported as 401.
-	token, created, err := registerOrLogin(ctx, client, base, cfg)
+	token, created, reset, err := registerOrLogin(ctx, client, base, cfg)
 	if err != nil {
 		return res, err
 	}
 	res.AdminCreated = created
+	res.AdminPasswordReset = reset
 
 	// 2. Promote to admin directly in Postgres (the one DB write in this
 	// harness), then re-login so the JWT carries role=admin.
@@ -171,14 +180,14 @@ func Seed(ctx context.Context, cfg Config) (Result, error) {
 
 // --- auth ----------------------------------------------------------------
 
-func registerOrLogin(ctx context.Context, c *http.Client, base string, cfg Config) (token string, created bool, err error) {
+func registerOrLogin(ctx context.Context, c *http.Client, base string, cfg Config) (token string, created, reset bool, err error) {
 	user, pass := cfg.AdminUser, cfg.AdminPass
 
 	// Try login first. This keeps seeding idempotent when the account already
 	// exists (including databases created before the password policy changed),
 	// and avoids making registration the first request on every rerun.
 	if token, err = login(ctx, c, base, user, pass); err == nil {
-		return token, false, nil
+		return token, false, false, nil
 	}
 
 	body := map[string]string{
@@ -188,13 +197,13 @@ func registerOrLogin(ctx context.Context, c *http.Client, base string, cfg Confi
 	}
 	resp, err := postJSON(ctx, c, base+"/api/auth/register", body)
 	if err != nil {
-		return "", false, err
+		return "", false, false, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusCreated || resp.StatusCode == http.StatusOK {
 		t, err := tokenFrom(resp)
-		return t, resp.StatusCode == http.StatusCreated, err
+		return t, resp.StatusCode == http.StatusCreated, false, err
 	}
 	if resp.StatusCode == http.StatusConflict {
 		// The username is taken but the configured password did not work.
@@ -203,18 +212,18 @@ func registerOrLogin(ctx context.Context, c *http.Client, base string, cfg Confi
 		// an operator's password on every deploy.
 		if !cfg.ResetPassword {
 			_, loginErr := login(ctx, c, base, user, pass)
-			return "", false, fmt.Errorf("seed: user %q already exists with a different "+
+			return "", false, false, fmt.Errorf("seed: user %q already exists with a different "+
 				"password — set SEED_ADMIN_RESET_PASSWORD=true once to overwrite it "+
 				"(got: %v)", user, loginErr)
 		}
 		if rerr := resetPassword(ctx, cfg); rerr != nil {
-			return "", false, rerr
+			return "", false, false, rerr
 		}
 		t, lerr := login(ctx, c, base, user, pass)
-		return t, false, lerr
+		return t, false, true, lerr
 	}
 	b, _ := io.ReadAll(resp.Body)
-	return "", false, apiError{resp.StatusCode, string(b)}
+	return "", false, false, apiError{resp.StatusCode, string(b)}
 }
 
 func login(ctx context.Context, c *http.Client, base, user, pass string) (string, error) {
@@ -271,9 +280,11 @@ func openDB(cfg Config) (*sql.DB, error) {
 const bcryptCost = 12
 
 // resetPassword makes the configured password authoritative for the admin.
-// It only runs when ResetPassword is enabled, and it clears
-// must_change_password so the repaired account can use the whole API instead
-// of being pinned to the profile page.
+// It only runs when ResetPassword is enabled and the stored hash did not match
+// the configured password, so a matching password never triggers a write.
+// It also clears must_change_password and sets role/email_verified, because a
+// repaired bootstrap account must be usable immediately and must not be pinned
+// to the profile page by the migration-000073 flag.
 func resetPassword(ctx context.Context, cfg Config) error {
 	db, err := openDB(cfg)
 	if err != nil {
