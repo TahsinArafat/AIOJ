@@ -19,6 +19,18 @@ type SubmissionStore struct{ db *sql.DB }
 
 func NewSubmissionStore(db *sql.DB) *SubmissionStore { return &SubmissionStore{db: db} }
 
+// remoteSourceList renders model.RemotePlatforms as a SQL list. The values are
+// compiled-in constants, so inlining them is safe; building it from the model
+// keeps the judge worker and the vjudge submit worker from disagreeing about
+// what counts as remote.
+var remoteSourceList = func() string {
+	quoted := make([]string, len(model.RemotePlatforms))
+	for i, p := range model.RemotePlatforms {
+		quoted[i] = "'" + p + "'"
+	}
+	return "(" + strings.Join(quoted, ",") + ")"
+}()
+
 func compressCode(src string) []byte {
 	if src == "" {
 		return nil
@@ -231,7 +243,7 @@ func (s *SubmissionStore) ClaimPending(ctx context.Context, id, claimToken strin
 		    AND EXISTS (
 		        SELECT 1 FROM problems p
 		        WHERE p.id=s.problem_id
-		          AND COALESCE(p.source,'local') IN ('','local')
+		          AND COALESCE(p.source,'') NOT IN `+remoteSourceList+`
 		    )`,
 		id, claimToken)
 	if err != nil {
@@ -400,7 +412,7 @@ func (s *SubmissionStore) GetUnsubmittedRemoteSubmissions(ctx context.Context) (
 		`SELECT s.id, s.problem_id, s.language, s.source_code_gz, s.status, s.created_at
 		 FROM submissions s
 		 JOIN problems p ON s.problem_id = p.id
-		 WHERE s.status = 'pending' AND s.remote_id = '' AND p.source != '' AND p.source != 'local'
+		 WHERE s.status = 'pending' AND s.remote_id = '' AND p.source IN `+remoteSourceList+`
 		 ORDER BY s.created_at ASC`)
 	if err != nil {
 		return nil, err
@@ -499,7 +511,7 @@ func (s *SubmissionStore) ListPending(ctx context.Context, limit int) ([]string,
 		   JOIN problems p ON p.id=s.problem_id
 		  WHERE s.status='pending'
 		    AND COALESCE(s.remote_id,'') = ''
-		    AND COALESCE(p.source,'local') IN ('','local')
+		    AND COALESCE(p.source,'') NOT IN `+remoteSourceList+`
 		  ORDER BY s.created_at ASC
 		  LIMIT $1`, limit)
 	if err != nil {
@@ -530,7 +542,7 @@ func (s *SubmissionStore) ListPendingWithContext(ctx context.Context, limit int)
 		  LEFT JOIN contests c ON c.id = s.contest_id
 		 WHERE s.status = 'pending'
 		   AND COALESCE(s.remote_id, '') = ''
-		   AND COALESCE(p.source, 'local') IN ('', 'local')
+		   AND COALESCE(p.source,'') NOT IN `+remoteSourceList+`
 		 ORDER BY s.created_at ASC
 		 LIMIT $1`, limit)
 	if err != nil {
@@ -617,7 +629,7 @@ func (s *SubmissionStore) ListForBulkRejudge(ctx context.Context, contestID, pro
 		 WHERE s.contest_id = $1
 		   AND s.status NOT IN ('pending', 'judging')
 		   AND COALESCE(s.remote_id, '') = ''
-		   AND COALESCE(p.source, 'local') IN ('', 'local')`
+		   AND COALESCE(p.source,'') NOT IN ` + remoteSourceList + ``
 	args := []interface{}{contestID}
 	if problemID != "" {
 		args = append(args, problemID)
@@ -844,7 +856,7 @@ func (s *SubmissionStore) ListIDsForProblemRejudge(ctx context.Context, problemI
 		 WHERE s.problem_id = $1
 		   AND s.status NOT IN ('pending', 'judging')
 		   AND COALESCE(s.remote_id, '') = ''
-		   AND COALESCE(p.source, 'local') IN ('', 'local')`
+		   AND COALESCE(p.source,'') NOT IN ` + remoteSourceList + ``
 	args := []interface{}{problemID}
 	if filter.ContestID != "" {
 		args = append(args, filter.ContestID)

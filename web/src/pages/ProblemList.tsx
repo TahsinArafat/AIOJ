@@ -19,6 +19,7 @@ const DIFFICULTY_TONE: Record<string, BadgeTone> = {
 const platforms = [
     { value: '', label: 'All Platforms' },
     { value: 'local', label: 'AIOJ' },
+    { value: 'ai', label: 'AI' },
     { value: 'codeforces', label: 'Codeforces' },
     { value: 'atcoder', label: 'AtCoder' },
     { value: 'cses', label: 'CSES' },

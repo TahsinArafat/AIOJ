@@ -173,7 +173,7 @@ func (h *SubmissionHandler) buildAndEnqueue(r *http.Request, w http.ResponseWrit
 		return
 	}
 
-	if prob.Source != "" && prob.Source != "local" && h.vjudgeSvc != nil {
+	if model.IsRemotePlatform(prob.Source) && h.vjudgeSvc != nil {
 		respondJSON(w, http.StatusCreated, sub)
 		return
 	}
@@ -399,7 +399,7 @@ func (h *SubmissionHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	prob, err := h.probStore.GetByID(r.Context(), sub.ProblemID)
-	if err == nil && prob != nil && prob.Source != "" && prob.Source != "local" {
+	if err == nil && prob != nil && model.IsRemotePlatform(prob.Source) {
 		sub.IsRemote = true
 		sub.RemoteOJ = prob.Source
 	}
@@ -755,7 +755,7 @@ func (h *SubmissionHandler) RetryRemote(w http.ResponseWriter, r *http.Request) 
 	}
 
 	prob, err := h.probStore.GetByID(r.Context(), sub.ProblemID)
-	if err != nil || prob == nil || prob.Source == "" || prob.Source == "local" {
+	if err != nil || prob == nil || !model.IsRemotePlatform(prob.Source) {
 		http.Error(w, "not a remote OJ problem", http.StatusBadRequest)
 		return
 	}

@@ -94,7 +94,7 @@ func (h *AdminSubmissionHandler) Rejudge(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	isRemote := prob.Source != "" && prob.Source != "local"
+	isRemote := model.IsRemotePlatform(prob.Source)
 
 	if isRemote {
 		// Remote OJ: clear remote tracking so the submit worker resubmits.

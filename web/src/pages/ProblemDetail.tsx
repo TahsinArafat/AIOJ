@@ -18,6 +18,7 @@ import { useTranslation } from 'react-i18next'
 import { useToast } from '../components/Toast'
 import { Badge, type BadgeTone } from '../components/ui/Badge'
 import { DEFAULT_LANGUAGE, LANGUAGE_OPTIONS, languageName, languageTemplate } from '../lib/languages'
+import { isRemotePlatform } from '../lib/platforms'
 import { Skeleton } from '../components/ui/PageHeader'
 import { VerdictBadge } from '../components/ui/VerdictBadge'
 import { useDocumentTitle } from '../lib/documentTitle'
@@ -222,7 +223,7 @@ export default function ProblemDetail() {
                 setProblem(p)
                 // local/default problems render the built-in language list; previously
                 // this reset was a synchronous setLanguages in the languages effect
-                if (!p?.source || p.source === 'local') setLanguages(LANGUAGE_OPTIONS)
+                if (!isRemotePlatform(p?.source)) setLanguages(LANGUAGE_OPTIONS)
             }).catch(() => { })
         }
     }, [slug])
@@ -247,8 +248,11 @@ export default function ProblemDetail() {
     // so no separate languageChanged listener is needed.
 
     useEffect(() => {
-        if (problem?.source && problem.source !== 'local') {
-            api.remoteLanguages.list(problem.source)
+        // Read the source once so the dependency below matches exactly what
+        // this effect consumes (a statement edit must not refetch the list).
+        const remoteSource = problem?.source
+        if (isRemotePlatform(remoteSource)) {
+            api.remoteLanguages.list(remoteSource)
                 .then(d => {
                     const langs = (d.data || [])
                         .filter((rl: RemoteLangOption) => rl.enabled)
@@ -844,8 +848,8 @@ export default function ProblemDetail() {
                     <div className="flex gap-2 flex-shrink-0">
                         <button
                             onClick={testWithSamples}
-                            disabled={runningSamples || !code.trim() || problem?.source !== 'local'}
-                            title={problem?.source !== 'local' ? 'Test Samples is only available for local problems' : undefined}
+                            disabled={runningSamples || !code.trim() || isRemotePlatform(problem?.source)}
+                            title={isRemotePlatform(problem?.source) ? 'Test Samples is only available for locally judged problems' : undefined}
                             className="bg-brand text-on-brand px-3 py-1.5 rounded text-sm font-medium hover:bg-brand-hover disabled:opacity-50 transition-colors cursor-pointer"
                         >
                             {runningSamples ? 'Testing...' : 'Test Samples'}
