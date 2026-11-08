@@ -250,7 +250,9 @@ func main() {
 	vjH := handler.NewVJudgeHandler(vjService)
 
 	setterStore := postgres.NewSetterStore(db)
-	adminH := handler.NewAdminHandler(userStore, setterStore)
+	// The refresh-token store is passed so a ban or an admin password reset ends
+	// the target's sessions immediately instead of waiting out the 15m access TTL.
+	adminH := handler.NewAdminHandler(userStore, setterStore, refreshTokenStore)
 
 	testcaseH := handler.NewTestcaseHandler(problemStore, "./testdata")
 	importH := handler.NewImportHandler(problemStore, "./testdata")

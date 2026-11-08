@@ -29,8 +29,31 @@ type UserStore interface {
 	GetProfile(ctx context.Context, userID string) (*model.UserProfile, error)
 	UpdateProfile(ctx context.Context, userID string, p *model.UserProfile) error
 	ListUsers(ctx context.Context, offset, limit int) ([]model.User, int, error)
+	// ListAdminUsers is the filtered/sorted/paginated listing the admin panel
+	// uses. ListUsers is kept for the plain offset/limit callers.
+	ListAdminUsers(ctx context.Context, f model.UserFilter) ([]model.AdminUserRow, int, error)
+	// GetAdminUser returns one account with the profile and session facts the
+	// admin detail view needs, or (nil, nil) when the id does not exist.
+	GetAdminUser(ctx context.Context, id string) (*model.AdminUserDetail, error)
+	// SetUserBan sets or clears the ban. A reason is only meaningful when
+	// banning; unbanning clears both columns.
+	SetUserBan(ctx context.Context, id string, banned bool, reason string) error
+	// IsBanned reports whether the account is suspended. Read on every login and
+	// refresh: a ban that did not stop the next token would not be a ban.
+	IsBanned(ctx context.Context, id string) (bool, error)
+	// SetEmailVerified lets an admin mark an address verified (support path for
+	// a user whose mail never arrived) or un-verify it.
+	SetEmailVerified(ctx context.Context, id string, verified bool) error
+	// CountAdmins feeds the "never remove the last administrator" guard.
+	CountAdmins(ctx context.Context) (int, error)
+	// TouchLastLogin records a successful sign-in. Best effort: a login must
+	// not fail because a bookkeeping write did.
+	TouchLastLogin(ctx context.Context, id string) error
 	UpdateRole(ctx context.Context, id, role string) error
 	UpdatePassword(ctx context.Context, id, passwordHash string) error
+	// SetMustChangePassword re-flags an account whose password an administrator
+	// just set, so the admin-chosen value cannot become permanent.
+	SetMustChangePassword(ctx context.Context, id string, required bool) error
 	UpdateRating(ctx context.Context, userID string, rating, maxRating, contestCount int) error
 	MarkEmailVerified(ctx context.Context, userID string) error
 	IsEmailVerified(ctx context.Context, userID string) (bool, error)

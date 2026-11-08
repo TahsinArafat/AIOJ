@@ -7,12 +7,19 @@ import (
 	"github.com/tahsinarafat/aioj/internal/model"
 )
 
-// stubUserForEV is a minimal UserStore for email-verification tests.
+// stubUserForEV is a minimal UserStore for email-verification and admin tests.
 type stubUserForEV struct {
 	users      map[string]*model.User
 	byEmail    map[string]*model.User
 	marked     string
 	isVerified bool
+	// banned holds user ids the stub reports as suspended.
+	banned map[string]bool
+	// adminCount is what CountAdmins reports, so the "never remove the last
+	// administrator" guard can be exercised without a database.
+	adminCount int
+	// lastLogin records the id passed to TouchLastLogin.
+	lastLogin string
 }
 
 func (s *stubUserForEV) Create(_ context.Context, u *model.User) error {
@@ -73,6 +80,36 @@ func (s *stubUserForEV) ListUsers(context.Context, int, int) ([]model.User, int,
 }
 func (s *stubUserForEV) UpdateRole(context.Context, string, string) error { return nil }
 func (s *stubUserForEV) UpdatePassword(context.Context, string, string) error {
+	return nil
+}
+func (s *stubUserForEV) SetMustChangePassword(context.Context, string, bool) error { return nil }
+
+// The admin-listing methods are part of UserStore but nothing in the
+// email-verification tests reaches them; they exist only to satisfy the
+// interface.
+func (s *stubUserForEV) ListAdminUsers(context.Context, model.UserFilter) ([]model.AdminUserRow, int, error) {
+	return nil, 0, nil
+}
+func (s *stubUserForEV) GetAdminUser(context.Context, string) (*model.AdminUserDetail, error) {
+	return nil, nil
+}
+func (s *stubUserForEV) SetUserBan(_ context.Context, id string, banned bool, _ string) error {
+	if s.banned == nil {
+		s.banned = map[string]bool{}
+	}
+	s.banned[id] = banned
+	return nil
+}
+func (s *stubUserForEV) IsBanned(_ context.Context, id string) (bool, error) {
+	return s.banned[id], nil
+}
+func (s *stubUserForEV) SetEmailVerified(_ context.Context, _ string, verified bool) error {
+	s.isVerified = verified
+	return nil
+}
+func (s *stubUserForEV) CountAdmins(context.Context) (int, error) { return s.adminCount, nil }
+func (s *stubUserForEV) TouchLastLogin(_ context.Context, id string) error {
+	s.lastLogin = id
 	return nil
 }
 func (s *stubUserForEV) UpdateRating(context.Context, string, int, int, int) error {

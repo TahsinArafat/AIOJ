@@ -24,6 +24,10 @@ import { ConfirmProvider } from '../components/ConfirmDialog'
 const mocks = vi.hoisted(() => ({
     listUsers: vi.fn().mockResolvedValue({ data: [] }),
     listApps: vi.fn().mockResolvedValue({ data: [] }),
+    // UsersPanel now reads the filtered listing; without this the panel throws
+    // inside a promise chain and the failure surfaces as an unhandled rejection
+    // rather than a test failure.
+    listAdminUsers: vi.fn().mockResolvedValue({ data: [], total: 0, offset: 0, limit: 25 }),
 }))
 
 vi.mock('../lib/api', () => ({
@@ -32,6 +36,7 @@ vi.mock('../lib/api', () => ({
             listUsers: mocks.listUsers,
             listApps: mocks.listApps,
             updateRole: vi.fn(),
+            users: { list: mocks.listAdminUsers },
             reviewApp: vi.fn(),
             settings: { list: vi.fn().mockResolvedValue({ data: [] }), update: vi.fn() },
             botAccounts: { list: vi.fn().mockResolvedValue({ data: [] }), create: vi.fn(), update: vi.fn(), delete: vi.fn(), testLogin: vi.fn() },
@@ -48,6 +53,7 @@ vi.mock('../lib/api', () => ({
 beforeEach(() => {
     vi.clearAllMocks()
     mocks.listUsers.mockResolvedValue({ data: [] })
+    mocks.listAdminUsers.mockResolvedValue({ data: [], total: 0, offset: 0, limit: 25 })
     mocks.listApps.mockResolvedValue({ data: [] })
     window.location.hash = ''
 })

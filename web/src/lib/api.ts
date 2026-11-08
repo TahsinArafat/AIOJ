@@ -218,7 +218,7 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
     }
 }
 
-import type { AIBrief, AIBriefPreset, AIGenerationJob, AIModel, APIKey, ActivityItem, AdminFeature, AuthResponse, AuthSessionResponse, BackupFile, BlogListItem, BlogPost, BotAccount, Clarification, Class, ClassListItem, ClassMember, Comment, Contest, ContestDetailResponse, ContestNotice, ContestPermission, ContestProblem, ContestRegistration, ContestSubmissionsResponse, DetectedTool, Editorial, FeaturePolicy, Group, GroupListItem, GroupMember, GroupPendingInvite, GymContest, GymData, Hack, HackResult, HackSubmission, LanguageConfig, Notification, NotificationPreferences, OnsiteBatchUser, Organization, OrganizationListItem, OrganizationMember, PendingInvite, PendingRemoteSubmission, PlagiarismPairDetail, PlagiarismReport, Problem, ProblemI18n, ProblemListItem, ProblemPermission, ProblemStats, PublicProfile, RankingEntry, RatingHistoryEntry, RemoteLanguage, ResolvedFeature, ScoreboardData, SetterApplication, Submission, Team, TeamListItem, TeamMember, TestResult, TrainingPlan, TrainingPlanDetail, TrainingPlanEnrollment, TrainingPlanProblem, TrainingPlanProgress, TrainingPlanSection, User, UserAchievement, UserProblemStats, UserProfile, VirtualContest, VirtualStatusResponse, WeakTagsRecommendations, Webhook } from '../types/api'
+import type { AIBrief, AIBriefPreset, AIGenerationJob, AIModel, APIKey, ActivityItem, AdminBulkAction, AdminBulkResponse, AdminFeature, AdminUserDetail, AdminUserQuery, AdminUserRow, AuthResponse, AuthSessionResponse, BackupFile, BlogListItem, BlogPost, BotAccount, Clarification, Class, ClassListItem, ClassMember, Comment, Contest, ContestDetailResponse, ContestNotice, ContestPermission, ContestProblem, ContestRegistration, ContestSubmissionsResponse, DetectedTool, Editorial, FeaturePolicy, Group, GroupListItem, GroupMember, GroupPendingInvite, GymContest, GymData, Hack, HackResult, HackSubmission, LanguageConfig, Notification, NotificationPreferences, OnsiteBatchUser, Organization, OrganizationListItem, OrganizationMember, PendingInvite, PendingRemoteSubmission, PlagiarismPairDetail, PlagiarismReport, Problem, ProblemI18n, ProblemListItem, ProblemPermission, ProblemStats, PublicProfile, RankingEntry, RatingHistoryEntry, RemoteLanguage, ResolvedFeature, ScoreboardData, SetterApplication, Submission, Team, TeamListItem, TeamMember, TestResult, TrainingPlan, TrainingPlanDetail, TrainingPlanEnrollment, TrainingPlanProblem, TrainingPlanProgress, TrainingPlanSection, User, UserAchievement, UserProblemStats, UserProfile, VirtualContest, VirtualStatusResponse, WeakTagsRecommendations, Webhook } from '../types/api'
 
 export const api = {
     auth: {
@@ -468,6 +468,44 @@ export const api = {
             request<{ data: User[]; total: number }>(`/admin/users?offset=${offset}&limit=${limit}`),
         updateRole: (userId: string, role: string) =>
             request(`/admin/users/${userId}/role`, { method: 'PUT', body: JSON.stringify({ role }) }),
+        // Advanced user management. `listUsers` above is kept for the bot-account
+        // panel, which only needs a flat dropdown of accounts.
+        users: {
+            list: (q: AdminUserQuery = {}) => {
+                // Only append keys that were actually set: `?status=` would be
+                // rejected by the API's filter validation.
+                const p = new URLSearchParams()
+                if (q.search) p.set('search', q.search)
+                if (q.role) p.set('role', q.role)
+                if (q.status) p.set('status', q.status)
+                if (q.sort) p.set('sort', q.sort)
+                if (q.order) p.set('order', q.order)
+                if (q.offset) p.set('offset', String(q.offset))
+                if (q.limit) p.set('limit', String(q.limit))
+                const qs = p.toString()
+                return request<{ data: AdminUserRow[]; total: number; offset: number; limit: number }>(
+                    `/admin/users${qs ? `?${qs}` : ''}`,
+                )
+            },
+            get: (userId: string) => request<AdminUserDetail>(`/admin/users/${userId}`),
+            setRole: (userId: string, role: string) =>
+                request(`/admin/users/${userId}/role`, { method: 'PUT', body: JSON.stringify({ role }) }),
+            resetPassword: (userId: string, password: string, force_change = true) =>
+                request(`/admin/users/${userId}/password`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ password, force_change }),
+                }),
+            ban: (userId: string, reason: string) =>
+                request(`/admin/users/${userId}/ban`, { method: 'POST', body: JSON.stringify({ reason }) }),
+            unban: (userId: string) =>
+                request(`/admin/users/${userId}/ban`, { method: 'DELETE' }),
+            verifyEmail: (userId: string) =>
+                request(`/admin/users/${userId}/verify-email`, { method: 'POST' }),
+            unverifyEmail: (userId: string) =>
+                request(`/admin/users/${userId}/verify-email`, { method: 'DELETE' }),
+            bulk: (d: { action: AdminBulkAction; ids: string[]; role?: string; reason?: string }) =>
+                request<AdminBulkResponse>('/admin/users/bulk', { method: 'POST', body: JSON.stringify(d) }),
+        },
         listApps: () => request<{ data: SetterApplication[] }>('/admin/setter-applications'),
         reviewApp: (userId: string, status: string) =>
             request(`/admin/setter-applications/${userId}/review`, { method: 'POST', body: JSON.stringify({ status }) }),

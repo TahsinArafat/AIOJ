@@ -117,6 +117,74 @@ type SetterApplication struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+// UserFilter is the query the admin users panel issues. Zero values mean "no
+// constraint": an empty Search matches everyone, an empty Role/Status disables
+// that filter, and Sort/Desc fall back to newest-first.
+//
+// It is a struct rather than another positional argument list because the
+// listing has five optional dimensions, and ListUsers(offset, limit) had
+// already reached the point where every new filter meant touching every
+// caller and every test stub.
+type UserFilter struct {
+	// Search matches username, email, or the exact user id (case-insensitive
+	// substring for the first two).
+	Search string
+	// Role restricts to one role; Status restricts to one account state.
+	Role string
+	// Status is one of: "", "active", "banned", "unverified", "must_change_password".
+	Status string
+	// Sort is one of: "", "created", "username", "rating", "submissions", "last_login".
+	Sort string
+	// Desc reverses the sort. Only meaningful together with Sort.
+	Desc   bool
+	Offset int
+	Limit  int
+}
+
+// AdminUserRow is one row of the admin users table: enough to identify the
+// account, see its privileges and state, and judge whether it is in use —
+// without a second request per row.
+type AdminUserRow struct {
+	ID       string `json:"id"`
+	Username string `json:"username"`
+	Email    string `json:"email"`
+	Role     string `json:"role"`
+	IsBot    bool   `json:"is_bot"`
+
+	EmailVerified      bool `json:"email_verified"`
+	MustChangePassword bool `json:"must_change_password"`
+
+	// BannedAt is nil for an active account. The timestamp, not a bool, is what
+	// an appeal is judged against.
+	BannedAt  *time.Time `json:"banned_at,omitempty"`
+	BanReason string     `json:"ban_reason,omitempty"`
+
+	Rating         int `json:"rating"`
+	ProblemsSolved int `json:"problems_solved"`
+	Submissions    int `json:"submissions"`
+
+	CreatedAt   time.Time  `json:"created_at"`
+	LastLoginAt *time.Time `json:"last_login_at,omitempty"`
+}
+
+// AdminUserDetail is the single-user view behind the panel's detail drawer.
+// It carries the profile fields an administrator needs to identify a person
+// (country, organisation, linked GitHub) and the 2FA state that decides whether
+// a password reset is enough to lock an attacker out.
+type AdminUserDetail struct {
+	AdminUserRow
+	MaxRating    int    `json:"max_rating"`
+	ContestCount int    `json:"contest_count"`
+	Country      string `json:"country,omitempty"`
+	Organization string `json:"organization,omitempty"`
+	GithubURL    string `json:"github_url,omitempty"`
+	Bio          string `json:"bio,omitempty"`
+	TOTPEnabled  bool   `json:"totp_enabled"`
+	// ActiveSessions is the number of unspent refresh tokens — the observable
+	// answer to "is someone signed in as this user right now".
+	ActiveSessions int `json:"active_sessions"`
+}
+
 type RankingEntry struct {
 	ID             string `json:"id"`
 	Username       string `json:"username"`

@@ -248,6 +248,15 @@ func Load(path string) (*Config, error) {
 	if v := os.Getenv("DB_HOST"); v != "" {
 		cfg.Database.Host = v
 	}
+	// DB_PORT was missing from this list while compose passed it, so a database
+	// on any port other than config.yaml's 5432 was unreachable and the value
+	// was silently ignored. Only a positive number is accepted: atoi returns 0
+	// for garbage, and port 0 would replace a working default with a broken one.
+	if v := os.Getenv("DB_PORT"); v != "" {
+		if n, err := strconv.Atoi(strings.TrimSpace(v)); err == nil && n > 0 {
+			cfg.Database.Port = n
+		}
+	}
 	if v := os.Getenv("DB_USER"); v != "" {
 		cfg.Database.User = v
 	}

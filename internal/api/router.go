@@ -386,7 +386,17 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 			r.Use(am.Middleware)
 		}
 		r.Get("/users", adminH.ListUsers)
+		// Declared before the {id} patterns: chi matches static segments first,
+		// but keeping "bulk" adjacent to the listing makes it obvious that the
+		// collection has a batch endpoint.
+		r.Post("/users/bulk", adminH.BulkUpdate)
+		r.Get("/users/{id}", adminH.GetUser)
 		r.Put("/users/{id}/role", adminH.UpdateUserRole)
+		r.Put("/users/{id}/password", adminH.ResetUserPassword)
+		r.Post("/users/{id}/ban", adminH.BanUser)
+		r.Delete("/users/{id}/ban", adminH.UnbanUser)
+		r.Post("/users/{id}/verify-email", adminH.VerifyUserEmail)
+		r.Delete("/users/{id}/verify-email", adminH.UnverifyUserEmail)
 		r.Get("/setter-applications", adminH.ListSetterApps)
 		r.Post("/setter-applications/{id}/review", adminH.ReviewSetterApp)
 

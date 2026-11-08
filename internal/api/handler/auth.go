@@ -147,6 +147,19 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	user, err := h.users.GetByUsername(r.Context(), req.Username)
 	if err == nil && user != nil && auth.CheckPassword(req.Password, user.PasswordHash) {
+		// A banned account must not receive a token even with the right
+		// password. This is checked after the password comparison, not before,
+		// so the response does not tell an attacker that a guessed password was
+		// correct — the ban message is only shown to someone who could have
+		// signed in.
+		if banned, banErr := h.users.IsBanned(r.Context(), user.ID); banErr == nil && banned {
+			http.Error(w, "this account has been suspended", http.StatusForbidden)
+			return
+		}
+		// Best effort: a failed bookkeeping write must not fail the login.
+		if err := h.users.TouchLastLogin(r.Context(), user.ID); err != nil {
+			slog.Warn("touch last login failed", "error", err, "user_id", user.ID)
+		}
 		if h.maybe2FAChallenge(w, r, user) {
 			return
 		}
@@ -240,6 +253,13 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 	user, _ := h.users.GetByID(r.Context(), userID)
 	if user == nil {
 		http.Error(w, "user not found", http.StatusUnauthorized)
+		return
+	}
+	// Refresh is the long-lived path (168h TTL), so a ban has to be enforced
+	// here too: banning revokes the stored tokens, but a request already in
+	// flight must not be able to mint a fresh one.
+	if banned, err := h.users.IsBanned(r.Context(), user.ID); err == nil && banned {
+		http.Error(w, "this account has been suspended", http.StatusForbidden)
 		return
 	}
 	respondJSON(w, http.StatusOK, h.tokenResp(r.Context(), user))

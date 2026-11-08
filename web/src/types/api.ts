@@ -1574,3 +1574,67 @@ export interface AdminFeature {
     /** True when a stored policy differs from the registry default. */
     customized: boolean
 }
+
+// ── Admin user management (GET /api/admin/users) ─────────────────────────────
+
+/** One row of the admin users table. Mirrors model.AdminUserRow. */
+export interface AdminUserRow {
+    id: string
+    username: string
+    email: string
+    role: string
+    is_bot: boolean
+    email_verified: boolean
+    must_change_password: boolean
+    /** Present only for a suspended account; the timestamp is what an appeal is judged against. */
+    banned_at?: string
+    ban_reason?: string
+    rating: number
+    problems_solved: number
+    submissions: number
+    created_at: string
+    /** Absent until the account signs in for the first time. */
+    last_login_at?: string
+}
+
+/** Single-user view (GET /api/admin/users/{id}). Mirrors model.AdminUserDetail. */
+export interface AdminUserDetail extends AdminUserRow {
+    max_rating: number
+    contest_count: number
+    country?: string
+    organization?: string
+    github_url?: string
+    bio?: string
+    totp_enabled: boolean
+    /** Unexpired refresh tokens — the observable "someone is signed in". */
+    active_sessions: number
+}
+
+export type AdminUserStatus = 'active' | 'banned' | 'unverified' | 'must_change_password'
+export type AdminUserSort = 'created' | 'username' | 'rating' | 'submissions' | 'last_login'
+
+/** Query for the admin users listing. Empty fields mean "no constraint". */
+export interface AdminUserQuery {
+    search?: string
+    role?: string
+    status?: AdminUserStatus | ''
+    sort?: AdminUserSort | ''
+    order?: 'asc' | 'desc'
+    offset?: number
+    limit?: number
+}
+
+export type AdminBulkAction = 'ban' | 'unban' | 'verify_email' | 'unverify_email' | 'set_role'
+
+/** Per-id outcome of a bulk action; failures are reported, not fatal. */
+export interface AdminBulkResult {
+    id: string
+    ok: boolean
+    error?: string
+}
+
+export interface AdminBulkResponse {
+    results: AdminBulkResult[]
+    succeeded: number
+    failed: number
+}
