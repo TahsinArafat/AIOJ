@@ -67,6 +67,7 @@ function baseSubmission(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
     vi.mocked(api.submissions.get).mockReset()
+    localStorage.clear()
 })
 
 test('renders judge cases in the fallback (non-subtask) view', async () => {
@@ -144,4 +145,36 @@ test('a submitter without judge access sees the generic note only', async () => 
     await waitFor(() => expect(screen.getByText(/A system error means the judge itself failed/)).toBeInTheDocument())
     expect(screen.queryByText('Judge error')).not.toBeInTheDocument()
     expect(screen.getByText(/setters and site admins can see the failure details/)).toBeInTheDocument()
+})
+
+// The single-submission page hardcoded "My submissions", so an admin or setter
+// opening somebody else's row was told it was theirs.
+function signInAs(id: string, username: string) {
+    const payload = btoa(JSON.stringify({ uid: id, uname: username, role: 'user' }))
+    localStorage.setItem('access_token', `h.${payload}.s`)
+}
+
+test('breadcrumb says Status for someone else\'s submission, and names the submitter', async () => {
+    signInAs('admin-1', 'admin')
+    vi.mocked(api.submissions.get).mockResolvedValue(
+        baseSubmission({ user_id: 'solver-1', username: 'tamjid' }) as never
+    )
+
+    renderPage()
+
+    await waitFor(() => expect(screen.getByText('Status')).toBeInTheDocument())
+    expect(screen.queryByText('My submissions')).not.toBeInTheDocument()
+    expect(screen.getByText('tamjid')).toBeInTheDocument()
+})
+
+test('breadcrumb says My submissions for your own row', async () => {
+    signInAs('solver-1', 'tamjid')
+    vi.mocked(api.submissions.get).mockResolvedValue(
+        baseSubmission({ user_id: 'solver-1', username: 'tamjid' }) as never
+    )
+
+    renderPage()
+
+    await waitFor(() => expect(screen.getByText('My submissions')).toBeInTheDocument())
+    expect(screen.queryByText('Status')).not.toBeInTheDocument()
 })

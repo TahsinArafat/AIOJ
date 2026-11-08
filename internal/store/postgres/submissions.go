@@ -71,15 +71,19 @@ func (s *SubmissionStore) GetByID(ctx context.Context, id string) (*model.Submis
 	var botID sql.NullString
 	var botSlug sql.NullString
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id,problem_id,user_id,COALESCE(contest_id::text,''),language,source_code,source_code_gz,code_size,
-		        status,score,time_used,memory_used,compile_output,judge_result,
-		        judged_by,created_at,judged_at,submission_type,remote_id,remote_url,
-		        COALESCE(bot_id,''),COALESCE(bot_slug,''),COALESCE(is_upsolving,false),
-		        COALESCE(judge_error,'') FROM submissions WHERE id=$1`, id).Scan(
+		`SELECT s.id,s.problem_id,s.user_id,COALESCE(s.contest_id::text,''),s.language,s.source_code,
+		        s.source_code_gz,s.code_size,s.status,s.score,s.time_used,s.memory_used,
+		        s.compile_output,s.judge_result,s.judged_by,s.created_at,s.judged_at,s.submission_type,
+		        s.remote_id,s.remote_url,COALESCE(s.bot_id,''),COALESCE(s.bot_slug,''),
+		        COALESCE(s.is_upsolving,false),COALESCE(s.judge_error,''),
+		        COALESCE(u.username,'')
+		   FROM submissions s
+		   LEFT JOIN users u ON u.id = s.user_id
+		  WHERE s.id=$1`, id).Scan(
 		&sub.ID, &sub.ProblemID, &sub.UserID, &cid, &sub.Language, &sub.SourceCode, &compressed, &sub.CodeSize,
 		&sub.Status, &sub.Score, &sub.TimeUsed, &sub.MemoryUsed, &co, &jr,
 		&sub.JudgedBy, &sub.CreatedAt, &ja, &sub.SubmissionType, &remoteID, &remoteURL, &botID, &botSlug, &sub.IsUpsolving,
-		&sub.JudgeError)
+		&sub.JudgeError, &sub.Username)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -93,6 +97,11 @@ func (s *SubmissionStore) GetByID(ctx context.Context, id string) (*model.Submis
 		sub.ContestID = cid.String
 	}
 	sub.CompileOutput = co.String
+	// Legacy rows (judged before judge_error existed) kept the message in
+	// compile_output; surface it as the judge error so the UI explains itself.
+	if sub.Status == model.StatusSE && sub.JudgeError == "" {
+		sub.JudgeError = sub.CompileOutput
+	}
 	if ja.Valid {
 		sub.JudgedAt = &ja.Time
 	}
@@ -666,10 +675,19 @@ func (s *SubmissionStore) ResetForRejudge(ctx context.Context, ids []string) err
 // submissionListColumns is the projection shared by the listing queries that
 // have to name the submitter and the problem. Kept in one place so the scan
 // order below cannot drift from the SELECT.
+// judgeErrorExpr is the failure text of a System Error.
+//
+// Rows judged before judge_error existed carry the message in compile_output
+// instead, and the UI hides compile_output unless the verdict is a compile
+// error — so those historical failures looked like they had no explanation.
+// NULLIF keeps a genuinely empty judge_error distinguishable from a missing
+// one.
+const judgeErrorExpr = `COALESCE(NULLIF(s.judge_error,''), CASE WHEN s.status='se' THEN s.compile_output ELSE '' END)`
+
 const submissionListColumns = `s.id,s.user_id,s.problem_id,COALESCE(u.username,''),
 	COALESCE(p.slug,''),COALESCE(p.title,''),
 	s.language,s.status,s.score,s.time_used,s.memory_used,s.created_at,s.submission_type,
-	COALESCE(s.contest_id::text,''),COALESCE(s.is_upsolving,false),COALESCE(s.judge_error,'')`
+	COALESCE(s.contest_id::text,''),COALESCE(s.is_upsolving,false),` + judgeErrorExpr
 
 func scanSubmissionList(rows *sql.Rows) ([]model.Submission, error) {
 	var items []model.Submission
@@ -752,7 +770,10 @@ func (s *SubmissionStore) ListPublic(ctx context.Context, offset, limit int, fil
 		LEFT JOIN contests c ON s.contest_id = c.id`
 
 	args := []interface{}{}
-	conds := []string{}
+	// Seeded with TRUE: an admin (ShowAll) with no filters contributes no
+	// clause of its own, and an empty WHERE is a syntax error — every admin
+	// load of the status page 500'd on it.
+	conds := []string{"TRUE"}
 	next := func(v interface{}) string {
 		args = append(args, v)
 		return fmt.Sprintf("$%d", len(args))

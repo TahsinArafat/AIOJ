@@ -448,3 +448,77 @@ func TestSystemErrorKeepsJudgeErrorText(t *testing.T) {
 		t.Errorf("rejudge must clear judge_error, got %q", reset.JudgeError)
 	}
 }
+
+// An admin sends no visibility clause at all (ShowAll), so with no other
+// filters the query had an empty WHERE and every admin load 500'd.
+func TestListPublicAdminWithoutFilters(t *testing.T) {
+	ctx := context.Background()
+	f, cleanup := newStatusFixture(t, ctx)
+	defer cleanup()
+	store := NewSubmissionStore(f.db)
+
+	rows, total, err := store.ListPublic(ctx, 0, 50, model.PublicSubmissionFilter{ShowAll: true})
+	if err != nil {
+		t.Fatalf("ListPublic(admin, no filters): %v", err)
+	}
+	if total == 0 || len(rows) == 0 {
+		t.Fatal("admin with no filters must still see the full log")
+	}
+	// An unfiltered read must include what a normal reader cannot see.
+	visible := map[string]bool{}
+	for _, r := range rows {
+		visible[r.ID] = true
+	}
+	if !visible[f.subs["hidden"]] || !visible[f.subs["live_contest"]] {
+		t.Error("admin view must include hidden-problem and running-contest rows")
+	}
+	if rows[0].ProblemID == "" {
+		t.Error("rows must carry problem_id")
+	}
+}
+
+// Rows judged before judge_error existed kept the failure text in
+// compile_output, which the UI hides for anything but a compile error. Those
+// rows must still read as explained.
+func TestLegacySystemErrorFallsBackToCompileOutput(t *testing.T) {
+	ctx := context.Background()
+	f, cleanup := newStatusFixture(t, ctx)
+	defer cleanup()
+	store := NewSubmissionStore(f.db)
+
+	const legacy = "execution client error: Post \"http://judge:5050/run\": EOF"
+	id := f.subs["practice_wa"]
+	// Simulate an old worker: message in compile_output, judge_error untouched.
+	if err := store.UpdateResult(ctx, id, model.StatusAC, 100, 1, 1, "", nil); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	if _, err := f.db.ExecContext(ctx,
+		"UPDATE submissions SET status='se', compile_output=$1, judge_error='' WHERE id=$2", legacy, id); err != nil {
+		t.Fatalf("update: %v", err)
+	}
+
+	sub, err := store.GetByID(ctx, id)
+	if err != nil {
+		t.Fatalf("GetByID: %v", err)
+	}
+	if sub.JudgeError != legacy {
+		t.Fatalf("GetByID judge_error = %q, want the legacy compile_output", sub.JudgeError)
+	}
+
+	failures, err := store.ListRecentFailures(ctx, 10)
+	if err != nil {
+		t.Fatalf("ListRecentFailures: %v", err)
+	}
+	found := false
+	for _, row := range failures {
+		if row.ID == id {
+			found = true
+			if row.JudgeError != legacy {
+				t.Errorf("listed judge_error = %q, want the legacy text", row.JudgeError)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("legacy failure missing from ListRecentFailures")
+	}
+}

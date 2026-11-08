@@ -1,6 +1,6 @@
 import { useState, useEffect, Suspense, lazy } from 'react'
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom'
-import { api, contestSlug } from './lib/api'
+import { api, contestSlug, currentUser } from './lib/api'
 import { ThemeProvider } from './context/ThemeContext'
 import { FeaturesProvider } from './context/FeaturesContext'
 import { FeatureGate } from './components/FeatureGate'
@@ -89,14 +89,7 @@ import './global.css'
  * whole home page instead of just showing the signed-out state.
  */
 function decodeUsername(): string | null {
-    const token = localStorage.getItem('access_token')
-    if (!token) return null
-    try {
-        const payload = JSON.parse(atob(token.split('.')[1]))
-        return typeof payload?.uname === 'string' ? payload.uname : null
-    } catch {
-        return null
-    }
+    return currentUser()?.username || null
 }
 
 function RouteFallback() {

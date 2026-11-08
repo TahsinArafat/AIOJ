@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { ExternalLink, RefreshCw } from 'lucide-react'
-import { api } from '../lib/api'
+import { api, currentUser } from '../lib/api'
 import { useDocumentTitle } from '../lib/documentTitle'
 import { resolveProblemSlug, resolveProblemTitle } from '../lib/problemSlugResolver'
 import { languageName } from '../lib/languages'
@@ -35,7 +35,7 @@ function formatTime(ms?: number | null): string {
 
 interface JudgeCase { status: string; case_name?: string; subtask_id?: number; time?: number; memory?: number; score?: number; detail?: string }
 interface SubmissionRecord {
-    id: string; problem_id: string; language: string; status: string;
+    id: string; problem_id: string; user_id?: string; username?: string; language: string; status: string;
     score?: number; time_used: number; memory_used: number; code_size?: number;
     created_at: string; source_code?: string; compile_output?: string;
     judge_error?: string; judged_at?: string | null;
@@ -131,6 +131,8 @@ export default function SubmissionDetail() {
         )
     }
 
+    const viewer = currentUser()
+    const mine = viewer !== null && sub.user_id === viewer.id
     const judgeResult = sub.judge_result || []
     const totalCases = judgeResult.length
     const passedCases = judgeResult.filter(r => r.status === 'ac').length
@@ -148,7 +150,14 @@ export default function SubmissionDetail() {
             {/* ── Header ── */}
             <header>
                 <nav aria-label="Breadcrumb" className="mb-2 flex items-center gap-1.5 text-xs text-muted">
-                    <Link to="/submissions" className="hover:text-ink">My submissions</Link>
+                    {/* Only the owner's own submission belongs to "My
+                        submissions"; everyone else arrived from the status
+                        page (admins and setters open other people's rows). */}
+                    {mine ? (
+                        <Link to="/submissions" className="hover:text-ink">My submissions</Link>
+                    ) : (
+                        <Link to="/status" className="hover:text-ink">Status</Link>
+                    )}
                     <span aria-hidden="true" className="text-hairline-strong">/</span>
                     <span className="tnum font-mono text-muted-soft">{sub.id.slice(0, 8)}</span>
                 </nav>
@@ -166,6 +175,14 @@ export default function SubmissionDetail() {
                                 </Link>
                             ) : (
                                 <span>{problemTitle || `Problem ${sub.problem_id?.slice(0, 8)}`}</span>
+                            )}
+                            {!mine && sub.username && (
+                                <>
+                                    <span aria-hidden="true">·</span>
+                                    <Link to={`/user/${sub.username}`} className="hover:text-ink">
+                                        {sub.username}
+                                    </Link>
+                                </>
                             )}
                             <span aria-hidden="true">·</span>
                             <span>{languageName(sub.language)}</span>

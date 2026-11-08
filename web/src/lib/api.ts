@@ -119,6 +119,29 @@ export async function signOut(): Promise<void> {
 
 export function getAccessToken(): string | null { return accessToken }
 
+/**
+ * Claims of the session token, or null when signed out.
+ *
+ * Reads the stored token as a fallback so a fresh page load (before this
+ * module's state is populated) still knows who is signed in. Never throws: a
+ * truncated or corrupted token must degrade to "signed out", not blank a page.
+ */
+export function currentUser(): { id: string; username: string; role: string } | null {
+    const token = accessToken ?? localStorage.getItem('access_token')
+    if (!token) return null
+    try {
+        const payload = JSON.parse(atob(token.split('.')[1]))
+        if (typeof payload?.uid !== 'string') return null
+        return {
+            id: payload.uid,
+            username: typeof payload.uname === 'string' ? payload.uname : '',
+            role: typeof payload.role === 'string' ? payload.role : '',
+        }
+    } catch {
+        return null
+    }
+}
+
 function getCsrfToken(): string {
     const m = document.cookie.match(/(?:^|;\s*)csrf=([^;]+)/)
     return m ? decodeURIComponent(m[1]) : ''
