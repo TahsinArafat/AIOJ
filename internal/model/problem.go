@@ -17,12 +17,12 @@ type TestCaseScore struct {
 }
 
 type Problem struct {
-	ID                   string          `json:"id"`
-	Slug                 string          `json:"slug"`
-	Title                string          `json:"title"`
-	Description          string          `json:"description"`
-	InputFormat          string          `json:"input_format,omitempty"`
-	OutputFormat         string          `json:"output_format,omitempty"`
+	ID           string `json:"id"`
+	Slug         string `json:"slug"`
+	Title        string `json:"title"`
+	Description  string `json:"description"`
+	InputFormat  string `json:"input_format,omitempty"`
+	OutputFormat string `json:"output_format,omitempty"`
 	// Constraints is a LaTeX/Markdown block of the problem's numeric bounds,
 	// rendered as its own section on the problem page (Codeforces style). It is
 	// separate from Description so the bounds are always marked as constraints.

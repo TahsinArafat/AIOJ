@@ -83,7 +83,8 @@ export default function AIJobsPage() {
         }).catch(e => setError(errorMessage(e))).finally(() => setLoading(false))
     }
 
-    useEffect(() => { load() }, [offset, filterStatus, actorFilter]) // eslint-disable-line react-hooks/exhaustive-deps
+    // deferred a microtask: the spinner lands pre-paint (react-hooks/set-state-in-effect)
+    useEffect(() => { queueMicrotask(load) }, [offset, filterStatus, actorFilter]) // eslint-disable-line react-hooks/exhaustive-deps
 
     // Poll if any jobs are active
     useEffect(() => {
