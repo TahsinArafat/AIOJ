@@ -633,6 +633,25 @@ export interface OAuthLink {
     linked_at: string
 }
 
+/**
+ * Response of a first-time OAuth callback: no session yet, because the account
+ * is only created once the person has chosen a username.
+ */
+export interface OAuthSignupChallenge {
+    requires_username: boolean
+    signup_token: string
+    suggested_username?: string
+    provider?: string
+    email?: string
+}
+
+/** GET /api/auth/oauth/username-available — the sign-up form's live hint. */
+export interface OAuthUsernameCheck {
+    available: boolean
+    username?: string
+    error?: string
+}
+
 export interface OnsiteBatchUser {
     id: string
     contest_id: string

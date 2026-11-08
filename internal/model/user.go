@@ -70,6 +70,31 @@ type AuthResponse struct {
 	ChallengeID  string `json:"challenge_id,omitempty"`
 }
 
+// OAuthSignupChallenge is the answer to a first-time OAuth callback: no
+// session yet, because the account is only created once the person has chosen
+// a username. SignupToken is a signed, short-lived copy of the provider
+// identity that CompleteSignup exchanges for a real account.
+type OAuthSignupChallenge struct {
+	RequiresUsername  bool   `json:"requires_username"`
+	SignupToken       string `json:"signup_token"`
+	SuggestedUsername string `json:"suggested_username,omitempty"`
+	Provider          string `json:"provider,omitempty"`
+	Email             string `json:"email,omitempty"`
+}
+
+// OAuthSignupRequest finishes a pending OAuth sign-up.
+type OAuthSignupRequest struct {
+	SignupToken string `json:"signup_token"`
+	Username    string `json:"username"`
+}
+
+// OAuthUsernameCheck answers the sign-up form's availability lookup.
+type OAuthUsernameCheck struct {
+	Available bool   `json:"available"`
+	Username  string `json:"username,omitempty"`
+	Error     string `json:"error,omitempty"`
+}
+
 // TOTPSecret is a per-user TOTP enrollment (enabled after first valid code).
 type TOTPSecret struct {
 	UserID    string     `json:"user_id"`

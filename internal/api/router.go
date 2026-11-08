@@ -211,6 +211,11 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 	}
 	if d.OAuthCallback != nil {
 		r.Get("/api/auth/oauth/{provider}/callback", d.OAuthCallback.Callback)
+		// Second half of a first-time sign-in: the callback deliberately
+		// returns a ticket instead of an account (see OAuthCallbackHandler),
+		// so the person chooses the username before the row exists.
+		r.With(rl.StrictAuth).Post("/api/auth/oauth/complete", d.OAuthCallback.CompleteSignup)
+		r.Get("/api/auth/oauth/username-available", d.OAuthCallback.UsernameAvailable)
 	}
 
 	r.Get("/api/users/{username}", usersH.GetByUsername)

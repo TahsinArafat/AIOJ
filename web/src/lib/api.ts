@@ -218,7 +218,7 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
     }
 }
 
-import type { AIBrief, AIBriefPreset, AIGenerationJob, AIModel, APIKey, ActivityItem, AdminBulkAction, AdminBulkResponse, AdminFeature, AdminUserDetail, AdminUserQuery, AdminAuthMethods, AdminUserRow, AuthMethods, AuthResponse, AuthSessionResponse, BackupFile, BlogListItem, BlogPost, BotAccount, Clarification, Class, ClassListItem, ClassMember, Comment, Contest, ContestDetailResponse, ContestNotice, ContestPermission, ContestProblem, ContestRegistration, ContestSubmissionsResponse, DetectedTool, Editorial, FeaturePolicy, Group, GroupListItem, GroupMember, GroupPendingInvite, GymContest, GymData, Hack, HackResult, HackSubmission, LanguageConfig, Notification, NotificationPreferences, OnsiteBatchUser, Organization, OrganizationListItem, OrganizationMember, PendingInvite, PendingRemoteSubmission, PlagiarismPairDetail, PlagiarismReport, Problem, ProblemI18n, ProblemListItem, ProblemPermission, ProblemStats, PublicProfile, RankingEntry, RatingHistoryEntry, RemoteLanguage, ResolvedFeature, ScoreboardData, SetterApplication, Submission, Team, TeamListItem, TeamMember, TestResult, TrainingPlan, TrainingPlanDetail, TrainingPlanEnrollment, TrainingPlanProblem, TrainingPlanProgress, TrainingPlanSection, User, UserAchievement, UserProblemStats, UserProfile, VirtualContest, VirtualStatusResponse, WeakTagsRecommendations, Webhook } from '../types/api'
+import type { AIBrief, AIBriefPreset, AIGenerationJob, AIModel, APIKey, ActivityItem, AdminBulkAction, AdminBulkResponse, AdminFeature, AdminUserDetail, AdminUserQuery, AdminAuthMethods, AdminUserRow, AuthMethods, AuthResponse, AuthSessionResponse, BackupFile, BlogListItem, BlogPost, BotAccount, Clarification, Class, ClassListItem, ClassMember, Comment, Contest, ContestDetailResponse, ContestNotice, ContestPermission, ContestProblem, ContestRegistration, ContestSubmissionsResponse, DetectedTool, Editorial, FeaturePolicy, Group, GroupListItem, GroupMember, GroupPendingInvite, GymContest, GymData, Hack, HackResult, HackSubmission, LanguageConfig, Notification, NotificationPreferences, OAuthUsernameCheck, OnsiteBatchUser, Organization, OrganizationListItem, OrganizationMember, PendingInvite, PendingRemoteSubmission, PlagiarismPairDetail, PlagiarismReport, Problem, ProblemI18n, ProblemListItem, ProblemPermission, ProblemStats, PublicProfile, RankingEntry, RatingHistoryEntry, RemoteLanguage, ResolvedFeature, ScoreboardData, SetterApplication, Submission, Team, TeamListItem, TeamMember, TestResult, TrainingPlan, TrainingPlanDetail, TrainingPlanEnrollment, TrainingPlanProblem, TrainingPlanProgress, TrainingPlanSection, User, UserAchievement, UserProblemStats, UserProfile, VirtualContest, VirtualStatusResponse, WeakTagsRecommendations, Webhook } from '../types/api'
 
 export const api = {
     auth: {
@@ -258,6 +258,24 @@ export const api = {
             request<{ message: string }>('/auth/verify-email/resend', { method: 'POST' }),
         logout: (refresh_token: string) =>
             request<null>('/auth/logout', { method: 'POST', body: JSON.stringify({ refresh_token }) }),
+        /**
+         * Finish a first-time OAuth sign-up.
+         *
+         * The callback deliberately issues a signed ticket instead of an
+         * account, so the person can pick the handle everyone else will see.
+         * This trades that ticket for a real session.
+         */
+        completeOAuthSignup: (d: { signup_token: string; username: string }) =>
+            request<AuthSessionResponse>('/auth/oauth/complete', {
+                method: 'POST',
+                body: JSON.stringify(d),
+            }),
+        /** Live availability hint for the sign-up form (needs its ticket). */
+        oauthUsernameAvailable: (signup_token: string, username: string) =>
+            request<OAuthUsernameCheck>(
+                `/auth/oauth/username-available?signup_token=${encodeURIComponent(signup_token)}` +
+                    `&username=${encodeURIComponent(username)}`,
+            ),
     },
     twoFactor: {
         begin: () =>
