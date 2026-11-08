@@ -211,6 +211,15 @@ services:
       dockerfile: Dockerfile
     expose:
       - "80"
+    # CRITICAL (Dokploy): Traefik lives on `dokploy-network`. Without joining
+    # it, Traefik sees the container via the Docker API but has no reachable
+    # IP for it -> 404. This is how Dokploy Applications (e.g. Sleepy/dashboard)
+    # work: Dokploy attaches the container to dokploy-network automatically.
+    # Compose stacks must do it explicitly. Keep `default` too so nginx can
+    # still reach backend:8080.
+    networks:
+      - default
+      - dokploy-network
     depends_on:
       backend:
         condition: service_started
@@ -376,6 +385,10 @@ services:
 networks:
   sandbox:
     internal: true
+  # Traefik (Dokploy) network — external, created/managed by Dokploy.
+  # Containers not on it are invisible to the router (→ 404).
+  dokploy-network:
+    external: true
 
 volumes:
   pgdata:
