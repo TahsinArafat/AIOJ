@@ -74,6 +74,9 @@ type ProblemStore interface {
 	ListWithFilter(ctx context.Context, offset, limit int, difficulty string, tags []string, search string, source string, rating string, sortBy string) ([]model.ProblemListItem, int, error)
 	ListByCreatedBy(ctx context.Context, userID string, offset, limit int) ([]model.ProblemListItem, int, error)
 	GetAllTags(ctx context.Context) ([]string, error)
+	// InUnreleasedContest reports whether the problem is in a contest that has
+	// not finished yet, so public reads can withhold its difficulty metadata.
+	InUnreleasedContest(ctx context.Context, problemID string) (bool, error)
 	UpdateCounts(ctx context.Context, id string, addSubmission, addAccepted int) error
 	Update(ctx context.Context, id string, p *model.Problem) error
 	Delete(ctx context.Context, id string) error

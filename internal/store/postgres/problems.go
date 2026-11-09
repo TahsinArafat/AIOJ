@@ -109,6 +109,26 @@ const problemColumns = `p.id, p.slug, p.title, p.description, COALESCE(p.constra
 	COALESCE(p.scoring_mode,'complete'), COALESCE(p.subtask_aggregation,'min'),
 	COALESCE(p.ai_generated,false)`
 
+// unreleasedContestSQL is true when the problem belongs to a contest that has
+// not finished yet. A problem in such a contest still shows its statement, but
+// its difficulty, rating and tags would give the answer's shape away, so every
+// public read uses this to decide whether to withhold them.
+const unreleasedContestSQL = `EXISTS (
+	SELECT 1 FROM contest_problems cp
+	JOIN contests c ON c.id = cp.contest_id
+	WHERE cp.problem_id = p.id AND c.end_time > NOW()
+)`
+
+// InUnreleasedContest reports whether the problem is part of a contest that has
+// not finished yet.
+func (s *ProblemStore) InUnreleasedContest(ctx context.Context, problemID string) (bool, error) {
+	var locked bool
+	err := s.db.QueryRowContext(ctx,
+		"SELECT EXISTS (SELECT 1 FROM contest_problems cp JOIN contests c ON c.id = cp.contest_id WHERE cp.problem_id = $1 AND c.end_time > NOW())",
+		problemID).Scan(&locked)
+	return locked, err
+}
+
 // problemScanner is the *sql.Row / *sql.Rows shape scanProblem needs.
 type problemScanner interface {
 	Scan(dest ...any) error
@@ -159,9 +179,10 @@ func (s *ProblemStore) getBy(ctx context.Context, field, value string) (*model.P
 func (s *ProblemStore) List(ctx context.Context, offset, limit int) ([]model.ProblemListItem, int, error) {
 	var total int
 	s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM problems WHERE visible=true`).Scan(&total)
-	rows, err := s.db.QueryContext(ctx,
-		`SELECT id,slug,title,difficulty,COALESCE(rating,0),tags,submission_count,accepted_count,source
-		 FROM problems WHERE visible=true ORDER BY created_at DESC OFFSET $1 LIMIT $2`, offset, limit)
+	query := fmt.Sprintf(`SELECT p.id, p.slug, p.title, p.difficulty, COALESCE(p.rating,0), p.tags,
+		 p.submission_count, p.accepted_count, p.source, %s
+		 FROM problems p WHERE p.visible=true ORDER BY p.created_at DESC OFFSET $1 LIMIT $2`, unreleasedContestSQL)
+	rows, err := s.db.QueryContext(ctx, query, offset, limit)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -171,7 +192,7 @@ func (s *ProblemStore) List(ctx context.Context, offset, limit int) ([]model.Pro
 		var item model.ProblemListItem
 		var tags []string
 		rows.Scan(&item.ID, &item.Slug, &item.Title, &item.Difficulty, &item.Rating, pq.Array(&tags),
-			&item.SubmissionCount, &item.AcceptedCount, &item.Source)
+			&item.SubmissionCount, &item.AcceptedCount, &item.Source, &item.InUnreleasedContest)
 		item.Tags = tags
 		items = append(items, item)
 	}
@@ -341,8 +362,9 @@ func (s *ProblemStore) ListWithFilter(ctx context.Context, offset, limit int, di
 		orderClause = "p.title ASC"
 	}
 
-	selectQuery := fmt.Sprintf(`SELECT p.id, p.slug, p.title, p.difficulty, COALESCE(p.rating,0), p.tags, p.submission_count, p.accepted_count, p.source
-		FROM problems p WHERE %s ORDER BY %s OFFSET $%d LIMIT $%d`, whereClause, orderClause, argIdx, argIdx+1)
+	selectQuery := fmt.Sprintf(`SELECT p.id, p.slug, p.title, p.difficulty, COALESCE(p.rating,0), p.tags,
+		p.submission_count, p.accepted_count, p.source, %s
+		FROM problems p WHERE %s ORDER BY %s OFFSET $%d LIMIT $%d`, unreleasedContestSQL, whereClause, orderClause, argIdx, argIdx+1)
 	args = append(args, offset, limit)
 
 	rows, err := s.db.QueryContext(ctx, selectQuery, args...)
@@ -356,7 +378,7 @@ func (s *ProblemStore) ListWithFilter(ctx context.Context, offset, limit int, di
 		var item model.ProblemListItem
 		var tagArr []string
 		rows.Scan(&item.ID, &item.Slug, &item.Title, &item.Difficulty, &item.Rating, pq.Array(&tagArr),
-			&item.SubmissionCount, &item.AcceptedCount, &item.Source)
+			&item.SubmissionCount, &item.AcceptedCount, &item.Source, &item.InUnreleasedContest)
 		item.Tags = tagArr
 		items = append(items, item)
 	}

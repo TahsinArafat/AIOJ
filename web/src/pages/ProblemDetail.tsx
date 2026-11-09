@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
-import { StatementSection, StatementBody } from '../components/StatementSection'
+import { ProblemStatement } from '../components/ProblemStatement'
 import 'katex/dist/katex.min.css'
 import { api, getAccessToken } from '../lib/api'
 import ProblemStats from '../components/ProblemStats'
@@ -10,7 +10,7 @@ import AddEditorialModal from '../components/AddEditorialModal'
 import CommentSection from '../components/CommentSection'
 import { EmptyState } from '../components/EmptyState'
 import { SubmissionStatusPanel, type SubmissionStatusData } from '../components/SubmissionStatusPanel'
-import { Download, Copy, Check } from 'lucide-react'
+
 import { useTranslation } from 'react-i18next'
 import { useToast } from '../components/Toast'
 import { Badge } from '../components/ui/Badge'
@@ -32,49 +32,6 @@ function useIsDesktop(breakpoint = 768) {
         return () => mql.removeEventListener('change', handler)
     }, [breakpoint])
     return isDesktop
-}
-
-function isPdfUrl(url: string | undefined | null): boolean {
-    if (!url) return false
-    try {
-        const parsed = new URL(url)
-        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false
-    } catch {
-        return false
-    }
-    const lower = url.toLowerCase()
-    return lower.endsWith('.pdf') || lower.includes('/problem.pdf')
-}
-
-function CopyButton({ text }: { text: string }) {
-    const [copied, setCopied] = useState(false)
-
-    const handleCopy = async () => {
-        try {
-            await navigator.clipboard.writeText(text)
-            setCopied(true)
-            setTimeout(() => setCopied(false), 2000)
-        } catch {
-            const ta = document.createElement('textarea')
-            ta.value = text
-            document.body.appendChild(ta)
-            ta.select()
-            document.execCommand('copy')
-            document.body.removeChild(ta)
-            setCopied(true)
-            setTimeout(() => setCopied(false), 2000)
-        }
-    }
-
-    return (
-        <button
-            onClick={handleCopy}
-            className="text-xs text-muted hover:text-ink transition-colors px-2 py-1 rounded hover:bg-surface-3 cursor-pointer"
-            title="Copy to clipboard"
-        >
-            {copied ? <><Check className="w-3.5 h-3.5" /> Copied</> : <><Copy className="w-3.5 h-3.5" /> Copy</>}
-        </button>
-    )
 }
 
 function decodeRole(): string | null {
@@ -550,70 +507,7 @@ export default function ProblemDetail() {
 
                 {tab === 'statement' ? (
                     <div className="space-y-5 pb-8 px-4 py-6 md:px-8 md:py-8">
-                        {isPdfUrl(effectiveDescription) ? (
-                            <div className="space-y-3">
-                                <h3 className="font-semibold text-sm text-ink-soft uppercase tracking-wide">PDF Problem Statement</h3>
-                                <a
-                                    href={effectiveDescription}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-brand bg-brand-soft border border-blue-200 dark:border-blue-800 rounded-lg hover:bg-brand-soft transition-colors"
-                                >
-                                    <Download className="w-4 h-4" />
-                                    Download PDF
-                                </a>
-                                <iframe
-                                    src={effectiveDescription}
-                                    className="w-full h-[800px] border-0 rounded-lg shadow-sm bg-surface"
-                                    title="Problem Statement"
-                                />
-                            </div>
-                        ) : (
-                            <StatementBody body={effectiveDescription} />
-                        )}
-                        {problem.input_format && (
-                            <StatementSection title="Input format" body={problem.input_format} />
-                        )}
-                        {problem.output_format && (
-                            <StatementSection title="Output format" body={problem.output_format} />
-                        )}
-                        {problem.constraints && (
-                            <StatementSection title="Constraints" body={problem.constraints} />
-                        )}
-                        {/* This block is `problem.hint`, not the constraints — it used to
-                            render under a "Constraints" heading and mislead readers. */}
-                        {problem.hint && (
-                            <StatementSection title="Notes" body={problem.hint} />
-                        )}
-                        {problem.sample_cases && problem.sample_cases.length > 0 && problem.sample_cases.map((sc, i) => (
-                            <div key={i}>
-                                <h3 className="text-xs font-semibold text-muted uppercase tracking-wide mb-2">Sample {i + 1}</h3>
-                                <div className="border border-hairline rounded-md overflow-hidden mb-4">
-                                    <div className="grid grid-cols-1 md:grid-cols-2">
-                                        <div className="border-b md:border-b-0 md:border-r border-hairline">
-                                            <div className="bg-surface-2 px-3 py-2 border-b border-hairline flex items-center justify-between">
-                                                <span className="text-xs font-semibold text-muted">Standard Input</span>
-                                                <CopyButton text={sc.input} />
-                                            </div>
-                                            <pre className="p-3 font-mono text-[13px] text-ink whitespace-pre-wrap break-all">{sc.input}</pre>
-                                        </div>
-                                        <div>
-                                            <div className="bg-surface-2 px-3 py-2 border-b border-hairline flex items-center justify-between">
-                                                <span className="text-xs font-semibold text-muted">Standard Output</span>
-                                                <CopyButton text={sc.output} />
-                                            </div>
-                                            <pre className="p-3 font-mono text-[13px] text-ink whitespace-pre-wrap break-all">{sc.output}</pre>
-                                        </div>
-                                    </div>
-                                </div>
-                                {sc.explanation && (
-                                    <StatementBody
-                                        body={sc.explanation}
-                                        className="prose prose-sm mt-1 max-w-none text-xs text-muted"
-                                    />
-                                )}
-                            </div>
-                        ))}
+                        <ProblemStatement problem={{ ...problem, description: effectiveDescription }} />
                     </div>
                 ) : tab === 'more' ? (
                     <div className="space-y-6 max-w-2xl py-2">

@@ -809,7 +809,7 @@ export const api = {
         checkRegistration: (id: string) => request<{ registered: boolean }>(`/contests/${id}/register`),
         listRegistrations: (id: string) => request<{ data: ContestRegistration[]; count: number }>(`/contests/${id}/registrations`),
         getProblemByIndex: (contestId: string, index: string) =>
-            request<{ problem: Problem; contest: Contest; can_submit?: boolean; upsolving_disabled?: boolean; statement_hidden?: boolean; is_judge?: boolean }>(`/contests/${contestId}/problems/${index}`),
+            request<{ problem: Problem; contest: Contest; can_submit?: boolean; upsolving_disabled?: boolean; statement_hidden?: boolean; is_judge?: boolean; spoilers_hidden?: boolean }>(`/contests/${contestId}/problems/${index}`),
         addProblem: (contestId: string, d: { problem_id: string; index: string; score?: number }) =>
             request<{ status: string }>(`/contests/${contestId}/problems`, { method: 'POST', body: JSON.stringify(d) }),
         updateProblem: (contestId: string, problemId: string, d: { index: string; score: number; sort_order: number }) =>

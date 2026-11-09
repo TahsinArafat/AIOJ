@@ -69,6 +69,10 @@ type ProblemListItem struct {
 	SubmissionCount int      `json:"submission_count"`
 	AcceptedCount   int      `json:"accepted_count"`
 	Source          string   `json:"source"`
+	// InUnreleasedContest reports whether the problem belongs to a contest that
+	// has not finished yet. It is not serialized: the handler uses it to decide
+	// whether difficulty and rating have to be withheld.
+	InUnreleasedContest bool `json:"-"`
 }
 
 type ProblemWithSamples struct {

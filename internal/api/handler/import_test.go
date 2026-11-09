@@ -16,6 +16,10 @@ import (
 type mockProblemStore struct {
 	createErr error
 	getBySlug *model.Problem
+	// listItems is what List returns, so the spoiler tests can drive rows.
+	listItems []model.ProblemListItem
+	// unreleasedContest answers InUnreleasedContest for every problem.
+	unreleasedContest bool
 	// access maps "userID/problemID" -> access level. A nil map means nobody
 	// has access anywhere, which is what the import tests rely on.
 	access map[string]string
@@ -29,7 +33,7 @@ func (m *mockProblemStore) GetBySlug(_ context.Context, _ string) (*model.Proble
 	return m.getBySlug, nil
 }
 func (m *mockProblemStore) List(_ context.Context, _, _ int) ([]model.ProblemListItem, int, error) {
-	return nil, 0, nil
+	return m.listItems, len(m.listItems), nil
 }
 func (m *mockProblemStore) ListWithFilter(_ context.Context, _, _ int, _ string, _ []string, _ string, _ string, _ string, _ string) ([]model.ProblemListItem, int, error) {
 	return nil, 0, nil
@@ -37,7 +41,10 @@ func (m *mockProblemStore) ListWithFilter(_ context.Context, _, _ int, _ string,
 func (m *mockProblemStore) ListByCreatedBy(_ context.Context, _ string, _, _ int) ([]model.ProblemListItem, int, error) {
 	return nil, 0, nil
 }
-func (m *mockProblemStore) GetAllTags(_ context.Context) ([]string, error)             { return nil, nil }
+func (m *mockProblemStore) GetAllTags(_ context.Context) ([]string, error) { return nil, nil }
+func (m *mockProblemStore) InUnreleasedContest(_ context.Context, _ string) (bool, error) {
+	return m.unreleasedContest, nil
+}
 func (m *mockProblemStore) UpdateCounts(_ context.Context, _ string, _, _ int) error   { return nil }
 func (m *mockProblemStore) Update(_ context.Context, _ string, _ *model.Problem) error { return nil }
 func (m *mockProblemStore) Delete(_ context.Context, _ string) error                   { return nil }

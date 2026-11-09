@@ -64,6 +64,15 @@ func (h *ProblemHandler) List(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	// Every row carries a difficulty badge and a rating, which would name the
+	// difficulty of a problem that is still live in a contest. This is the public
+	// list, so the restriction applies to everyone including admins: the setter
+	// workspace is where an author sees their own problems in full.
+	for i := range items {
+		if items[i].InUnreleasedContest {
+			redactProblemListItem(&items[i])
+		}
+	}
 	respondJSON(w, http.StatusOK, map[string]interface{}{
 		"data":   items,
 		"total":  total,
@@ -91,13 +100,18 @@ func (h *ProblemHandler) GetBySlug(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
+	claims := middleware.GetUserClaims(r)
 	// Privacy guard: private problems only visible to admin, owner, co_author, tester
 	if !p.Visible {
-		claims := middleware.GetUserClaims(r)
 		if claims == nil || (claims.Role != "admin" && !h.store.HasAccess(r.Context(), p.ID, claims.UserID, "owner", "co_author", "tester")) {
 			http.Error(w, "forbidden", http.StatusForbidden)
 			return
 		}
+	}
+	// Contest problems are ordinary archive problems here, so this endpoint is a
+	// second way to reach one that is still being used by a running contest.
+	if hideSpoilers(r.Context(), h.store, p, claims) {
+		redactProblem(p)
 	}
 	respondJSON(w, http.StatusOK, p)
 }

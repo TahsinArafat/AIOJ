@@ -1,20 +1,32 @@
 package handler
 
 import (
+	"context"
 	"net/http"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
+	"github.com/tahsinarafat/aioj/internal/model"
 	"github.com/tahsinarafat/aioj/internal/store"
 )
 
+// contestProblemStore is the slice of the contest store this handler needs.
+// Narrower than store.ContestStore so the spoiler policy can be tested without
+// standing up the whole store.
+type contestProblemStore interface {
+	GetByID(ctx context.Context, id string) (*model.Contest, error)
+	HasAccess(ctx context.Context, contestID, userID string, requiredLevels ...string) bool
+	GetContestProblemByIndex(ctx context.Context, contestID, index string) (*model.Problem, error)
+	IsParticipant(ctx context.Context, contestID, userID string) (bool, error)
+}
+
 type ContestProblemHandler struct {
-	contestStore store.ContestStore
+	contestStore contestProblemStore
 	problemStore store.ProblemStore
 }
 
-func NewContestProblemHandler(cs store.ContestStore, ps store.ProblemStore) *ContestProblemHandler {
+func NewContestProblemHandler(cs contestProblemStore, ps store.ProblemStore) *ContestProblemHandler {
 	return &ContestProblemHandler{
 		contestStore: cs,
 		problemStore: ps,
@@ -47,6 +59,17 @@ func (h *ContestProblemHandler) GetByIndex(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	isJudge := claims != nil && (claims.Role == "admin" || h.contestStore.HasAccess(r.Context(), contest.ID, claims.UserID, "manager", "judge"))
+
+	// Difficulty, rating, tags, the hint and the solve counts stay hidden until
+	// every contest using this problem is over, the way Codeforces reveals tags
+	// and rating only after the round. Judges and the problem's own authors keep
+	// the full view: they need it to run and edit the contest.
+	seesSpoilers := isJudge || !hideSpoilers(r.Context(), h.problemStore, problem, claims)
+	if !seesSpoilers {
+		redactProblem(problem)
+	}
+
 	if now.After(contest.EndTime) && !problem.Visible {
 		if !contest.UpsolvingEnabled {
 			if claims == nil {
@@ -65,6 +88,7 @@ func (h *ContestProblemHandler) GetByIndex(w http.ResponseWriter, r *http.Reques
 				"contest":            contest,
 				"can_submit":         false,
 				"upsolving_disabled": true,
+				"spoilers_hidden":    !seesSpoilers,
 			})
 			return
 		}
@@ -75,8 +99,6 @@ func (h *ContestProblemHandler) GetByIndex(w http.ResponseWriter, r *http.Reques
 		canSubmit = false
 	}
 
-	isJudge := claims != nil && (claims.Role == "admin" || h.contestStore.HasAccess(r.Context(), contest.ID, claims.UserID, "manager", "judge"))
-
 	statementHidden := contest.StatementHidden && !isJudge
 
 	respondJSON(w, http.StatusOK, map[string]interface{}{
@@ -85,5 +107,6 @@ func (h *ContestProblemHandler) GetByIndex(w http.ResponseWriter, r *http.Reques
 		"can_submit":       canSubmit,
 		"statement_hidden": statementHidden,
 		"is_judge":         isJudge,
+		"spoilers_hidden":  !seesSpoilers,
 	})
 }

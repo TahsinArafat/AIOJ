@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { EmptyState } from '../components/EmptyState'
 import { LANGUAGE_OPTIONS } from '../lib/languages'
-import { StatementBody, StatementSection } from '../components/StatementSection'
+import { ProblemStatement } from '../components/ProblemStatement'
 import { ProblemMeta } from '../components/ProblemMeta'
 import { Badge } from '../components/ui/Badge'
 import 'katex/dist/katex.min.css'
@@ -10,7 +10,7 @@ import { api, getAccessToken } from '../lib/api'
 import { useDocumentTitle } from '../lib/documentTitle'
 import { lazy } from 'react'
 const CodeEditor = lazy(() => import('../components/CodeEditor'))
-import { Copy, Check, Lightbulb, ClipboardList, BarChart3, FileText, Download } from 'lucide-react'
+import { ClipboardList, BarChart3, FileText } from 'lucide-react'
 import { useToast } from '../components/Toast'
 import { SubmissionStatusPanel } from '../components/SubmissionStatusPanel'
 import { errorMessage } from '../lib/errors'
@@ -19,7 +19,6 @@ import { errorMessage } from '../lib/errors'
 // importing model types (shared type files are in flux).
 type LoadedProblem = Awaited<ReturnType<typeof api.contests.getProblemByIndex>>['problem'] & { problem_type?: string }
 type LoadedContest = Awaited<ReturnType<typeof api.contests.getProblemByIndex>>['contest']
-interface SampleCaseData { input: string; output?: string; explanation?: string }
 interface SubmissionView {
     id?: string
     error?: string
@@ -34,19 +33,6 @@ interface SubmissionView {
 interface SubRow { id: string; status?: string; created_at?: string; time_used?: number; memory_used?: number; language?: string }
 interface RunResult { stdout?: string; stderr?: string; expected?: string; passed?: boolean | null; status?: string; time_used?: number; memory_used?: number; compile_output?: string; error?: string }
 interface SampleRunResult { index: number; input: string; expected?: string; actual?: string; passed: boolean; status?: string; time?: number; memory?: number; stderr?: string; compile_output?: string; error?: string }
-
-function isPdfUrl(url: string | undefined | null): boolean {
-    if (!url) return false
-    try {
-        const parsed = new URL(url)
-        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false
-    } catch {
-        return false
-    }
-    const lower = url.toLowerCase()
-    return lower.endsWith('.pdf') || lower.includes('/problem.pdf')
-}
-
 
 /** True when the split view has to collapse into a single column (matches `lg`). */
 function isNarrowViewport(): boolean {
@@ -189,94 +175,6 @@ function RunningTimer({ start, end }: { start: string; end: string }) {
     )
 }
 
-function CopyButton({ text }: { text: string }) {
-    const [copied, setCopied] = useState(false)
-
-    const handleCopy = async () => {
-        try {
-            await navigator.clipboard.writeText(text)
-            setCopied(true)
-            setTimeout(() => setCopied(false), 2000)
-        } catch {
-            const ta = document.createElement('textarea')
-            ta.value = text
-            document.body.appendChild(ta)
-            ta.select()
-            document.execCommand('copy')
-            document.body.removeChild(ta)
-            setCopied(true)
-            setTimeout(() => setCopied(false), 2000)
-        }
-    }
-
-    return (
-        <button
-            onClick={handleCopy}
-            className="text-xs text-muted hover:text-ink transition-colors px-2 py-1 rounded hover:bg-surface-3"
-            title="Copy to clipboard"
-        >
-            {copied ? <><Check className="w-3.5 h-3.5" /> Copied</> : <><Copy className="w-3.5 h-3.5" /> Copy</>}
-        </button>
-    )
-}
-
-function SampleCase({ sample, index }: { sample: SampleCaseData; index: number }) {
-    return (
-        <div className="border border-hairline rounded-lg overflow-hidden">
-            <div className="bg-surface-2/20 px-4 py-2 border-b border-hairline">
-                <span className="font-semibold text-sm text-ink-soft">Sample {index + 1}</span>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-hairline">
-                <div className="p-4">
-                    <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-semibold text-muted uppercase tracking-wide">Input</span>
-                        <CopyButton text={sample.input} />
-                    </div>
-                    <pre className="bg-surface-2 text-ink border border-hairline text-sm p-3 rounded-md overflow-x-auto font-mono whitespace-pre-wrap">
-                        {sample.input}
-                    </pre>
-                </div>
-                <div className="p-4">
-                    <div className="flex items-center justify-between mb-2">
-                        <span className="text-xs font-semibold text-muted uppercase tracking-wide">Output</span>
-                        <CopyButton text={sample.output || ''} />
-                    </div>
-                    <pre className="bg-surface-2 text-ink border border-hairline text-sm p-3 rounded-md overflow-x-auto font-mono whitespace-pre-wrap">
-                        {sample.output}
-                    </pre>
-                </div>
-            </div>
-            {sample.explanation && (
-                <div className="border-t border-hairline bg-brand-soft px-4 py-3">
-                    <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-brand">Explanation</div>
-                    <StatementBody body={sample.explanation} className="prose prose-sm max-w-none text-xs text-ink-soft" />
-                </div>
-            )}
-        </div>
-    )
-}
-
-function HintSection({ hint }: { hint: string }) {
-    const [expanded, setExpanded] = useState(false)
-
-    return (
-        <div className="border border-warn/30 rounded-lg overflow-hidden">
-            <button
-                onClick={() => setExpanded(!expanded)}
-                className="w-full flex items-center justify-between px-4 py-3 bg-warn/10 hover:bg-warn/12 transition-colors text-left"
-            >
-                <span className="text-sm font-semibold text-warn flex items-center gap-1.5"><Lightbulb className="w-4 h-4" /> Hint</span>
-                <span className="text-warn text-sm">{expanded ? '▲ Hide' : '▼ Show'}</span>
-            </button>
-            {expanded && (
-                <div className="px-4 py-3 bg-surface border-t border-warn/30">
-                    <StatementBody body={hint} className="prose prose-sm max-w-none text-[14px] leading-[1.65] text-ink-soft" />
-                </div>
-            )}
-        </div>
-    )
-}
-
 /**
  * Receipt for the submission made on this page. The id and the live verdict
  * come from the shared panel so a contest submission and a practice one look
@@ -411,6 +309,9 @@ export default function ContestProblem() {
     const [canSubmit, setCanSubmit] = useState(true)
     const [upsolvingDisabled, setUpsolvingDisabled] = useState(false)
     const [statementHidden, setStatementHidden] = useState(false)
+    // Set by the API while a contest is unreleased: difficulty, rating, tags and
+    // the hint are withheld until it ends.
+    const [spoilersHidden, setSpoilersHidden] = useState(false)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
 
@@ -500,6 +401,7 @@ export default function ContestProblem() {
             setCanSubmit(data.can_submit ?? true)
             setUpsolvingDisabled(data.upsolving_disabled ?? false)
             setStatementHidden(data.statement_hidden ?? false)
+            setSpoilersHidden(data.spoilers_hidden ?? false)
         } catch (err) {
             if (isMounted.current) {
                 setError(errorMessage(err) || 'Failed to load problem')
@@ -791,6 +693,7 @@ export default function ContestProblem() {
                         rating={problem.rating}
                         tags={problem.tags}
                         interactive={problem.interactive}
+                        hideSpoilers={spoilersHidden}
                     />
                     {(problem.problem_type === 'output' || problem.scoring_mode === 'partial') && (
                         <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -825,56 +728,14 @@ export default function ContestProblem() {
                     {/* Statement Tab */}
                     {tab === 'statement' && (
                         <div className="space-y-6 pb-8">
-                            {!statementHidden && (
-                                <>
-                                    {isPdfUrl(problem.description) ? (
-                                        <div className="space-y-3">
-                                            <h3 className="font-semibold text-sm text-ink-soft uppercase tracking-wide">PDF Problem Statement</h3>
-                                            <a
-                                                href={problem.description}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-brand bg-brand-soft border border-brand/30 rounded-lg hover:bg-brand-soft transition-colors"
-                                            >
-                                                <Download className="w-4 h-4" />
-                                                Download PDF
-                                            </a>
-                                            <iframe
-                                                src={problem.description}
-                                                className="w-full h-[800px] border-0 rounded-lg shadow-sm bg-surface"
-                                                title="Problem Statement"
-                                            />
-                                        </div>
-                                    ) : (
-                                        <StatementBody body={problem.description} />
-                                    )}
-
-                                    {problem.input_format && (
-                                        <StatementSection title="Input format" body={problem.input_format} />
-                                    )}
-                                    {problem.output_format && (
-                                        <StatementSection title="Output format" body={problem.output_format} />
-                                    )}
-                                    {problem.constraints && (
-                                        <StatementSection title="Constraints" body={problem.constraints} />
-                                    )}
-                                </>
-                            )}
-
-                            {/* Sample cases - always show even with hidden statement */}
-                            {problem.sample_cases && problem.sample_cases.length > 0 && (
-                                <div>
-                                    <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">Sample Cases</h3>
-                                    <div className="space-y-4">
-                                        {problem.sample_cases.map((sample: SampleCaseData, i: number) => (
-                                            <SampleCase key={i} sample={sample} index={i} />
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Hint - collapsible */}
-                            {problem.hint && <HintSection hint={problem.hint} />}
+                            {/* Samples stay visible even when the statement is
+                                hidden; the viewer owns that rule now. */}
+                            <ProblemStatement
+                                problem={problem}
+                                showStatement={!statementHidden}
+                                hideSpoilers={spoilersHidden}
+                                collapsibleHint
+                            />
                         </div>
                     )}
 
