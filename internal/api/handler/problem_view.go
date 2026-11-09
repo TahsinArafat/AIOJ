@@ -39,14 +39,6 @@ func redactProblem(p *model.Problem) {
 	p.AcceptedCount = 0
 }
 
-// redactProblemListItem does the same for the list projection. The list shows a
-// difficulty badge, a rating and a tag column, so all three have to go.
-func redactProblemListItem(item *model.ProblemListItem) {
-	item.Difficulty = ""
-	item.Rating = 0
-	item.Tags = nil
-}
-
 // problemIsLive reports whether the problem belongs to a contest that has not
 // finished yet. A lookup error is treated as "not live" so a database hiccup
 // degrades to today's behaviour rather than hiding every problem.

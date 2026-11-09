@@ -64,15 +64,6 @@ func (h *ProblemHandler) List(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	// Every row carries a difficulty badge and a rating, which would name the
-	// difficulty of a problem that is still live in a contest. This is the public
-	// list, so the restriction applies to everyone including admins: the setter
-	// workspace is where an author sees their own problems in full.
-	for i := range items {
-		if items[i].InUnreleasedContest {
-			redactProblemListItem(&items[i])
-		}
-	}
 	respondJSON(w, http.StatusOK, map[string]interface{}{
 		"data":   items,
 		"total":  total,
@@ -108,10 +99,16 @@ func (h *ProblemHandler) GetBySlug(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	// Contest problems are ordinary archive problems here, so this endpoint is a
-	// second way to reach one that is still being used by a running contest.
+	// A problem that is still in play in a contest is not part of the archive: it
+	// belongs to its contest until the round is over, the way Codeforces keeps a
+	// round's problems out of the problem set. Answering 404 rather than a blanked
+	// copy also stops this endpoint being a second way to reach it at all.
+	//
+	// The people who author or test it keep access — they are not the audience the
+	// round is measuring — and so does an admin.
 	if !canSeeSpoilers(r.Context(), h.store, p, claims) && problemIsLive(r.Context(), h.store, p) {
-		redactProblem(p)
+		http.Error(w, "not found", http.StatusNotFound)
+		return
 	}
 	respondJSON(w, http.StatusOK, p)
 }

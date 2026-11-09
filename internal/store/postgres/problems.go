@@ -109,15 +109,20 @@ const problemColumns = `p.id, p.slug, p.title, p.description, COALESCE(p.constra
 	COALESCE(p.scoring_mode,'complete'), COALESCE(p.subtask_aggregation,'min'),
 	COALESCE(p.ai_generated,false)`
 
-// unreleasedContestSQL is true when the problem belongs to a contest that has
-// not finished yet. A problem in such a contest still shows its statement, but
-// its difficulty, rating and tags would give the answer's shape away, so every
-// public read uses this to decide whether to withhold them.
+// unreleasedContestSQL is true when the problem belongs to a contest that has not
+// finished yet. Such a problem is not part of the archive: it is reachable through
+// its contest and nothing else, the way Codeforces keeps a round's problems out of
+// the problem list until the round is over. Every public archive read excludes it
+// with `NOT unreleasedContestSQL`.
 const unreleasedContestSQL = `EXISTS (
 	SELECT 1 FROM contest_problems cp
 	JOIN contests c ON c.id = cp.contest_id
 	WHERE cp.problem_id = p.id AND c.end_time > NOW()
 )`
+
+// archivedProblemSQL is the condition a problem must satisfy to appear in the
+// public archive at all: published, and not still in play in a contest.
+const archivedProblemSQL = "p.visible = true AND NOT " + unreleasedContestSQL
 
 // InUnreleasedContest reports whether the problem is part of a contest that has
 // not finished yet.
@@ -180,8 +185,8 @@ func (s *ProblemStore) List(ctx context.Context, offset, limit int) ([]model.Pro
 	var total int
 	s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM problems WHERE visible=true`).Scan(&total)
 	query := fmt.Sprintf(`SELECT p.id, p.slug, p.title, p.difficulty, COALESCE(p.rating,0), p.tags,
-		 p.submission_count, p.accepted_count, p.source, %s
-		 FROM problems p WHERE p.visible=true ORDER BY p.created_at DESC OFFSET $1 LIMIT $2`, unreleasedContestSQL)
+		 p.submission_count, p.accepted_count, p.source
+		 FROM problems p WHERE %s ORDER BY p.created_at DESC OFFSET $1 LIMIT $2`, archivedProblemSQL)
 	rows, err := s.db.QueryContext(ctx, query, offset, limit)
 	if err != nil {
 		return nil, 0, err
@@ -192,7 +197,7 @@ func (s *ProblemStore) List(ctx context.Context, offset, limit int) ([]model.Pro
 		var item model.ProblemListItem
 		var tags []string
 		rows.Scan(&item.ID, &item.Slug, &item.Title, &item.Difficulty, &item.Rating, pq.Array(&tags),
-			&item.SubmissionCount, &item.AcceptedCount, &item.Source, &item.InUnreleasedContest)
+			&item.SubmissionCount, &item.AcceptedCount, &item.Source)
 		item.Tags = tags
 		items = append(items, item)
 	}
@@ -287,7 +292,7 @@ func (s *ProblemStore) HasAccess(ctx context.Context, problemID, userID string, 
 }
 
 func (s *ProblemStore) ListWithFilter(ctx context.Context, offset, limit int, difficulty string, tags []string, search string, source string, rating string, sortBy string) ([]model.ProblemListItem, int, error) {
-	where := []string{"p.visible = true"}
+	where := []string{archivedProblemSQL}
 	args := []interface{}{}
 	argIdx := 1
 
@@ -363,8 +368,8 @@ func (s *ProblemStore) ListWithFilter(ctx context.Context, offset, limit int, di
 	}
 
 	selectQuery := fmt.Sprintf(`SELECT p.id, p.slug, p.title, p.difficulty, COALESCE(p.rating,0), p.tags,
-		p.submission_count, p.accepted_count, p.source, %s
-		FROM problems p WHERE %s ORDER BY %s OFFSET $%d LIMIT $%d`, unreleasedContestSQL, whereClause, orderClause, argIdx, argIdx+1)
+		p.submission_count, p.accepted_count, p.source
+		FROM problems p WHERE %s ORDER BY %s OFFSET $%d LIMIT $%d`, whereClause, orderClause, argIdx, argIdx+1)
 	args = append(args, offset, limit)
 
 	rows, err := s.db.QueryContext(ctx, selectQuery, args...)
@@ -378,7 +383,7 @@ func (s *ProblemStore) ListWithFilter(ctx context.Context, offset, limit int, di
 		var item model.ProblemListItem
 		var tagArr []string
 		rows.Scan(&item.ID, &item.Slug, &item.Title, &item.Difficulty, &item.Rating, pq.Array(&tagArr),
-			&item.SubmissionCount, &item.AcceptedCount, &item.Source, &item.InUnreleasedContest)
+			&item.SubmissionCount, &item.AcceptedCount, &item.Source)
 		item.Tags = tagArr
 		items = append(items, item)
 	}

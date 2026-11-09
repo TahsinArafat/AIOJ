@@ -67,6 +67,11 @@ export default function ProblemDetail() {
     const isUpsolving = searchParams.get('upsolving') === 'true'
     const contestId = searchParams.get('contest')
     const [problem, setProblem] = useState<ProblemData | null>(null)
+    // The slug whose load failed outright (a 404 for a problem that is live in a
+    // contest, or a deleted one), so the page can say so instead of showing a
+    // skeleton that never resolves. Stored as a slug rather than a boolean so
+    // navigating to another problem needs no reset.
+    const [failedSlug, setFailedSlug] = useState<string | null>(null)
     const { i18n } = useTranslation()
     // Translation for the active UI language, if the setter supplied one.
     const [translation, setTranslation] = useState<ProblemTranslation | null>(null)
@@ -148,7 +153,12 @@ export default function ProblemDetail() {
                 // local/default problems render the built-in language list; previously
                 // this reset was a synchronous setLanguages in the languages effect
                 if (!isRemotePlatform(p?.source)) setLanguages(LANGUAGE_OPTIONS)
-            }).catch(() => { })
+            }).catch(() => {
+                // A problem that is live in a contest answers 404 here: it is not
+                // part of the archive until the round ends. Swallowing the error
+                // left the skeleton spinning forever.
+                if (isMountedRef.current) setFailedSlug(slug)
+            })
         }
     }, [slug])
 
@@ -385,6 +395,15 @@ export default function ProblemDetail() {
 
     const role = decodeRole()
     const canExport = role === 'admin' || role === 'setter'
+
+    if (!problem && failedSlug === slug) {
+        return (
+            <EmptyState
+                text="Problem not found"
+                description="This problem is not in the archive. Problems that are part of a contest appear here once that contest has ended."
+            />
+        )
+    }
 
     if (!problem) {
         // A skeleton that matches the real layout, so the page does not jump

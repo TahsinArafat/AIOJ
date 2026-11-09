@@ -18,15 +18,14 @@ func NewSearchStore(db *sql.DB) *SearchStore {
 }
 
 func (s *SearchStore) SearchProblems(ctx context.Context, query string, limit int) ([]model.ProblemListItem, error) {
-	// Selects the same unreleased-contest flag as the problem list: search results
-	// are another public read of a problem, and one that ships difficulty and
-	// tags. The handler redacts rows the flag marks.
+	// Search is a public archive read, so it uses the same archive condition as the
+	// problem list: a problem still in play in a contest is not findable here.
 	searchQuery := fmt.Sprintf(`SELECT p.id, p.slug, p.title, p.difficulty, p.tags,
-		p.submission_count, p.accepted_count, p.source, %s
+		p.submission_count, p.accepted_count, p.source
 		FROM problems p
-		WHERE p.visible = true AND (p.title ILIKE '%%' || $1 || '%%' OR p.slug ILIKE '%%' || $1 || '%%')
+		WHERE %s AND (p.title ILIKE '%%' || $1 || '%%' OR p.slug ILIKE '%%' || $1 || '%%')
 		ORDER BY p.title
-		LIMIT $2`, unreleasedContestSQL)
+		LIMIT $2`, archivedProblemSQL)
 	rows, err := s.db.QueryContext(ctx, searchQuery, query, limit)
 	if err != nil {
 		return nil, err
@@ -37,7 +36,7 @@ func (s *SearchStore) SearchProblems(ctx context.Context, query string, limit in
 	for rows.Next() {
 		var p model.ProblemListItem
 		if err := rows.Scan(&p.ID, &p.Slug, &p.Title, &p.Difficulty, pq.Array(&p.Tags),
-			&p.SubmissionCount, &p.AcceptedCount, &p.Source, &p.InUnreleasedContest); err != nil {
+			&p.SubmissionCount, &p.AcceptedCount, &p.Source); err != nil {
 			return nil, err
 		}
 		items = append(items, p)

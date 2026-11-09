@@ -40,14 +40,7 @@ func (h *SearchHandler) Search(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Search is a public read too, and it ships difficulty and tags for every hit.
-	// The dropdown only shows titles, but the JSON would answer "what difficulty is
-	// problem C of the running round?".
-	for i := range result.Problems {
-		if result.Problems[i].InUnreleasedContest {
-			redactProblemListItem(&result.Problems[i])
-		}
-	}
-
+	// Problems still in play in a contest are already excluded from the archive
+	// query, so nothing has to be stripped here.
 	respondJSON(w, http.StatusOK, result)
 }

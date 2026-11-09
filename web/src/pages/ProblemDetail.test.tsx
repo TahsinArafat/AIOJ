@@ -110,3 +110,24 @@ test('shows the submission id and live verdict immediately after submit', async 
     expect(screen.getByText('Pending')).toBeInTheDocument()
     expect(screen.getByText(/updates automatically/)).toBeInTheDocument()
 })
+
+// A problem that is live in a contest is not in the archive and answers 404. The
+// page used to swallow that and leave its skeleton spinning forever.
+test('says so when the problem is not in the archive', async () => {
+    vi.mocked(api.problems.get).mockRejectedValueOnce(new Error('not found'))
+
+    render(
+        <MemoryRouter initialEntries={['/problems/in-a-live-round']}>
+            <ToastProvider>
+                <ConfirmProvider>
+                    <Routes>
+                        <Route path="/problems/:slug" element={<ProblemDetail />} />
+                    </Routes>
+                </ConfirmProvider>
+            </ToastProvider>
+        </MemoryRouter>
+    )
+
+    expect(await screen.findByText('Problem not found')).toBeInTheDocument()
+    expect(screen.getByText(/appear here once that contest has ended/)).toBeInTheDocument()
+})

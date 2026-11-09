@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"testing"
 
@@ -13,10 +14,14 @@ import (
 
 /**
  * Contest problems here are ordinary archive problems, so a problem that is live
- * in a contest is reachable from both the contest endpoint and the public one.
- * Difficulty, rating, tags and the hint give the intended solution away, so both
- * have to withhold them until every contest using the problem has finished —
- * hiding them in the UI alone is bypassable with curl.
+ * in a contest used to be reachable straight from /api/problems/{slug}. Redacting
+ * its fields left a public page with no difficulty, rating or tags and no reason
+ * given — and still confirmed the problem existed.
+ *
+ * A live problem is now kept out of the archive entirely, the way Codeforces keeps
+ * a round's problems out of the problem set until the round ends: the public page
+ * answers 404 and the list and search never return it. The contest page is where it
+ * lives meanwhile, with its difficulty withheld.
  */
 
 func spoiledProblem() *model.Problem {
@@ -36,7 +41,7 @@ func spoiledProblem() *model.Problem {
 	}
 }
 
-func getBySlugWith(t *testing.T, store *mockProblemStore, claims *auth.Claims) *model.Problem {
+func getBySlugWith(t *testing.T, store *mockProblemStore, claims *auth.Claims) (int, *model.Problem) {
 	t.Helper()
 	h := NewProblemHandler(store)
 	req := httptest.NewRequest("GET", "/api/problems/secret", nil)
@@ -46,91 +51,70 @@ func getBySlugWith(t *testing.T, store *mockProblemStore, claims *auth.Claims) *
 	w := httptest.NewRecorder()
 	h.GetBySlug(w, req)
 
+	if w.Code != http.StatusOK {
+		return w.Code, nil
+	}
 	var got model.Problem
-	_ = json.Unmarshal(w.Body.Bytes(), &got)
-	return &got
+	if err := json.Unmarshal(w.Body.Bytes(), &got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	return w.Code, &got
 }
 
-func TestGetBySlugHidesSpoilersWhileTheContestRuns(t *testing.T) {
+func TestGetBySlugHidesAProblemThatIsLiveInAContest(t *testing.T) {
 	store := &mockProblemStore{getBySlug: spoiledProblem(), unreleasedContest: true}
 
-	got := getBySlugWith(t, store, nil)
+	code, _ := getBySlugWith(t, store, nil)
 
-	if got.Difficulty != "" || got.Rating != 0 || len(got.Tags) != 0 || got.Hint != "" {
-		t.Fatalf("spoilers leaked: difficulty=%q rating=%d tags=%v hint=%q",
-			got.Difficulty, got.Rating, got.Tags, got.Hint)
-	}
-	if got.SubmissionCount != 0 || got.AcceptedCount != 0 {
-		t.Fatalf("solve counts leaked: %d/%d", got.AcceptedCount, got.SubmissionCount)
-	}
-	// The statement itself must still be readable.
-	if got.Description != "body" || got.Constraints == "" {
-		t.Fatalf("statement was withheld along with the spoilers")
+	if code != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404 while the problem is in an unfinished contest", code)
 	}
 }
 
-func TestGetBySlugRevealsSpoilersOnceTheContestEnds(t *testing.T) {
+func TestGetBySlugServesTheProblemOnceTheContestEnds(t *testing.T) {
 	store := &mockProblemStore{getBySlug: spoiledProblem(), unreleasedContest: false}
 
-	got := getBySlugWith(t, store, nil)
+	code, got := getBySlugWith(t, store, nil)
 
-	if got.Difficulty != "hard" || got.Rating != 2400 || got.Hint == "" {
-		t.Fatalf("spoilers should be visible after the contest: %+v", got)
+	if code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 after the contest", code)
+	}
+	if got.Difficulty != "hard" || got.Rating != 2400 || len(got.Tags) == 0 {
+		t.Fatalf("a problem that is back in the archive must carry its metadata: %+v", got)
+	}
+	if got.Description != "body" || got.Constraints == "" {
+		t.Fatalf("statement went missing: %+v", got)
 	}
 }
 
-func TestGetBySlugKeepsSpoilersForTheAuthor(t *testing.T) {
+// The authors and testers are not the audience the round measures, so hiding the
+// problem from them would only stop them checking their own work.
+func TestGetBySlugKeepsAccessForTheAuthor(t *testing.T) {
 	store := &mockProblemStore{
 		getBySlug:         spoiledProblem(),
 		unreleasedContest: true,
 		access:            map[string]string{"setter1/p1": "owner"},
 	}
 
-	got := getBySlugWith(t, store, &auth.Claims{UserID: "setter1", Role: "setter"})
+	code, got := getBySlugWith(t, store, &auth.Claims{UserID: "setter1", Role: "setter"})
 
+	if code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 for the author", code)
+	}
 	if got.Difficulty != "hard" || got.Rating != 2400 || len(got.Tags) == 0 {
 		t.Fatalf("the author must keep the full view: %+v", got)
 	}
 }
 
-func TestGetBySlugKeepsSpoilersForAdmins(t *testing.T) {
+func TestGetBySlugKeepsAccessForAdmins(t *testing.T) {
 	store := &mockProblemStore{getBySlug: spoiledProblem(), unreleasedContest: true}
 
-	got := getBySlugWith(t, store, &auth.Claims{UserID: "admin1", Role: "admin"})
+	code, got := getBySlugWith(t, store, &auth.Claims{UserID: "admin1", Role: "admin"})
 
-	if got.Difficulty != "hard" || got.Rating != 2400 {
+	if code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 for an admin", code)
+	}
+	if got.Difficulty != "hard" {
 		t.Fatalf("an admin must keep the full view: %+v", got)
 	}
-}
-
-func TestListHidesSpoilersOnLiveContestProblems(t *testing.T) {
-	store := &mockProblemStore{listItems: []model.ProblemListItem{
-		{Slug: "live", Difficulty: "hard", Rating: 2400, InUnreleasedContest: true},
-		{Slug: "archived", Difficulty: "easy", Rating: 800, InUnreleasedContest: false},
-	}}
-
-	items := listAs(t, store)
-
-	if items[0].Difficulty != "" || items[0].Rating != 0 {
-		t.Fatalf("live contest problem leaked its difficulty: %+v", items[0])
-	}
-	if items[1].Difficulty != "easy" || items[1].Rating != 800 {
-		t.Fatalf("archived problem should keep its difficulty: %+v", items[1])
-	}
-}
-
-func listAs(t *testing.T, store *mockProblemStore) []model.ProblemListItem {
-	t.Helper()
-	h := NewProblemHandler(store)
-	req := httptest.NewRequest("GET", "/api/problems", nil)
-	w := httptest.NewRecorder()
-	h.List(w, req)
-
-	var body struct {
-		Data []model.ProblemListItem `json:"data"`
-	}
-	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode list: %v", err)
-	}
-	return body.Data
 }
