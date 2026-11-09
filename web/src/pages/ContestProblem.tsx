@@ -1,10 +1,10 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import ReactMarkdown from 'react-markdown'
 import { EmptyState } from '../components/EmptyState'
 import { LANGUAGE_OPTIONS } from '../lib/languages'
-import rehypeKatex from 'rehype-katex'
-import { richTextRemarkPlugins } from '../lib/markdown'
+import { StatementBody, StatementSection } from '../components/StatementSection'
+import { ProblemMeta } from '../components/ProblemMeta'
+import { Badge } from '../components/ui/Badge'
 import 'katex/dist/katex.min.css'
 import { api, getAccessToken } from '../lib/api'
 import { useDocumentTitle } from '../lib/documentTitle'
@@ -248,12 +248,8 @@ function SampleCase({ sample, index }: { sample: SampleCaseData; index: number }
             </div>
             {sample.explanation && (
                 <div className="border-t border-hairline bg-brand-soft px-4 py-3">
-                    <div className="text-xs font-semibold text-brand uppercase tracking-wide mb-1">Explanation</div>
-                    <div className="prose prose-sm max-w-none text-ink-soft">
-                        <ReactMarkdown remarkPlugins={richTextRemarkPlugins} rehypePlugins={[rehypeKatex]}>
-                            {sample.explanation}
-                        </ReactMarkdown>
-                    </div>
+                    <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-brand">Explanation</div>
+                    <StatementBody body={sample.explanation} className="prose prose-sm max-w-none text-xs text-ink-soft" />
                 </div>
             )}
         </div>
@@ -274,11 +270,7 @@ function HintSection({ hint }: { hint: string }) {
             </button>
             {expanded && (
                 <div className="px-4 py-3 bg-surface border-t border-warn/30">
-                    <div className="prose prose-sm max-w-none text-ink-soft">
-                        <ReactMarkdown remarkPlugins={richTextRemarkPlugins} rehypePlugins={[rehypeKatex]}>
-                            {hint}
-                        </ReactMarkdown>
-                    </div>
+                    <StatementBody body={hint} className="prose prose-sm max-w-none text-[14px] leading-[1.65] text-ink-soft" />
                 </div>
             )}
         </div>
@@ -790,40 +782,22 @@ export default function ContestProblem() {
                         </span>
                         <h1 className="text-2xl font-bold text-ink leading-tight">{problem.title}</h1>
                     </div>
-                    {/* Metadata bar */}
-                    <div className="flex flex-wrap items-center gap-4 mt-3 text-sm text-muted">
-                        <span className="flex items-center gap-1.5">
-                            <span className="font-semibold text-ink-soft">Time Limit:</span> {problem.time_limit} ms
-                        </span>
-                        <span className="text-muted">|</span>
-                        <span className="flex items-center gap-1.5">
-                            <span className="font-semibold text-ink-soft">Memory Limit:</span> {Math.round(problem.memory_limit / 1024)} MB
-                        </span>
-                        {problem.interactive && (
-                            <>
-                                <span className="text-muted">|</span>
-                                <span className="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-violet-500/12 text-accent">
-                                    Interactive
-                                </span>
-                            </>
-                        )}
-                        {problem.problem_type === 'output' && (
-                            <>
-                                <span className="text-muted">|</span>
-                                <span className="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-warn/12 text-warn">
-                                    Output-Only
-                                </span>
-                            </>
-                        )}
-                        {problem.scoring_mode === 'partial' && (
-                            <>
-                                <span className="text-muted">|</span>
-                                <span className="inline-block px-2 py-0.5 rounded text-xs font-semibold bg-brand-soft text-brand">
-                                    Partial Scoring
-                                </span>
-                            </>
-                        )}
-                    </div>
+                    {/* Metadata bar — the same strip the practice page uses. */}
+                    <ProblemMeta
+                        className="mt-3"
+                        timeLimit={problem.time_limit}
+                        memoryLimit={problem.memory_limit}
+                        difficulty={problem.difficulty}
+                        rating={problem.rating}
+                        tags={problem.tags}
+                        interactive={problem.interactive}
+                    />
+                    {(problem.problem_type === 'output' || problem.scoring_mode === 'partial') && (
+                        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                            {problem.problem_type === 'output' && <Badge tone="warn">Output-only</Badge>}
+                            {problem.scoring_mode === 'partial' && <Badge tone="brand">Partial scoring</Badge>}
+                        </div>
+                    )}
                     {/* Tabs */}
                     <div className="flex border-b border-hairline mb-6">
                         <button
@@ -872,44 +846,17 @@ export default function ContestProblem() {
                                             />
                                         </div>
                                     ) : (
-                                        <div className="prose prose-sm max-w-none text-ink leading-relaxed">
-                                            <ReactMarkdown remarkPlugins={richTextRemarkPlugins} rehypePlugins={[rehypeKatex]}>
-                                                {problem.description}
-                                            </ReactMarkdown>
-                                        </div>
+                                        <StatementBody body={problem.description} />
                                     )}
 
                                     {problem.input_format && (
-                                        <div>
-                                            <h3 className="font-semibold text-sm text-ink-soft uppercase tracking-wide mb-2">Input Format</h3>
-                                            <div className="prose prose-sm max-w-none text-ink-soft bg-surface-2/20 rounded-lg p-4 border border-hairline">
-                                                <ReactMarkdown remarkPlugins={richTextRemarkPlugins} rehypePlugins={[rehypeKatex]}>
-                                                    {problem.input_format}
-                                                </ReactMarkdown>
-                                            </div>
-                                        </div>
+                                        <StatementSection title="Input format" body={problem.input_format} />
                                     )}
-
                                     {problem.output_format && (
-                                        <div>
-                                            <h3 className="font-semibold text-sm text-ink-soft uppercase tracking-wide mb-2">Output Format</h3>
-                                            <div className="prose prose-sm max-w-none text-ink-soft bg-surface-2/20 rounded-lg p-4 border border-hairline">
-                                                <ReactMarkdown remarkPlugins={richTextRemarkPlugins} rehypePlugins={[rehypeKatex]}>
-                                                    {problem.output_format}
-                                                </ReactMarkdown>
-                                            </div>
-                                        </div>
+                                        <StatementSection title="Output format" body={problem.output_format} />
                                     )}
-
                                     {problem.constraints && (
-                                        <div>
-                                            <h3 className="font-semibold text-sm text-ink-soft uppercase tracking-wide mb-2">Constraints</h3>
-                                            <div className="prose prose-sm max-w-none text-ink-soft bg-surface-2/20 rounded-lg p-4 border border-hairline">
-                                                <ReactMarkdown remarkPlugins={richTextRemarkPlugins} rehypePlugins={[rehypeKatex]}>
-                                                    {problem.constraints}
-                                                </ReactMarkdown>
-                                            </div>
-                                        </div>
+                                        <StatementSection title="Constraints" body={problem.constraints} />
                                     )}
                                 </>
                             )}
@@ -917,7 +864,7 @@ export default function ContestProblem() {
                             {/* Sample cases - always show even with hidden statement */}
                             {problem.sample_cases && problem.sample_cases.length > 0 && (
                                 <div>
-                                    <h3 className="font-semibold text-sm text-ink-soft uppercase tracking-wide mb-3">Sample Cases</h3>
+                                    <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">Sample Cases</h3>
                                     <div className="space-y-4">
                                         {problem.sample_cases.map((sample: SampleCaseData, i: number) => (
                                             <SampleCase key={i} sample={sample} index={i} />

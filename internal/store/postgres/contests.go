@@ -407,50 +407,27 @@ func (s *ContestStore) ListTeamRegistrations(ctx context.Context, contestID stri
 // GetContestProblemByIndex returns a problem from a contest by its index (A, B, C...).
 // Unlike GetBySlug/GetByID, this does NOT check problem.visible - the problem is
 // accessible if it's in the contest, regardless of its visibility setting.
+//
+// It selects problemColumns and scans with scanProblem, exactly like the practice
+// page, so a problem cannot render differently depending on where it is opened.
+// The hand-written copy this replaced had lost `constraints` (so the Constraints
+// block never appeared in a contest), read `tags` as raw bytes and JSON-decoded a
+// Postgres array literal (so every problem came back untagged), and scanned
+// nullable columns into plain strings (so a NULL interactor_language failed the
+// whole read).
 func (s *ContestStore) GetContestProblemByIndex(ctx context.Context, contestID, index string) (*model.Problem, error) {
-	query := `
-		SELECT p.id, p.slug, p.title, p.description, p.input_format, p.output_format,
-		       p.hint, p.time_limit, p.memory_limit, p.difficulty, p.tags,
-		       p.sample_cases,
-		       p.visible, p.spj, p.spj_language, p.spj_source_code, p.checker_type,
-		       p.float_epsilon, p.interactive, p.interactor_language, p.interactor_source_code,
-		       p.scoring_mode, p.subtask_aggregation, p.submission_count, p.accepted_count,
-		       p.source, p.remote_id, COALESCE(p.created_by::text,''), p.created_at, p.updated_at
+	query := fmt.Sprintf(`SELECT %s
 		FROM problems p
 		JOIN contest_problems cp ON p.id = cp.problem_id
-		WHERE cp.contest_id = $1 AND cp.index = $2`
+		WHERE cp.contest_id = $1 AND cp.index = $2`, problemColumns)
 
 	var p model.Problem
-	var tags []byte
-	var samples []byte
-	err := s.db.QueryRowContext(ctx, query, contestID, index).Scan(
-		&p.ID, &p.Slug, &p.Title, &p.Description, &p.InputFormat, &p.OutputFormat,
-		&p.Hint, &p.TimeLimit, &p.MemoryLimit, &p.Difficulty, &tags,
-		&samples,
-		&p.Visible, &p.SPJ, &p.SPJLanguage, &p.SPJSourceCode, &p.CheckerType,
-		&p.FloatEpsilon, &p.Interactive, &p.InteractorLanguage, &p.InteractorSourceCode,
-		&p.ScoringMode, &p.SubtaskAggregation, &p.SubmissionCount, &p.AcceptedCount,
-		&p.Source, &p.RemoteID, &p.CreatedBy, &p.CreatedAt, &p.UpdatedAt,
-	)
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
-	if err != nil {
+	if err := scanProblem(s.db.QueryRowContext(ctx, query, contestID, index), &p); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
 		return nil, fmt.Errorf("get contest problem by index: %w", err)
 	}
-
-	if len(tags) > 0 {
-		if err := json.Unmarshal(tags, &p.Tags); err != nil {
-			p.Tags = []string{}
-		}
-	}
-
-	if len(samples) > 0 {
-		if err := json.Unmarshal(samples, &p.SampleCases); err != nil {
-			p.SampleCases = []model.SampleCase{}
-		}
-	}
-
 	return &p, nil
 }
 

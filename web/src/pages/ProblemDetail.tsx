@@ -1,8 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
-import ReactMarkdown from 'react-markdown'
-import rehypeKatex from 'rehype-katex'
-import { richTextRemarkPlugins } from '../lib/markdown'
+import { StatementSection, StatementBody } from '../components/StatementSection'
 import 'katex/dist/katex.min.css'
 import { api, getAccessToken } from '../lib/api'
 import ProblemStats from '../components/ProblemStats'
@@ -12,10 +10,11 @@ import AddEditorialModal from '../components/AddEditorialModal'
 import CommentSection from '../components/CommentSection'
 import { EmptyState } from '../components/EmptyState'
 import { SubmissionStatusPanel, type SubmissionStatusData } from '../components/SubmissionStatusPanel'
-import { Download, Copy, Check, Timer, MemoryStick, Gauge, type LucideIcon } from 'lucide-react'
+import { Download, Copy, Check } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useToast } from '../components/Toast'
-import { Badge, type BadgeTone } from '../components/ui/Badge'
+import { Badge } from '../components/ui/Badge'
+import { ProblemMeta } from '../components/ProblemMeta'
 import { DEFAULT_LANGUAGE, LANGUAGE_OPTIONS, languageName, languageTemplate } from '../lib/languages'
 import { isRemotePlatform } from '../lib/platforms'
 import { Skeleton } from '../components/ui/PageHeader'
@@ -87,37 +86,6 @@ function decodeRole(): string | null {
     } catch {
         return null
     }
-}
-
-const DIFFICULTY_TONE: Record<string, BadgeTone> = {
-    easy: 'ok',
-    medium: 'warn',
-    hard: 'bad',
-}
-
-/** One statement sub-section: heading plus KaTeX/GFM-rendered body. */
-function StatementSection({ title, body }: { title: string; body: string }) {
-    return (
-        <section>
-            <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-muted">{title}</h3>
-            <div className="prose prose-sm max-w-none text-[14px] leading-[1.65] text-ink-soft">
-                <ReactMarkdown remarkPlugins={richTextRemarkPlugins} rehypePlugins={[rehypeKatex]}>
-                    {body}
-                </ReactMarkdown>
-            </div>
-        </section>
-    )
-}
-
-/** A limit chip: icon, label and value on one line. */
-function Limit({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
-    return (
-        <span className="flex items-center gap-1.5">
-            <Icon className="h-3.5 w-3.5 text-muted-soft" aria-hidden="true" />
-            <span className="text-muted">{label}</span>
-            <span className="tnum font-medium text-ink">{value}</span>
-        </span>
-    )
 }
 
 interface ProblemTranslation { language: string; title?: string | null; description?: string | null }
@@ -510,37 +478,20 @@ export default function ProblemDetail() {
                                 {i18n.language.toUpperCase()}
                             </Badge>
                         )}
-                        {problem.interactive && <Badge tone="accent">Interactive</Badge>}
                         {problem.problem_type === 'output' && <Badge tone="warn">Output-only</Badge>}
                         {problem.scoring_mode === 'partial' && <Badge tone="brand">Partial scoring</Badge>}
                     </h1>
                     {/* Limits are the first thing a competitor looks for, so they
-                        get a fixed-order strip. The difficulty pill used a fixed
-                        `text-green-800` with no dark variant, which was dark green
-                        on a dark tint — unreadable on the dark canvas. */}
-                    <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-hairline pb-3 text-xs">
-                        <Limit icon={Timer} label="Time" value={`${(problem.time_limit / 1000).toFixed(1)} s`} />
-                        <Limit icon={MemoryStick} label="Memory" value={`${Math.round(problem.memory_limit / 1024)} MB`} />
-                        {problem.difficulty && (
-                            <span className="flex items-center gap-1.5">
-                                <span className="text-muted">Difficulty</span>
-                                <Badge tone={DIFFICULTY_TONE[problem.difficulty] || 'neutral'} className="uppercase tracking-wider">
-                                    {problem.difficulty}
-                                </Badge>
-                            </span>
-                        )}
-                        {(problem.rating ?? 0) > 0 && (
-                            <Limit icon={Gauge} label="Rating" value={String(problem.rating)} />
-                        )}
-                        {problem.tags && problem.tags.length > 0 && (
-                            <span className="flex flex-wrap items-center gap-1.5">
-                                <span className="text-muted">Tags</span>
-                                {problem.tags.map(tag => (
-                                    <Badge key={tag} tone="neutral">{tag}</Badge>
-                                ))}
-                            </span>
-                        )}
-                    </div>
+                        get a fixed-order strip shared with the contest page. */}
+                    <ProblemMeta
+                        className="mt-3 border-b border-hairline pb-3"
+                        timeLimit={problem.time_limit}
+                        memoryLimit={problem.memory_limit}
+                        difficulty={problem.difficulty}
+                        rating={problem.rating}
+                        tags={problem.tags}
+                        interactive={problem.interactive}
+                    />
                     {canExport && (
                         <div className="mt-2">
                             <button
@@ -618,24 +569,7 @@ export default function ProblemDetail() {
                                 />
                             </div>
                         ) : (
-                            <div className="prose prose-sm max-w-none text-ink text-[14px] leading-[1.6]">
-                                <ReactMarkdown
-                                    remarkPlugins={richTextRemarkPlugins}
-                                    rehypePlugins={[rehypeKatex]}
-                                    components={{
-                                        code(props) {
-                                            const { children, className } = props
-                                            const isBlock = className?.includes('language-')
-                                            if (isBlock) {
-                                                return <code className={className}>{children}</code>
-                                            }
-                                            return <code className="bg-surface-3 px-1.5 py-0.5 rounded text-sm font-mono text-ink">{children}</code>
-                                        }
-                                    }}
-                                >
-                                    {effectiveDescription}
-                                </ReactMarkdown>
-                            </div>
+                            <StatementBody body={effectiveDescription} />
                         )}
                         {problem.input_format && (
                             <StatementSection title="Input format" body={problem.input_format} />
@@ -673,11 +607,10 @@ export default function ProblemDetail() {
                                     </div>
                                 </div>
                                 {sc.explanation && (
-                                    <div className="prose prose-sm mt-1 max-w-none text-xs text-muted">
-                                        <ReactMarkdown remarkPlugins={richTextRemarkPlugins} rehypePlugins={[rehypeKatex]}>
-                                            {sc.explanation}
-                                        </ReactMarkdown>
-                                    </div>
+                                    <StatementBody
+                                        body={sc.explanation}
+                                        className="prose prose-sm mt-1 max-w-none text-xs text-muted"
+                                    />
                                 )}
                             </div>
                         ))}

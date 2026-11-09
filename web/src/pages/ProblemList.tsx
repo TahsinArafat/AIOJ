@@ -3,18 +3,13 @@ import { Link } from 'react-router-dom'
 import { SlidersHorizontal, X } from 'lucide-react'
 import { api } from '../lib/api'
 import { EmptyState } from '../components/EmptyState'
-import { Badge, type BadgeTone } from '../components/ui/Badge'
+import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
+import { DIFFICULTY_TONE } from '../lib/difficulty'
 import { Card } from '../components/ui/Card'
 import { Input, Select } from '../components/ui/Field'
 import { PageHeader } from '../components/ui/PageHeader'
 import { Table, TableShell, Td, Th, THead, Tr } from '../components/ui/Table'
-
-const DIFFICULTY_TONE: Record<string, BadgeTone> = {
-    easy: 'ok',
-    medium: 'warn',
-    hard: 'bad',
-}
 
 const platforms = [
     { value: '', label: 'All Platforms' },

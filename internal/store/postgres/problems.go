@@ -91,33 +91,68 @@ func (s *ProblemStore) GetBySlug(ctx context.Context, slug string) (*model.Probl
 	return s.getBy(ctx, "slug", slug)
 }
 
+// problemColumns is the one column list that produces a complete model.Problem,
+// paired with scanProblem below. Both the practice read (getBy) and the contest
+// read (ContestStore.GetContestProblemByIndex) select it so the two cannot drift
+// again: contest statements silently lost their Constraints block because the
+// contest query was a hand-maintained copy that never gained the column.
+//
+// Every nullable column is COALESCEd: scanning a NULL into a plain string or
+// bool fails the whole read.
+const problemColumns = `p.id, p.slug, p.title, p.description, COALESCE(p.constraints,''),
+	p.input_format, p.output_format, p.hint, p.sample_cases,
+	p.time_limit, p.memory_limit, p.difficulty, COALESCE(p.rating,0), p.tags, p.visible, p.testdata_path,
+	p.testcase_score, p.spj, p.spj_language, p.spj_source_code, p.spj_version, p.checker_type,
+	p.float_epsilon, p.submission_count, p.accepted_count, p.source, p.remote_id,
+	COALESCE(p.created_by::text,''), p.created_at, p.updated_at,
+	COALESCE(p.interactive,false), COALESCE(p.interactor_language,''), COALESCE(p.interactor_source_code,''),
+	COALESCE(p.scoring_mode,'complete'), COALESCE(p.subtask_aggregation,'min'),
+	COALESCE(p.ai_generated,false)`
+
+// problemScanner is the *sql.Row / *sql.Rows shape scanProblem needs.
+type problemScanner interface {
+	Scan(dest ...any) error
+}
+
+// scanProblem reads one row selected with problemColumns into p.
+func scanProblem(row problemScanner, p *model.Problem) error {
+	var samples, scores []byte
+	if err := row.Scan(
+		&p.ID, &p.Slug, &p.Title, &p.Description, &p.Constraints, &p.InputFormat, &p.OutputFormat, &p.Hint, &samples,
+		&p.TimeLimit, &p.MemoryLimit, &p.Difficulty, &p.Rating, pq.Array(&p.Tags), &p.Visible, &p.TestdataPath,
+		&scores, &p.SPJ, &p.SPJLanguage, &p.SPJSourceCode, &p.SPJVersion, &p.CheckerType, &p.FloatEpsilon,
+		&p.SubmissionCount, &p.AcceptedCount, &p.Source, &p.RemoteID, &p.CreatedBy, &p.CreatedAt, &p.UpdatedAt,
+		&p.Interactive, &p.InteractorLanguage, &p.InteractorSourceCode, &p.ScoringMode, &p.SubtaskAggregation,
+		&p.AIGenerated,
+	); err != nil {
+		return err
+	}
+	if len(samples) > 0 {
+		if err := json.Unmarshal(samples, &p.SampleCases); err != nil {
+			p.SampleCases = []model.SampleCase{}
+		}
+	}
+	if len(scores) > 0 {
+		if err := json.Unmarshal(scores, &p.TestCaseScore); err != nil {
+			p.TestCaseScore = []model.TestCaseScore{}
+		}
+	}
+	if p.Tags == nil {
+		p.Tags = []string{}
+	}
+	return nil
+}
+
 func (s *ProblemStore) getBy(ctx context.Context, field, value string) (*model.Problem, error) {
 	var p model.Problem
-	var samples, scores []byte
-	var tags []string
-	err := s.db.QueryRowContext(ctx, fmt.Sprintf(`SELECT
-		id,slug,title,description,COALESCE(constraints,''),input_format,output_format,hint,sample_cases,
-		time_limit,memory_limit,difficulty,COALESCE(rating,0),tags,visible,testdata_path,testcase_score,
-		spj,spj_language,spj_source_code,spj_version,checker_type,float_epsilon,submission_count,accepted_count,
-		source,remote_id,COALESCE(created_by::text,''),created_at,updated_at,
-		interactive,COALESCE(interactor_language,''),COALESCE(interactor_source_code,''),
-		COALESCE(scoring_mode,'complete'),COALESCE(subtask_aggregation,'min'),
-		COALESCE(ai_generated,false) FROM problems WHERE %s=$1`, field), value).Scan(
-		&p.ID, &p.Slug, &p.Title, &p.Description, &p.Constraints, &p.InputFormat, &p.OutputFormat, &p.Hint, &samples,
-		&p.TimeLimit, &p.MemoryLimit, &p.Difficulty, &p.Rating, pq.Array(&tags), &p.Visible, &p.TestdataPath, &scores,
-		&p.SPJ, &p.SPJLanguage, &p.SPJSourceCode, &p.SPJVersion, &p.CheckerType, &p.FloatEpsilon, &p.SubmissionCount, &p.AcceptedCount,
-		&p.Source, &p.RemoteID, &p.CreatedBy, &p.CreatedAt, &p.UpdatedAt,
-		&p.Interactive, &p.InteractorLanguage, &p.InteractorSourceCode,
-		&p.ScoringMode, &p.SubtaskAggregation, &p.AIGenerated)
+	query := fmt.Sprintf("SELECT %s FROM problems p WHERE p.%s=$1", problemColumns, field)
+	err := scanProblem(s.db.QueryRowContext(ctx, query, value), &p)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	json.Unmarshal(samples, &p.SampleCases)
-	json.Unmarshal(scores, &p.TestCaseScore)
-	p.Tags = tags
 	return &p, nil
 }
 
