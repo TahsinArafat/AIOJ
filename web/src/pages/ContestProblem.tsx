@@ -380,6 +380,11 @@ export default function ContestProblem() {
 
     const isLoggedIn = !!getAccessToken()
     const status = contest ? getStatus(contest.start_time, contest.end_time, contest.freeze_time ?? undefined) : 'ended'
+    // The API says when a problem's difficulty metadata is withheld, but the
+    // contest's own clock is enough to know it: nothing is spoiled before the
+    // round ends. Both are OR'd so the page stays honest even if the flag is
+    // missing, and still covers a problem reused by a later contest.
+    const hideSpoilers = spoilersHidden || status !== 'ended'
     const isUpcoming = status === 'upcoming'
     const isRunning = status === 'running' || status === 'frozen'
     const showSubmit = isLoggedIn && canSubmit && !upsolvingDisabled
@@ -693,7 +698,7 @@ export default function ContestProblem() {
                         rating={problem.rating}
                         tags={problem.tags}
                         interactive={problem.interactive}
-                        hideSpoilers={spoilersHidden}
+                        hideSpoilers={hideSpoilers}
                     />
                     {(problem.problem_type === 'output' || problem.scoring_mode === 'partial') && (
                         <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -733,7 +738,7 @@ export default function ContestProblem() {
                             <ProblemStatement
                                 problem={problem}
                                 showStatement={!statementHidden}
-                                hideSpoilers={spoilersHidden}
+                                hideSpoilers={hideSpoilers}
                                 collapsibleHint
                             />
                         </div>

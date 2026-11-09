@@ -16,8 +16,17 @@ import (
  * intended solution away — on Codeforces the tags and rating only appear once the
  * round is over. Contest problems here are usually ordinary archive problems, so
  * hiding the fields on the contest endpoint alone is not enough: the same problem
- * is served by /api/problems/{slug}. Every public read therefore goes through
- * these two helpers, so all of them agree on what a viewer may see.
+ * is served by /api/problems/{slug}, by the problem list and by search. Every
+ * public read therefore goes through these helpers, so all of them agree.
+ *
+ * Who is exempt differs by surface, and that is the point:
+ *
+ *   - The public problem page exempts the problem's own authors, who wrote the
+ *     statement and are not being tested by it.
+ *   - The contest page exempts only admins. A contest's manager or judge is
+ *     already signed in when checking their own round, so exempting them put the
+ *     answer key on the exact page the competitors use. Their full view is the
+ *     setter workspace.
  */
 
 // redactProblem clears the fields that would reveal a problem's difficulty.
@@ -30,15 +39,24 @@ func redactProblem(p *model.Problem) {
 	p.AcceptedCount = 0
 }
 
-// redactProblemListItem does the same for the list projection, which only carries
-// difficulty and rating.
+// redactProblemListItem does the same for the list projection. The list shows a
+// difficulty badge, a rating and a tag column, so all three have to go.
 func redactProblemListItem(item *model.ProblemListItem) {
 	item.Difficulty = ""
 	item.Rating = 0
+	item.Tags = nil
 }
 
-// canSeeSpoilers reports whether the viewer is trusted with the full problem
-// regardless of any contest: admins, and the people who author or test it.
+// problemIsLive reports whether the problem belongs to a contest that has not
+// finished yet. A lookup error is treated as "not live" so a database hiccup
+// degrades to today's behaviour rather than hiding every problem.
+func problemIsLive(ctx context.Context, problems store.ProblemStore, p *model.Problem) bool {
+	live, err := problems.InUnreleasedContest(ctx, p.ID)
+	return err == nil && live
+}
+
+// canSeeSpoilers reports whether the viewer authored or tests the problem, and so
+// is not the audience the difficulty is being hidden from.
 func canSeeSpoilers(ctx context.Context, problems store.ProblemStore, p *model.Problem, claims *auth.Claims) bool {
 	if claims == nil {
 		return false
@@ -49,12 +67,6 @@ func canSeeSpoilers(ctx context.Context, problems store.ProblemStore, p *model.P
 	return problems.HasAccess(ctx, p.ID, claims.UserID, "owner", "co_author", "tester")
 }
 
-// hideSpoilers reports whether this viewer must be shown the problem without the
-// metadata that gives its difficulty away.
-func hideSpoilers(ctx context.Context, problems store.ProblemStore, p *model.Problem, claims *auth.Claims) bool {
-	if canSeeSpoilers(ctx, problems, p, claims) {
-		return false
-	}
-	locked, err := problems.InUnreleasedContest(ctx, p.ID)
-	return err == nil && locked
+func isAdmin(claims *auth.Claims) bool {
+	return claims != nil && claims.Role == "admin"
 }

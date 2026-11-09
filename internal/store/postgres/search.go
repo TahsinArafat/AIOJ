@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	"github.com/lib/pq"
 	"github.com/tahsinarafat/aioj/internal/model"
@@ -17,13 +18,16 @@ func NewSearchStore(db *sql.DB) *SearchStore {
 }
 
 func (s *SearchStore) SearchProblems(ctx context.Context, query string, limit int) ([]model.ProblemListItem, error) {
-	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, slug, title, difficulty, tags, submission_count, accepted_count, source
-		 FROM problems
-		 WHERE visible = true AND (title ILIKE '%' || $1 || '%' OR slug ILIKE '%' || $1 || '%')
-		 ORDER BY title
-		 LIMIT $2`,
-		query, limit)
+	// Selects the same unreleased-contest flag as the problem list: search results
+	// are another public read of a problem, and one that ships difficulty and
+	// tags. The handler redacts rows the flag marks.
+	searchQuery := fmt.Sprintf(`SELECT p.id, p.slug, p.title, p.difficulty, p.tags,
+		p.submission_count, p.accepted_count, p.source, %s
+		FROM problems p
+		WHERE p.visible = true AND (p.title ILIKE '%%' || $1 || '%%' OR p.slug ILIKE '%%' || $1 || '%%')
+		ORDER BY p.title
+		LIMIT $2`, unreleasedContestSQL)
+	rows, err := s.db.QueryContext(ctx, searchQuery, query, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -32,11 +36,10 @@ func (s *SearchStore) SearchProblems(ctx context.Context, query string, limit in
 	var items []model.ProblemListItem
 	for rows.Next() {
 		var p model.ProblemListItem
-		var tags []string
-		if err := rows.Scan(&p.ID, &p.Slug, &p.Title, &p.Difficulty, pq.Array(&tags), &p.SubmissionCount, &p.AcceptedCount, &p.Source); err != nil {
+		if err := rows.Scan(&p.ID, &p.Slug, &p.Title, &p.Difficulty, pq.Array(&p.Tags),
+			&p.SubmissionCount, &p.AcceptedCount, &p.Source, &p.InUnreleasedContest); err != nil {
 			return nil, err
 		}
-		p.Tags = tags
 		items = append(items, p)
 	}
 	if items == nil {

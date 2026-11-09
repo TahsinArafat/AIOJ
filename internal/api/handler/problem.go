@@ -110,7 +110,7 @@ func (h *ProblemHandler) GetBySlug(w http.ResponseWriter, r *http.Request) {
 	}
 	// Contest problems are ordinary archive problems here, so this endpoint is a
 	// second way to reach one that is still being used by a running contest.
-	if hideSpoilers(r.Context(), h.store, p, claims) {
+	if !canSeeSpoilers(r.Context(), h.store, p, claims) && problemIsLive(r.Context(), h.store, p) {
 		redactProblem(p)
 	}
 	respondJSON(w, http.StatusOK, p)

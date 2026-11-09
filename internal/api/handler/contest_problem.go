@@ -63,9 +63,14 @@ func (h *ContestProblemHandler) GetByIndex(w http.ResponseWriter, r *http.Reques
 
 	// Difficulty, rating, tags, the hint and the solve counts stay hidden until
 	// every contest using this problem is over, the way Codeforces reveals tags
-	// and rating only after the round. Judges and the problem's own authors keep
-	// the full view: they need it to run and edit the contest.
-	seesSpoilers := isJudge || !hideSpoilers(r.Context(), h.problemStore, problem, claims)
+	// and rating only after the round.
+	//
+	// Only admins are exempt. Being the contest's manager, judge or tester — or
+	// the problem's author — is deliberately NOT a reason to see them here: that
+	// is the button a setter presses while already logged in, so exempting them
+	// meant the person checking the round saw the spoilers on the very page the
+	// competitors use. Their full view lives in the setter workspace.
+	seesSpoilers := isAdmin(claims) || !problemIsLive(r.Context(), h.problemStore, problem)
 	if !seesSpoilers {
 		redactProblem(problem)
 	}

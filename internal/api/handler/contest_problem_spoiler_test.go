@@ -103,18 +103,25 @@ func TestContestProblemRevealsAfterTheContest(t *testing.T) {
 	}
 }
 
-func TestContestProblemKeepsSpoilersForJudges(t *testing.T) {
+// Being the contest's manager or judge is not a reason to see the spoilers here:
+// a setter is already logged in when they check their own round, so exempting
+// them showed the answer key on the exact page competitors use.
+func TestContestProblemHidesSpoilersEvenForTheContestManager(t *testing.T) {
 	stub := &contestStub{contest: solvedContest(), problem: spoiledProblem(), judge: true}
 	store := &mockProblemStore{unreleasedContest: true}
 
 	body := contestProblemAs(t, stub, store, &auth.Claims{UserID: "judge1", Role: "user"})
 
-	if body["problem"].(map[string]interface{})["difficulty"] != "hard" {
-		t.Errorf("a judge must keep the full view: %v", body["problem"])
+	problem := body["problem"].(map[string]interface{})
+	if difficulty, _ := problem["difficulty"].(string); difficulty != "" {
+		t.Errorf("a contest manager must not see the spoilers here: %q", difficulty)
+	}
+	if body["spoilers_hidden"] != true {
+		t.Errorf("spoilers_hidden = %v, want true", body["spoilers_hidden"])
 	}
 }
 
-func TestContestProblemKeepsSpoilersForTheAuthor(t *testing.T) {
+func TestContestProblemHidesSpoilersEvenForTheAuthor(t *testing.T) {
 	stub := &contestStub{contest: solvedContest(), problem: spoiledProblem()}
 	store := &mockProblemStore{
 		unreleasedContest: true,
@@ -123,7 +130,19 @@ func TestContestProblemKeepsSpoilersForTheAuthor(t *testing.T) {
 
 	body := contestProblemAs(t, stub, store, &auth.Claims{UserID: "setter1", Role: "setter"})
 
+	problem := body["problem"].(map[string]interface{})
+	if difficulty, _ := problem["difficulty"].(string); difficulty != "" {
+		t.Errorf("an author must not see the spoilers here either: %q", difficulty)
+	}
+}
+
+func TestContestProblemKeepsSpoilersForAdmins(t *testing.T) {
+	stub := &contestStub{contest: solvedContest(), problem: spoiledProblem()}
+	store := &mockProblemStore{unreleasedContest: true}
+
+	body := contestProblemAs(t, stub, store, &auth.Claims{UserID: "admin1", Role: "admin"})
+
 	if body["problem"].(map[string]interface{})["difficulty"] != "hard" {
-		t.Errorf("the author must keep the full view: %v", body["problem"])
+		t.Errorf("an admin keeps the full view: %v", body["problem"])
 	}
 }
