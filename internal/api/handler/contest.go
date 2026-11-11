@@ -256,6 +256,33 @@ func (h *ContestHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 		c.Password = ""
 	}
 	problems, _ := h.store.GetProblems(r.Context(), c.ID)
+
+	// Per-problem solve state for the problem list: a green tick for the problems
+	// this viewer has solved, and the round-wide solve count so they can see what
+	// the field is finding easy. The list otherwise renders a bare "Solve"
+	// button with no indication of progress.
+	//
+	// During a standings freeze the public count is cut at the freeze instant,
+	// for the same reason the scoreboard is: a live "solved by N" beside a frozen
+	// board leaks the very solves the freeze is hiding. Staff keep the live view,
+	// matching what the scoreboard does for them.
+	//
+	// Anonymous callers still get the counts; viewerID is simply empty, which the
+	// query treats as "nobody", so My* come back false and are omitted.
+	var countCutoff *time.Time
+	if c.FreezeTime != nil && now.After(*c.FreezeTime) && now.Before(c.EndTime) && !isManager {
+		countCutoff = c.FreezeTime
+	}
+	if progress, err := h.store.GetProblemProgress(r.Context(), c.ID, userID, countCutoff); err == nil {
+		for i := range problems {
+			p := progress[problems[i].ProblemID]
+			problems[i].SolvedCount = p.SolvedCount
+			problems[i].MySolved = p.MySolved
+			problems[i].MyAttempted = p.MyAttempted
+			problems[i].MySubmissions = p.MySubmissions
+		}
+	}
+
 	ratings, _ := h.ratingStore.GetByContest(r.Context(), c.ID)
 	c.RatingCalculated = len(ratings) > 0
 	respondJSON(w, http.StatusOK, map[string]interface{}{"contest": c, "problems": problems})

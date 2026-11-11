@@ -284,6 +284,13 @@ export interface ContestProblem {
     slug?: string
     score: number
     sort_order: number
+    /** How many participants in this round have solved it. Always present. */
+    solved_count?: number
+    /** Per-viewer progress. Absent when signed out, so "unsolved" and
+     *  "we don't know who you are" stay distinguishable. */
+    my_solved?: boolean
+    my_attempted?: boolean
+    my_submissions?: number
 }
 
 export interface ContestRankEntry {

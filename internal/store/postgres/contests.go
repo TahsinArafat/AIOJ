@@ -340,6 +340,52 @@ func (s *ContestStore) GetProblems(ctx context.Context, contestID string) ([]mod
 	return items, nil
 }
 
+// GetProblemProgress returns, for every problem in the contest, how many
+// participants have solved it and what this viewer has done with it.
+//
+// Both halves come from one scan of the round's submissions rather than a query
+// per problem: a contest problem list is a single page load and was otherwise
+// N+1 twice over.
+//
+// viewerID may be empty (anonymous), in which case only the round-wide counts
+// are populated and My* stay false.
+//
+// beforeTime applies to the round-wide count only. During a standings freeze the
+// public scoreboard hides post-freeze solves, and a live "solved by N" next to it
+// would give that away by arithmetic — so the count is cut at the same instant.
+// The viewer's own state ignores it on purpose: their own verdicts were never
+// secret from them, and hiding a solve they just made would read as a bug.
+func (s *ContestStore) GetProblemProgress(ctx context.Context, contestID, viewerID string, beforeTime *time.Time) (map[string]model.ContestProblemProgress, error) {
+	var cutoff interface{}
+	if beforeTime != nil {
+		cutoff = *beforeTime
+	}
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT problem_id,
+		        COUNT(DISTINCT user_id) FILTER (WHERE status = 'ac' AND ($3::timestamptz IS NULL OR created_at < $3)) AS solved_count,
+		        COALESCE(BOOL_OR(status = 'ac') FILTER (WHERE user_id = NULLIF($2,'')::uuid), false) AS my_solved,
+		        COALESCE(BOOL_OR(user_id = NULLIF($2,'')::uuid), false) AS my_attempted,
+		        COUNT(*) FILTER (WHERE user_id = NULLIF($2,'')::uuid) AS my_submissions
+		   FROM submissions
+		  WHERE contest_id = $1
+		  GROUP BY problem_id`, contestID, viewerID, cutoff)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make(map[string]model.ContestProblemProgress)
+	for rows.Next() {
+		var problemID string
+		var p model.ContestProblemProgress
+		if err := rows.Scan(&problemID, &p.SolvedCount, &p.MySolved, &p.MyAttempted, &p.MySubmissions); err != nil {
+			return nil, err
+		}
+		out[problemID] = p
+	}
+	return out, rows.Err()
+}
+
 func (s *ContestStore) GetScoreboardRows(ctx context.Context, contestID string, beforeTime *time.Time) ([]ScoreboardRow, error) {
 	query := `SELECT s.user_id, s.problem_id, s.status, s.score, s.created_at
 			  FROM submissions s WHERE s.contest_id=$1`

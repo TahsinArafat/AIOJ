@@ -196,7 +196,13 @@ interface ContestInfo {
     upsolving_enabled?: boolean
     virtual_contest_enabled?: boolean
 }
-interface ProblemRow { problem_id?: string; index?: string; title?: string; score?: number }
+interface ProblemRow {
+    problem_id?: string; index?: string; title?: string; score?: number;
+    /** Round-wide solve count, always present. */
+    solved_count?: number;
+    /** Per-viewer progress; absent when signed out. */
+    my_solved?: boolean; my_attempted?: boolean; my_submissions?: number;
+}
 interface ClarificationItem { id?: string; created_at: string; question?: string; answer?: string | null; username?: string; is_public?: boolean }
 interface AnnouncementItem { id: string; created_at: string; content?: string; username?: string }
 interface SubmissionRow { id?: string; created_at: string; status: string; language?: string; problem_id?: string; user_id?: string; username?: string; time_used?: number; memory_used?: number; score?: number }
@@ -537,33 +543,75 @@ export default function ContestDetail() {
                                             <tr className="bg-surface-2/20 border-b border-hairline">
                                                 <th className="text-left px-4 py-3 font-semibold text-muted">#</th>
                                                 <th className="text-left px-4 py-3 font-semibold text-muted">Problem</th>
+                                                <th className="text-center px-4 py-3 font-semibold text-muted">Solved by</th>
                                                 <th className="text-right px-4 py-3 font-semibold text-muted">Score</th>
                                                 <th className="text-center px-4 py-3 font-semibold text-muted">Action</th>
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {problems.map((p, i) => (
-                                                <tr key={p.problem_id} className="border-b border-hairline last:border-0 hover:bg-surface-2 transition-colors">
-                                                    <td className="px-4 py-3 font-mono font-bold text-muted">{p.index || String.fromCharCode(65 + i)}</td>
-                                                    <td className="px-4 py-3">
-                                                        <Link
-                                                            to={`/contests/${id}/problem/${p.index || String.fromCharCode(65 + i)}`}
-                                                            className="text-brand hover:text-brand hover:underline font-medium"
-                                                        >
-                                                            {p.title || `Problem ${p.index || String.fromCharCode(65 + i)}`}
-                                                        </Link>
-                                                    </td>
-                                                    <td className="px-4 py-3 text-right font-mono text-ink-soft">{p.score ?? 100}</td>
-                                                    <td className="px-4 py-3 text-center">
-                                                        <Link
-                                                            to={`/contests/${id}/problem/${p.index || String.fromCharCode(65 + i)}`}
-                                                            className="inline-block px-3 py-1 bg-brand text-on-brand text-xs font-semibold rounded-lg hover:bg-brand-hover transition-colors"
-                                                        >
-                                                            Solve
-                                                        </Link>
-                                                    </td>
-                                                </tr>
-                                            ))}
+                                            {problems.map((p, i) => {
+                                                const letter = p.index || String.fromCharCode(65 + i)
+                                                // A green tick means solved. An amber dot
+                                                // means tried but not yet solved, so a
+                                                // half-finished problem is not mistaken
+                                                // for an untouched one.
+                                                return (
+                                                    <tr key={p.problem_id} className="border-b border-hairline last:border-0 hover:bg-surface-2 transition-colors">
+                                                        <td className="px-4 py-3 font-mono font-bold text-muted">
+                                                            <span className="inline-flex items-center gap-1.5">
+                                                                {p.my_solved && (
+                                                                    <CheckCircle2 className="w-4 h-4 text-ok flex-shrink-0" aria-label="Solved" />
+                                                                )}
+                                                                {letter}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-4 py-3">
+                                                            <Link
+                                                                to={`/contests/${id}/problem/${letter}`}
+                                                                className="text-brand hover:text-brand hover:underline font-medium"
+                                                            >
+                                                                {p.title || `Problem ${letter}`}
+                                                            </Link>
+                                                            {p.my_solved && (
+                                                                <span className="ml-2 text-[11px] font-semibold uppercase tracking-wide text-ok">Solved</span>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-center font-mono text-xs">
+                                                            {typeof p.solved_count === 'number' ? (
+                                                                <span className="inline-flex items-center gap-1 text-muted" title={`${p.solved_count} participant${p.solved_count === 1 ? '' : 's'} solved this`}>
+                                                                    <Users className="w-3 h-3" />
+                                                                    {p.solved_count}
+                                                                </span>
+                                                            ) : <span className="text-muted-soft">—</span>}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-right font-mono text-ink-soft">{p.score ?? 100}</td>
+                                                        <td className="px-4 py-3 text-center">
+                                                            {p.my_solved ? (
+                                                                <Link
+                                                                    to={`/contests/${id}/problem/${letter}`}
+                                                                    className="inline-block px-3 py-1 bg-ok/12 text-ok border border-ok/30 text-xs font-semibold rounded-lg hover:bg-ok/20 transition-colors"
+                                                                >
+                                                                    Review
+                                                                </Link>
+                                                            ) : (
+                                                                <>
+                                                                    {p.my_attempted && (
+                                                                        <span className="mr-2 text-[11px] font-medium text-warn" title={`${p.my_submissions ?? 0} attempt${p.my_submissions === 1 ? '' : 's'}, not solved`}>
+                                                                            Tried
+                                                                        </span>
+                                                                    )}
+                                                                    <Link
+                                                                        to={`/contests/${id}/problem/${letter}`}
+                                                                        className="inline-block px-3 py-1 bg-brand text-on-brand text-xs font-semibold rounded-lg hover:bg-brand-hover transition-colors"
+                                                                    >
+                                                                        Solve
+                                                                    </Link>
+                                                                </>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                )
+                                            })}
                                         </tbody>
                                     </table>
                                 </div>

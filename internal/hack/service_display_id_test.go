@@ -3,6 +3,7 @@ package hack
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/tahsinarafat/aioj/internal/model"
 	"github.com/tahsinarafat/aioj/internal/store"
@@ -47,6 +48,9 @@ func (canonicalHackContestStore) RemoveProblem(context.Context, string, string) 
 	return nil
 }
 func (canonicalHackContestStore) GetProblems(context.Context, string) ([]model.ContestProblem, error) {
+	return nil, nil
+}
+func (canonicalHackContestStore) GetProblemProgress(context.Context, string, string, *time.Time) (map[string]model.ContestProblemProgress, error) {
 	return nil, nil
 }
 func (canonicalHackContestStore) GetContestProblemByIndex(context.Context, string, string) (*model.Problem, error) {

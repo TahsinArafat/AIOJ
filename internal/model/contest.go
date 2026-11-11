@@ -72,6 +72,26 @@ type ContestProblem struct {
 	Slug      string `json:"slug,omitempty"`
 	Score     int    `json:"score"`
 	SortOrder int    `json:"sort_order"`
+	// Per-viewer progress, filled only by the contest detail endpoint. The
+	// problem list shows a solved tick and the solve count for the round, which
+	// a competitor needs to decide what to open next — the list used to render a
+	// bare "Solve" button and nothing else.
+	//
+	// Omitted from the payload for anonymous callers rather than sent as false,
+	// so "not solved" and "we do not know who you are" stay distinguishable.
+	SolvedCount   int  `json:"solved_count,omitempty"`
+	MySolved      bool `json:"my_solved,omitempty"`
+	MyAttempted   bool `json:"my_attempted,omitempty"`
+	MySubmissions int  `json:"my_submissions,omitempty"`
+}
+
+// ContestProblemProgress is one problem's solve state: how many participants in
+// the round have solved it, and what the viewing user has done with it.
+type ContestProblemProgress struct {
+	SolvedCount   int
+	MySolved      bool
+	MyAttempted   bool
+	MySubmissions int
 }
 
 type ProblemResult struct {

@@ -228,6 +228,9 @@ type ContestStore interface {
 	UpdateProblem(ctx context.Context, contestID, problemID, index string, score, sortOrder int) error
 	RemoveProblem(ctx context.Context, contestID, problemID string) error
 	GetProblems(ctx context.Context, contestID string) ([]model.ContestProblem, error)
+	// GetProblemProgress is the per-viewer solve state and round-wide solve count
+	// for each problem, keyed by problem id. viewerID may be empty.
+	GetProblemProgress(ctx context.Context, contestID, viewerID string, beforeTime *time.Time) (map[string]model.ContestProblemProgress, error)
 	GetContestProblemByIndex(ctx context.Context, contestID, index string) (*model.Problem, error)
 	GetParticipants(ctx context.Context, contestID string) ([]string, error)
 	IsParticipant(ctx context.Context, contestID, userID string) (bool, error)
