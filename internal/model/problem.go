@@ -49,23 +49,34 @@ type Problem struct {
 	Interactive          bool            `json:"interactive"`
 	InteractorLanguage   string          `json:"interactor_language,omitempty"`
 	InteractorSourceCode string          `json:"interactor_source_code,omitempty"`
-	ScoringMode          string          `json:"scoring_mode"`        // "complete" or "partial"
-	SubtaskAggregation   string          `json:"subtask_aggregation"` // "min" or "sum"
-	LanguageLimits       []LanguageLimit `json:"language_limits,omitempty"`
-	SubmissionCount      int             `json:"submission_count"`
-	AcceptedCount        int             `json:"accepted_count"`
-	Source               string          `json:"source"`
-	RemoteID             string          `json:"remote_id,omitempty"`
-	AIGenerated          bool            `json:"ai_generated,omitempty"`
-	CreatedBy            string          `json:"created_by"`
-	CreatedAt            time.Time       `json:"created_at"`
-	UpdatedAt            time.Time       `json:"updated_at"`
+	// ProblemType is "standard", "interactive" or "output_only". The judge has
+	// always supported all three; only output_only had no way to be declared,
+	// which is why the contestant could never submit an output file.
+	ProblemType        string          `json:"problem_type"`
+	ScoringMode        string          `json:"scoring_mode"`        // "complete" or "partial"
+	SubtaskAggregation string          `json:"subtask_aggregation"` // "min" or "sum"
+	LanguageLimits     []LanguageLimit `json:"language_limits,omitempty"`
+	SubmissionCount    int             `json:"submission_count"`
+	AcceptedCount      int             `json:"accepted_count"`
+	Source             string          `json:"source"`
+	RemoteID           string          `json:"remote_id,omitempty"`
+	AIGenerated        bool            `json:"ai_generated,omitempty"`
+	CreatedBy          string          `json:"created_by"`
+	CreatedAt          time.Time       `json:"created_at"`
+	UpdatedAt          time.Time       `json:"updated_at"`
 }
 
 // Problem review states. Publishing is an admin decision: a setter's problem
 // starts as a draft, moves to pending when submitted, and only 'published'
 // makes it readable by the public. Visible is derived from these — the CHECK
 // constraints in migration 000081 keep the two from disagreeing.
+// Problem types. Kept in step with the CHECK constraint in migration 000082.
+const (
+	ProblemTypeStandard    = "standard"
+	ProblemTypeInteractive = "interactive"
+	ProblemTypeOutputOnly  = "output_only"
+)
+
 const (
 	ProblemStatusDraft     = "draft"
 	ProblemStatusPending   = "pending"

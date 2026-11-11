@@ -321,7 +321,12 @@ export default function ProblemDetail() {
 
     const submit = async () => {
         if (!getAccessToken()) { toast.info('Please login first'); return }
-        if (!code.trim()) { toast.info('Please write some code'); return }
+        if (!code.trim()) {
+            toast.info(problem?.problem_type === 'output_only'
+                ? 'Paste your answer output first'
+                : 'Please write some code')
+            return
+        }
         if (!problem) return
         const now = Date.now()
         if (now - lastSubmitTime < 5000) { toast.info('Please wait 5 seconds between submissions'); return }
@@ -454,7 +459,7 @@ export default function ProblemDetail() {
                                 {i18n.language.toUpperCase()}
                             </Badge>
                         )}
-                        {problem.problem_type === 'output' && <Badge tone="warn">Output-only</Badge>}
+                        {problem.problem_type === 'output_only' && <Badge tone="warn">Output-only</Badge>}
                         {problem.scoring_mode === 'partial' && <Badge tone="brand">Partial scoring</Badge>}
                     </h1>
                     {/* Limits are the first thing a competitor looks for, so they

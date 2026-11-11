@@ -135,6 +135,9 @@ type submissionBuildRequest struct {
 	ContestID  string
 	UserID     string
 	Upsolving  bool
+	// SubmissionType is empty for a normal code submission; "output" when the
+	// caller is attaching an output file to an output-only problem.
+	SubmissionType string
 	// IsTester marks a submission made by a contest judge/tester/manager
 	// before the contest window opens.  These get PriorityContest because
 	// they validate problems and must not wait behind practice submissions.
@@ -154,14 +157,24 @@ func (h *SubmissionHandler) buildAndEnqueue(r *http.Request, w http.ResponseWrit
 		return
 	}
 
+	// The judge has always known how to run an output-only submission
+	// (worker.go:242 dispatches before any language lookup), but nothing ever set
+	// SubmissionType, so the path was unreachable. Derive it from the problem
+	// rather than trusting the client: an output submission on a coded problem
+	// would skip compilation entirely and be judged as literal stdout.
+	subType := model.SubmissionTypeCode
+	if prob.ProblemType == model.ProblemTypeOutputOnly {
+		subType = model.SubmissionTypeOutput
+	}
 	sub := &model.Submission{
-		ID:         uuid.New().String(),
-		ProblemID:  req.ProblemID,
-		UserID:     req.UserID,
-		Language:   req.Language,
-		SourceCode: req.SourceCode,
-		CodeSize:   len(req.SourceCode),
-		Status:     model.StatusPending,
+		ID:             uuid.New().String(),
+		ProblemID:      req.ProblemID,
+		UserID:         req.UserID,
+		Language:       req.Language,
+		SourceCode:     req.SourceCode,
+		CodeSize:       len(req.SourceCode),
+		Status:         model.StatusPending,
+		SubmissionType: subType,
 	}
 	if req.ContestID != "" {
 		sub.ContestID = req.ContestID
@@ -251,8 +264,20 @@ func (h *SubmissionHandler) Create(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid body", http.StatusBadRequest)
 		return
 	}
-	if req.ProblemID == "" || req.Language == "" || req.SourceCode == "" {
-		http.Error(w, "problem_id, language, and source_code are required", http.StatusBadRequest)
+	if req.ProblemID == "" || req.SourceCode == "" {
+		http.Error(w, "problem_id and source_code are required", http.StatusBadRequest)
+		return
+	}
+
+	// An output-only problem takes the contestant's ANSWER as source_code, so it
+	// needs no language. A coded problem still does.
+	prob, err := h.probStore.GetByID(r.Context(), req.ProblemID)
+	if err != nil || prob == nil {
+		http.Error(w, "problem not found", http.StatusNotFound)
+		return
+	}
+	if prob.ProblemType != model.ProblemTypeOutputOnly && req.Language == "" {
+		http.Error(w, "language is required", http.StatusBadRequest)
 		return
 	}
 

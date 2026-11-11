@@ -700,9 +700,9 @@ export default function ContestProblem() {
                         interactive={problem.interactive}
                         hideSpoilers={hideSpoilers}
                     />
-                    {(problem.problem_type === 'output' || problem.scoring_mode === 'partial') && (
+                    {(problem.problem_type === 'output_only' || problem.scoring_mode === 'partial') && (
                         <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                            {problem.problem_type === 'output' && <Badge tone="warn">Output-only</Badge>}
+                            {problem.problem_type === 'output_only' && <Badge tone="warn">Output-only</Badge>}
                             {problem.scoring_mode === 'partial' && <Badge tone="brand">Partial scoring</Badge>}
                         </div>
                     )}
