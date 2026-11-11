@@ -59,6 +59,23 @@ func (h *ContestProblemHandler) GetByIndex(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	// Membership in the contest is what made this readable, and the store read
+	// deliberately skips p.visible so a private problem still opens during the
+	// round. That grant must not outlive the round: otherwise attaching a draft
+	// to any contest makes it readable through this endpoint forever, which is a
+	// way around the fact that an unpublished problem is nobody else's business.
+	// Once the contest is over the draft goes back to being private, and only its
+	// authors and admins keep access.
+	//
+	// canReadDraft is computed once and reused below: someone who may read the
+	// draft at all (its author, a collaborator, an admin) is not a participant to
+	// be gated on, so the upsolving rule must not turn them away either.
+	canReadDraft := canReadProblem(r.Context(), h.problemStore, problem, claims)
+	if now.After(contest.EndTime) && !canReadDraft {
+		http.Error(w, "problem not found in contest", http.StatusNotFound)
+		return
+	}
+
 	isJudge := claims != nil && (claims.Role == "admin" || h.contestStore.HasAccess(r.Context(), contest.ID, claims.UserID, "manager", "judge"))
 
 	// Difficulty, rating, tags, the hint and the solve counts stay hidden until
@@ -83,7 +100,7 @@ func (h *ContestProblemHandler) GetByIndex(w http.ResponseWriter, r *http.Reques
 			}
 
 			isParticipant, _ := h.contestStore.IsParticipant(r.Context(), contest.ID, claims.UserID)
-			if !isParticipant && claims.Role != "admin" {
+			if !isParticipant && claims.Role != "admin" && !canReadDraft {
 				http.Error(w, "forbidden", http.StatusForbidden)
 				return
 			}

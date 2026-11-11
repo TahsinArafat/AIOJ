@@ -497,11 +497,18 @@ func (h *SubmissionHandler) ListByContest(w http.ResponseWriter, r *http.Request
 		Status:    r.URL.Query().Get("status"),
 	}
 
-	// mine=true (or default) means only current user's submissions
-	// mine=false means all submissions in the contest (for everyone)
+	// mine=false means the whole contest's rows. That is a judge's view: it names
+	// every submitter and their verdicts, so it is limited to the people running
+	// the round. Before this, isJudge was computed and then only echoed back in
+	// the response, so any signed-in user could read the entire contest's traffic
+	// by adding ?mine=false. The freeze is a scoreboard concern and is applied
+	// there; a judge running a round still needs to see its submissions.
 	mine := r.URL.Query().Get("mine")
 	if mine == "false" {
-		// Show all — no user filter
+		if !isJudge {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
 	} else {
 		// Default: show only user's own
 		filter.UserID = claims.UserID

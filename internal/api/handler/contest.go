@@ -764,6 +764,19 @@ func (h *ContestHandler) ListTeamRegistrations(w http.ResponseWriter, r *http.Re
 		respondContestLookupError(w, err)
 		return
 	}
+	// The roster names every registered team and when each signed up. That is
+	// organizer information, not public information, so it belongs to the people
+	// running the round. The route used to carry no middleware at all, which also
+	// made it an unauthenticated enumeration of contest ids.
+	claims := middleware.GetUserClaims(r)
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if claims.Role != "admin" && !h.store.HasAccess(r.Context(), contest.ID, claims.UserID, "manager", "judge", "tester") {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
 	teams, err := h.store.ListTeamRegistrations(r.Context(), contest.ID)
 	if err != nil {
 		http.Error(w, "failed to list registrations", http.StatusInternalServerError)

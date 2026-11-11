@@ -363,7 +363,8 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 			r.Post("/{id}/calculate-ratings", contestH.CalculateRatings)
 		})
 		r.With(middleware.AuthMiddleware(jwtManager)).Post("/{id}/register-team", contestH.RegisterTeam)
-		r.Get("/{id}/team-registrations", contestH.ListTeamRegistrations)
+		// The roster is organizer information; the handler checks manager/judge.
+		r.With(middleware.AuthMiddleware(jwtManager)).Get("/{id}/team-registrations", contestH.ListTeamRegistrations)
 	})
 
 	r.Route("/api/contests/{contestId}/clarifications", func(r chi.Router) {
