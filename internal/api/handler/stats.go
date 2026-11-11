@@ -9,15 +9,29 @@ import (
 )
 
 type StatsHandler struct {
-	subStore store.SubmissionStore
+	subStore     store.SubmissionStore
+	problemStore store.ProblemStore
 }
 
-func NewStatsHandler(ss store.SubmissionStore) *StatsHandler {
-	return &StatsHandler{subStore: ss}
+func NewStatsHandler(ss store.SubmissionStore, ps store.ProblemStore) *StatsHandler {
+	return &StatsHandler{subStore: ss, problemStore: ps}
 }
 
 func (h *StatsHandler) GetProblemStats(w http.ResponseWriter, r *http.Request) {
 	problemID := chi.URLParam(r, "problemId")
+
+	// Per-problem solve statistics are a draft's activity, and answering them is
+	// also an existence oracle for unpublished problems if left unguarded.
+	p, err := h.problemStore.GetByID(r.Context(), problemID)
+	if err != nil || p == nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if !canReadProblem(r.Context(), h.problemStore, p, middleware.GetUserClaims(r)) {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
 	stats, err := h.subStore.GetProblemStats(r.Context(), problemID)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)

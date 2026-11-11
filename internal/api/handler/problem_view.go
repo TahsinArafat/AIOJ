@@ -62,3 +62,39 @@ func canSeeSpoilers(ctx context.Context, problems store.ProblemStore, p *model.P
 func isAdmin(claims *auth.Claims) bool {
 	return claims != nil && claims.Role == "admin"
 }
+
+/**
+ * Visibility control for a private problem.
+ *
+ * A problem with visible = false is a draft: it belongs to its authors only. The
+ * gate below is the single answer to "may this caller read it at all", and every
+ * handler that returns a private problem's statement, test data, translations,
+ * permissions or editorial must go through it. It was repeated per-handler
+ * before, and the copies that were never written are exactly the leaks this
+ * file exists to close — /export shipped every test file of every slug to any
+ * signed-in account for want of one call.
+ *
+ * Authorization is by permission row, never by role: there is no `setter`
+ * bypass, so one setter cannot open another's draft. problems.created_by is
+ * checked directly as well, because Create inserts the owner row but a row whose
+ * permission entry was lost must still be reachable by the person who wrote it.
+ */
+
+// problemAccessLevels are the permission levels that may read a private problem.
+var problemAccessLevels = []string{"owner", "co_author", "tester"}
+
+// canReadProblem reports whether claims may read p at all. It answers only the
+// draft question; whether a *published* problem is currently hidden because its
+// contest is still running is problemIsLive's business, not this one's.
+func canReadProblem(ctx context.Context, problems store.ProblemStore, p *model.Problem, claims *auth.Claims) bool {
+	if p.Visible {
+		return true
+	}
+	if claims == nil {
+		return false
+	}
+	if claims.Role == "admin" || p.CreatedBy == claims.UserID {
+		return true
+	}
+	return problems.HasAccess(ctx, p.ID, claims.UserID, problemAccessLevels...)
+}

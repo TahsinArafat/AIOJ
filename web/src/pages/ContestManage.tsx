@@ -201,7 +201,7 @@ export function ChallengesTab({ contestId }: { contestId: string }) {
 
     const searchProblems = async () => {
         if (!search.trim()) return
-        const res = await api.problems.list(0, 20, { search })
+        const res = await api.problems.listSelectable(search.trim(), 0, 20)
         setAllProblems(res.data || [])
     }
 

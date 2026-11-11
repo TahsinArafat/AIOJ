@@ -8,15 +8,17 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
 	"github.com/tahsinarafat/aioj/internal/model"
+	"github.com/tahsinarafat/aioj/internal/store"
 	"github.com/tahsinarafat/aioj/internal/store/postgres"
 )
 
 type EditorialHandler struct {
-	store *postgres.EditorialStore
+	store        *postgres.EditorialStore
+	problemStore store.ProblemStore
 }
 
-func NewEditorialHandler(s *postgres.EditorialStore) *EditorialHandler {
-	return &EditorialHandler{store: s}
+func NewEditorialHandler(s *postgres.EditorialStore, ps store.ProblemStore) *EditorialHandler {
+	return &EditorialHandler{store: s, problemStore: ps}
 }
 
 func (h *EditorialHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -73,6 +75,24 @@ func (h *EditorialHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 
 func (h *EditorialHandler) GetByProblem(w http.ResponseWriter, r *http.Request) {
 	problemID := chi.URLParam(r, "problemId")
+
+	// An editorial carries the solution. On a draft that is the answer key, and
+	// this route is unauthenticated, so the problem itself must be readable
+	// first — the editorialVisible() filter in the store only covers contests.
+	p, err := h.problemStore.GetByID(r.Context(), problemID)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if p == nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if !canReadProblem(r.Context(), h.problemStore, p, middleware.GetUserClaims(r)) {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
 	editorials, err := h.store.GetByProblem(r.Context(), problemID)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)

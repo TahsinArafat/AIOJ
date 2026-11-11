@@ -124,6 +124,18 @@ const unreleasedContestSQL = `EXISTS (
 // public archive at all: published, and not still in play in a contest.
 const archivedProblemSQL = "p.visible = true AND NOT " + unreleasedContestSQL
 
+// selectableProblemSQL is what a contest's problem picker searches: the public
+// archive, plus the problems the caller created or holds a permission row on.
+//
+// The second and third clauses are why a setter can finally attach their own
+// limited (visible = false) draft to a round. They are deliberately scoped to
+// the caller — p.created_by = $1 and perm.user_id = $1 — so opening the picker
+// wider than the archive does not also expose every other setter's private
+// drafts, which is the bug the archive filter was protecting against.
+const selectableProblemSQL = `((` + archivedProblemSQL + `)
+	OR p.created_by = $1
+	OR EXISTS (SELECT 1 FROM problem_permissions perm WHERE perm.problem_id = p.id AND perm.user_id = $1))`
+
 // InUnreleasedContest reports whether the problem is part of a contest that has
 // not finished yet.
 func (s *ProblemStore) InUnreleasedContest(ctx context.Context, problemID string) (bool, error) {
@@ -436,6 +448,55 @@ func (s *ProblemStore) ListByCreatedBy(ctx context.Context, userID string, offse
 		var createdAt interface{}
 		rows.Scan(&item.ID, &item.Slug, &item.Title, &item.Difficulty, &item.Rating, pq.Array(&tags),
 			&item.SubmissionCount, &item.AcceptedCount, &item.Source, &createdAt)
+		item.Tags = tags
+		items = append(items, item)
+	}
+	if items == nil {
+		items = []model.ProblemListItem{}
+	}
+	return items, total, nil
+}
+
+// ListSelectable is the contest problem picker's search: the public archive plus
+// everything the caller may attach — their own problems, and any problem they
+// hold a permission row on. See selectableProblemSQL.
+func (s *ProblemStore) ListSelectable(ctx context.Context, userID string, offset, limit int, search string) ([]model.ProblemListItem, int, error) {
+	where := []string{selectableProblemSQL}
+	args := []interface{}{userID}
+	argIdx := 2
+
+	if search != "" {
+		where = append(where, fmt.Sprintf(
+			"(p.search_vector @@ plainto_tsquery('simple', $%d) OR p.title ILIKE $%d OR p.slug ILIKE $%d)",
+			argIdx, argIdx+1, argIdx+2))
+		args = append(args, search, "%"+search+"%", "%"+search+"%")
+		argIdx += 3
+	}
+
+	whereClause := strings.Join(where, " AND ")
+
+	var total int
+	s.db.QueryRowContext(ctx,
+		"SELECT COUNT(*) FROM problems p WHERE "+whereClause, args...).Scan(&total)
+
+	selectQuery := fmt.Sprintf(`SELECT p.id, p.slug, p.title, p.difficulty, COALESCE(p.rating,0), p.tags,
+		p.submission_count, p.accepted_count, p.source
+		FROM problems p WHERE %s ORDER BY p.visible ASC, p.created_at DESC OFFSET $%d LIMIT $%d`,
+		whereClause, argIdx, argIdx+1)
+	args = append(args, offset, limit)
+
+	rows, err := s.db.QueryContext(ctx, selectQuery, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var items []model.ProblemListItem
+	for rows.Next() {
+		var item model.ProblemListItem
+		var tags []string
+		rows.Scan(&item.ID, &item.Slug, &item.Title, &item.Difficulty, &item.Rating, pq.Array(&tags),
+			&item.SubmissionCount, &item.AcceptedCount, &item.Source)
 		item.Tags = tags
 		items = append(items, item)
 	}

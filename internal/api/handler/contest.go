@@ -145,7 +145,13 @@ func (h *ContestHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	for i, pid := range req.ProblemIDs {
 		idx := string(rune('A' + i))
-		h.store.AddProblem(r.Context(), c.ID, pid, idx, 100, i)
+		// Skip problems this creator may not use rather than failing the whole
+		// contest: a bad id must not cost the round, and silently attaching
+		// somebody else's draft would leak it through the contest endpoint.
+		if p, err := h.problemStore.GetByID(r.Context(), pid); err == nil && p != nil &&
+			canReadProblem(r.Context(), h.problemStore, p, claims) {
+			h.store.AddProblem(r.Context(), c.ID, pid, idx, 100, i)
+		}
 	}
 	respondJSON(w, http.StatusCreated, c)
 }
@@ -333,10 +339,13 @@ func (h *ContestHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 		isJudge = false
 	}
 
-	// Check cache (key: contestID:view:page:limit)
+	// Check cache (key: contestID:view:page:limit:judge)
 	pageStr := r.URL.Query().Get("page")
 	limitStr := r.URL.Query().Get("limit")
-	cacheKey := contest.ID + ":" + viewParam + ":" + pageStr + ":" + limitStr
+	// isJudge belongs in the key: a judge sees past the freeze and gets
+	// is_judge:true, so without it the first judge to load the page seeded the
+	// unfrozen board for every anonymous visitor until the entry expired.
+	cacheKey := contest.ID + ":" + viewParam + ":" + pageStr + ":" + limitStr + ":" + strconv.FormatBool(isJudge)
 	if cached, ok := h.cache.get(cacheKey); ok {
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("X-Cache", "HIT")
@@ -690,7 +699,12 @@ func (h *ContestHandler) CreateEducational(w http.ResponseWriter, r *http.Reques
 
 	for i, pid := range req.ProblemIDs {
 		idx := string(rune('A' + i))
-		h.store.AddProblem(r.Context(), c.ID, pid, idx, 100, i)
+		// Same rule as Create: only attach a problem this creator may read, so an
+		// educational round cannot be used to surface someone else's draft.
+		if p, err := h.problemStore.GetByID(r.Context(), pid); err == nil && p != nil &&
+			canReadProblem(r.Context(), h.problemStore, p, claims) {
+			h.store.AddProblem(r.Context(), c.ID, pid, idx, 100, i)
+		}
 	}
 
 	respondJSON(w, http.StatusCreated, c)
@@ -803,6 +817,20 @@ func (h *ContestHandler) AddProblem(w http.ResponseWriter, r *http.Request) {
 		req.Score = 100
 	}
 
+	// Managing a contest says nothing about the problems put into it. Without
+	// this check a setter could attach another setter's private draft to their
+	// own round and then read it through the contest endpoint, which
+	// deliberately skips the visibility filter — the read half of the leak.
+	p, err := h.problemStore.GetByID(r.Context(), req.ProblemID)
+	if err != nil || p == nil {
+		http.Error(w, "problem not found", http.StatusNotFound)
+		return
+	}
+	if !canReadProblem(r.Context(), h.problemStore, p, claims) {
+		http.Error(w, "problem not found", http.StatusNotFound)
+		return
+	}
+
 	if err := h.store.AddProblem(r.Context(), c.ID, req.ProblemID, req.Index, req.Score, 0); err != nil {
 		http.Error(w, "failed to add problem", http.StatusInternalServerError)
 		return
@@ -851,6 +879,17 @@ func (h *ContestHandler) DownloadPDF(w http.ResponseWriter, r *http.Request) {
 
 	isJudge := claims != nil && (claims.Role == "admin" || h.store.HasAccess(r.Context(), contest.ID, claims.UserID, "manager", "judge"))
 
+	// A PDF is the whole round's statements in one file, so it needs the same
+	// guard the contest page has and this endpoint shipped without: an
+	// unpublished or not-yet-started contest must not hand its statements to an
+	// anonymous visitor just because statement_hidden defaults to false.
+	if !contest.Visible || time.Now().Before(contest.StartTime) {
+		if claims == nil || (claims.Role != "admin" && !h.store.HasAccess(r.Context(), contest.ID, claims.UserID, "manager", "tester")) {
+			http.Error(w, "contest not found", http.StatusNotFound)
+			return
+		}
+	}
+
 	if (contest.StatementHidden || !contest.PDFEnabled) && !isJudge {
 		http.Error(w, "PDF generation is disabled or hidden for this contest", http.StatusForbidden)
 		return
@@ -893,7 +932,17 @@ func (h *ContestHandler) ContestStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Stats are public like the scoreboard — no auth check needed.
+	// Per-problem stats carry the problem title, so the contest's own visibility
+	// has to be checked here too — "public like the scoreboard" is only true once
+	// the round is public.
+	claims := middleware.GetUserClaims(r)
+	if !contest.Visible || time.Now().Before(contest.StartTime) {
+		if claims == nil || (claims.Role != "admin" && !h.store.HasAccess(r.Context(), contest.ID, claims.UserID, "manager", "tester")) {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+	}
+
 	stats, err := h.store.GetContestStats(r.Context(), contest.ID)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)

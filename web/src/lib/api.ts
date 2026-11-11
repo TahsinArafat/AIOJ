@@ -375,6 +375,13 @@ export const api = {
             return request<{ data: ProblemListItem[]; total: number }>(url);
         },
         listMy: (offset = 0, limit = 20) => request<{ data: ProblemListItem[]; total: number }>(`/problems/my?offset=${offset}&limit=${limit}`),
+        // The contest problem picker: the archive plus the caller's own
+        // unpublished drafts, which the archive listing can never return.
+        listSelectable: (search: string, offset = 0, limit = 20) => {
+            let url = `/problems/selectable?offset=${offset}&limit=${limit}`;
+            if (search) url += `&search=${encodeURIComponent(search)}`;
+            return request<{ data: ProblemListItem[]; total: number }>(url);
+        },
         listTags: () => request<{ data: string[] }>('/problems/tags'),
         get: (slug: string) => request<Problem>(`/problems/${slug}`),
         // Per-problem statement translations. `listI18n` is public; the write

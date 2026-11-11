@@ -261,13 +261,18 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 		r.Get("/", problemH.List)
 		r.Get("/tags", problemH.ListTags)
 		r.With(middleware.AuthMiddleware(jwtManager)).Get("/my", problemH.ListMyProblems)
+		// The contest problem picker searches a wider set than the archive: it
+		// must also offer the caller's own unpublished drafts. Auth-gated
+		// because the result is per-caller.
+		r.With(middleware.AuthMiddleware(jwtManager)).Get("/selectable", problemH.ListSelectable)
 		r.With(middleware.OptionalAuthMiddleware(jwtManager)).Get("/{slug}", problemH.GetBySlug)
 
-		// Per-problem statement translations (dmoj-style i18n). Reads are public
-		// so a solver can fetch the statement in their own language; writes sit
-		// behind auth like the other setter operations.
+		// Per-problem statement translations (dmoj-style i18n). The handler
+		// decides who may read them, because a draft's translations are as
+		// private as the draft — so it needs the caller's identity even on the
+		// read path, which plain public routing would not supply.
 		r.Route("/{id}/i18n", func(r chi.Router) {
-			r.Get("/", problemI18nH.List)
+			r.With(middleware.OptionalAuthMiddleware(jwtManager)).Get("/", problemI18nH.List)
 			r.With(middleware.AuthMiddleware(jwtManager)).Put("/{lang}", problemI18nH.Upsert)
 			r.With(middleware.AuthMiddleware(jwtManager)).Delete("/{lang}", problemI18nH.Delete)
 		})
@@ -579,7 +584,7 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 
 	r.Route("/api/stats", func(r chi.Router) {
 		r.Get("/platform", statsH.GetPlatformStats)
-		r.Get("/problems/{problemId}", statsH.GetProblemStats)
+		r.With(middleware.OptionalAuthMiddleware(jwtManager)).Get("/problems/{problemId}", statsH.GetProblemStats)
 		r.With(middleware.AuthMiddleware(jwtManager)).Get("/me", statsH.GetUserStats)
 	})
 

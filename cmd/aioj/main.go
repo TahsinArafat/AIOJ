@@ -270,7 +270,7 @@ func main() {
 	hackService := hack.NewService(hackStore, contestStore, submissionStore).
 		WithJudge(problemStore, hack.NewJudge(execClient, cfg.LangDir))
 	hackH := handler.NewHackHandler(hackService, hackStore, contestStore)
-	statsH := handler.NewStatsHandler(submissionStore)
+	statsH := handler.NewStatsHandler(submissionStore, problemStore)
 	notifStore := postgres.NewNotificationStore(db)
 	notifH := handler.NewNotificationHandler(notifStore)
 	groupStore := postgres.NewGroupStore(db)
@@ -279,7 +279,7 @@ func main() {
 	blogStore := postgres.NewBlogStore(db)
 	blogH := handler.NewBlogHandler(blogStore)
 	editorialStore := postgres.NewEditorialStore(db)
-	editorialH := handler.NewEditorialHandler(editorialStore)
+	editorialH := handler.NewEditorialHandler(editorialStore, problemStore)
 	apiKeyStore := postgres.NewAPIKeyStore(db)
 	apiKeyH := handler.NewAPIKeyHandler(apiKeyStore)
 	webhookStore := postgres.NewWebhookStore(db)

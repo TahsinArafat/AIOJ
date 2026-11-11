@@ -92,12 +92,11 @@ func (h *ProblemHandler) GetBySlug(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	claims := middleware.GetUserClaims(r)
-	// Privacy guard: private problems only visible to admin, owner, co_author, tester
-	if !p.Visible {
-		if claims == nil || (claims.Role != "admin" && !h.store.HasAccess(r.Context(), p.ID, claims.UserID, "owner", "co_author", "tester")) {
-			http.Error(w, "forbidden", http.StatusForbidden)
-			return
-		}
+	// Privacy guard: a draft is its authors' business. Kept as 403 rather than
+	// 404 because this endpoint has always answered that way for a private slug.
+	if !canReadProblem(r.Context(), h.store, p, claims) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
 	}
 	// A problem that is still in play in a contest is not part of the archive: it
 	// belongs to its contest until the round is over, the way Codeforces keeps a
@@ -200,12 +199,38 @@ func (h *ProblemHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// canAuthorProblem reports whether the caller may author this problem's data.
+// Distinct from canReadProblem in problem_view.go: that one answers "may I see
+// the statement", this one "may I take the test data away with me".
+func (h *ProblemHandler) canAuthorProblem(r *http.Request, p *model.Problem) bool {
+	claims := middleware.GetUserClaims(r)
+	if claims == nil {
+		return false
+	}
+	if claims.Role == "admin" || p.CreatedBy == claims.UserID {
+		return true
+	}
+	return h.store.HasAccess(r.Context(), p.ID, claims.UserID, "owner", "co_author")
+}
+
 func (h *ProblemHandler) Export(w http.ResponseWriter, r *http.Request) {
 	slug := chi.URLParam(r, "slug")
 
 	prob, err := h.store.GetBySlug(r.Context(), slug)
 	if err != nil {
 		http.Error(w, "problem not found", http.StatusNotFound)
+		return
+	}
+	if prob == nil {
+		http.Error(w, "problem not found", http.StatusNotFound)
+		return
+	}
+	// An export is the whole problem — statement plus every test file — so it is
+	// the most valuable thing a private draft can leak. Authoring rights, not
+	// mere authentication: the route's feature gate admits any signed-in user.
+	if !canReadProblem(r.Context(), h.store, prob, middleware.GetUserClaims(r)) ||
+		!h.canAuthorProblem(r, prob) {
+		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
 
@@ -351,6 +376,13 @@ func (h *ProblemHandler) ListPermissions(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
+	// Who collaborates on a draft is itself private, and answering 403 for
+	// hidden slugs versus 200 for visible ones would make this an existence
+	// oracle for unpublished problems.
+	if !canReadProblem(r.Context(), h.store, p, middleware.GetUserClaims(r)) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
 	perms, err := h.store.GetPermissions(r.Context(), p.ID)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -437,6 +469,32 @@ func (h *ProblemHandler) ListMyProblems(w http.ResponseWriter, r *http.Request) 
 	}
 
 	items, total, err := h.store.ListByCreatedBy(r.Context(), claims.UserID, offset, limit)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{"data": items, "total": total})
+}
+
+// ListSelectable backs the contest problem picker. It answers the public archive
+// plus the caller's own and shared problems, so a setter can attach a problem
+// they have not published yet — which the plain archive listing can never show
+// them, because an unpublished problem is by definition not in the archive.
+func (h *ProblemHandler) ListSelectable(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r)
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	if limit <= 0 || limit > 50 {
+		limit = 20
+	}
+
+	items, total, err := h.store.ListSelectable(r.Context(), claims.UserID, offset, limit, r.URL.Query().Get("search"))
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return

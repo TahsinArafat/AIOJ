@@ -446,6 +446,12 @@ func (h *SubmissionHandler) ListByProblem(w http.ResponseWriter, r *http.Request
 		http.Error(w, "problem not found", http.StatusNotFound)
 		return
 	}
+	// Submission traffic names its submitters. On a draft that is not public
+	// information, and the route carries no auth middleware of its own.
+	if !canReadProblem(r.Context(), h.probStore, problem, middleware.GetUserClaims(r)) {
+		http.Error(w, "problem not found", http.StatusNotFound)
+		return
+	}
 
 	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))

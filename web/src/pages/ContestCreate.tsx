@@ -142,7 +142,7 @@ export default function ContestCreate() {
         debounceRef.current = setTimeout(async () => {
             setSearchLoading(true)
             try {
-                const res = await api.problems.list(0, 10, { search: value.trim() })
+                const res = await api.problems.listSelectable(value.trim(), 0, 10)
                 const items = (res.data || []).map((p: ProblemSearchHit) => ({
                     id: p.id,
                     title: p.title,

@@ -16,6 +16,8 @@ import (
 type mockProblemStore struct {
 	createErr error
 	getBySlug *model.Problem
+	// getByID answers GetByID, used by the access-guard tests.
+	getByID *model.Problem
 	// listItems is what List returns, so the spoiler tests can drive rows.
 	listItems []model.ProblemListItem
 	// unreleasedContest answers InUnreleasedContest for every problem.
@@ -27,7 +29,7 @@ type mockProblemStore struct {
 
 func (m *mockProblemStore) Create(_ context.Context, _ *model.Problem) error { return m.createErr }
 func (m *mockProblemStore) GetByID(_ context.Context, _ string) (*model.Problem, error) {
-	return nil, nil
+	return m.getByID, nil
 }
 func (m *mockProblemStore) GetBySlug(_ context.Context, _ string) (*model.Problem, error) {
 	return m.getBySlug, nil
@@ -39,6 +41,9 @@ func (m *mockProblemStore) ListWithFilter(_ context.Context, _, _ int, _ string,
 	return nil, 0, nil
 }
 func (m *mockProblemStore) ListByCreatedBy(_ context.Context, _ string, _, _ int) ([]model.ProblemListItem, int, error) {
+	return nil, 0, nil
+}
+func (m *mockProblemStore) ListSelectable(_ context.Context, _ string, _, _ int, _ string) ([]model.ProblemListItem, int, error) {
 	return nil, 0, nil
 }
 func (m *mockProblemStore) GetAllTags(_ context.Context) ([]string, error) { return nil, nil }

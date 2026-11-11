@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/tahsinarafat/aioj/internal/api/middleware"
 	"github.com/tahsinarafat/aioj/internal/model"
 	"github.com/tahsinarafat/aioj/internal/store"
 )
@@ -36,8 +37,46 @@ func validLanguage(lang string) bool {
 	return languageTagRe.MatchString(lang)
 }
 
+// problem resolves {id} and reports whether the caller may read it. It writes
+// the error response itself and returns nil on failure. Translations carry the
+// statement text, so a draft's translations are as private as the draft.
+func (h *ProblemI18nHandler) readableProblem(w http.ResponseWriter, r *http.Request) *model.Problem {
+	p, err := h.problemStore.GetByID(r.Context(), chi.URLParam(r, "id"))
+	if err != nil {
+		http.Error(w, "problem not found", http.StatusNotFound)
+		return nil
+	}
+	if p == nil {
+		http.Error(w, "problem not found", http.StatusNotFound)
+		return nil
+	}
+	if !canReadProblem(r.Context(), h.problemStore, p, middleware.GetUserClaims(r)) {
+		http.Error(w, "problem not found", http.StatusNotFound)
+		return nil
+	}
+	return p
+}
+
+// authorProblem is readableProblem plus the right to change the statement.
+func (h *ProblemI18nHandler) authorProblem(w http.ResponseWriter, r *http.Request) *model.Problem {
+	p := h.readableProblem(w, r)
+	if p == nil {
+		return nil
+	}
+	claims := middleware.GetUserClaims(r)
+	if claims == nil || (claims.Role != "admin" && p.CreatedBy != claims.UserID &&
+		!h.problemStore.HasAccess(r.Context(), p.ID, claims.UserID, "owner", "co_author")) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return nil
+	}
+	return p
+}
+
 // List returns every translation for a problem.
 func (h *ProblemI18nHandler) List(w http.ResponseWriter, r *http.Request) {
+	if h.readableProblem(w, r) == nil {
+		return
+	}
 	problemID := chi.URLParam(r, "id")
 	items, err := h.i18nStore.ListForProblem(r.Context(), problemID)
 	if err != nil {
@@ -59,10 +98,10 @@ func (h *ProblemI18nHandler) Upsert(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Confirm the problem exists so we return 404 rather than a foreign-key
-	// violation (which would leak a 500 for what is really a client error).
-	if _, err := h.problemStore.GetByID(r.Context(), problemID); err != nil {
-		http.Error(w, "problem not found", http.StatusNotFound)
+	// Confirm the problem exists, is readable, and that this caller may change
+	// its statement, so we return 404/403 rather than a foreign-key violation
+	// (which would leak a 500 for what is really a client error).
+	if h.authorProblem(w, r) == nil {
 		return
 	}
 
@@ -108,6 +147,9 @@ func (h *ProblemI18nHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 	if !validLanguage(lang) {
 		http.Error(w, "invalid language tag", http.StatusBadRequest)
+		return
+	}
+	if h.authorProblem(w, r) == nil {
 		return
 	}
 	if err := h.i18nStore.Delete(r.Context(), problemID, lang); err != nil {
