@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { api, getAccessToken } from '../lib/api'
+import { loginHref } from '../lib/authRedirect'
 import { Button } from '../components/ui/Button'
 
 interface PracticeProblem { id: string; slug: string; title: string; difficulty?: string; tags?: string[]; submission_count: number; accepted_count: number }
 interface Recommendations { hybrid?: PracticeProblem[]; progression?: PracticeProblem[]; weak_tags?: { tags?: string[]; problems?: PracticeProblem[] } }
 
 export default function Practice() {
+    const location = useLocation()
     const [rec, setRec] = useState<Recommendations | null>(null)
     const [loading, setLoading] = useState(() => !getAccessToken())
     const [error, setError] = useState('')
@@ -46,7 +48,7 @@ export default function Practice() {
             <div className="max-w-4xl mx-auto text-center py-20">
                 <h1 className="text-3xl font-extrabold tracking-tight text-ink mb-4">Personalized Practice</h1>
                 <p className="text-muted mb-6">Log in to get smart problem recommendations tailored to your rating and weak areas.</p>
-                <a href="/login" className="bg-brand text-on-brand px-6 py-3 rounded-lg font-medium hover:bg-brand-hover transition-colors">
+                <a href={loginHref(location)} className="bg-brand text-on-brand px-6 py-3 rounded-lg font-medium hover:bg-brand-hover transition-colors">
                     Log In to Practice
                 </a>
             </div>

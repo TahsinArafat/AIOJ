@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { getAccessToken, signOut } from '../lib/api'
+import { loginHref } from '../lib/authRedirect'
 import { useTheme } from '../context/ThemeContext'
 import { useFeatures } from '../context/FeaturesContext'
 import NotificationBell from './NotificationBell'
@@ -231,7 +232,7 @@ export default function Navbar() {
                     ) : (
                         <div className="flex items-center gap-1.5 pl-1">
                             <Link
-                                to="/login"
+                                to={loginHref(location)}
                                 className="rounded-lg px-2.5 py-1.5 text-sm text-muted transition-colors hover:bg-surface-2 hover:text-ink"
                             >
                                 Login
@@ -335,7 +336,7 @@ export default function Navbar() {
                     ) : (
                         <div className="flex flex-col gap-2 pt-1">
                             <Link
-                                to="/login"
+                                to={loginHref(location)}
                                 className="flex items-center justify-center rounded-lg border border-hairline-strong py-3 text-sm font-medium text-ink transition-colors hover:bg-surface-2"
                             >
                                 Login

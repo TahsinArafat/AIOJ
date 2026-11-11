@@ -2,12 +2,14 @@ import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api, setTokens } from '../../lib/api'
+import { nextPath } from '../../lib/authRedirect'
 
 /** Standalone 2FA challenge page when login redirects here with ?challenge_id=. */
 export default function TwoFactorVerify() {
     const { t } = useTranslation()
     const [params] = useSearchParams()
     const challengeId = params.get('challenge_id') || ''
+    const dest = nextPath(params)
     const [code, setCode] = useState('')
     const [error, setError] = useState<string | null>(null)
     const [busy, setBusy] = useState(false)
@@ -24,7 +26,7 @@ export default function TwoFactorVerify() {
         try {
             const d = await api.twoFactor.verify({ challenge_id: challengeId, code })
             setTokens(d.access_token, d.refresh_token)
-            navigate('/')
+            navigate(dest, { replace: true })
         } catch (e) {
             setError((e instanceof Error ? e.message : '') || 'Invalid code')
         } finally {

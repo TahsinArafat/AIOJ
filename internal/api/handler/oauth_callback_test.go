@@ -112,8 +112,13 @@ func newOAuthCallbackFixture(t *testing.T) *oauthCallbackFixture {
 
 // callback drives GET /api/auth/oauth/{provider}/callback with a valid state.
 func (f *oauthCallbackFixture) callback(t *testing.T, accept string) *httptest.ResponseRecorder {
+	return f.callbackWithNext(t, accept, "")
+}
+
+// callbackWithNext is callback with a post-login destination in the state.
+func (f *oauthCallbackFixture) callbackWithNext(t *testing.T, accept, next string) *httptest.ResponseRecorder {
 	t.Helper()
-	raw, sig, err := oauth.IssueStateTokenWith(f.secret, 5*time.Minute)
+	raw, sig, err := oauth.IssueStateTokenWith(f.secret, 5*time.Minute, next)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -186,6 +191,37 @@ func TestOAuthCallback_BrowserRedirectCarriesSignupTicket(t *testing.T) {
 	}
 	if strings.Contains(loc, "access_token=") {
 		t.Error("a first-time sign-in must not carry tokens before a username is chosen")
+	}
+}
+
+func TestOAuthCallback_BrowserRedirectCarriesNext(t *testing.T) {
+	f := newOAuthCallbackFixture(t)
+	f.handler.RespondJSON = false
+	f.handler.PublicURL = "https://aioj.example"
+	rec := f.callbackWithNext(t, "text/html,application/xhtml+xml", "/problems?difficulty=hard")
+	if rec.Code != http.StatusFound {
+		t.Fatalf("status %d body %s", rec.Code, rec.Body.String())
+	}
+	loc := rec.Header().Get("Location")
+	if !strings.Contains(loc, "next="+url.QueryEscape("/problems?difficulty=hard")) {
+		t.Errorf("redirect %q must carry the post-login destination", loc)
+	}
+}
+
+func TestOAuthCallback_SignupRedirectCarriesNext(t *testing.T) {
+	f := newOAuthCallbackFixture(t)
+	f.handler.RespondJSON = false
+	f.handler.PublicURL = "https://aioj.example"
+	rec := f.callbackWithNext(t, "text/html", "/problems")
+	if rec.Code != http.StatusFound {
+		t.Fatalf("status %d body %s", rec.Code, rec.Body.String())
+	}
+	loc := rec.Header().Get("Location")
+	if !strings.Contains(loc, "signup_token=") {
+		t.Fatalf("redirect %q must carry the sign-up ticket", loc)
+	}
+	if !strings.Contains(loc, "next="+url.QueryEscape("/problems")) {
+		t.Errorf("redirect %q must carry the post-login destination through the sign-up step", loc)
 	}
 }
 

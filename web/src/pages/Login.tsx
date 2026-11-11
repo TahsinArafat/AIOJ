@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { api, setTokens } from '../lib/api'
+import { nextPath } from '../lib/authRedirect'
 import { AuthAlert, AuthDivider, AuthLayout } from '../components/AuthLayout'
 import { Button } from '../components/ui/Button'
 import { Field, Input } from '../components/ui/Field'
@@ -15,6 +16,10 @@ export default function Login() {
     const [code, setCode] = useState('')
     const [verifying, setVerifying] = useState(false)
     const nav = useNavigate()
+    const [params] = useSearchParams()
+    // Where to go once the session is established. Read from the URL rather
+    // than component state so a reload of /login?next=… keeps the destination.
+    const dest = nextPath(params)
     const { methods, loading: methodsLoading } = useAuthMethods()
 
     const handle = async (e: React.FormEvent) => {
@@ -33,9 +38,9 @@ export default function Login() {
             }
             setTokens(d.access_token, d.refresh_token)
             // The seeded admin (and any admin-issued password) is locked to the
-            // profile endpoints until it is changed; sending it to "/" would
-            // only produce 403s.
-            nav(d.user?.must_change_password ? '/profile' : '/')
+            // profile endpoints until it is changed; sending it to the
+            // destination would only produce 403s.
+            nav(d.user?.must_change_password ? '/profile' : dest, { replace: true })
         } catch (e: unknown) {
             setErr(e instanceof Error ? e.message : 'Login failed')
         } finally {
@@ -50,7 +55,7 @@ export default function Login() {
         try {
             const d = await api.auth.verify2FA(challenge, code)
             setTokens(d.access_token, d.refresh_token)
-            nav(d.user?.must_change_password ? '/profile' : '/')
+            nav(d.user?.must_change_password ? '/profile' : dest, { replace: true })
         } catch (e: unknown) {
             setErr(e instanceof Error ? e.message : 'Invalid code')
         } finally {
@@ -63,7 +68,14 @@ export default function Login() {
             <AuthLayout
                 title="Two-factor authentication"
                 subtitle="Enter the 6-digit code from your authenticator app."
-                footer={<Link to="/login" className="text-brand hover:underline">Back to sign in</Link>}
+                footer={
+                    <Link
+                        to={params.toString() ? `${'/login'}?${params.toString()}` : '/login'}
+                        className="text-brand hover:underline"
+                    >
+                        Back to sign in
+                    </Link>
+                }
             >
                 {err && <AuthAlert>{err}</AuthAlert>}
                 <form onSubmit={verify2fa} className="space-y-4">

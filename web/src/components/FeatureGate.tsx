@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { Lock, LogIn, ShieldAlert, Star } from 'lucide-react'
 import { useFeature } from '../context/FeaturesContext'
+import { loginHref } from '../lib/authRedirect'
 import { buttonClass } from './ui/buttonStyles'
 import type { ResolvedFeature } from '../types/api'
 
@@ -55,6 +56,7 @@ const REASON_COPY: Record<string, { title: string; body: (label: string) => stri
  * explanation — a bare "403" leaves people guessing whether the site is broken.
  */
 export function FeatureUnavailable({ feature, featureKey }: { feature?: ResolvedFeature; featureKey: string }) {
+    const location = useLocation()
     const reason = feature?.reason ?? 'disabled'
     const copy = REASON_COPY[reason] ?? REASON_COPY.disabled
     const label = feature?.label ?? featureKey
@@ -91,7 +93,7 @@ export function FeatureUnavailable({ feature, featureKey }: { feature?: Resolved
 
             <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
                 {reason === 'login_required' ? (
-                    <Link to="/login" className={buttonClass({ size: 'sm' })}>Sign in</Link>
+                    <Link to={loginHref(location)} className={buttonClass({ size: 'sm' })}>Sign in</Link>
                 ) : null}
                 <Link to="/" className={buttonClass({ variant: 'secondary', size: 'sm' })}>Go home</Link>
                 <Link to="/problems" className={buttonClass({ variant: 'secondary', size: 'sm' })}>Browse problems</Link>

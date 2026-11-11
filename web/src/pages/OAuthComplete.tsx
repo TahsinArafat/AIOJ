@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api, setTokens } from '../lib/api'
+import { nextParam } from '../lib/authRedirect'
 import { AuthAlert, AuthLayout } from '../components/AuthLayout'
 import { Button } from '../components/ui/Button'
 import { Field, Input } from '../components/ui/Field'
@@ -37,6 +38,11 @@ function readPending(): Pending | null {
     }
 }
 
+/** The login page, keeping the destination so "not you?" does not lose it. */
+function backToLogin(next: string): string {
+    return next ? `/login?${new URLSearchParams({ next }).toString()}` : '/login'
+}
+
 export default function OAuthComplete() {
     const nav = useNavigate()
     // The fragment is this page's entire input and cannot change while it is
@@ -44,6 +50,9 @@ export default function OAuthComplete() {
     // effect (which would cost a second render and, under StrictMode, run
     // twice).
     const [pending] = useState<Pending | null>(readPending)
+    // Where the user was trying to get to; carried through the signed OAuth
+    // state and handed to the SPA in the fragment.
+    const [next] = useState<string>(() => nextParam(fragmentParams()) ?? '')
     const [username, setUsername] = useState(() => pending?.suggested ?? '')
     const [verdict, setVerdict] = useState<Verdict | null>(null)
     const [err, setErr] = useState('')
@@ -59,12 +68,12 @@ export default function OAuthComplete() {
         if (access && refresh) {
             setTokens(access, refresh)
             window.history.replaceState(null, '', window.location.pathname)
-            nav('/', { replace: true })
+            nav(next || '/', { replace: true })
             return
         }
         // With a sign-up ticket the page stays put and shows the form.
-        if (!pending) nav('/login', { replace: true })
-    }, [nav, pending])
+        if (!pending) nav(backToLogin(next), { replace: true })
+    }, [nav, next, pending])
 
     const ticket = pending?.token
 
@@ -112,7 +121,7 @@ export default function OAuthComplete() {
             })
             setTokens(d.access_token, d.refresh_token)
             window.history.replaceState(null, '', window.location.pathname)
-            nav('/', { replace: true })
+            nav(next || '/', { replace: true })
         } catch (e: unknown) {
             setErr(e instanceof Error ? e.message : 'Could not create your account')
         } finally {
@@ -139,7 +148,7 @@ export default function OAuthComplete() {
             footer={
                 <>
                     Not you?{' '}
-                    <Link to="/login" className="font-medium text-brand hover:underline">
+                    <Link to={backToLogin(next)} className="font-medium text-brand hover:underline">
                         Back to sign in
                     </Link>
                 </>

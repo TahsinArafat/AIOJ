@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { api, getAccessToken } from '../lib/api'
+import { loginHref } from '../lib/authRedirect'
 
 interface PlanProblemInput { problem_id: string; points: number }
 interface PlanSectionInput { title: string; description: string; problems: PlanProblemInput[] }
@@ -8,6 +9,7 @@ interface OrgOption { id: string; name: string }
 
 export default function TrainingPlanCreate() {
 	const nav = useNavigate()
+	const location = useLocation()
 	const [title, setTitle] = useState('')
 	const [desc, setDesc] = useState('')
 	const [orgId, setOrgId] = useState('')
@@ -18,10 +20,11 @@ export default function TrainingPlanCreate() {
 	const [error, setError] = useState('')
 	const [submitting, setSubmitting] = useState(false)
 
+	const login = loginHref(location)
 	useEffect(() => {
-		if (!getAccessToken()) nav('/login')
+		if (!getAccessToken()) nav(login)
 		api.organizations.my().then(d => setMyOrgs(d.data || [])).catch(() => {})
-	}, [nav])
+	}, [nav, login])
 
 	const handleAddSection = () => {
 		setSections(p => [...p, {

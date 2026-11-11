@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { api, getAccessToken, contestSlug } from '../lib/api'
+import { loginHref } from '../lib/authRedirect'
 import { resolveProblemSlug, resolveProblemTitle } from '../lib/problemSlugResolver'
 import { useTheme } from '../context/ThemeContext'
 import { EmptyState } from '../components/EmptyState'
@@ -37,6 +38,7 @@ type ContestProblemRef = { problem_id: string; index?: string }
 interface ContestDataShape { contest?: { id: string; slug?: string; display_id?: number; title?: string; start_time: string; end_time: string }; problems?: ContestProblemRef[] }
 
 export default function VirtualContest() {
+    const location = useLocation()
     const { theme } = useTheme()
     const [virtualStatus, setVirtualStatus] = useState<VirtualStatusState | null>(null)
     const [contestData, setContestData] = useState<ContestDataShape | null>(null)
@@ -130,7 +132,7 @@ export default function VirtualContest() {
         return (
             <div className="text-center py-20">
                 <p className="text-muted mb-4">Please log in to participate in virtual contests.</p>
-                <Link to="/login" className="text-brand hover:underline text-sm">Go to Login</Link>
+                <Link to={loginHref(location)} className="text-brand hover:underline text-sm">Go to Login</Link>
             </div>
         )
     }

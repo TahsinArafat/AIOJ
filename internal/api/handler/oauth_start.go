@@ -43,7 +43,11 @@ func (h *OAuthStartHandler) Start(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "provider is disabled on this instance", http.StatusForbidden)
 		return
 	}
-	raw, sig, err := oauth.IssueStateTokenWith(h.StateSecret, h.StateTTL)
+	// The SPA sends the page it wants back to after sign-in. It is signed into
+	// the state token so it survives the provider round-trip, and vetted so a
+	// crafted start URL cannot turn the callback into an open redirect.
+	next := oauth.NormalizeNext(r.URL.Query().Get("next"))
+	raw, sig, err := oauth.IssueStateTokenWith(h.StateSecret, h.StateTTL, next)
 	if err != nil {
 		http.Error(w, "state issue: "+err.Error(), http.StatusInternalServerError)
 		return

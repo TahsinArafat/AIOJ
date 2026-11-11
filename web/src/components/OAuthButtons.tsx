@@ -1,4 +1,6 @@
+import { useSearchParams } from 'react-router-dom'
 import { buttonClass } from './ui/buttonStyles'
+import { nextParam } from '../lib/authRedirect'
 import type { AuthMethods } from '../types/api'
 
 /* Brand marks are inline because lucide-react v1 dropped brand icons. */
@@ -32,16 +34,21 @@ function GoogleMark() {
  * provider that really is unavailable.
  */
 export function OAuthButtons({ methods }: { methods: AuthMethods | null }) {
+    // The page the user started from rides through the provider round-trip so
+    // they land back on it after signing in.
+    const [params] = useSearchParams()
+    const next = nextParam(params)
+    const nextQuery = next ? `?${new URLSearchParams({ next }).toString()}` : ''
     const providers = [
         methods?.github !== false && {
             key: 'github',
-            href: '/api/auth/oauth/github/start',
+            href: `/api/auth/oauth/github/start${nextQuery}`,
             label: 'Continue with GitHub',
             mark: <GitHubMark />,
         },
         methods?.google !== false && {
             key: 'google',
-            href: '/api/auth/oauth/google/start',
+            href: `/api/auth/oauth/google/start${nextQuery}`,
             label: 'Continue with Google',
             mark: <GoogleMark />,
         },

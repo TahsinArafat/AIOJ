@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useLocation } from 'react-router-dom'
 import { EmptyState } from '../components/EmptyState'
 import { LANGUAGE_OPTIONS } from '../lib/languages'
 import { ProblemStatement } from '../components/ProblemStatement'
@@ -8,6 +8,7 @@ import { Badge } from '../components/ui/Badge'
 import 'katex/dist/katex.min.css'
 import { api, getAccessToken } from '../lib/api'
 import { useDocumentTitle } from '../lib/documentTitle'
+import { loginHref } from '../lib/authRedirect'
 import { lazy } from 'react'
 const CodeEditor = lazy(() => import('../components/CodeEditor'))
 import { ClipboardList, BarChart3, FileText } from 'lucide-react'
@@ -303,6 +304,7 @@ function MySubmissionsTab({ problemId, contestId }: { problemId: string; contest
 export default function ContestProblem() {
     const toast = useToast()
     const { contestId, index } = useParams<{ contestId: string; index: string }>()
+    const location = useLocation()
     const [problem, setProblem] = useState<LoadedProblem | null>(null)
     const [contest, setContest] = useState<LoadedContest | null>(null)
     useDocumentTitle(problem?.title)
@@ -941,7 +943,7 @@ export default function ContestProblem() {
                                 Please login to submit a solution.
                             </p>
                             <Link
-                                to="/login"
+                                to={loginHref(location)}
                                 className="inline-block px-4 py-2 bg-brand text-on-brand text-sm font-medium rounded-lg hover:bg-brand-hover transition-colors"
                             >
                                 Login

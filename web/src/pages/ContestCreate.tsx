@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, Link, useLocation } from 'react-router-dom'
 import { api, getAccessToken, contestSlug } from '../lib/api'
+import { loginHref } from '../lib/authRedirect'
 import { DIVISIONS } from '../lib/divisions'
 import { PageHeader } from '../components/ui/PageHeader'
 
@@ -59,6 +60,7 @@ interface ProblemSearchHit { id: string; title: string; slug: string; difficulty
 
 export default function ContestCreate() {
     const nav = useNavigate()
+    const location = useLocation()
 
     // Basic info
     const [title, setTitle] = useState('')
@@ -106,9 +108,10 @@ export default function ContestCreate() {
     // Auto-generate slug from title
 
     // Auth guard
+    const login = loginHref(location)
     useEffect(() => {
-        if (!getAccessToken()) nav('/login')
-    }, [nav])
+        if (!getAccessToken()) nav(login)
+    }, [nav, login])
 
     // Click outside to close search dropdown
     useEffect(() => {

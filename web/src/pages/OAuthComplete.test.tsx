@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useLocation } from 'react-router-dom'
 import { beforeEach, expect, test, vi } from 'vitest'
+import { useEffect } from 'react'
 import OAuthComplete from './OAuthComplete'
 import { api, setTokens } from '../lib/api'
 
@@ -14,11 +15,21 @@ vi.mock('../lib/api', () => ({
     setTokens: vi.fn(),
 }))
 
+// Records the router location so a test can assert where a navigation went.
+let lastLocation: { pathname: string } | null = null
+function LocationProbe() {
+    const location = useLocation()
+    useEffect(() => { lastLocation = location })
+    return null
+}
+
 function withFragment(fragment: string) {
     window.location.hash = fragment
+    lastLocation = null
     return render(
         <MemoryRouter initialEntries={['/oauth/complete']}>
             <OAuthComplete />
+            <LocationProbe />
         </MemoryRouter>,
     )
 }
@@ -99,6 +110,32 @@ test('shows the server error when the handle is refused at submit time', async (
 
     expect(await screen.findByRole('alert')).toHaveTextContent('username taken')
     expect(setTokens).not.toHaveBeenCalled()
+})
+
+test('returns to the page the visitor started from', async () => {
+    withFragment('#access_token=at&refresh_token=rt&next=%2Fproblems')
+
+    await waitFor(() => expect(setTokens).toHaveBeenCalledWith('at', 'rt'))
+    await waitFor(() => expect(lastLocation?.pathname).toBe('/problems'))
+})
+
+test('refuses an off-site next after OAuth', async () => {
+    withFragment('#access_token=at&refresh_token=rt&next=https%3A%2F%2Fevil.example')
+
+    await waitFor(() => expect(lastLocation?.pathname).toBe('/'))
+})
+
+test('returns to the page after completing a sign-up', async () => {
+    vi.mocked(api.auth.completeOAuthSignup).mockResolvedValue({
+        access_token: 'a2',
+        refresh_token: 'r2',
+    } as never)
+    withFragment('#signup_token=ticket-1&username=fuser&provider=google&next=%2Fproblems')
+
+    await screen.findByText(/fuser is available/)
+    fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
+
+    await waitFor(() => expect(lastLocation?.pathname).toBe('/problems'))
 })
 
 test('falls back to the sign-in page without a fragment', async () => {

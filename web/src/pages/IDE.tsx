@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { lazy } from 'react'
 const CodeEditor = lazy(() => import('../components/CodeEditor'))
 import { api, getAccessToken } from '../lib/api'
+import { loginHref } from '../lib/authRedirect'
 import { DEFAULT_LANGUAGE, LANGUAGE_OPTIONS, languageTemplate } from '../lib/languages'
 import { VerdictBadge } from '../components/ui/VerdictBadge'
 import { Play, Clock, Cpu, AlertTriangle, Maximize2, Minimize2 } from 'lucide-react'
@@ -27,6 +28,7 @@ const COOLDOWN_MS = 5000
 const MAX_OUTPUT_LENGTH = 100000
 
 export default function IDE() {
+    const location = useLocation()
     const [language, setLanguage] = useState(() => localStorage.getItem('aioj_ide_lang') || DEFAULT_LANGUAGE)
     const [code, setCode] = useState('')
     const [customInput, setCustomInput] = useState('')
@@ -132,7 +134,7 @@ export default function IDE() {
                     <AlertTriangle className="w-12 h-12 mx-auto text-yellow-500" />
                     <h2 className="text-xl font-bold text-ink">Login Required</h2>
                     <p className="text-muted">You must be logged in to use the IDE.</p>
-                    <Link to="/login" className="inline-block bg-brand text-on-brand px-6 py-2 rounded-lg font-medium hover:bg-brand-hover transition-colors">
+                    <Link to={loginHref(location)} className="inline-block bg-brand text-on-brand px-6 py-2 rounded-lg font-medium hover:bg-brand-hover transition-colors">
                         Log In
                     </Link>
                 </div>

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import type { TeamInvite, GroupInvite } from '../types/community'
 import type { UserProfile } from '../types/api'
 import {
@@ -7,6 +7,7 @@ import {
     Mail, MapPin, RotateCcw, ShieldAlert, Trash2, UserRound, Users, type LucideIcon,
 } from 'lucide-react'
 import { api, getAccessToken, clearTokens, signOut } from '../lib/api'
+import { loginHref } from '../lib/authRedirect'
 import { errorMessage } from '../lib/errors'
 import { getRatingColor, getRatingTitle } from '../lib/rating'
 import RatingBadge from '../components/RatingBadge'
@@ -566,6 +567,7 @@ function DetailsSection({
 
 function SecuritySection() {
     const navigate = useNavigate()
+    const location = useLocation()
     const [currentPassword, setCurrentPassword] = useState('')
     const [newPassword, setNewPassword] = useState('')
     const [confirmPassword, setConfirmPassword] = useState('')
@@ -600,7 +602,7 @@ function SecuritySection() {
             setNewPassword('')
             setConfirmPassword('')
             await signOut()
-            navigate('/login')
+            navigate(loginHref(location))
         } catch (e) {
             setMessage('Error: ' + errorMessage(e))
         } finally {
@@ -1018,6 +1020,7 @@ function DangerSection() {
 type SectionKey = 'details' | 'security' | 'invites' | 'setter' | 'danger'
 
 export default function Profile() {
+    const location = useLocation()
     const [user] = useState(decodeUser)
     const [section, setSection] = useState<SectionKey>('details')
     const [profile, setProfile] = useState<UserProfile | null>(null)
@@ -1071,7 +1074,7 @@ export default function Profile() {
                 <h1 className="text-2xl font-semibold tracking-tight text-ink">Profile</h1>
                 <p className="mt-2 text-sm text-muted">You need to be signed in to view your profile.</p>
                 <div className="mt-5 flex justify-center gap-2">
-                    <Link to="/login" className={buttonClass()}>Sign in</Link>
+                    <Link to={loginHref(location)} className={buttonClass()}>Sign in</Link>
                     <Link to="/register" className={buttonClass({ variant: 'secondary' })}>Create an account</Link>
                 </div>
             </div>

@@ -60,7 +60,8 @@ func (h *OAuthCallbackHandler) Callback(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "missing code or state", http.StatusBadRequest)
 		return
 	}
-	if err := h.validateState(stateRaw); err != nil {
+	next, err := h.validateState(stateRaw)
+	if err != nil {
 		http.Error(w, "invalid state: "+err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -82,7 +83,7 @@ func (h *OAuthCallbackHandler) Callback(w http.ResponseWriter, r *http.Request) 
 	if link != nil {
 		u, _ := h.Users.GetByID(r.Context(), link.UserID)
 		if u != nil {
-			h.issue(w, r, u)
+			h.issue(w, r, u, next)
 			return
 		}
 	}
@@ -94,7 +95,7 @@ func (h *OAuthCallbackHandler) Callback(w http.ResponseWriter, r *http.Request) 
 				ID: uuid.NewString(), UserID: existing.ID,
 				Provider: providerName, ProviderUserID: info.ProviderUserID,
 			})
-			h.issue(w, r, existing)
+			h.issue(w, r, existing, next)
 			return
 		}
 	}
@@ -108,24 +109,27 @@ func (h *OAuthCallbackHandler) Callback(w http.ResponseWriter, r *http.Request) 
 		ProviderUserID: info.ProviderUserID,
 		Email:          info.Email,
 		SuggestedName:  h.uniqueUsername(r, oauth.SuggestUsername(info.Username)),
-	})
+	}, next)
 }
 
 // beginSignup hands out a signed sign-up ticket: in the URL fragment for a
 // browser navigation (so the identity never reaches a proxy log), as JSON for
 // an API client.
-func (h *OAuthCallbackHandler) beginSignup(w http.ResponseWriter, r *http.Request, p *oauth.PendingSignup) {
+func (h *OAuthCallbackHandler) beginSignup(w http.ResponseWriter, r *http.Request, p *oauth.PendingSignup, next string) {
 	token, err := oauth.IssueSignupToken(h.StateSecret, p, h.signupTTL())
 	if err != nil {
 		http.Error(w, "signup token: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	if !h.wantsJSON(r) {
-		uu := h.completeURL()
-		uu.Fragment = "signup_token=" + url.QueryEscape(token) +
-			"&username=" + url.QueryEscape(p.SuggestedName) +
-			"&provider=" + url.QueryEscape(p.Provider)
-		http.Redirect(w, r, uu.String(), http.StatusFound)
+		vals := url.Values{}
+		vals.Set("signup_token", token)
+		vals.Set("username", p.SuggestedName)
+		vals.Set("provider", p.Provider)
+		if next != "" {
+			vals.Set("next", next)
+		}
+		http.Redirect(w, r, h.completeURL().String()+"#"+vals.Encode(), http.StatusFound)
 		return
 	}
 	respondJSON(w, http.StatusOK, &model.OAuthSignupChallenge{
@@ -291,18 +295,25 @@ func (h *OAuthCallbackHandler) completeURL() *url.URL {
 		uu, _ = url.Parse("/")
 	}
 	uu.Path = "/oauth/complete"
+	// The caller appends its own "#"+values; a fragment on the configured
+	// origin would otherwise produce a second, stray "#".
+	uu.Fragment = ""
+	uu.RawFragment = ""
 	return uu
 }
 
-func (h *OAuthCallbackHandler) issue(w http.ResponseWriter, r *http.Request, u *model.User) {
+func (h *OAuthCallbackHandler) issue(w http.ResponseWriter, r *http.Request, u *model.User, next string) {
 	resp := h.mint(r, u)
 	// Browser navigations get tokens in the URL fragment (never sent to server).
 	// JSON clients (tests, API) get a plain AuthResponse body.
 	if !h.wantsJSON(r) {
-		uu := h.completeURL()
-		uu.Fragment = "access_token=" + url.QueryEscape(resp.AccessToken) +
-			"&refresh_token=" + url.QueryEscape(resp.RefreshToken)
-		http.Redirect(w, r, uu.String(), http.StatusFound)
+		vals := url.Values{}
+		vals.Set("access_token", resp.AccessToken)
+		vals.Set("refresh_token", resp.RefreshToken)
+		if next != "" {
+			vals.Set("next", next)
+		}
+		http.Redirect(w, r, h.completeURL().String()+"#"+vals.Encode(), http.StatusFound)
 		return
 	}
 	respondJSON(w, http.StatusOK, resp)
@@ -361,7 +372,11 @@ func containsFold(hay, needle string) bool {
 	return false
 }
 
-func (h *OAuthCallbackHandler) validateState(stateRaw string) error {
+// validateState checks the provider state and returns the post-login
+// destination it carries. The destination is signed, but NormalizeNext vets
+// it again so a token minted by an older build can never become an open
+// redirect.
+func (h *OAuthCallbackHandler) validateState(stateRaw string) (string, error) {
 	idx := -1
 	for i := len(stateRaw) - 1; i >= 0; i-- {
 		if stateRaw[i] == '.' {
@@ -370,19 +385,19 @@ func (h *OAuthCallbackHandler) validateState(stateRaw string) error {
 		}
 	}
 	if idx < 0 {
-		return errors.New("state mismatch")
+		return "", errors.New("state mismatch")
 	}
 	raw, sigStr := stateRaw[:idx], stateRaw[idx+1:]
 	sig, err := oauth.DecodeSig(sigStr)
 	if err != nil {
-		return err
+		return "", err
 	}
 	ok, err := oauth.ValidateStateTokenWith(h.StateSecret, raw, sig, h.StateTTL)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if !ok {
-		return errors.New("state mismatch")
+		return "", errors.New("state mismatch")
 	}
-	return nil
+	return oauth.NormalizeNext(oauth.StateTokenNext(raw)), nil
 }

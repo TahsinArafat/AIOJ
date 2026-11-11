@@ -6,12 +6,15 @@ import { api, setTokens } from '../../lib/api'
 
 const navigate = vi.fn()
 
+// Mutable so a test can point the challenge at a post-login destination.
+const search = vi.hoisted(() => ({ value: 'challenge_id=ch_1' }))
+
 vi.mock('react-router-dom', async () => {
     const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom')
     return {
         ...actual,
         useNavigate: () => navigate,
-        useSearchParams: () => [new URLSearchParams('challenge_id=ch_1')],
+        useSearchParams: () => [new URLSearchParams(search.value)],
     }
 })
 
@@ -30,6 +33,7 @@ vi.mock('../../lib/api', () => ({
 describe('TwoFactorVerify', () => {
     beforeEach(() => {
         vi.clearAllMocks()
+        search.value = 'challenge_id=ch_1'
     })
 
     it('submits challenge and code, stores tokens, navigates home', async () => {
@@ -56,7 +60,31 @@ describe('TwoFactorVerify', () => {
                 code: '654321',
             })
             expect(setTokens).toHaveBeenCalledWith('a', 'r')
-            expect(navigate).toHaveBeenCalledWith('/')
+            expect(navigate).toHaveBeenCalledWith('/', { replace: true })
+        })
+    })
+
+    it('returns to the page the visitor started from', async () => {
+        search.value = 'challenge_id=ch_1&next=%2Fproblems'
+        ;(api.twoFactor.verify as ReturnType<typeof vi.fn>).mockResolvedValue({
+            access_token: 'a',
+            refresh_token: 'r',
+            user: { id: '1' },
+        })
+
+        render(
+            <MemoryRouter>
+                <TwoFactorVerify />
+            </MemoryRouter>,
+        )
+
+        fireEvent.change(screen.getByPlaceholderText(/6-digit code/i), {
+            target: { value: '654321' },
+        })
+        fireEvent.click(screen.getByRole('button', { name: /verify/i }))
+
+        await waitFor(() => {
+            expect(navigate).toHaveBeenCalledWith('/problems', { replace: true })
         })
     })
 

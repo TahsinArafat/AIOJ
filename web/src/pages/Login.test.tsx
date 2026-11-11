@@ -1,6 +1,7 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useLocation } from 'react-router-dom'
 import { beforeEach, expect, test, vi } from 'vitest'
+import { useEffect } from 'react'
 import Login from './Login'
 import { api } from '../lib/api'
 
@@ -25,10 +26,20 @@ beforeEach(() => {
     } as never)
 })
 
-function renderPage() {
+// Records the router location so a test can assert where a navigation went.
+let lastLocation: { pathname: string; search: string } | null = null
+function LocationProbe() {
+    const location = useLocation()
+    useEffect(() => { lastLocation = location })
+    return null
+}
+
+function renderPage(initial = '/login') {
+    lastLocation = null
     return render(
-        <MemoryRouter>
+        <MemoryRouter initialEntries={[initial]}>
             <Login />
+            <LocationProbe />
         </MemoryRouter>,
     )
 }
@@ -51,6 +62,30 @@ test('submits credentials and shows the 2FA step when the server asks for one', 
     fireEvent.click(screen.getByRole('button', { name: 'Verify' }))
 
     await waitFor(() => expect(api.auth.verify2FA).toHaveBeenCalledWith('chal-1', '123456'))
+})
+
+test('returns to the page the visitor started from', async () => {
+    vi.mocked(api.auth.login).mockResolvedValue({ access_token: 'a', refresh_token: 'r' } as never)
+
+    renderPage('/login?next=%2Fproblems')
+
+    fireEvent.change(screen.getByLabelText('Username'), { target: { value: 'alice' } })
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'hunter2hunter2' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Login' }))
+
+    await waitFor(() => expect(lastLocation?.pathname).toBe('/problems'))
+})
+
+test('refuses to redirect off-site after login', async () => {
+    vi.mocked(api.auth.login).mockResolvedValue({ access_token: 'a', refresh_token: 'r' } as never)
+
+    renderPage('/login?next=https%3A%2F%2Fevil.example')
+
+    fireEvent.change(screen.getByLabelText('Username'), { target: { value: 'alice' } })
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'hunter2hunter2' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Login' }))
+
+    await waitFor(() => expect(lastLocation?.pathname).toBe('/'))
 })
 
 test('surfaces a login error and keeps the form on screen', async () => {
