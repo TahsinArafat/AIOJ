@@ -86,12 +86,28 @@ func mdToHTML(md string, stripIO bool) string {
 	var out strings.Builder
 	inCode := false
 	inList := false
+	// para accumulates consecutive prose lines into ONE <p>. Emitting a <p> per
+	// source line split a wrapped sentence into fragments, which is why statements
+	// looked shredded across the page: Markdown soft-wraps prose, it does not
+	// start a new paragraph on every newline.
+	var para []string
+
+	// flushPara writes the pending prose as a single paragraph.
+	flushPara := func() {
+		if len(para) == 0 {
+			return
+		}
+		joined := strings.Join(para, " ")
+		para = para[:0]
+		out.WriteString(fmt.Sprintf("<p>%s</p>\n", processInline(joined)))
+	}
 
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
 
 		// Code blocks
 		if strings.HasPrefix(trimmed, "```") {
+			flushPara()
 			if inCode {
 				out.WriteString("</code></pre>\n")
 				inCode = false
@@ -108,6 +124,7 @@ func mdToHTML(md string, stripIO bool) string {
 
 		// Headings
 		if strings.HasPrefix(trimmed, "### ") {
+			flushPara()
 			if inList {
 				out.WriteString("</ul>\n")
 				inList = false
@@ -116,6 +133,7 @@ func mdToHTML(md string, stripIO bool) string {
 			continue
 		}
 		if strings.HasPrefix(trimmed, "## ") {
+			flushPara()
 			if inList {
 				out.WriteString("</ul>\n")
 				inList = false
@@ -126,6 +144,7 @@ func mdToHTML(md string, stripIO bool) string {
 
 		// Bullet lists
 		if strings.HasPrefix(trimmed, "- ") || strings.HasPrefix(trimmed, "* ") {
+			flushPara()
 			if !inList {
 				out.WriteString("<ul>\n")
 				inList = true
@@ -142,17 +161,18 @@ func mdToHTML(md string, stripIO bool) string {
 
 		// Paragraphs
 		if trimmed == "" {
+			flushPara()
 			if inList {
 				out.WriteString("</ul>\n")
 				inList = false
 			}
-			out.WriteString("<br/>\n")
 			continue
 		}
 
-		out.WriteString(fmt.Sprintf("<p>%s</p>\n", processInline(trimmed)))
+		para = append(para, trimmed)
 	}
 
+	flushPara()
 	if inList {
 		out.WriteString("</ul>\n")
 	}
@@ -233,7 +253,7 @@ func escapeAndProcessMath(s string) string {
 			result += "$$" + s
 			break
 		}
-		result += fmt.Sprintf(`<span class="katex-display">$$%s$$</span>`, s[:end])
+		result += `<span class="katex-display">$$` + s[:end] + `$$</span>`
 		s = s[end+2:]
 	}
 	return result
@@ -255,7 +275,10 @@ func processInlineMath(s string) string {
 			result += "$" + template.HTMLEscapeString(s)
 			break
 		}
-		result += fmt.Sprintf(`<span class="katex">$$%s$$</span>`, s[:end])
+		// Inline math keeps single-$ delimiters. It previously emitted $$...$$,
+		// which KaTeX renders as display math — so every mid-sentence $t$ became
+		// a centred block on its own line, breaking the paragraph apart.
+		result += `<span class="katex-inline">$` + s[:end] + `$</span>`
 		s = s[end+1:]
 	}
 	return result
@@ -540,8 +563,12 @@ var pdfTemplate = `<!DOCTYPE html>
     padding: 0;
   }
 
+  /* KaTeX owns the layout of its own output. These wrappers only carry the
+     inline/display distinction, so inline math must NOT inherit any margin or
+     centring — doing that is what turned a mid-sentence $t$ into a block. */
   .katex { font-size: 1.05em; }
-  .katex-display { margin: 2mm 0; text-align: center; }
+  .katex-inline { display: inline; }
+  .katex-display { display: block; margin: 2mm 0; text-align: center; }
 
   strong { font-weight: 600; }
 

@@ -25,7 +25,7 @@ func bookletHTML(t *testing.T) string {
 		Index: "A",
 		Problem: model.Problem{
 			Title:        "Sums",
-			Description:  "Given $n \\le 10^5$, compute $\\sum_{i=1}^n a_i$.",
+			Description:  "Given $n \\le 10^5$, compute $\\sum_{i=1}^n a_i$.\n\n$$\\sum_{i=1}^{n} a_i = S$$",
 			InputFormat:  "A single integer $n$.",
 			OutputFormat: "The sum.",
 		},
@@ -137,5 +137,67 @@ func TestBookletHasNoInlineJavaScript(t *testing.T) {
 	// The behaviour must live in a same-origin file instead.
 	if !strings.Contains(html, `src="/booklet/booklet.js"`) {
 		t.Fatal("the booklet behaviour script is not referenced from /booklet/booklet.js")
+	}
+}
+
+// Inline math must stay inline. The generator emitted $...$ wrapped in $$...$$,
+// so KaTeX rendered a mid-sentence $t$ as display math: its own centred line,
+// which shredded the paragraph and produced the reported layout. Display math
+// still uses $$...$$, so the two must be distinguishable in the output.
+func TestInlineMathKeepsInlineDelimiters(t *testing.T) {
+	html := bookletHTML(t)
+
+	if strings.Contains(html, `class="katex-inline">$$`) {
+		t.Fatal("inline math is emitted with display delimiters, so KaTeX breaks the line")
+	}
+	if !strings.Contains(html, `class="katex-inline">$`) {
+		t.Fatal("inline math is not emitted as inline span with single-dollar delimiters")
+	}
+	// Display math keeps its own delimiters and block wrapper.
+	if !strings.Contains(html, `class="katex-display">$$`) {
+		t.Fatal("display math lost its display delimiters")
+	}
+	// The wrappers must carry the layout distinction, not APIC-style margins.
+	if !strings.Contains(html, ".katex-inline { display: inline; }") {
+		t.Fatal("inline math has no inline CSS rule, so it may inherit block layout")
+	}
+}
+
+// Prose soft-wraps in Markdown: a newline inside a sentence is not a paragraph
+// break. Emitting one <p> per source line fragmented every statement, which is
+// why the booklet looked shredded rather than like the problem page.
+func TestSoftWrappedProseStaysOneParagraph(t *testing.T) {
+	c := &model.Contest{ID: "c1", Title: "R", StartTime: mustTime(), EndTime: mustTime()}
+	desc := "The first line contains $t$, the number of queries.\n" +
+		"Each of the next $t$ lines contains two integers $n$ and $k$."
+	out, err := NewGenerator().GenerateContestPDF(c, []model.ProblemWithSamples{{
+		Index: "A", Problem: model.Problem{Title: "D", Description: desc},
+	}})
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	html := string(out)
+
+	// One paragraph, not two: the sentence spans a source newline.
+	if n := strings.Count(html, "<p>"); n != 1 {
+		t.Fatalf("statement produced %d <p> elements, want 1 (soft wrap must not split a paragraph)", n)
+	}
+	if !strings.Contains(html, "queries. Each of the next") {
+		t.Fatal("the wrapped sentence was not joined; prose fragments across lines")
+	}
+}
+
+// A blank line still separates paragraphs.
+func TestBlankLineStartsANewParagraph(t *testing.T) {
+	c := &model.Contest{ID: "c1", Title: "R", StartTime: mustTime(), EndTime: mustTime()}
+	desc := "First paragraph.\n\nSecond paragraph."
+	out, err := NewGenerator().GenerateContestPDF(c, []model.ProblemWithSamples{{
+		Index: "A", Problem: model.Problem{Title: "D", Description: desc},
+	}})
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	if n := strings.Count(string(out), "<p>"); n != 2 {
+		t.Fatalf("blank line produced %d paragraphs, want 2", n)
 	}
 }
