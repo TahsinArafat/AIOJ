@@ -52,7 +52,8 @@ func newStatusFixture(t *testing.T, ctx context.Context) (*statusFixture, func()
 	if err := problems.Create(ctx, &model.Problem{
 		ID: f.visibleID, Slug: f.visibleSlug, Title: "Visible Problem",
 		Description: "d", TimeLimit: 1000, MemoryLimit: 262144, Difficulty: "easy",
-		Tags: []string{}, CreatedBy: f.ownerID, Visible: true,
+		Tags: []string{}, CreatedBy: f.ownerID,
+		Status: model.ProblemStatusPublished, Visible: true,
 	}); err != nil {
 		t.Fatalf("create visible problem: %v", err)
 	}

@@ -297,6 +297,8 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 			r.Post("/", problemH.Create)
 			r.Put("/{slug}", problemH.Update)
 			r.Delete("/{slug}", problemH.Delete)
+			// Publishing is an admin decision: authors submit, admins review.
+			r.Post("/{slug}/submit", problemH.SubmitForReview)
 			r.Get("/{slug}/permissions", problemH.ListPermissions)
 			r.Post("/{slug}/permissions", problemH.AddPermission)
 			r.Delete("/{slug}/permissions/{userId}", problemH.RemovePermission)
@@ -308,12 +310,17 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 			r.Post("/{slug}/language-limits", langLimitH.Set)
 			r.Delete("/{slug}/language-limits/{lang}", langLimitH.Delete)
 			r.Get("/{slug}/export", problemH.Export)
-			r.Post("/import", importH.Import)
-			r.Post("/import/codeforces", importH.ImportCodeforces)
-			r.Post("/import/cses", importH.ImportCSES)
-			r.Post("/import/atcoder", importH.ImportAtCoder)
-			r.Post("/import/toph", importH.ImportToph)
-			r.Post("/import/qoj", importH.ImportQOJ)
+			// Importing from another judge is its own admin-configurable
+			// permission (feature "problem_import"), not an automatic right of
+			// the setter workspace: pulling third-party problems into the set is
+			// a curation decision. gate() is a no-op when no resolver is wired,
+			// so router tests still build.
+			r.With(gate(feature.KeyProblemImport)).Post("/import", importH.Import)
+			r.With(gate(feature.KeyProblemImport)).Post("/import/codeforces", importH.ImportCodeforces)
+			r.With(gate(feature.KeyProblemImport)).Post("/import/cses", importH.ImportCSES)
+			r.With(gate(feature.KeyProblemImport)).Post("/import/atcoder", importH.ImportAtCoder)
+			r.With(gate(feature.KeyProblemImport)).Post("/import/toph", importH.ImportToph)
+			r.With(gate(feature.KeyProblemImport)).Post("/import/qoj", importH.ImportQOJ)
 			r.Post("/{slug}/media", mediaH.Upload)
 		})
 	})
@@ -353,6 +360,9 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 			r.Post("/educational", contestH.CreateEducational)
 			r.Put("/{id}", contestH.Update)
 			r.Delete("/{id}", contestH.Delete)
+			// Propose a round for admin approval. Publishing itself is admin-only
+			// and lives under /api/admin.
+			r.Post("/{id}/submit", contestH.SubmitForReview)
 			r.Get("/{id}/permissions", contestH.ListPermissions)
 			r.Post("/{id}/permissions", contestH.AddPermission)
 			r.Delete("/{id}/permissions/{userId}", contestH.RemovePermission)
@@ -444,6 +454,14 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 		r.Delete("/users/{id}/verify-email", adminH.UnverifyUserEmail)
 		r.Get("/setter-applications", adminH.ListSetterApps)
 		r.Post("/setter-applications/{id}/review", adminH.ReviewSetterApp)
+
+		// Authoring review queue: the admin side of "setters propose, admins
+		// approve". Registered under /api/admin, so AuthMiddleware + admin role
+		// from this group's middleware already apply.
+		r.Get("/problem-review", problemH.ReviewQueue)
+		r.Post("/problem-review/{slug}", problemH.ReviewProblem)
+		r.Get("/contest-review", contestH.ReviewQueue)
+		r.Post("/contest-review/{id}", contestH.ReviewContest)
 
 		r.Route("/bot-accounts", func(r chi.Router) {
 			r.Get("/", botAccountH.List)

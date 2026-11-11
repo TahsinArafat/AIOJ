@@ -35,6 +35,9 @@ type Problem struct {
 	Rating               int             `json:"rating"` // 0 = unrated
 	Tags                 []string        `json:"tags,omitempty"`
 	Visible              bool            `json:"visible"`
+	Status               string          `json:"status"` // draft|pending|published|rejected
+	ReviewNote           string          `json:"review_note,omitempty"`
+	ReviewedAt           *time.Time      `json:"reviewed_at,omitempty"`
 	TestdataPath         string          `json:"-"`
 	TestCaseScore        []TestCaseScore `json:"testcase_score,omitempty"`
 	SPJ                  bool            `json:"spj"`
@@ -59,6 +62,22 @@ type Problem struct {
 	UpdatedAt            time.Time       `json:"updated_at"`
 }
 
+// Problem review states. Publishing is an admin decision: a setter's problem
+// starts as a draft, moves to pending when submitted, and only 'published'
+// makes it readable by the public. Visible is derived from these — the CHECK
+// constraints in migration 000081 keep the two from disagreeing.
+const (
+	ProblemStatusDraft     = "draft"
+	ProblemStatusPending   = "pending"
+	ProblemStatusPublished = "published"
+	ProblemStatusRejected  = "rejected"
+)
+
+// StatusAllowsVisible reports whether a problem in this state may be public.
+func StatusAllowsVisible(status string) bool {
+	return status == ProblemStatusPublished
+}
+
 type ProblemListItem struct {
 	ID              string   `json:"id"`
 	Slug            string   `json:"slug"`
@@ -69,6 +88,7 @@ type ProblemListItem struct {
 	SubmissionCount int      `json:"submission_count"`
 	AcceptedCount   int      `json:"accepted_count"`
 	Source          string   `json:"source"`
+	Status          string   `json:"status,omitempty"`
 }
 
 type ProblemWithSamples struct {

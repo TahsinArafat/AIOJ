@@ -25,6 +25,11 @@ type mockProblemStore struct {
 	// access maps "userID/problemID" -> access level. A nil map means nobody
 	// has access anywhere, which is what the import tests rely on.
 	access map[string]string
+	// updated records the last problem handed to Update, so the review tests can
+	// assert on what a handler tried to persist.
+	updated *model.Problem
+	// listStatus records the status a caller asked ListByStatus for.
+	listStatus func(status string)
 }
 
 func (m *mockProblemStore) Create(_ context.Context, _ *model.Problem) error { return m.createErr }
@@ -50,11 +55,21 @@ func (m *mockProblemStore) GetAllTags(_ context.Context) ([]string, error) { ret
 func (m *mockProblemStore) InUnreleasedContest(_ context.Context, _ string) (bool, error) {
 	return m.unreleasedContest, nil
 }
-func (m *mockProblemStore) UpdateCounts(_ context.Context, _ string, _, _ int) error   { return nil }
-func (m *mockProblemStore) Update(_ context.Context, _ string, _ *model.Problem) error { return nil }
-func (m *mockProblemStore) Delete(_ context.Context, _ string) error                   { return nil }
-func (m *mockProblemStore) AddPermission(_ context.Context, _, _, _ string) error      { return nil }
-func (m *mockProblemStore) RemovePermission(_ context.Context, _, _ string) error      { return nil }
+func (m *mockProblemStore) UpdateCounts(_ context.Context, _ string, _, _ int) error { return nil }
+func (m *mockProblemStore) Update(_ context.Context, _ string, p *model.Problem) error {
+	m.updated = p
+	return nil
+}
+func (m *mockProblemStore) Delete(_ context.Context, _ string) error                  { return nil }
+func (m *mockProblemStore) SetReviewState(_ context.Context, _, _, _, _ string) error { return nil }
+func (m *mockProblemStore) ListByStatus(_ context.Context, status string, _, _ int) ([]model.ProblemListItem, int, error) {
+	if m.listStatus != nil {
+		m.listStatus(status)
+	}
+	return nil, 0, nil
+}
+func (m *mockProblemStore) AddPermission(_ context.Context, _, _, _ string) error { return nil }
+func (m *mockProblemStore) RemovePermission(_ context.Context, _, _ string) error { return nil }
 func (m *mockProblemStore) GetPermissions(_ context.Context, _ string) ([]model.ProblemPermission, error) {
 	return nil, nil
 }

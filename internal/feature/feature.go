@@ -422,6 +422,16 @@ var registry = []Feature{
 		Description: "Generating problems, statements and editorials with a model.",
 		Default:     Unrestricted, RequiresLogin: true, APIEnforced: true,
 	},
+	{
+		// Importing pulls third-party problems into the set, so who may do it is
+		// an admin decision rather than a side effect of holding the setter role.
+		// Defaults to setters; an admin can narrow it to only themselves by
+		// clearing the role list, or open it to everyone, from the features
+		// panel. Admins always pass, per feature.Decide.
+		Key: "problem_import", Label: "Problem import", Category: CategoryAuthor,
+		Description: "Importing problems from Codeforces, CSES, AtCoder, Toph and QOJ.",
+		Default:     Policy{Enabled: true, Roles: []string{model.RoleSetter}}, RequiresLogin: true, APIEnforced: true,
+	},
 }
 
 // All returns every declared feature, in registry order.
@@ -478,4 +488,5 @@ const (
 	KeyVJudge          = "vjudge"
 	KeySetterWorkspace = "setter_workspace"
 	KeyAIGeneration    = "ai_generation"
+	KeyProblemImport   = "problem_import"
 )

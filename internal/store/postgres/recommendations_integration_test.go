@@ -47,6 +47,7 @@ func TestGetRecommendationsDB(t *testing.T) {
 		Description: "Practice dynamic programming",
 		Difficulty:  "easy",
 		Tags:        []string{"dp", "math"},
+		Status:      model.ProblemStatusPublished,
 		Visible:     true,
 		CreatedBy:   userID,
 	}
@@ -65,6 +66,7 @@ func TestGetRecommendationsDB(t *testing.T) {
 		Description: "Practice graphs",
 		Difficulty:  "easy",
 		Tags:        []string{"graphs"},
+		Status:      model.ProblemStatusPublished,
 		Visible:     true,
 		CreatedBy:   userID,
 	}

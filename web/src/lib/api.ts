@@ -375,6 +375,10 @@ export const api = {
             return request<{ data: ProblemListItem[]; total: number }>(url);
         },
         listMy: (offset = 0, limit = 20) => request<{ data: ProblemListItem[]; total: number }>(`/problems/my?offset=${offset}&limit=${limit}`),
+        // Publishing is an admin decision, so an author's last step is to submit
+        // for review rather than to flip a visible flag.
+        submitForReview: (slug: string) =>
+            request(`/problems/${slug}/submit`, { method: 'POST' }),
         // The contest problem picker: the archive plus the caller's own
         // unpublished drafts, which the archive listing can never return.
         listSelectable: (search: string, offset = 0, limit = 20) => {
@@ -690,6 +694,30 @@ export const api = {
         listApps: () => request<{ data: SetterApplication[] }>('/admin/setter-applications'),
         reviewApp: (userId: string, status: string) =>
             request(`/admin/setter-applications/${userId}/review`, { method: 'POST', body: JSON.stringify({ status }) }),
+        // Authoring review: setters propose, admins publish. These are the only
+        // routes that can put a problem or a contest into the public set.
+        problemReview: {
+            queue: (status = 'pending', offset = 0, limit = 20) =>
+                request<{ data: ProblemListItem[]; total: number }>(
+                    `/admin/problem-review?status=${encodeURIComponent(status)}&offset=${offset}&limit=${limit}`,
+                ),
+            review: (slug: string, status: string, note = '') =>
+                request(`/admin/problem-review/${slug}`, {
+                    method: 'POST',
+                    body: JSON.stringify({ status, note }),
+                }),
+        },
+        contestReview: {
+            queue: (status = 'pending', offset = 0, limit = 20) =>
+                request<{ data: Contest[]; total: number }>(
+                    `/admin/contest-review?status=${encodeURIComponent(status)}&offset=${offset}&limit=${limit}`,
+                ),
+            review: (id: string, status: string, note = '') =>
+                request(`/admin/contest-review/${id}`, {
+                    method: 'POST',
+                    body: JSON.stringify({ status, note }),
+                }),
+        },
         botAccounts: {
             list: (offset = 0, limit = 20) =>
                 request<{ data: BotAccount[]; total: number }>(`/admin/bot-accounts?offset=${offset}&limit=${limit}`),
@@ -801,6 +829,9 @@ export const api = {
             return request<{ data: Contest[]; total: number }>(url);
         },
         listMy: (offset = 0, limit = 20) => request<{ data: Contest[]; total: number }>(`/contests/my?offset=${offset}&limit=${limit}`),
+        // A setter proposes a round; only an admin can publish it.
+        submitForReview: (id: string) =>
+            request(`/contests/${id}/submit`, { method: 'POST' }),
         get: (id: string) => request<ContestDetailResponse>(`/contests/${id}`),
         create: (d: unknown) => request<Contest>('/contests', { method: 'POST', body: JSON.stringify(d) }),
         getFormats: () => request<{ formats: string[] }>('/contests/formats'),

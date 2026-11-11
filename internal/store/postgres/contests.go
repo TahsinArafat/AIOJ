@@ -40,12 +40,22 @@ func (s *ContestStore) Create(ctx context.Context, c *model.Contest) error {
 		slug = c.Slug
 	}
 
+	// A caller that predates the review workflow leaves Status empty; treat that
+	// as a draft rather than sending '' to a CHECK constraint, and keep visible
+	// consistent with it — publishing is an admin decision.
+	if c.Status == "" {
+		c.Status = model.ContestStatusDraft
+	}
+	c.Visible = c.Status == model.ContestStatusPublished
+
 	err = tx.QueryRowContext(ctx,
 		`INSERT INTO contests(id,slug,title,type,format,format_config,start_time,end_time,freeze_time,password,visible,description,
-		                    registration_required,registration_deadline,max_participants,division,educational_config,created_by)
-		 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING created_at`,
+		                    registration_required,registration_deadline,max_participants,division,educational_config,created_by,
+		                    status,is_rated,rated_for_min,rated_for_max)
+		 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22) RETURNING created_at`,
 		c.ID, slug, c.Title, c.Type, c.Format, formatConfigJSON, c.StartTime, c.EndTime, c.FreezeTime, c.Password, c.Visible, c.Description,
 		c.RegistrationRequired, c.RegistrationDeadline, c.MaxParticipants, c.Division, configJSON, c.CreatedBy,
+		c.Status, c.IsRated, c.RatedForMin, c.RatedForMax,
 	).Scan(&c.CreatedAt)
 	if err != nil {
 		return err
@@ -94,6 +104,8 @@ func (s *ContestStore) getByWhere(ctx context.Context, where string, args ...int
 		`SELECT id,display_id,slug,title,type,format,format_config,start_time,end_time,freeze_time,password,visible,description,
 		        registration_required,registration_deadline,max_participants,division,educational_config,
 		        upsolving_enabled,virtual_contest_enabled,pdf_enabled,statement_hidden,created_by,created_at,
+		        COALESCE(status,'draft'), COALESCE(review_note,''),
+		        COALESCE(is_rated,true), COALESCE(rated_for_min,0), COALESCE(rated_for_max,9999),
 		        (SELECT group_id::text FROM group_contests WHERE contest_id = id LIMIT 1) AS group_id
 		 FROM contests WHERE `+where, args...).Scan(
 		&c.ID, &c.DisplayID, &slug, &c.Title, &c.Type, &c.Format, &formatConfigJSON, &c.StartTime, &c.EndTime, &c.FreezeTime,
@@ -101,7 +113,8 @@ func (s *ContestStore) getByWhere(ctx context.Context, where string, args ...int
 		&c.RegistrationRequired, &c.RegistrationDeadline, &c.MaxParticipants,
 		&c.Division, &configJSON,
 		&c.UpsolvingEnabled, &c.VirtualContestEnabled, &c.PDFEnabled, &c.StatementHidden,
-		&c.CreatedBy, &c.CreatedAt, &groupID)
+		&c.CreatedBy, &c.CreatedAt, &c.Status, &c.ReviewNote,
+		&c.IsRated, &c.RatedForMin, &c.RatedForMax, &groupID)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -206,12 +219,19 @@ func (s *ContestStore) Update(ctx context.Context, c *model.Contest) error {
 		slug = c.Slug
 	}
 
+	// visible is derived from status, never taken from the caller: editing a
+	// contest must not be a way to publish one. Same rule as problems.
+	if c.Status == "" {
+		c.Status = model.ContestStatusDraft
+	}
 	_, err := s.db.ExecContext(ctx,
 		`UPDATE contests SET title=$1, type=$2, format=$3, format_config=$4, start_time=$5, end_time=$6,
-	 freeze_time=$7, password=$8, description=$9, visible=$10, pdf_enabled=$11, statement_hidden=$12,
-	 slug=$14, upsolving_enabled=$15, virtual_contest_enabled=$16
+	 freeze_time=$7, password=$8, description=$9, visible=($17::varchar='published'), pdf_enabled=$11, statement_hidden=$12,
+	 slug=$14, upsolving_enabled=$15, virtual_contest_enabled=$16,
+	 status=$17, is_rated=$18, rated_for_min=$19, rated_for_max=$20
 	 WHERE id=$13`,
-		c.Title, c.Type, c.Format, formatConfigJSON, c.StartTime, c.EndTime, c.FreezeTime, c.Password, c.Description, c.Visible, c.PDFEnabled, c.StatementHidden, c.ID, slug, c.UpsolvingEnabled, c.VirtualContestEnabled)
+		c.Title, c.Type, c.Format, formatConfigJSON, c.StartTime, c.EndTime, c.FreezeTime, c.Password, c.Description, c.Visible, c.PDFEnabled, c.StatementHidden, c.ID, slug, c.UpsolvingEnabled, c.VirtualContestEnabled,
+		c.Status, c.IsRated, c.RatedForMin, c.RatedForMax)
 	if err != nil {
 		return err
 	}
@@ -222,6 +242,53 @@ func (s *ContestStore) Update(ctx context.Context, c *model.Contest) error {
 	}
 
 	return nil
+}
+
+// SetReviewState records an admin's verdict on a contest. Publishing is the only
+// thing that makes a round visible, so a proposal cannot go live by itself.
+func (s *ContestStore) SetReviewState(ctx context.Context, id, status, note, reviewerID string) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE contests
+		    SET status=$2, review_note=$3, reviewed_by=NULLIF($4,'')::uuid, reviewed_at=NOW(),
+		        visible=($2::varchar='published')
+		  WHERE id=$1`,
+		id, status, note, reviewerID)
+	return err
+}
+
+// ListByStatus is the admin contest review queue.
+func (s *ContestStore) ListByStatus(ctx context.Context, status string, offset, limit int) ([]model.Contest, int, error) {
+	var total int
+	s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM contests WHERE status=$1`, status).Scan(&total)
+
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id,display_id,COALESCE(slug,''),title,type,format,format_config,start_time,end_time,freeze_time,password,visible,description,
+		        registration_required,registration_deadline,max_participants,division,educational_config,
+		        upsolving_enabled,virtual_contest_enabled,pdf_enabled,statement_hidden,created_by,created_at,
+		        COALESCE(status,'draft'), COALESCE(review_note,''),
+		        COALESCE(is_rated,true), COALESCE(rated_for_min,0), COALESCE(rated_for_max,9999)
+		   FROM contests WHERE status=$1 ORDER BY created_at ASC OFFSET $2 LIMIT $3`, status, offset, limit)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var items []model.Contest
+	for rows.Next() {
+		var c model.Contest
+		var configJSON, formatConfigJSON []byte
+		rows.Scan(&c.ID, &c.DisplayID, &c.Slug, &c.Title, &c.Type, &c.Format, &formatConfigJSON,
+			&c.StartTime, &c.EndTime, &c.FreezeTime, &c.Password, &c.Visible, &c.Description,
+			&c.RegistrationRequired, &c.RegistrationDeadline, &c.MaxParticipants, &c.Division, &configJSON,
+			&c.UpsolvingEnabled, &c.VirtualContestEnabled, &c.PDFEnabled, &c.StatementHidden,
+			&c.CreatedBy, &c.CreatedAt, &c.Status, &c.ReviewNote,
+			&c.IsRated, &c.RatedForMin, &c.RatedForMax)
+		items = append(items, c)
+	}
+	if items == nil {
+		items = []model.Contest{}
+	}
+	return items, total, nil
 }
 
 func (s *ContestStore) Delete(ctx context.Context, id string) error {

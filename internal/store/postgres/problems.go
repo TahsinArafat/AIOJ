@@ -46,6 +46,15 @@ func (s *ProblemStore) Create(ctx context.Context, p *model.Problem) error {
 		return fmt.Errorf("marshal testcase_score: %w", err)
 	}
 
+	// A caller that predates the review workflow (the AI apply path, the seeder)
+	// leaves Status empty. Treat that as a draft rather than sending '' to a
+	// CHECK constraint that would reject the insert outright — and keep visible
+	// consistent with it, since the constraint ties the two together.
+	if p.Status == "" {
+		p.Status = model.ProblemStatusDraft
+	}
+	p.Visible = p.Status == model.ProblemStatusPublished
+
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)
@@ -57,14 +66,14 @@ func (s *ProblemStore) Create(ctx context.Context, p *model.Problem) error {
 		 time_limit,memory_limit,difficulty,rating,tags,visible,testdata_path,testcase_score,
 		 spj,spj_language,spj_source_code,spj_version,source,remote_id,created_by,
 		 checker_type,float_epsilon,interactive,interactor_language,interactor_source_code,
-		 scoring_mode,subtask_aggregation,ai_generated)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32)
+		 scoring_mode,subtask_aggregation,ai_generated,status,review_note,reviewed_at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35)
 		RETURNING created_at,updated_at`,
 		p.ID, p.Slug, p.Title, p.Description, p.Constraints, p.InputFormat, p.OutputFormat, p.Hint, samples,
 		p.TimeLimit, p.MemoryLimit, p.Difficulty, p.Rating, pq.Array(p.Tags), p.Visible, p.TestdataPath, scores,
 		p.SPJ, p.SPJLanguage, p.SPJSourceCode, p.SPJVersion, p.Source, p.RemoteID, p.CreatedBy,
 		p.CheckerType, p.FloatEpsilon, p.Interactive, p.InteractorLanguage, p.InteractorSourceCode,
-		p.ScoringMode, p.SubtaskAggregation, p.AIGenerated,
+		p.ScoringMode, p.SubtaskAggregation, p.AIGenerated, p.Status, p.ReviewNote, p.ReviewedAt,
 	).Scan(&p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
 		return fmt.Errorf("insert problem: %w", err)
@@ -107,7 +116,8 @@ const problemColumns = `p.id, p.slug, p.title, p.description, COALESCE(p.constra
 	COALESCE(p.created_by::text,''), p.created_at, p.updated_at,
 	COALESCE(p.interactive,false), COALESCE(p.interactor_language,''), COALESCE(p.interactor_source_code,''),
 	COALESCE(p.scoring_mode,'complete'), COALESCE(p.subtask_aggregation,'min'),
-	COALESCE(p.ai_generated,false)`
+	COALESCE(p.ai_generated,false),
+	COALESCE(p.status,'draft'), COALESCE(p.review_note,''), p.reviewed_at`
 
 // unreleasedContestSQL is true when the problem belongs to a contest that has not
 // finished yet. Such a problem is not part of the archive: it is reachable through
@@ -121,8 +131,15 @@ const unreleasedContestSQL = `EXISTS (
 )`
 
 // archivedProblemSQL is the condition a problem must satisfy to appear in the
-// public archive at all: published, and not still in play in a contest.
-const archivedProblemSQL = "p.visible = true AND NOT " + unreleasedContestSQL
+// public archive at all: approved by an admin, and not still in play in a
+// contest.
+//
+// It reads status, not visible. The CHECK constraint only guarantees
+// published => visible, so a row could in principle be visible while still a
+// draft; status is the actual review decision, and filtering on it means the
+// archive cannot leak an unapproved problem even if visible is set by hand in
+// psql or by a future caller that forgets to derive it.
+const archivedProblemSQL = "p.status = 'published' AND NOT " + unreleasedContestSQL
 
 // selectableProblemSQL is what a contest's problem picker searches: the public
 // archive, plus the problems the caller created or holds a permission row on.
@@ -161,6 +178,7 @@ func scanProblem(row problemScanner, p *model.Problem) error {
 		&p.SubmissionCount, &p.AcceptedCount, &p.Source, &p.RemoteID, &p.CreatedBy, &p.CreatedAt, &p.UpdatedAt,
 		&p.Interactive, &p.InteractorLanguage, &p.InteractorSourceCode, &p.ScoringMode, &p.SubtaskAggregation,
 		&p.AIGenerated,
+		&p.Status, &p.ReviewNote, &p.ReviewedAt,
 	); err != nil {
 		return err
 	}
@@ -195,7 +213,8 @@ func (s *ProblemStore) getBy(ctx context.Context, field, value string) (*model.P
 
 func (s *ProblemStore) List(ctx context.Context, offset, limit int) ([]model.ProblemListItem, int, error) {
 	var total int
-	s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM problems WHERE visible=true`).Scan(&total)
+	s.db.QueryRowContext(ctx,
+		"SELECT COUNT(*) FROM problems p WHERE "+archivedProblemSQL).Scan(&total)
 	query := fmt.Sprintf(`SELECT p.id, p.slug, p.title, p.difficulty, COALESCE(p.rating,0), p.tags,
 		 p.submission_count, p.accepted_count, p.source
 		 FROM problems p WHERE %s ORDER BY p.created_at DESC OFFSET $1 LIMIT $2`, archivedProblemSQL)
@@ -238,23 +257,74 @@ func (s *ProblemStore) Update(ctx context.Context, id string, p *model.Problem) 
 	if err != nil {
 		return fmt.Errorf("marshal testcase_score: %w", err)
 	}
+	// visible is derived from status, never taken from the caller. Publishing is
+	// an admin decision enforced in the handler, so a client that sends
+	// visible:true on a draft must not be able to publish it by editing. The
+	// CHECK constraint from migration 000081 enforces the same invariant in the
+	// database, so this cannot drift even if a future caller forgets.
 	_, err = s.db.ExecContext(ctx, `UPDATE problems SET
 		title=$2, description=$3, constraints=$4, input_format=$5, output_format=$6, hint=$7, sample_cases=$8,
-		time_limit=$9, memory_limit=$10, difficulty=$11, rating=$12, tags=$13, visible=$14,
+		time_limit=$9, memory_limit=$10, difficulty=$11, rating=$12, tags=$13,
+		visible=($27::varchar='published'),
 		testdata_path=$15, testcase_score=$16, spj=$17, spj_language=$18, spj_source_code=$19, checker_type=$20, float_epsilon=$21,
 		interactive=$22, interactor_language=$23, interactor_source_code=$24,
-		scoring_mode=$25, subtask_aggregation=$26, updated_at=NOW() WHERE id=$1`,
+		scoring_mode=$25, subtask_aggregation=$26,
+		status=$27, review_note=$28, reviewed_at=$29, updated_at=NOW() WHERE id=$1`,
 		id, p.Title, p.Description, p.Constraints, p.InputFormat, p.OutputFormat, p.Hint, samples,
 		p.TimeLimit, p.MemoryLimit, p.Difficulty, p.Rating, pq.Array(p.Tags), p.Visible, p.TestdataPath,
 		scores, p.SPJ, p.SPJLanguage, p.SPJSourceCode, p.CheckerType, p.FloatEpsilon,
 		p.Interactive, p.InteractorLanguage, p.InteractorSourceCode,
-		p.ScoringMode, p.SubtaskAggregation)
+		p.ScoringMode, p.SubtaskAggregation, p.Status, p.ReviewNote, p.ReviewedAt)
 	return err
 }
 
 func (s *ProblemStore) Delete(ctx context.Context, id string) error {
 	_, err := s.db.ExecContext(ctx, "DELETE FROM problems WHERE id=$1", id)
 	return err
+}
+
+// SetReviewState records an admin's verdict on a problem and keeps visible in
+// step with it, so approval is the only thing that makes a problem public and a
+// rejection or a send-back makes it private again.
+func (s *ProblemStore) SetReviewState(ctx context.Context, id, status, note, reviewerID string) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE problems
+		    SET status=$2, review_note=$3, reviewed_by=NULLIF($4,'')::uuid, reviewed_at=NOW(),
+		        visible=($2::varchar='published'), updated_at=NOW()
+		  WHERE id=$1`,
+		id, status, note, reviewerID)
+	return err
+}
+
+// ListByStatus is the review queue. Pending is what the admin panel shows; the
+// other states back the setter's own filtered view.
+func (s *ProblemStore) ListByStatus(ctx context.Context, status string, offset, limit int) ([]model.ProblemListItem, int, error) {
+	var total int
+	s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM problems WHERE status=$1`, status).Scan(&total)
+
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT p.id, p.slug, p.title, p.difficulty, COALESCE(p.rating,0), p.tags,
+		        p.submission_count, p.accepted_count, p.source, p.status
+		   FROM problems p WHERE p.status=$1
+		  ORDER BY p.created_at ASC OFFSET $2 LIMIT $3`, status, offset, limit)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var items []model.ProblemListItem
+	for rows.Next() {
+		var item model.ProblemListItem
+		var tags []string
+		rows.Scan(&item.ID, &item.Slug, &item.Title, &item.Difficulty, &item.Rating, pq.Array(&tags),
+			&item.SubmissionCount, &item.AcceptedCount, &item.Source, &item.Status)
+		item.Tags = tags
+		items = append(items, item)
+	}
+	if items == nil {
+		items = []model.ProblemListItem{}
+	}
+	return items, total, nil
 }
 
 func (s *ProblemStore) AddPermission(ctx context.Context, problemID, userID, accessLevel string) error {
@@ -432,7 +502,7 @@ func (s *ProblemStore) ListByCreatedBy(ctx context.Context, userID string, offse
 		 WHERE p.created_by = $1 OR perm.user_id = $1`, userID).Scan(&total)
 
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT DISTINCT p.id, p.slug, p.title, p.difficulty, COALESCE(p.rating,0), p.tags, p.submission_count, p.accepted_count, p.source, p.created_at
+		`SELECT DISTINCT p.id, p.slug, p.title, p.difficulty, COALESCE(p.rating,0), p.tags, p.submission_count, p.accepted_count, p.source, p.created_at, COALESCE(p.status,'draft')
 		 FROM problems p
 		 LEFT JOIN problem_permissions perm ON p.id = perm.problem_id
 		 WHERE p.created_by = $1 OR perm.user_id = $1
@@ -447,7 +517,7 @@ func (s *ProblemStore) ListByCreatedBy(ctx context.Context, userID string, offse
 		var tags []string
 		var createdAt interface{}
 		rows.Scan(&item.ID, &item.Slug, &item.Title, &item.Difficulty, &item.Rating, pq.Array(&tags),
-			&item.SubmissionCount, &item.AcceptedCount, &item.Source, &createdAt)
+			&item.SubmissionCount, &item.AcceptedCount, &item.Source, &createdAt, &item.Status)
 		item.Tags = tags
 		items = append(items, item)
 	}

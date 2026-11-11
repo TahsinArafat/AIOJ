@@ -31,6 +31,12 @@ func (canonicalHackContestStore) ListByCreatedBy(context.Context, string, int, i
 }
 func (canonicalHackContestStore) Update(context.Context, *model.Contest) error { return nil }
 func (canonicalHackContestStore) Delete(context.Context, string) error         { return nil }
+func (canonicalHackContestStore) SetReviewState(context.Context, string, string, string, string) error {
+	return nil
+}
+func (canonicalHackContestStore) ListByStatus(context.Context, string, int, int) ([]model.Contest, int, error) {
+	return nil, 0, nil
+}
 func (canonicalHackContestStore) AddProblem(context.Context, string, string, string, int, int) error {
 	return nil
 }

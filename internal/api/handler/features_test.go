@@ -115,6 +115,12 @@ func TestFeaturesListResolvesForASignedInUser(t *testing.T) {
 		t.Fatalf("invalid JSON: %v", err)
 	}
 	for _, f := range body.Data {
+		// A feature whose default policy names roles is deliberately restricted —
+		// problem_import ships setter-only so an admin can decide who may pull
+		// third-party problems in. Everything else ships open to any account.
+		if len(f.Policy.Roles) > 0 {
+			continue
+		}
 		if !f.Allowed {
 			t.Fatalf("feature %q denied to a signed-in user by default (%+v)", f.Key, f)
 		}

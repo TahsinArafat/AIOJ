@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { Users, FileText, Bot, Settings, Code, Globe, Send, Database, Cpu, SlidersHorizontal, KeyRound } from 'lucide-react'
+import { Users, FileText, Bot, Settings, Code, Globe, Send, Database, Cpu, SlidersHorizontal, KeyRound, ShieldCheck } from 'lucide-react'
 import UsersPanel from './admin/UsersPanel'
 import SetterAppsPanel from './admin/SetterAppsPanel'
+import ReviewPanel from './admin/ReviewPanel'
 import BotAccountsPanel from './admin/BotAccountsPanel'
 import SystemSettingsPanel from './admin/SystemSettingsPanel'
 import LanguagesPanel from './admin/LanguagesPanel'
@@ -14,11 +15,12 @@ import AuthMethodsPanel from './admin/AuthMethodsPanel'
 import AIJobsPage from './AIJobsPage'
 import { useDocumentTitle } from '../lib/documentTitle'
 
-type AdminTab = 'users' | 'applications' | 'bots' | 'languages' | 'remote-languages' | 'submissions' | 'settings' | 'backups' | 'ai-models' | 'ai-jobs' | 'features' | 'auth'
+type AdminTab = 'users' | 'applications' | 'review' | 'bots' | 'languages' | 'remote-languages' | 'submissions' | 'settings' | 'backups' | 'ai-models' | 'ai-jobs' | 'features' | 'auth'
 
 const tabs: { key: AdminTab; label: string; icon: typeof Users }[] = [
     { key: 'users', label: 'Users', icon: Users },
     { key: 'applications', label: 'Applications', icon: FileText },
+    { key: 'review', label: 'Review Queue', icon: ShieldCheck },
     { key: 'bots', label: 'Bot Accounts', icon: Bot },
     { key: 'languages', label: 'Languages', icon: Code },
     { key: 'remote-languages', label: 'Remote Languages', icon: Globe },
@@ -95,6 +97,7 @@ export default function AdminDashboard() {
                 <div className="flex-1 min-w-0">
                     {activeTab === 'users' && <UsersPanel />}
                     {activeTab === 'applications' && <SetterAppsPanel />}
+                    {activeTab === 'review' && <ReviewPanel />}
                     {activeTab === 'bots' && <BotAccountsPanel />}
                     {activeTab === 'languages' && <LanguagesPanel />}
                     {activeTab === 'remote-languages' && <RemoteLanguagesPanel />}

@@ -29,8 +29,15 @@ func NewProblemHandler(s store.ProblemStore) *ProblemHandler {
 	return &ProblemHandler{store: s}
 }
 
-func visibleForCreator(requested bool, role string) bool {
-	return requested && (role == "admin" || role == "setter")
+// initialStatus is the review state a newly created problem starts in. Only an
+// admin may publish directly; a setter's problem starts as a draft and reaches
+// the archive through the review queue. visible is derived from status by the
+// store, so this one decision is the whole publish policy for creation.
+func initialStatus(requested bool, role string) string {
+	if requested && role == "admin" {
+		return model.ProblemStatusPublished
+	}
+	return model.ProblemStatusDraft
 }
 
 func (h *ProblemHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -155,7 +162,19 @@ func (h *ProblemHandler) Update(w http.ResponseWriter, r *http.Request) {
 	p.SPJSourceCode = req.SPJSourceCode
 	p.CheckerType = req.CheckerType
 	p.FloatEpsilon = req.FloatEpsilon
-	p.Visible = req.Visible
+	// Editing must not publish. Before this, an owner could send visible:true
+	// here and put a draft in the archive without any review — the queue would
+	// have been decorative. Only an admin's edit may change the state, and
+	// publishing is still an explicit admin action (SetReviewState), so a
+	// non-admin's visible flag is ignored outright. p.Status carries the
+	// existing value for everybody else, and the store derives visible from it.
+	if claims.Role == "admin" {
+		if req.Visible {
+			p.Status = model.ProblemStatusPublished
+		} else if p.Status == model.ProblemStatusPublished {
+			p.Status = model.ProblemStatusDraft
+		}
+	}
 	p.Interactive = req.Interactive
 	p.InteractorLanguage = req.InteractorLanguage
 	p.InteractorSourceCode = req.InteractorSourceCode
@@ -343,7 +362,8 @@ func (h *ProblemHandler) Create(w http.ResponseWriter, r *http.Request) {
 		InteractorLanguage:   req.InteractorLanguage,
 		InteractorSourceCode: req.InteractorSourceCode,
 		Source:               "local",
-		Visible:              visibleForCreator(req.Visible, claims.Role),
+		Status:               initialStatus(req.Visible, claims.Role),
+		Visible:              req.Visible && claims.Role == "admin",
 		CreatedBy:            claims.UserID,
 	}
 	if err := h.store.Create(r.Context(), prob); err != nil {
@@ -501,4 +521,89 @@ func (h *ProblemHandler) ListSelectable(w http.ResponseWriter, r *http.Request) 
 	}
 
 	respondJSON(w, http.StatusOK, map[string]interface{}{"data": items, "total": total})
+}
+
+// SubmitForReview moves an authored problem into the admin queue. Authorship is
+// required; a rejected problem may be resubmitted once the author has fixed it,
+// which is the point of keeping 'rejected' distinct from 'draft'.
+func (h *ProblemHandler) SubmitForReview(w http.ResponseWriter, r *http.Request) {
+	p, err := h.store.GetBySlug(r.Context(), chi.URLParam(r, "slug"))
+	if err != nil || p == nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if !h.canAuthorProblem(r, p) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	if p.Status == model.ProblemStatusPending {
+		http.Error(w, "already awaiting review", http.StatusConflict)
+		return
+	}
+	if p.Status == model.ProblemStatusPublished {
+		http.Error(w, "already published", http.StatusConflict)
+		return
+	}
+	if err := h.store.SetReviewState(r.Context(), p.ID, model.ProblemStatusPending, "", ""); err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+// ReviewQueue lists problems awaiting an admin. Admin-only: it is the moderation
+// surface, and every other state is visible to its author through /problems/my.
+func (h *ProblemHandler) ReviewQueue(w http.ResponseWriter, r *http.Request) {
+	status := r.URL.Query().Get("status")
+	if status == "" {
+		status = model.ProblemStatusPending
+	}
+	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
+
+	items, total, err := h.store.ListByStatus(r.Context(), status, offset, limit)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	respondJSON(w, http.StatusOK, map[string]interface{}{"data": items, "total": total})
+}
+
+// ReviewProblem records an admin verdict: publish, reject, or send back to draft.
+// This is the only path that can publish a setter's problem.
+func (h *ProblemHandler) ReviewProblem(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r)
+	if claims == nil || claims.Role != "admin" {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	var req struct {
+		Status string `json:"status"`
+		Note   string `json:"note"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	switch req.Status {
+	case model.ProblemStatusPublished, model.ProblemStatusRejected, model.ProblemStatusDraft:
+	default:
+		http.Error(w, "status must be published, rejected or draft", http.StatusBadRequest)
+		return
+	}
+
+	p, err := h.store.GetBySlug(r.Context(), chi.URLParam(r, "slug"))
+	if err != nil || p == nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if err := h.store.SetReviewState(r.Context(), p.ID, req.Status, req.Note, claims.UserID); err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	respondJSON(w, http.StatusOK, map[string]string{"status": req.Status})
 }

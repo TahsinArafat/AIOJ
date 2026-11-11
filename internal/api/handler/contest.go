@@ -68,6 +68,16 @@ func NewContestHandler(s *postgres.ContestStore, rs *postgres.RatingStore, ps st
 	return &ContestHandler{store: s, ratingStore: rs, problemStore: ps, userStore: us, teamStore: ts, cache: newScoreboardCache(30 * time.Second)}
 }
 
+// initialContestStatus mirrors the problem rule: an admin publishes directly,
+// everyone else proposes. A setter announcing a rated round to the public
+// without review is exactly what the queue exists to prevent.
+func initialContestStatus(role string) string {
+	if role == "admin" {
+		return model.ContestStatusPublished
+	}
+	return model.ContestStatusDraft
+}
+
 func (h *ContestHandler) Create(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetUserClaims(r)
 	if claims == nil {
@@ -129,16 +139,18 @@ func (h *ContestHandler) Create(w http.ResponseWriter, r *http.Request) {
 		FreezeTime:           req.FreezeTime,
 		Password:             password,
 		Description:          req.Description,
-		Visible:              true,
+		Status:               initialContestStatus(claims.Role),
+		Visible:              claims.Role == "admin",
 		GroupID:              req.GroupID,
 		CreatedBy:            claims.UserID,
 		RegistrationRequired: req.RegistrationRequired,
 		RegistrationDeadline: req.RegistrationDeadline,
 		MaxParticipants:      req.MaxParticipants,
+		IsRated:              req.IsRated,
+		RatedForMin:          req.RatedForMin,
+		RatedForMax:          req.RatedForMax,
 	}
-	if req.Visible != nil {
-		c.Visible = *req.Visible
-	}
+
 	if err := h.store.Create(r.Context(), c); err != nil {
 		http.Error(w, "create failed", http.StatusInternalServerError)
 		return
@@ -623,6 +635,19 @@ func (h *ContestHandler) CalculateRatings(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	// Ratings are the one irreversible effect of a round: they rewrite every
+	// participant's profile. Refuse an unapproved or explicitly unrated contest
+	// so a draft can never move the leaderboard, and so is_rated finally means
+	// something instead of being a column nobody read.
+	if contest.Status != model.ContestStatusPublished {
+		http.Error(w, "contest is not published", http.StatusConflict)
+		return
+	}
+	if !contest.IsRated {
+		http.Error(w, "contest is not rated", http.StatusConflict)
+		return
+	}
+
 	participants, _ := h.store.GetParticipants(r.Context(), contest.ID)
 
 	standings := make([]rating.ContestStanding, 0, len(participants))
@@ -688,7 +713,7 @@ func (h *ContestHandler) CreateEducational(w http.ResponseWriter, r *http.Reques
 		EndTime:           req.EndTime,
 		EducationalConfig: &config,
 		Description:       req.Description,
-		Visible:           true,
+		Status:            initialContestStatus(claims.Role),
 		CreatedBy:         claims.UserID,
 	}
 
@@ -1024,4 +1049,89 @@ func (h *ContestHandler) ListMyContests(w http.ResponseWriter, r *http.Request) 
 	}
 
 	respondJSON(w, http.StatusOK, map[string]interface{}{"data": items, "total": total})
+}
+
+// SubmitForReview moves a proposed contest into the admin queue. Only a manager
+// may propose it, and an already-published round is not resubmittable.
+func (h *ContestHandler) SubmitForReview(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r)
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	c, err := resolveContest(r.Context(), chi.URLParam(r, "id"), h.store)
+	if err != nil {
+		respondContestLookupError(w, err)
+		return
+	}
+	if claims.Role != "admin" && !h.store.HasAccess(r.Context(), c.ID, claims.UserID, "manager") {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	switch c.Status {
+	case model.ContestStatusPending:
+		http.Error(w, "already awaiting review", http.StatusConflict)
+		return
+	case model.ContestStatusPublished:
+		http.Error(w, "already published", http.StatusConflict)
+		return
+	}
+	if err := h.store.SetReviewState(r.Context(), c.ID, model.ContestStatusPending, "", ""); err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+// ReviewQueue lists contests awaiting an admin. Admin-only.
+func (h *ContestHandler) ReviewQueue(w http.ResponseWriter, r *http.Request) {
+	status := r.URL.Query().Get("status")
+	if status == "" {
+		status = model.ContestStatusPending
+	}
+	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
+	items, total, err := h.store.ListByStatus(r.Context(), status, offset, limit)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	respondJSON(w, http.StatusOK, map[string]interface{}{"data": items, "total": total})
+}
+
+// ReviewContest records an admin verdict on a proposed round. This is the only
+// path that can publish a setter's contest.
+func (h *ContestHandler) ReviewContest(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r)
+	if claims == nil || claims.Role != "admin" {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	var req struct {
+		Status string `json:"status"`
+		Note   string `json:"note"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	switch req.Status {
+	case model.ContestStatusPublished, model.ContestStatusRejected, model.ContestStatusDraft:
+	default:
+		http.Error(w, "status must be published, rejected or draft", http.StatusBadRequest)
+		return
+	}
+	c, err := resolveContest(r.Context(), chi.URLParam(r, "id"), h.store)
+	if err != nil {
+		respondContestLookupError(w, err)
+		return
+	}
+	if err := h.store.SetReviewState(r.Context(), c.ID, req.Status, req.Note, claims.UserID); err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	respondJSON(w, http.StatusOK, map[string]string{"status": req.Status})
 }

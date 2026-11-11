@@ -83,6 +83,12 @@ type ProblemStore interface {
 	UpdateCounts(ctx context.Context, id string, addSubmission, addAccepted int) error
 	Update(ctx context.Context, id string, p *model.Problem) error
 	Delete(ctx context.Context, id string) error
+	// SetReviewState applies an admin verdict. It also derives visible from the
+	// new status, so approval is the only path to a public problem.
+	SetReviewState(ctx context.Context, id, status, note, reviewerID string) error
+	// ListByStatus is the review queue (status = pending) and the setter's
+	// filtered views.
+	ListByStatus(ctx context.Context, status string, offset, limit int) ([]model.ProblemListItem, int, error)
 	AddPermission(ctx context.Context, problemID, userID, accessLevel string) error
 	RemovePermission(ctx context.Context, problemID, userID string) error
 	GetPermissions(ctx context.Context, problemID string) ([]model.ProblemPermission, error)
@@ -210,6 +216,11 @@ type ContestStore interface {
 	ListByCreatedBy(ctx context.Context, userID string, offset, limit int) ([]model.Contest, int, error)
 	Update(ctx context.Context, c *model.Contest) error
 	Delete(ctx context.Context, id string) error
+	// SetReviewState applies an admin verdict and derives visible from it, so a
+	// proposal cannot publish itself.
+	SetReviewState(ctx context.Context, id, status, note, reviewerID string) error
+	// ListByStatus is the admin contest review queue.
+	ListByStatus(ctx context.Context, status string, offset, limit int) ([]model.Contest, int, error)
 	AddProblem(ctx context.Context, contestID, problemID, index string, score, sortOrder int) error
 	UpdateProblem(ctx context.Context, contestID, problemID, index string, score, sortOrder int) error
 	RemoveProblem(ctx context.Context, contestID, problemID string) error

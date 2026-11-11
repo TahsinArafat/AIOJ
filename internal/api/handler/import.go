@@ -86,7 +86,12 @@ func (h *ImportHandler) ImportCodeforces(w http.ResponseWriter, r *http.Request)
 		prob.Slug = prob.Slug + "-" + uuid.New().String()[:8]
 	}
 	prob.CreatedBy = claims.UserID
-	prob.Visible = true
+	// An import is not an approval. It used to hardcode Visible = true, so any
+	// setter could pull a Codeforces problem into the public archive with no
+	// review at all — the fastest route around the queue. Imports land as drafts
+	// and follow the same review path as a hand-written problem.
+	prob.Status = initialStatus(true, claims.Role)
+	prob.Visible = claims.Role == "admin"
 	if prob.Tags == nil {
 		prob.Tags = []string{}
 	}
@@ -162,7 +167,12 @@ func (h *ImportHandler) ImportCSES(w http.ResponseWriter, r *http.Request) {
 		prob.Slug = prob.Slug + "-" + uuid.New().String()[:8]
 	}
 	prob.CreatedBy = claims.UserID
-	prob.Visible = true
+	// An import is not an approval. It used to hardcode Visible = true, so any
+	// setter could pull a Codeforces problem into the public archive with no
+	// review at all — the fastest route around the queue. Imports land as drafts
+	// and follow the same review path as a hand-written problem.
+	prob.Status = initialStatus(true, claims.Role)
+	prob.Visible = claims.Role == "admin"
 	if prob.Tags == nil {
 		prob.Tags = []string{}
 	}
@@ -237,7 +247,12 @@ func (h *ImportHandler) ImportAtCoder(w http.ResponseWriter, r *http.Request) {
 		prob.Slug = prob.Slug + "-" + uuid.New().String()[:8]
 	}
 	prob.CreatedBy = claims.UserID
-	prob.Visible = true
+	// An import is not an approval. It used to hardcode Visible = true, so any
+	// setter could pull a Codeforces problem into the public archive with no
+	// review at all — the fastest route around the queue. Imports land as drafts
+	// and follow the same review path as a hand-written problem.
+	prob.Status = initialStatus(true, claims.Role)
+	prob.Visible = claims.Role == "admin"
 	if prob.Tags == nil {
 		prob.Tags = []string{}
 	}
@@ -311,7 +326,12 @@ func (h *ImportHandler) ImportToph(w http.ResponseWriter, r *http.Request) {
 		prob.Slug = prob.Slug + "-" + uuid.New().String()[:8]
 	}
 	prob.CreatedBy = claims.UserID
-	prob.Visible = true
+	// An import is not an approval. It used to hardcode Visible = true, so any
+	// setter could pull a Codeforces problem into the public archive with no
+	// review at all — the fastest route around the queue. Imports land as drafts
+	// and follow the same review path as a hand-written problem.
+	prob.Status = initialStatus(true, claims.Role)
+	prob.Visible = claims.Role == "admin"
 	if prob.Tags == nil {
 		prob.Tags = []string{}
 	}
@@ -385,7 +405,12 @@ func (h *ImportHandler) ImportQOJ(w http.ResponseWriter, r *http.Request) {
 		prob.Slug = prob.Slug + "-" + uuid.New().String()[:8]
 	}
 	prob.CreatedBy = claims.UserID
-	prob.Visible = true
+	// An import is not an approval. It used to hardcode Visible = true, so any
+	// setter could pull a Codeforces problem into the public archive with no
+	// review at all — the fastest route around the queue. Imports land as drafts
+	// and follow the same review path as a hand-written problem.
+	prob.Status = initialStatus(true, claims.Role)
+	prob.Visible = claims.Role == "admin"
 	if prob.Tags == nil {
 		prob.Tags = []string{}
 	}

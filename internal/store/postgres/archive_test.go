@@ -10,8 +10,8 @@ import (
 // condition lives in one constant so the problem list, its filtered variant and
 // search cannot drift apart; this pins what it has to contain.
 func TestArchivedProblemSQLExcludesUnfinishedContests(t *testing.T) {
-	if !strings.Contains(archivedProblemSQL, "p.visible = true") {
-		t.Error("the archive must require a visible problem")
+	if !strings.Contains(archivedProblemSQL, "p.status = 'published'") {
+		t.Error("the archive must require an admin-approved problem, not merely a visible one")
 	}
 	if !strings.Contains(archivedProblemSQL, "NOT EXISTS") {
 		t.Error("the archive must exclude problems that are not over yet")

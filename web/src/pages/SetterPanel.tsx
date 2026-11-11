@@ -19,7 +19,7 @@ function decodeRole(): string | null {
     }
 }
 
-interface SetterProblemRow { id: string; title?: string; source?: string; difficulty?: string; slug: string }
+interface SetterProblemRow { id: string; title?: string; source?: string; difficulty?: string; slug: string; status?: string }
 interface SetterContestRow { id: string; title?: string; start_time: string; format?: string; visible?: boolean }
 
 export default function SetterPanel() {
@@ -48,6 +48,18 @@ export default function SetterPanel() {
     }
 
     useEffect(() => { loadData() }, [activeTab]) // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Publishing is an admin decision, so the author's last step is to ask for
+    // review. The problem stays private until an admin approves it.
+    const submitForReview = async (slug: string) => {
+        try {
+            await api.problems.submitForReview(slug)
+            toast.success('Submitted for review')
+            loadData()
+        } catch (e) {
+            toast.error(errorMessage(e) || 'Could not submit for review')
+        }
+    }
 
     const handleImport = async () => {
         if (!contestId || !problemIndex) toast.info('Contest ID and Problem Index are required'); return
@@ -459,6 +471,7 @@ export default function SetterPanel() {
                                     <th className="px-4 py-3 text-left">Title</th>
                                     <th className="px-4 py-3 text-left">Source</th>
                                     <th className="px-4 py-3 text-left">Difficulty</th>
+                                    <th className="px-4 py-3 text-left">Status</th>
                                     <th className="px-4 py-3 text-right">Actions</th>
                                 </tr>
                             </thead>
@@ -472,14 +485,29 @@ export default function SetterPanel() {
                                                 p.difficulty === 'medium' ? 'bg-warn/12 text-warn' : 'bg-bad/12 text-bad'
                                                 }`}>{p.difficulty}</span>
                                         </td>
+                                        <td className="px-4 py-3">
+                                            <span className={`px-2 py-1 rounded text-xs font-medium ${p.status === 'published' ? 'bg-ok/12 text-ok' :
+                                                p.status === 'pending' ? 'bg-warn/12 text-warn' :
+                                                    p.status === 'rejected' ? 'bg-bad/12 text-bad' : 'bg-surface-2 text-muted'
+                                                }`}>{p.status || 'draft'}</span>
+                                        </td>
                                         <td className="px-4 py-3 text-right flex gap-2 justify-end items-center">
                                             <Link to={`/problems/${p.slug}`} className="text-brand hover:underline text-xs">View</Link>
+                                            {(p.status === 'draft' || p.status === 'rejected') && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => submitForReview(p.slug)}
+                                                    className="bg-brand-soft hover:bg-brand/20 border border-brand/30 text-brand px-2.5 py-1 rounded text-xs"
+                                                >
+                                                    Submit for review
+                                                </button>
+                                            )}
                                             <Link to={`/setter/${p.slug}`} className="bg-warn/10 dark:bg-warn/10 hover:bg-warn/15 border border-warn/30 text-warn px-2.5 py-1 rounded text-xs">Edit</Link>
                                         </td>
                                     </tr>
                                 ))}
                                 {problems.length === 0 && (
-                                    <tr><td colSpan={4} className="px-4 py-4"><EmptyState text="No problems found" description="Problems you author or are assigned will appear here." /></td></tr>
+                                    <tr><td colSpan={5} className="px-4 py-4"><EmptyState text="No problems found" description="Problems you author or are assigned will appear here." /></td></tr>
                                 )}
                             </tbody>
                         </table>

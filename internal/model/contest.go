@@ -38,7 +38,25 @@ type Contest struct {
 	RatingCalculated      bool                    `json:"rating_calculated"`
 	CreatedBy             string                  `json:"created_by"`
 	CreatedAt             time.Time               `json:"created_at"`
+	Status                string                  `json:"status"` // draft|pending|published|rejected
+	ReviewNote            string                  `json:"review_note,omitempty"`
+	// IsRated was in the schema since migration 000003 and no Go code ever read
+	// or wrote it, so every contest was implicitly rated and an unrated round
+	// could not exist. It is now part of the model and of the create/update path.
+	IsRated     bool `json:"is_rated"`
+	RatedForMin int  `json:"rated_for_min"`
+	RatedForMax int  `json:"rated_for_max"`
 }
+
+// Contest review states. A setter proposes a round; an admin publishes it. Only
+// a published contest is visible to competitors, and only a published, rated
+// contest may have ratings applied.
+const (
+	ContestStatusDraft     = "draft"
+	ContestStatusPending   = "pending"
+	ContestStatusPublished = "published"
+	ContestStatusRejected  = "rejected"
+)
 
 const (
 	ContestPermissionManager = "manager"
@@ -108,6 +126,12 @@ type CreateContestRequest struct {
 	RegistrationRequired bool       `json:"registration_required"`
 	RegistrationDeadline *time.Time `json:"registration_deadline,omitempty"`
 	MaxParticipants      *int       `json:"max_participants,omitempty"`
+	// Rating controls. is_rated has existed in the schema since migration 000003
+	// but was absent from every Go struct, so a contest could not be declared
+	// unrated. RatedForMin/Max bound which competitors the round counts for.
+	IsRated     bool `json:"is_rated"`
+	RatedForMin int  `json:"rated_for_min"`
+	RatedForMax int  `json:"rated_for_max"`
 }
 
 type ContestRegistration struct {

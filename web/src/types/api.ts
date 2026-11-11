@@ -247,6 +247,14 @@ export interface Contest {
     rating_calculated: boolean
     created_by: string
     created_at: string
+    /** Review workflow: draft | pending | published | rejected. */
+    status?: string
+    review_note?: string
+    /** is_rated existed in the schema since migration 000003 but was absent from
+     * every Go struct and from this type, so a contest could not be unrated. */
+    is_rated?: boolean
+    rated_for_min?: number
+    rated_for_max?: number
 }
 
 export interface ContestNotice {
