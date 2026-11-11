@@ -373,6 +373,10 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 		r.With(middleware.OptionalAuthMiddleware(jwtManager)).Get("/{id}/stats", contestH.ContestStats)
 		r.With(middleware.OptionalAuthMiddleware(jwtManager)).Get("/{contestId}/problems/{index}", contestProblemH.GetByIndex)
 		r.With(middleware.OptionalAuthMiddleware(jwtManager)).Get("/{id}/pdf", contestH.DownloadPDF)
+		// ICPC-style event feed for an external scorer. Authorized by an
+		// operator-configured shared token, not a user session, so it is
+		// deliberately outside the JWT machinery.
+		r.Get("/{id}/feed", contestH.Feed)
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.AuthMiddleware(jwtManager))
 			// Contest authoring and management belong to the setter workspace.

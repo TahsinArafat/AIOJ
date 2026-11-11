@@ -68,6 +68,17 @@ type ContestHandler struct {
 	// notify and hooks are optional; nil instances are no-ops.
 	notify *notify.Notifier
 	hooks  *webhook.Dispatcher
+	// feedStore and feedToken back the ICPC-style event feed. Both are optional:
+	// with no token the endpoint answers 503 rather than exposing the feed.
+	feedStore feedLister
+	feedToken string
+}
+
+// WithFeed enables the event feed. An empty token leaves it disabled.
+func (h *ContestHandler) WithFeed(store feedLister, token string) *ContestHandler {
+	h.feedStore = store
+	h.feedToken = token
+	return h
 }
 
 // WithWebhooks attaches a webhook dispatcher and returns the handler.

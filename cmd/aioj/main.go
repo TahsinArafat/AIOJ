@@ -300,6 +300,9 @@ func main() {
 	notifier := notify.New(notifStore)
 	problemH.WithNotifier(notifier)
 	contestH.WithNotifier(notifier)
+	// The ICPC-style event feed is opt-in: with no token configured the endpoint
+	// answers 503 rather than exposing every run to anyone who guesses the id.
+	contestH.WithFeed(submissionStore, os.Getenv("FEED_TOKEN"))
 	// Webhook delivery: GetByEvent had no caller and webhook_deliveries was never
 	// written, so a registered webhook never fired. Targets are SSRF-guarded.
 	// The dispatcher is attached to the review handlers below, once webhookStore

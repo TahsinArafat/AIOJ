@@ -929,3 +929,100 @@ func summarizeCaseFailures(results []model.TestCaseResult) string {
 	}
 	return strings.Join(lines, "\n")
 }
+
+// FeedRun is one submission as an external scorer needs to see it.
+type FeedRun struct {
+	SubmissionID string
+	UserID       string
+	Username     string
+	TeamName     string
+	ProblemIndex string
+	Status       string
+	Score        int
+	TimeUsed     int
+	MemoryUsed   int
+	CreatedAt    time.Time
+}
+
+// ListFeed returns a contest's submissions in creation order for the CCS-style
+// event feed.
+//
+// Ordered by (created_at, id) and cursored on the pair rather than an offset: a
+// scorer polls this repeatedly, and an offset would re-send or skip rows as new
+// submissions arrive. `since` is the opaque cursor returned by the previous call
+// (format "RFC3339Nano|uuid"); an empty cursor starts from the beginning.
+func (s *SubmissionStore) ListFeed(ctx context.Context, contestID, since string, limit int) ([]FeedRun, string, error) {
+	if limit <= 0 || limit > 500 {
+		limit = 200
+	}
+
+	var rows *sql.Rows
+	var err error
+	if since == "" {
+		rows, err = s.db.QueryContext(ctx,
+			`SELECT s.id, s.user_id, COALESCE(u.username,''), s.status, s.score,
+			        s.time_used, s.memory_used, s.created_at,
+			        COALESCE(cp.index,''), COALESCE(ob.team_name,'')
+			   FROM submissions s
+			   LEFT JOIN users u ON u.id = s.user_id
+			   LEFT JOIN contest_problems cp ON cp.contest_id = s.contest_id AND cp.problem_id = s.problem_id
+			   LEFT JOIN onsite_batch_users ob ON ob.used_by = s.user_id AND ob.contest_id = s.contest_id
+			  WHERE s.contest_id = $1
+			  ORDER BY s.created_at ASC, s.id ASC
+			  LIMIT $2`, contestID, limit)
+	} else {
+		at, id, ok := splitFeedCursor(since)
+		if !ok {
+			return nil, "", fmt.Errorf("invalid cursor")
+		}
+		rows, err = s.db.QueryContext(ctx,
+			`SELECT s.id, s.user_id, COALESCE(u.username,''), s.status, s.score,
+			        s.time_used, s.memory_used, s.created_at,
+			        COALESCE(cp.index,''), COALESCE(ob.team_name,'')
+			   FROM submissions s
+			   LEFT JOIN users u ON u.id = s.user_id
+			   LEFT JOIN contest_problems cp ON cp.contest_id = s.contest_id AND cp.problem_id = s.problem_id
+			   LEFT JOIN onsite_batch_users ob ON ob.used_by = s.user_id AND ob.contest_id = s.contest_id
+			  WHERE s.contest_id = $1
+			    AND (s.created_at, s.id) > ($2, $3)
+			  ORDER BY s.created_at ASC, s.id ASC
+			  LIMIT $4`, contestID, at, id, limit)
+	}
+	if err != nil {
+		return nil, "", err
+	}
+	defer rows.Close()
+
+	var out []FeedRun
+	for rows.Next() {
+		var r FeedRun
+		if err := rows.Scan(&r.SubmissionID, &r.UserID, &r.Username, &r.Status, &r.Score,
+			&r.TimeUsed, &r.MemoryUsed, &r.CreatedAt, &r.ProblemIndex, &r.TeamName); err != nil {
+			return nil, "", err
+		}
+		out = append(out, r)
+	}
+	if out == nil {
+		out = []FeedRun{}
+	}
+
+	next := since
+	if len(out) > 0 {
+		last := out[len(out)-1]
+		next = last.CreatedAt.UTC().Format(time.RFC3339Nano) + "|" + last.SubmissionID
+	}
+	return out, next, rows.Err()
+}
+
+// splitFeedCursor parses "RFC3339Nano|uuid".
+func splitFeedCursor(c string) (time.Time, string, bool) {
+	i := strings.LastIndex(c, "|")
+	if i <= 0 || i == len(c)-1 {
+		return time.Time{}, "", false
+	}
+	at, err := time.Parse(time.RFC3339Nano, c[:i])
+	if err != nil {
+		return time.Time{}, "", false
+	}
+	return at, c[i+1:], true
+}
