@@ -14,7 +14,7 @@ import {
 import { useConfirm } from '../components/ConfirmDialog'
 import { useToast } from '../components/Toast'
 import { ContestCountdown, ContestRunningClock } from '../components/ContestClock'
-import { formatDuration } from '../lib/contestTime'
+import { formatDuration, formatPenaltyMinutes } from '../lib/contestTime'
 import { problemLetter } from '../lib/contestProblems'
 import { useContestAnnouncements } from '../hooks/useContestAnnouncements'
 import { useClarifications } from '../hooks/useClarifications'
@@ -594,11 +594,7 @@ export default function ContestDetail() {
                                                 const isMe = row.user_id === userId
                                                 const rank = row.rank || idx + 1
                                                 const medal = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : null
-                                                const sec = row.total_penalty ?? 0
-                                                const ph = Math.floor(sec / 3600)
-                                                const pm = Math.floor((sec % 3600) / 60)
-                                                const ps = sec % 60
-                                                const penaltyStr = ph > 0 ? `${ph}:${String(pm).padStart(2, '0')}:${String(ps).padStart(2, '0')}` : `${pm}:${String(ps).padStart(2, '0')}`
+                                                const penaltyStr = formatPenaltyMinutes(row.total_penalty ?? 0)
                                                 return (
                                                     <tr key={row.user_id || idx} className={`transition-colors ${isMe ? 'bg-brand-soft hover:bg-brand/15' : idx % 2 === 0 ? 'bg-surface hover:bg-surface-2' : 'bg-surface-2 hover:bg-surface-2'}`}>
                                                         <td className="text-center px-3 py-2.5">
@@ -628,9 +624,8 @@ export default function ContestDetail() {
                                                             const solved = cell.solved
                                                             const attempts = cell.attempts || 0
                                                             const pending = cell.pending || 0
-                                                            const timeSec = cell.time || 0
                                                             const isFirst = solved && firstSolvers[pidx] === row.user_id
-                                                            const timeMin = Math.floor(timeSec / 60)
+                                                            const timeMin = Math.floor(cell.time || 0)
                                                             if (solved) {
                                                                 return (
                                                                     <td key={i} className="text-center px-1 py-2.5">

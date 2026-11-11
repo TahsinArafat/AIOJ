@@ -45,6 +45,25 @@ export function formatDuration(ms: number): string {
     return `${days}d ${hours % 24}h`
 }
 
+/**
+ * An ACM penalty as competition software prints it: whole minutes.
+ *
+ * The API sends `total_penalty` and a solved cell's `time` in MINUTES — the
+ * scoring formats build them with `int(d.Sub(...).Minutes())`, and the wrong-
+ * attempt penalty is added in the same unit. Both scoreboards used to treat
+ * that number as seconds and divide it down, so a solve three hours in (180)
+ * rendered as "3:00" and a per-problem cell read "3m".
+ *
+ * Past an hour it reads `H:MM`, otherwise `MMm` — the trailing `m` matters,
+ * because a bare `3:00` is indistinguishable from a clock time.
+ */
+export function formatPenaltyMinutes(minutes: number): string {
+    const total = Math.max(0, Math.floor(minutes))
+    if (total < 60) return `${total}m`
+    const hours = Math.floor(total / 60)
+    return `${hours}:${pad2(total % 60)}`
+}
+
 /** Under 15 minutes: where "how much is left" starts being asked. */
 const WARN_MS = 15 * 60_000
 /** Under 5 minutes: answers must be given, not considered. */

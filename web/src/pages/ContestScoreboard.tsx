@@ -5,6 +5,7 @@ import { errorMessage } from '../lib/errors';
 import RatingBadge from '../components/RatingBadge';
 import { AlertTriangle, Eye, EyeOff, ChevronLeft, ChevronRight } from 'lucide-react';
 import { EmptyState } from '../components/EmptyState';
+import { formatPenaltyMinutes } from '../lib/contestTime';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -365,12 +366,8 @@ export default function ContestScoreboard() {
                 const medal = entry.rank === 1 ? 'gold' : entry.rank === 2 ? 'silver' : entry.rank === 3 ? 'bronze' : null
                 const ratingDelta = ratings.get(entry.user_id);
 
-                // Format penalty as H:MM:SS
-                const sec = entry.total_penalty ?? 0
-                const ph = Math.floor(sec / 3600)
-                const pm = Math.floor((sec % 3600) / 60)
-                const ps = sec % 60
-                const penaltyStr = ph > 0 ? `${ph}:${String(pm).padStart(2, '0')}:${String(ps).padStart(2, '0')}` : `${pm}:${String(ps).padStart(2, '0')}`
+                // The API sends the penalty in minutes, not seconds.
+                const penaltyStr = formatPenaltyMinutes(entry.total_penalty ?? 0)
 
                 return (
                   <tr
@@ -453,8 +450,7 @@ export default function ContestScoreboard() {
                       }
 
                       const isFirst = firstSolves.has(`${entry.user_id}::${idx}`);
-                      const timeSec = cell.time || 0
-                      const timeMin = Math.floor(timeSec / 60)
+                      const timeMin = Math.floor(cell.time || 0)
 
                       if (cell.solved) {
                         const attemptStr = cell.attempts <= 1 ? '+' : `+${cell.attempts - 1}`

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clockUrgency, formatCountdown, formatDuration } from './contestTime'
+import { clockUrgency, formatCountdown, formatDuration, formatPenaltyMinutes } from './contestTime'
 
 /**
  * The contest clock's strings.
@@ -55,6 +55,33 @@ describe('formatDuration', () => {
 
     it('never renders a negative span', () => {
         expect(formatDuration(-5_000)).toBe('0s')
+    })
+})
+
+describe('formatPenaltyMinutes', () => {
+    it('reads the API value as minutes, never seconds', () => {
+        // The scoring formats build the penalty with `.Minutes()`, so 180 is a
+        // solve three hours into the round. Dividing it down rendered "3:00".
+        expect(formatPenaltyMinutes(180)).toBe('3:00')
+        expect(formatPenaltyMinutes(30)).toBe('30m')
+        expect(formatPenaltyMinutes(1)).toBe('1m')
+    })
+
+    it('adds the wrong-attempt penalty in the same unit', () => {
+        // 75 minutes plus three wrong attempts at 20 each, as ACM scores it.
+        expect(formatPenaltyMinutes(135)).toBe('2:15')
+    })
+
+    it('keeps an hour-readable form past sixty minutes', () => {
+        expect(formatPenaltyMinutes(59)).toBe('59m')
+        expect(formatPenaltyMinutes(60)).toBe('1:00')
+        expect(formatPenaltyMinutes(61)).toBe('1:01')
+        expect(formatPenaltyMinutes(600)).toBe('10:00')
+    })
+
+    it('never renders a negative penalty', () => {
+        expect(formatPenaltyMinutes(0)).toBe('0m')
+        expect(formatPenaltyMinutes(-10)).toBe('0m')
     })
 })
 

@@ -535,17 +535,30 @@ func (h *ContestHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// A submission carries the problem's UUID; the board reads the frozen count
+	// back with the letter it already has in hand. Translate once, here, or the
+	// two identifiers never meet and every cell reports zero pending.
+	problemIndexByID := make(map[string]string, len(problems))
+	for _, p := range problems {
+		problemIndexByID[p.ProblemID] = p.Index
+	}
+
 	type userProblemKey struct {
 		UserID    string
 		ProblemID string
 	}
+	type userProblemLetterKey struct {
+		UserID string
+		Letter string
+	}
 	submissionsByUserProblem := make(map[userProblemKey][]format.Submission)
-	frozenSubmissionsByUserProblem := make(map[userProblemKey]int)
+	frozenSubmissionsByUserProblem := make(map[userProblemLetterKey]int)
 
 	for _, row := range rows {
 		key := userProblemKey{UserID: row.UserID, ProblemID: row.ProblemID}
 		if frozen && !isJudge && beforeTime != nil && row.CreatedAt.After(*beforeTime) {
-			frozenSubmissionsByUserProblem[key]++
+			frozenKey := userProblemLetterKey{UserID: row.UserID, Letter: problemIndexByID[row.ProblemID]}
+			frozenSubmissionsByUserProblem[frozenKey]++
 			continue
 		}
 		sub := format.Submission{
@@ -659,7 +672,7 @@ func (h *ContestHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 	for i, rank := range ranks {
 		probMap := make(map[string]model.ProblemResult)
 		for _, pResult := range rank.Score.Problems {
-			key := userProblemKey{UserID: rank.Score.UserID, ProblemID: pResult.ProblemIndex}
+			key := userProblemLetterKey{UserID: rank.Score.UserID, Letter: pResult.ProblemIndex}
 			pending := frozenSubmissionsByUserProblem[key]
 
 			probMap[pResult.ProblemIndex] = model.ProblemResult{
