@@ -14,10 +14,13 @@ import (
 type VirtualHandler struct {
 	service      *virtual.Service
 	virtualStore *postgres.VirtualStore
+	// contestStore is needed to refuse starting a virtual contest on a contest
+	// the caller cannot read; the handler used to pass the id straight through.
+	contestStore *postgres.ContestStore
 }
 
-func NewVirtualHandler(s *virtual.Service, vs *postgres.VirtualStore) *VirtualHandler {
-	return &VirtualHandler{service: s, virtualStore: vs}
+func NewVirtualHandler(s *virtual.Service, vs *postgres.VirtualStore, cs *postgres.ContestStore) *VirtualHandler {
+	return &VirtualHandler{service: s, virtualStore: vs, contestStore: cs}
 }
 
 func (h *VirtualHandler) Start(w http.ResponseWriter, r *http.Request) {
@@ -36,7 +39,16 @@ func (h *VirtualHandler) Start(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	v, err := h.service.StartVirtualContest(r.Context(), claims.UserID, req.ContestID, req.DurationMinutes)
+	// A virtual contest replays a round's problems. Starting one on a contest the
+	// caller cannot read would hand them its problem set, so the contest has to be
+	// readable first — same rule as every other contest read.
+	contest, err := h.contestStore.GetByID(r.Context(), req.ContestID)
+	if err != nil || contest == nil || !canReadContest(r.Context(), h.contestStore, contest, claims) {
+		http.Error(w, "contest not found", http.StatusNotFound)
+		return
+	}
+
+	v, err := h.service.StartVirtualContest(r.Context(), claims.UserID, contest.ID, req.DurationMinutes)
 	if err != nil {
 		if err == virtual.ErrActiveVirtualExists {
 			http.Error(w, err.Error(), http.StatusConflict)

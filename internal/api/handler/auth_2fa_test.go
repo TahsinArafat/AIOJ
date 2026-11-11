@@ -169,8 +169,8 @@ func (s *stubOnsite) MarkUsed(context.Context, string, string) error { return ni
 func (s *stubOnsite) ListByContest(context.Context, string) ([]model.OnsiteBatchUser, error) {
 	return nil, nil
 }
-func (s *stubOnsite) DeleteByContest(context.Context, string) error { return nil }
-func (s *stubOnsite) DeleteByID(context.Context, string) error      { return nil }
+func (s *stubOnsite) DeleteByContest(context.Context, string) error    { return nil }
+func (s *stubOnsite) DeleteByID(context.Context, string, string) error { return nil }
 func (s *stubOnsite) AutoRegister(context.Context, string, string) error {
 	return nil
 }

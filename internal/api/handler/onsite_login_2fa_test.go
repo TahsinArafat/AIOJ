@@ -28,8 +28,8 @@ func (s *onsiteLoginStub) MarkUsed(context.Context, string, string) error { retu
 func (s *onsiteLoginStub) ListByContest(context.Context, string) ([]model.OnsiteBatchUser, error) {
 	return nil, nil
 }
-func (s *onsiteLoginStub) DeleteByContest(context.Context, string) error { return nil }
-func (s *onsiteLoginStub) DeleteByID(context.Context, string) error      { return nil }
+func (s *onsiteLoginStub) DeleteByContest(context.Context, string) error    { return nil }
+func (s *onsiteLoginStub) DeleteByID(context.Context, string, string) error { return nil }
 func (s *onsiteLoginStub) AutoRegister(context.Context, string, string) error {
 	return nil
 }

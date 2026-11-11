@@ -200,12 +200,13 @@ func (h *TrainingHandler) AddSection(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	planID := chi.URLParam(r, "id")
-	plan, err := h.store.GetByID(r.Context(), planID)
-	if err != nil || plan == nil {
-		http.Error(w, "not found", http.StatusNotFound)
+	// The plan used to be fetched here and then dropped on the floor: the handler
+	// created a section on whatever plan the id named. Authorize it.
+	plan := h.planFromParam(w, r)
+	if plan == nil {
 		return
 	}
+	planID := plan.ID
 
 	var req struct {
 		Title       string `json:"title"`
@@ -240,7 +241,11 @@ func (h *TrainingHandler) DeleteSection(w http.ResponseWriter, r *http.Request) 
 	}
 
 	sectionID := chi.URLParam(r, "sectionId")
-	if err := h.store.DeleteSection(r.Context(), sectionID); err != nil {
+	plan := h.requirePlanForSection(w, r, sectionID)
+	if plan == nil {
+		return
+	}
+	if err := h.store.DeleteSection(r.Context(), sectionID, plan.ID); err != nil {
 		http.Error(w, "delete section failed", http.StatusInternalServerError)
 		return
 	}
@@ -256,6 +261,9 @@ func (h *TrainingHandler) AddProblem(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sectionID := chi.URLParam(r, "sectionId")
+	if h.requirePlanForSection(w, r, sectionID) == nil {
+		return
+	}
 	var req struct {
 		ProblemID string `json:"problem_id"`
 		Points    int    `json:"points"`
@@ -282,7 +290,11 @@ func (h *TrainingHandler) RemoveProblem(w http.ResponseWriter, r *http.Request) 
 	}
 
 	problemID := chi.URLParam(r, "problemId")
-	if err := h.store.RemoveProblem(r.Context(), problemID); err != nil {
+	plan := h.requirePlanForProblemRow(w, r, problemID)
+	if plan == nil {
+		return
+	}
+	if err := h.store.RemoveProblem(r.Context(), problemID, plan.ID); err != nil {
 		http.Error(w, "remove problem failed", http.StatusInternalServerError)
 		return
 	}
@@ -336,7 +348,13 @@ func (h *TrainingHandler) Unenroll(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, map[string]string{"status": "unenrolled"})
 }
 
+// GetEnrollments returns a plan's roster. It names every enrolled user, so it is
+// manager information: the route carried no auth at all, which made it an
+// unauthenticated enumeration of who is studying what.
 func (h *TrainingHandler) GetEnrollments(w http.ResponseWriter, r *http.Request) {
+	if h.planFromParam(w, r) == nil {
+		return
+	}
 	planID := chi.URLParam(r, "id")
 	enrollments, err := h.store.GetEnrollments(r.Context(), planID)
 	if err != nil {

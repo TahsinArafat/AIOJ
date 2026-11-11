@@ -144,6 +144,21 @@ func (h *BlogHandler) Vote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// target_type was passed straight through to an INSERT, so any string became a
+	// vote row and the only two branches that update counters were "blog" and
+	// "comment". Everything else accumulated rows nobody reads, and let a client
+	// stuff votes against arbitrary ids. Accept only the two real targets.
+	switch req.TargetType {
+	case model.VoteTargetBlog, model.VoteTargetComment:
+	default:
+		http.Error(w, "invalid target_type: must be blog or comment", http.StatusBadRequest)
+		return
+	}
+	if req.TargetID == "" {
+		http.Error(w, "target_id required", http.StatusBadRequest)
+		return
+	}
+
 	if err := h.store.Vote(r.Context(), claims.UserID, req.TargetType, req.TargetID, req.Value); err != nil {
 		http.Error(w, "vote failed", http.StatusInternalServerError)
 		return

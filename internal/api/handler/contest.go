@@ -335,11 +335,9 @@ func (h *ContestHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	claims := middleware.GetUserClaims(r)
 
-	if !contest.Visible || now.Before(contest.StartTime) {
-		if claims == nil || (claims.Role != "admin" && !h.store.HasAccess(r.Context(), contest.ID, claims.UserID, "manager", "tester")) {
-			http.Error(w, "forbidden", http.StatusForbidden)
-			return
-		}
+	if !canReadContest(r.Context(), h.store, contest, claims) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
 	}
 
 	isJudge := claims != nil && (claims.Role == "admin" || h.store.HasAccess(r.Context(), contest.ID, claims.UserID, "manager", "judge"))
@@ -921,11 +919,9 @@ func (h *ContestHandler) DownloadPDF(w http.ResponseWriter, r *http.Request) {
 	// guard the contest page has and this endpoint shipped without: an
 	// unpublished or not-yet-started contest must not hand its statements to an
 	// anonymous visitor just because statement_hidden defaults to false.
-	if !contest.Visible || time.Now().Before(contest.StartTime) {
-		if claims == nil || (claims.Role != "admin" && !h.store.HasAccess(r.Context(), contest.ID, claims.UserID, "manager", "tester")) {
-			http.Error(w, "contest not found", http.StatusNotFound)
-			return
-		}
+	if !canReadContest(r.Context(), h.store, contest, claims) {
+		http.Error(w, "contest not found", http.StatusNotFound)
+		return
 	}
 
 	if (contest.StatementHidden || !contest.PDFEnabled) && !isJudge {
@@ -974,11 +970,9 @@ func (h *ContestHandler) ContestStats(w http.ResponseWriter, r *http.Request) {
 	// has to be checked here too — "public like the scoreboard" is only true once
 	// the round is public.
 	claims := middleware.GetUserClaims(r)
-	if !contest.Visible || time.Now().Before(contest.StartTime) {
-		if claims == nil || (claims.Role != "admin" && !h.store.HasAccess(r.Context(), contest.ID, claims.UserID, "manager", "tester")) {
-			http.Error(w, "not found", http.StatusNotFound)
-			return
-		}
+	if !canReadContest(r.Context(), h.store, contest, claims) {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
 	}
 
 	stats, err := h.store.GetContestStats(r.Context(), contest.ID)

@@ -29,6 +29,13 @@ type Comment struct {
 	UpdatedAt  time.Time `json:"updated_at"`
 }
 
+// Vote target types. These are the only two the store updates counters for, so
+// they are the only two a client may submit.
+const (
+	VoteTargetBlog    = "blog"
+	VoteTargetComment = "comment"
+)
+
 type Vote struct {
 	UserID     string    `json:"user_id"`
 	TargetType string    `json:"target_type"`

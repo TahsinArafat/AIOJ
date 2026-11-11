@@ -122,8 +122,12 @@ func (s *OnsiteUserStoreImpl) DeleteByContest(ctx context.Context, contestID str
 	return err
 }
 
-func (s *OnsiteUserStoreImpl) DeleteByID(ctx context.Context, id string) error {
-	_, err := s.db.ExecContext(ctx, `DELETE FROM onsite_batch_users WHERE id = $1`, id)
+// DeleteByID is scoped to the contest the handler authorized against. The
+// unscoped form deleted by raw id, so a manager of contest A could delete
+// contest B's onsite users.
+func (s *OnsiteUserStoreImpl) DeleteByID(ctx context.Context, contestID, id string) error {
+	_, err := s.db.ExecContext(ctx,
+		`DELETE FROM onsite_batch_users WHERE id = $1 AND contest_id = $2`, id, contestID)
 	return err
 }
 

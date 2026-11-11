@@ -359,7 +359,8 @@ type APIKeyStore interface {
 	Create(ctx context.Context, k *model.APIKey) error
 	GetByHash(ctx context.Context, keyHash string) (*model.APIKey, error)
 	GetByUser(ctx context.Context, userID string) ([]model.APIKey, error)
-	Delete(ctx context.Context, id string) error
+	// Delete is scoped to the owner so one user cannot delete another's key.
+	Delete(ctx context.Context, id, userID string) error
 	UpdateLastUsed(ctx context.Context, id string) error
 	IncrementRequestCount(ctx context.Context, keyID string, windowStart time.Time) error
 	GetRequestCount(ctx context.Context, keyID string, windowStart time.Time) (int, error)
@@ -374,7 +375,8 @@ type PasswordResetTokenStore interface {
 type WebhookStore interface {
 	Create(ctx context.Context, w *model.Webhook) error
 	GetByUser(ctx context.Context, userID string) ([]model.Webhook, error)
-	Delete(ctx context.Context, id string) error
+	// Delete is scoped to the owner for the same reason as API keys.
+	Delete(ctx context.Context, id, userID string) error
 	GetByEvent(ctx context.Context, eventType string) ([]model.Webhook, error)
 }
 
@@ -422,9 +424,15 @@ type TrainingPlanStore interface {
 	Delete(ctx context.Context, id string) error
 	CreateSection(ctx context.Context, s *model.TrainingPlanSection) error
 	GetSections(ctx context.Context, planID string) ([]model.TrainingPlanSection, error)
-	DeleteSection(ctx context.Context, sectionID string) error
+	// GetSectionByID and GetProblemRowByID exist so a handler given a bare
+	// section/problem id can walk up to the plan before authorizing it.
+	GetSectionByID(ctx context.Context, sectionID string) (*model.TrainingPlanSection, error)
+	GetProblemRowByID(ctx context.Context, id string) (*model.TrainingPlanProblem, error)
+	// DeleteSection and RemoveProblem are scoped to the planId the caller was
+	// authorized against, so a stale id cannot touch another plan.
+	DeleteSection(ctx context.Context, sectionID, planID string) error
 	AddProblem(ctx context.Context, sectionID, problemID string, sortOrder, points int) error
-	RemoveProblem(ctx context.Context, id string) error
+	RemoveProblem(ctx context.Context, id, planID string) error
 	GetProblems(ctx context.Context, sectionID string) ([]model.TrainingPlanProblem, error)
 	Enroll(ctx context.Context, planID, userID string) error
 	Unenroll(ctx context.Context, planID, userID string) error
@@ -496,7 +504,8 @@ type OnsiteUserStore interface {
 	MarkUsed(ctx context.Context, id string, userID string) error
 	ListByContest(ctx context.Context, contestID string) ([]model.OnsiteBatchUser, error)
 	DeleteByContest(ctx context.Context, contestID string) error
-	DeleteByID(ctx context.Context, id string) error
+	// DeleteByID is scoped to the contest the caller was authorized against.
+	DeleteByID(ctx context.Context, contestID, id string) error
 	AutoRegister(ctx context.Context, contestID, userID string) error
 }
 

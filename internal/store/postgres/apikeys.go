@@ -80,8 +80,11 @@ func (s *APIKeyStore) GetByUser(ctx context.Context, userID string) ([]model.API
 	return keys, nil
 }
 
-func (s *APIKeyStore) Delete(ctx context.Context, id string) error {
-	_, err := s.db.ExecContext(ctx, "DELETE FROM api_keys WHERE id = $1", id)
+// Delete is scoped to the owner. It was `WHERE id = $1` alone, so any signed-in
+// account could delete anyone's key by id — an easy denial of a bot's credentials.
+func (s *APIKeyStore) Delete(ctx context.Context, id, userID string) error {
+	_, err := s.db.ExecContext(ctx,
+		"DELETE FROM api_keys WHERE id = $1 AND user_id = $2", id, userID)
 	return err
 }
 

@@ -229,7 +229,7 @@ func (h *OnsiteBatchHandler) DeleteUser(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if err := h.onsiteStore.DeleteByID(r.Context(), userID); err != nil {
+	if err := h.onsiteStore.DeleteByID(r.Context(), contest.ID, userID); err != nil {
 		http.Error(w, "failed to delete", http.StatusInternalServerError)
 		return
 	}

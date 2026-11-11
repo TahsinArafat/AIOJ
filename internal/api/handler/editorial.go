@@ -15,10 +15,11 @@ import (
 type EditorialHandler struct {
 	store        *postgres.EditorialStore
 	problemStore store.ProblemStore
+	contestStore store.ContestStore
 }
 
-func NewEditorialHandler(s *postgres.EditorialStore, ps store.ProblemStore) *EditorialHandler {
-	return &EditorialHandler{store: s, problemStore: ps}
+func NewEditorialHandler(s *postgres.EditorialStore, ps store.ProblemStore, cs store.ContestStore) *EditorialHandler {
+	return &EditorialHandler{store: s, problemStore: ps, contestStore: cs}
 }
 
 func (h *EditorialHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -34,6 +35,16 @@ func (h *EditorialHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// An editorial carries the solution, so attaching one to a problem the caller
+	// cannot even read would let them park solution code on a stranger's draft
+	// (and name it by id). The problem must be readable first.
+	p, err := h.problemStore.GetByID(r.Context(), req.ProblemID)
+	if err != nil || p == nil || !canReadProblem(r.Context(), h.problemStore, p, claims) {
+		http.Error(w, "problem not found", http.StatusNotFound)
+		return
+	}
+	req.ProblemID = p.ID
+
 	e := &model.Editorial{
 		ProblemID:        req.ProblemID,
 		UserID:           claims.UserID,
@@ -47,7 +58,14 @@ func (h *EditorialHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.ContestID != "" {
-		cid := req.ContestID
+		// editorialVisible() keys off the contest, so an arbitrary contest id would
+		// control when this editorial becomes readable. Require a readable one.
+		contest, err := h.contestStore.GetByID(r.Context(), req.ContestID)
+		if err != nil || contest == nil || !canReadContest(r.Context(), h.contestStore, contest, claims) {
+			http.Error(w, "contest not found", http.StatusNotFound)
+			return
+		}
+		cid := contest.ID
 		e.ContestID = &cid
 	}
 

@@ -46,11 +46,9 @@ func (h *ContestProblemHandler) GetByIndex(w http.ResponseWriter, r *http.Reques
 	now := time.Now()
 	claims := middleware.GetUserClaims(r)
 
-	if !contest.Visible || now.Before(contest.StartTime) {
-		if claims == nil || (claims.Role != "admin" && !h.contestStore.HasAccess(r.Context(), contest.ID, claims.UserID, "manager", "tester")) {
-			http.Error(w, "forbidden", http.StatusForbidden)
-			return
-		}
+	if !canReadContest(r.Context(), h.contestStore, contest, claims) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
 	}
 
 	problem, err := h.contestStore.GetContestProblemByIndex(r.Context(), contest.ID, index)

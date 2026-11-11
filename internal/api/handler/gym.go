@@ -8,15 +8,19 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
 	"github.com/tahsinarafat/aioj/internal/model"
+	"github.com/tahsinarafat/aioj/internal/store"
 	"github.com/tahsinarafat/aioj/internal/store/postgres"
 )
 
 type GymHandler struct {
 	store *postgres.GymStore
+	// contestStore is needed to answer "may this caller see the contest this gym
+	// points at" — the check the handler shipped without.
+	contestStore store.ContestStore
 }
 
-func NewGymHandler(s *postgres.GymStore) *GymHandler {
-	return &GymHandler{store: s}
+func NewGymHandler(s *postgres.GymStore, cs store.ContestStore) *GymHandler {
+	return &GymHandler{store: s, contestStore: cs}
 }
 
 func (h *GymHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -34,6 +38,19 @@ func (h *GymHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	if req.Category == "" {
 		req.Category = model.GymCategoryGeneral
+	}
+
+	// A gym is a public listing for a contest, so whoever creates one must be
+	// able to read that contest. Without this check any signed-in account could
+	// attach a gym to a private draft — which then published that draft's title
+	// and slug through the gym list. Gyms stay auto-approved (no review queue):
+	// the guard is on the contest, not on the gym.
+	contest, err := h.contestStore.GetByID(r.Context(), req.ContestID)
+	if err != nil || contest == nil || !canReadContest(r.Context(), h.contestStore, contest, claims) {
+		// 404 rather than 403 so gym creation is not an oracle for which private
+		// contest ids exist.
+		http.Error(w, "contest not found", http.StatusNotFound)
+		return
 	}
 
 	g := &model.GymContest{
@@ -83,7 +100,11 @@ func (h *GymHandler) List(w http.ResponseWriter, r *http.Request) {
 
 func (h *GymHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	g, err := h.store.GetByID(r.Context(), id)
+	var viewUserID string
+	if claims := middleware.GetUserClaims(r); claims != nil {
+		viewUserID = claims.UserID
+	}
+	g, err := h.store.GetByIDForViewer(r.Context(), id, viewUserID)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return

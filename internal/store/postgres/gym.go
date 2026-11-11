@@ -26,7 +26,18 @@ func (s *GymStore) Create(ctx context.Context, g *model.GymContest) error {
 	).Scan(&g.ID, &g.CreatedAt)
 }
 
+// GetByID returns a gym only if the caller may see the contest behind it.
+//
+// A gym is a public listing for a contest, so a gym attached to an unpublished
+// contest must not disclose that contest's title or slug. The creator keeps
+// access to their own row. viewUserID may be empty for an anonymous caller.
 func (s *GymStore) GetByID(ctx context.Context, id string) (*model.GymContest, error) {
+	return s.GetByIDForViewer(ctx, id, "")
+}
+
+// GetByIDForViewer is GetByID with the caller's identity, so an owner can load
+// their own gym before its contest is published.
+func (s *GymStore) GetByIDForViewer(ctx context.Context, id, viewUserID string) (*model.GymContest, error) {
 	if _, err := uuid.Parse(id); err != nil {
 		return nil, nil
 	}
@@ -38,8 +49,11 @@ func (s *GymStore) GetByID(ctx context.Context, id string) (*model.GymContest, e
 		 FROM gym_contests g
 		 JOIN contests c ON g.contest_id = c.id
 		 JOIN users u ON g.created_by = u.id
-		 WHERE g.id = $1`,
-		id).Scan(&g.ID, &g.ContestID, &g.ContestTitle, &slug, &g.ContestDisplayID, &g.DifficultyRating, &g.Category,
+		 WHERE g.id = $1
+		   -- A gym pointing at an unpublished contest must not disclose that
+		   -- contest's title or slug. The creator keeps their own row.
+		   AND (c.visible = true OR g.created_by = NULLIF($2,'')::uuid)`,
+		id, viewUserID).Scan(&g.ID, &g.ContestID, &g.ContestTitle, &slug, &g.ContestDisplayID, &g.DifficultyRating, &g.Category,
 		&g.Country, &g.Season, &g.Description, &g.IsPublic, &g.SolveCount,
 		&g.CreatedBy, &g.CreatorName, &g.CreatedAt)
 	if err == sql.ErrNoRows {
@@ -55,7 +69,10 @@ func (s *GymStore) GetByID(ctx context.Context, id string) (*model.GymContest, e
 }
 
 func (s *GymStore) List(ctx context.Context, offset, limit int, filter model.GymFilter) ([]model.GymContest, int, error) {
-	where := []string{"g.is_public = true"}
+	// A gym is listed publicly only when its contest is published. Without the
+	// contest predicate the join leaked an unpublished round's title and slug to
+	// anyone browsing the gym list.
+	where := []string{"g.is_public = true", "c.visible = true"}
 	args := []interface{}{}
 	argIdx := 1
 

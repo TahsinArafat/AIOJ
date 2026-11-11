@@ -202,9 +202,46 @@ func (s *TrainingPlanStore) GetSections(ctx context.Context, planID string) ([]m
 	return sections, nil
 }
 
-func (s *TrainingPlanStore) DeleteSection(ctx context.Context, sectionID string) error {
-	_, err := s.db.ExecContext(ctx, "DELETE FROM training_plan_sections WHERE id = $1", sectionID)
+// GetSectionByID resolves one section, which is how a handler learns which plan a
+// bare {sectionId} route belongs to before authorizing it.
+func (s *TrainingPlanStore) GetSectionByID(ctx context.Context, sectionID string) (*model.TrainingPlanSection, error) {
+	var sec model.TrainingPlanSection
+	err := s.db.QueryRowContext(ctx,
+		`SELECT id, plan_id, title, description, sort_order
+		   FROM training_plan_sections WHERE id = $1`, sectionID).
+		Scan(&sec.ID, &sec.PlanID, &sec.Title, &sec.Description, &sec.SortOrder)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &sec, nil
+}
+
+// DeleteSection is scoped to the plan the caller was authorized against, so a
+// stale section id cannot delete a section belonging to someone else's plan.
+func (s *TrainingPlanStore) DeleteSection(ctx context.Context, sectionID, planID string) error {
+	_, err := s.db.ExecContext(ctx,
+		"DELETE FROM training_plan_sections WHERE id = $1 AND plan_id = $2", sectionID, planID)
 	return err
+}
+
+// GetProblemRowByID resolves one training_plan_problems row so a handler can walk
+// row -> section -> plan before authorizing.
+func (s *TrainingPlanStore) GetProblemRowByID(ctx context.Context, id string) (*model.TrainingPlanProblem, error) {
+	var row model.TrainingPlanProblem
+	err := s.db.QueryRowContext(ctx,
+		`SELECT id, section_id, problem_id, sort_order, points
+		   FROM training_plan_problems WHERE id = $1`, id).
+		Scan(&row.ID, &row.SectionID, &row.ProblemID, &row.SortOrder, &row.Points)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &row, nil
 }
 
 func (s *TrainingPlanStore) AddProblem(ctx context.Context, sectionID, problemID string, sortOrder, points int) error {
@@ -215,8 +252,13 @@ func (s *TrainingPlanStore) AddProblem(ctx context.Context, sectionID, problemID
 	return err
 }
 
-func (s *TrainingPlanStore) RemoveProblem(ctx context.Context, id string) error {
-	_, err := s.db.ExecContext(ctx, "DELETE FROM training_plan_problems WHERE id = $1", id)
+// RemoveProblem is scoped to the owning plan via the section, so an id from
+// another plan is a no-op rather than a cross-tenant delete.
+func (s *TrainingPlanStore) RemoveProblem(ctx context.Context, id, planID string) error {
+	_, err := s.db.ExecContext(ctx,
+		`DELETE FROM training_plan_problems
+		  WHERE id = $1
+		    AND section_id IN (SELECT id FROM training_plan_sections WHERE plan_id = $2)`, id, planID)
 	return err
 }
 

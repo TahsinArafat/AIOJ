@@ -78,7 +78,7 @@ func (h *WebhookHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	id := chi.URLParam(r, "id")
-	if err := h.store.Delete(r.Context(), id); err != nil {
+	if err := h.store.Delete(r.Context(), id, claims.UserID); err != nil {
 		http.Error(w, "delete failed", http.StatusInternalServerError)
 		return
 	}

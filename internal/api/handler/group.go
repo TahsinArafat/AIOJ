@@ -15,10 +15,14 @@ import (
 type GroupHandler struct {
 	store     *postgres.GroupStore
 	userStore store.UserStore
+	// contestStore answers "may this group's manager see the contest they are
+	// attaching" — the group used to be able to adopt any contest id, including
+	// an unpublished one.
+	contestStore store.ContestStore
 }
 
-func NewGroupHandler(s *postgres.GroupStore, us store.UserStore) *GroupHandler {
-	return &GroupHandler{store: s, userStore: us}
+func NewGroupHandler(s *postgres.GroupStore, us store.UserStore, cs store.ContestStore) *GroupHandler {
+	return &GroupHandler{store: s, userStore: us, contestStore: cs}
 }
 
 func (h *GroupHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -157,7 +161,16 @@ func (h *GroupHandler) AddContest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.store.AddContest(r.Context(), groupID, req.ContestID); err != nil {
+	// Managing a group says nothing about the contests put into it. Without this
+	// check a group owner could attach any contest — including a private draft —
+	// and surface it to every group member.
+	contest, err := h.contestStore.GetByID(r.Context(), req.ContestID)
+	if err != nil || contest == nil || !canReadContest(r.Context(), h.contestStore, contest, claims) {
+		http.Error(w, "contest not found", http.StatusNotFound)
+		return
+	}
+
+	if err := h.store.AddContest(r.Context(), groupID, contest.ID); err != nil {
 		http.Error(w, "add contest failed", http.StatusInternalServerError)
 		return
 	}

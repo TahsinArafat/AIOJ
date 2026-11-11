@@ -52,8 +52,11 @@ func (s *WebhookStore) GetByUser(ctx context.Context, userID string) ([]model.We
 	return webhooks, nil
 }
 
-func (s *WebhookStore) Delete(ctx context.Context, id string) error {
-	_, err := s.db.ExecContext(ctx, "DELETE FROM webhooks WHERE id = $1", id)
+// Delete is scoped to the owner, for the same reason as API keys: the
+// unscoped form let any signed-in account destroy another user's integration.
+func (s *WebhookStore) Delete(ctx context.Context, id, userID string) error {
+	_, err := s.db.ExecContext(ctx,
+		"DELETE FROM webhooks WHERE id = $1 AND user_id = $2", id, userID)
 	return err
 }
 
