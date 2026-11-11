@@ -1,6 +1,8 @@
 package pdf
 
 import (
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -184,6 +186,100 @@ func TestSoftWrappedProseStaysOneParagraph(t *testing.T) {
 	}
 	if !strings.Contains(html, "queries. Each of the next") {
 		t.Fatal("the wrapped sentence was not joined; prose fragments across lines")
+	}
+}
+
+/**
+ * The booklet printed with no page numbers at all. `counter(page)` and
+ * `counter(pages)` resolve to zero anywhere in the document flow — they only
+ * have values inside a page-margin box, which is why the counters must be
+ * declared in a @bottom-center block nested in @page rather than in an element
+ * or a body::after rule.
+ *
+ * Measured in Chrome 155 against the real booklet: three problems print as four
+ * sheets (cover + 3), and the footers read "Page 2 of 4", "Page 3 of 4",
+ * "Page 4 of 4" with the cover carrying no number. `@page :first` is what
+ * suppresses the cover; `counter-reset: page` is ignored, so the cover still
+ * counts toward the total and the numbers match the printed sheet count.
+ */
+
+// pageRule returns the text of the @page block from the booklet stylesheet.
+func pageRule(t *testing.T, html string) string {
+	t.Helper()
+	i := strings.Index(html, "@page")
+	if i < 0 {
+		t.Fatal("the booklet has no @page rule, so nothing can print in the margin")
+	}
+	depth, j := 0, strings.Index(html[i:], "{")
+	if j < 0 {
+		t.Fatal("@page has no block")
+	}
+	j += i
+	for k := j; k < len(html); k++ {
+		switch html[k] {
+		case '{':
+			depth++
+		case '}':
+			depth--
+			if depth == 0 {
+				return html[j : k+1]
+			}
+		}
+	}
+	t.Fatal("@page block is unterminated")
+	return ""
+}
+
+func TestBookletPrintsPageNumbers(t *testing.T) {
+	html := bookletHTML(t)
+	rule := pageRule(t, html)
+
+	// The counters only mean anything inside a margin box. A counter(page) in
+	// the body, or a footer built as an <div>, prints nothing.
+	for _, want := range []string{"@bottom-center", "counter(page)", "counter(pages)"} {
+		if !strings.Contains(rule, want) {
+			t.Fatalf("the @page rule is missing %q, so pages print unnumbered", want)
+		}
+	}
+
+	// Both counters must sit in the same margin-box content declaration: split
+	// apart, one of the two silently prints as an empty string.
+	content := rule[strings.Index(rule, "content:"):]
+	if !strings.Contains(content[:strings.Index(content, ";")], "counter(page)") {
+		t.Fatal("counter(page) is outside the margin box content declaration")
+	}
+}
+
+// The cover is a title page. A number on it is the one thing a reader notices,
+// and it was not in the request.
+func TestBookletCoverCarriesNoPageNumber(t *testing.T) {
+	html := bookletHTML(t)
+
+	if !strings.Contains(html, "@page :first") {
+		t.Fatal("no @page :first rule, so the cover is numbered like a problem page")
+	}
+	// The margin box must still be declared for the other pages, or suppressing
+	// the cover also suppressed every footer.
+	if !strings.Contains(html, "@bottom-center") {
+		t.Fatal("suppressing the cover removed the footer for every page")
+	}
+}
+
+// The page-number band lives in the page margin, so the bottom margin has to be
+// deep enough to hold it without colliding with the last line of a statement.
+// Measured in the printed booklet: the 9pt footer baseline lands ~11mm from the
+// sheet edge while the text block ends at the bottom margin, so the margin must
+// comfortably exceed one 9pt line (~3.2mm) plus padding.
+func TestBookletReservesSpaceForTheFooter(t *testing.T) {
+	rule := pageRule(t, bookletHTML(t))
+
+	m := regexp.MustCompile(`margin:\s*([\d.]+)mm\s+([\d.]+)mm\s+([\d.]+)mm\s+([\d.]+)mm`).FindStringSubmatch(rule)
+	if m == nil {
+		t.Fatal("@page margin is not the 4-value form, so the bottom band is unverified")
+	}
+	bottom, _ := strconv.ParseFloat(m[3], 64)
+	if bottom < 15 {
+		t.Fatalf("bottom margin is only %gmm; a 9pt footer plus padding needs at least 15mm", bottom)
 	}
 }
 

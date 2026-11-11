@@ -367,7 +367,20 @@ var pdfTemplate = `<!DOCTYPE html>
 <style>
   @page {
     size: A4;
-    margin: 22mm 20mm 22mm 20mm;
+    margin: 22mm 20mm 24mm 20mm;
+    /* Page numbers can only be printed from a page-margin box: counter(page) and
+       counter(pages) resolve nowhere in the document flow, only inside @page. */
+    @bottom-center {
+      content: "Page " counter(page) " of " counter(pages);
+      font-family: "Latin Modern Roman", "Computer Modern Roman", "Times New Roman", Georgia, serif;
+      font-size: 9pt;
+      color: #555;
+    }
+  }
+  /* The cover is a title page — a number on it reads as a mistake. The count
+     still includes it, so the numbers match the printed sheet count. */
+  @page :first {
+    @bottom-center { content: none; }
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   /* Text must be selectable: the booklet is read on screen and quoted from, and
