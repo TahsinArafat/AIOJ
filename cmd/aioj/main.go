@@ -38,6 +38,7 @@ import (
 	"github.com/tahsinarafat/aioj/internal/store/postgres"
 	"github.com/tahsinarafat/aioj/internal/virtual"
 	"github.com/tahsinarafat/aioj/internal/vjudge"
+	"github.com/tahsinarafat/aioj/internal/webhook"
 
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
@@ -280,6 +281,10 @@ func main() {
 	notifier := notify.New(notifStore)
 	problemH.WithNotifier(notifier)
 	contestH.WithNotifier(notifier)
+	// Webhook delivery: GetByEvent had no caller and webhook_deliveries was never
+	// written, so a registered webhook never fired. Targets are SSRF-guarded.
+	// The dispatcher is attached to the review handlers below, once webhookStore
+	// exists. (Instantiated at its own creation site.)
 	groupStore := postgres.NewGroupStore(db)
 	groupH := handler.NewGroupHandler(groupStore, userStore, contestStore)
 	teamH := handler.NewTeamHandler(teamStore, userStore)
@@ -291,6 +296,9 @@ func main() {
 	apiKeyH := handler.NewAPIKeyHandler(apiKeyStore)
 	webhookStore := postgres.NewWebhookStore(db)
 	webhookH := handler.NewWebhookHandler(webhookStore)
+	dispatcher := webhook.New(webhookStore)
+	problemH.WithWebhooks(dispatcher)
+	contestH.WithWebhooks(dispatcher)
 	recommendationH := handler.NewRecommendationHandler(problemStore, ratingStore)
 	rankingsH := handler.NewRankingsHandler(userStore)
 	usersH := handler.NewUsersHandler(userStore, blogStore, submissionStore, teamStore, groupStore, refreshTokenStore)

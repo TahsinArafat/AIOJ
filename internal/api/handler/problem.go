@@ -20,13 +20,15 @@ import (
 	"github.com/tahsinarafat/aioj/internal/model"
 	"github.com/tahsinarafat/aioj/internal/notify"
 	"github.com/tahsinarafat/aioj/internal/store"
+	"github.com/tahsinarafat/aioj/internal/webhook"
 )
 
 type ProblemHandler struct {
 	store store.ProblemStore
-	// notify is optional: a nil notifier is a no-op, so constructing a handler
-	// without one (tests, the seeder) still works.
+	// notify and hooks are optional: nil instances are no-ops, so constructing a
+	// handler without them (tests, the seeder) still works.
 	notify *notify.Notifier
+	hooks  *webhook.Dispatcher
 }
 
 func NewProblemHandler(s store.ProblemStore) *ProblemHandler {
@@ -36,6 +38,12 @@ func NewProblemHandler(s store.ProblemStore) *ProblemHandler {
 // WithNotifier attaches a notifier and returns the handler, for call-site chaining.
 func (h *ProblemHandler) WithNotifier(n *notify.Notifier) *ProblemHandler {
 	h.notify = n
+	return h
+}
+
+// WithWebhooks attaches a webhook dispatcher and returns the handler.
+func (h *ProblemHandler) WithWebhooks(d *webhook.Dispatcher) *ProblemHandler {
+	h.hooks = d
 	return h
 }
 
@@ -626,6 +634,12 @@ func (h *ProblemHandler) ReviewProblem(w http.ResponseWriter, r *http.Request) {
 	}
 	h.notify.Notify(r.Context(), p.CreatedBy, "problem_review", title, content,
 		"/problems/"+p.Slug, notify.CategorySystem)
+	h.hooks.Dispatch(r.Context(), webhook.Event{
+		Type: "problem.reviewed",
+		Payload: map[string]any{
+			"slug": p.Slug, "title": p.Title, "status": req.Status, "note": req.Note,
+		},
+	})
 
 	respondJSON(w, http.StatusOK, map[string]string{"status": req.Status})
 }

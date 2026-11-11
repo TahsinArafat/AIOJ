@@ -24,6 +24,7 @@ import (
 	"github.com/tahsinarafat/aioj/internal/rating"
 	"github.com/tahsinarafat/aioj/internal/store"
 	"github.com/tahsinarafat/aioj/internal/store/postgres"
+	"github.com/tahsinarafat/aioj/internal/webhook"
 )
 
 type scoreboardCacheEntry struct {
@@ -64,8 +65,15 @@ type ContestHandler struct {
 	userStore    store.UserStore
 	teamStore    store.TeamStore
 	cache        *scoreboardCache
-	// notify is optional; a nil notifier is a no-op.
+	// notify and hooks are optional; nil instances are no-ops.
 	notify *notify.Notifier
+	hooks  *webhook.Dispatcher
+}
+
+// WithWebhooks attaches a webhook dispatcher and returns the handler.
+func (h *ContestHandler) WithWebhooks(d *webhook.Dispatcher) *ContestHandler {
+	h.hooks = d
+	return h
 }
 
 // WithNotifier attaches a notifier and returns the handler, for call-site chaining.
@@ -1158,6 +1166,12 @@ func (h *ContestHandler) ReviewContest(w http.ResponseWriter, r *http.Request) {
 	}
 	h.notify.Notify(r.Context(), c.CreatedBy, "contest_review", title, content,
 		"/contests/"+c.ID, notify.CategoryContest)
+	h.hooks.Dispatch(r.Context(), webhook.Event{
+		Type: "contest.reviewed",
+		Payload: map[string]any{
+			"contest_id": c.ID, "title": c.Title, "status": req.Status, "note": req.Note,
+		},
+	})
 
 	respondJSON(w, http.StatusOK, map[string]string{"status": req.Status})
 }

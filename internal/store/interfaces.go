@@ -378,6 +378,9 @@ type WebhookStore interface {
 	// Delete is scoped to the owner for the same reason as API keys.
 	Delete(ctx context.Context, id, userID string) error
 	GetByEvent(ctx context.Context, eventType string) ([]model.Webhook, error)
+	// RecordDelivery writes one delivery attempt, so a webhook that never fires
+	// leaves a trace instead of failing silently.
+	RecordDelivery(ctx context.Context, d *model.WebhookDelivery) error
 }
 
 type LanguageLimitStore interface {

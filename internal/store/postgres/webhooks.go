@@ -60,6 +60,19 @@ func (s *WebhookStore) Delete(ctx context.Context, id, userID string) error {
 	return err
 }
 
+// RecordDelivery writes one delivery attempt. The table has existed since
+// migration 000015 and was never inserted into, so a webhook could be registered
+// and never fire with no trace either way.
+func (s *WebhookStore) RecordDelivery(ctx context.Context, d *model.WebhookDelivery) error {
+	return s.db.QueryRowContext(ctx,
+		`INSERT INTO webhook_deliveries
+		   (webhook_id, event_type, payload, status, response_code, response_body, attempts, delivered_at)
+		 VALUES ($1,$2,$3,$4,NULLIF($5,0),$6,$7,$8)
+		 RETURNING id, created_at`,
+		d.WebhookID, d.EventType, d.Payload, d.Status, d.ResponseCode, d.ResponseBody, d.Attempts, d.DeliveredAt,
+	).Scan(&d.ID, &d.CreatedAt)
+}
+
 func (s *WebhookStore) GetByEvent(ctx context.Context, eventType string) ([]model.Webhook, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, user_id, url, secret, events, is_active, description, created_at, updated_at
