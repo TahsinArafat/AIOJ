@@ -25,7 +25,6 @@ const baseState: ProblemFormState = {
   interactive: false,
   interactorLanguage: 'cpp-gpp-64',
   interactorSourceCode: '',
-  visible: true,
 }
 
 test('renders all statement form fields', () => {

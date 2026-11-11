@@ -38,6 +38,10 @@ export default function SetterProblemWorkspace() {
     slug: string
     title: string
     description: string
+    /** Review workflow state; publishing is an admin decision. */
+    status?: string
+    review_note?: string
+    visible?: boolean
 }
 
 const [problem, setProblem] = useState<LoadedProblem | null>(null)
@@ -95,7 +99,6 @@ useDocumentTitle(problem ? `${problem.title} — setter` : null)
     interactive: false,
     interactorLanguage: 'cpp-gpp-64',
     interactorSourceCode: '',
-    visible: true,
   })
 
   // Test Cases supplementary state
@@ -138,7 +141,9 @@ useDocumentTitle(problem ? `${problem.title} — setter` : null)
       interactive: merged.interactive,
       interactor_language: merged.interactorLanguage,
       interactor_source_code: merged.interactorSourceCode,
-      visible: merged.visible,
+      // `visible` is deliberately NOT sent: the API derives it from the review
+      // status and ignores a non-admin's value, so sending it only implied a
+      // control the author does not have.
     }
   }
 
@@ -169,7 +174,6 @@ useDocumentTitle(problem ? `${problem.title} — setter` : null)
         interactive: data.interactive || false,
         interactorLanguage: data.interactor_language || 'cpp-gpp-64',
         interactorSourceCode: data.interactor_source_code || '',
-        visible: data.visible !== false,
       })
 
       const permData = await api.problems.getPermissions(data.slug)
@@ -506,8 +510,22 @@ useDocumentTitle(problem ? `${problem.title} — setter` : null)
     }
   }
 
-  const handleUpdateVisibility = () => {
-    handleSave({ visible: formState.visible })
+  // Publishing is an admin decision. The author's action is to submit for
+  // review; the old handler saved `visible`, which the API now ignores for
+  // non-admins, so the toggle silently did nothing.
+  const handleSubmitForReview = async () => {
+    if (!problem?.slug) return
+    setSaving(true)
+    setError(null)
+    try {
+      await api.problems.submitForReview(problem.slug as string)
+      const data = await api.problems.get(problem.slug as string)
+      setProblem(data)
+    } catch (err) {
+      setError(errorMessage(err) || 'Failed to submit for review')
+    } finally {
+      setSaving(false)
+    }
   }
 
   if (!problem) {
@@ -688,10 +706,11 @@ useDocumentTitle(problem ? `${problem.title} — setter` : null)
 
           {activeTab === 'settings' && (
             <SettingsTab
-              visible={formState.visible}
+              status={problem.status || 'draft'}
+              reviewNote={problem.review_note}
+              visible={problem.visible ?? false}
               saving={saving}
-              onUpdateVisibility={handleUpdateVisibility}
-              onToggleVisibility={(v) => updateField('visible', v)}
+              onSubmitForReview={handleSubmitForReview}
               onDelete={handleDeleteProblem}
             />
           )}

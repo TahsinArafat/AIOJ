@@ -43,8 +43,9 @@ export interface ProblemFormState {
   interactorLanguage: string
   interactorSourceCode: string
 
-  // Settings
-  visible: boolean
+  // Settings. There is deliberately no `visible` field: publishing is an admin
+  // decision derived from the review status, so the author has no visibility
+  // switch to send.
 }
 
 export function createDefaultFormState(): ProblemFormState {
@@ -70,6 +71,5 @@ export function createDefaultFormState(): ProblemFormState {
     interactive: false,
     interactorLanguage: 'cpp-gpp-64',
     interactorSourceCode: '',
-    visible: true,
   }
 }

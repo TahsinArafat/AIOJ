@@ -15,7 +15,6 @@ const baseState: ProblemFormState = {
   interactive: false,
   interactorLanguage: 'cpp-gpp-64',
   interactorSourceCode: '',
-  visible: true,
 }
 
 test('renders checker type selector with all options', () => {

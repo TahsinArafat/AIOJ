@@ -837,6 +837,14 @@ export interface Problem {
     rating: number
     tags?: string[]
     visible: boolean
+    /** Review workflow: draft | pending | published | rejected. Publishing is
+     * an admin decision, so `visible` is derived from this and is not
+     * client-settable. */
+    status?: string
+    review_note?: string
+    reviewed_at?: string
+    /** "standard" | "interactive" | "output_only". */
+    problem_type?: string
     testcase_score?: TestCaseScore[]
     spj: boolean
     spj_language?: string
@@ -920,6 +928,14 @@ export interface ProblemWithSamples {
     difficulty: string
     tags?: string[]
     visible: boolean
+    /** Review workflow: draft | pending | published | rejected. Publishing is
+     * an admin decision, so `visible` is derived from this and is not
+     * client-settable. */
+    status?: string
+    review_note?: string
+    reviewed_at?: string
+    /** "standard" | "interactive" | "output_only". */
+    problem_type?: string
     testcase_score?: TestCaseScore[]
     spj: boolean
     spj_language?: string
