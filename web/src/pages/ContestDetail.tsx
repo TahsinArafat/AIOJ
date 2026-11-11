@@ -1,8 +1,7 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react'
+import React, { useEffect, useState, useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { api, getAccessToken, currentUser } from '../lib/api'
 import { useDocumentTitle } from '../lib/documentTitle'
-import { usePageVisible } from '../hooks/usePageVisible'
 import DivisionBadge from '../components/DivisionBadge'
 import { ContestStatusBadge, ContestFormatBadge, ContestTypeBadge } from '../components/contest/ContestBadges'
 import type { Division } from '../lib/divisions'
@@ -14,6 +13,10 @@ import {
 } from 'lucide-react'
 import { useConfirm } from '../components/ConfirmDialog'
 import { useToast } from '../components/Toast'
+import { useContestAnnouncements } from '../hooks/useContestAnnouncements'
+import { useClarifications } from '../hooks/useClarifications'
+import { ClarificationsPanel, AskClarificationForm } from '../components/ClarificationsPanel'
+import { ContestAnnouncementPopup } from '../components/ContestAnnouncementPopup'
 
 function decodeRole(): string | null {
     return currentUser()?.role ?? null
@@ -203,8 +206,6 @@ interface ProblemRow {
     /** Per-viewer progress; absent when signed out. */
     my_solved?: boolean; my_attempted?: boolean; my_submissions?: number;
 }
-interface ClarificationItem { id?: string; created_at: string; question?: string; answer?: string | null; username?: string; is_public?: boolean }
-interface AnnouncementItem { id: string; created_at: string; content?: string; username?: string }
 interface SubmissionRow { id?: string; created_at: string; status: string; language?: string; problem_id?: string; user_id?: string; username?: string; time_used?: number; memory_used?: number; score?: number }
 interface StandingsCell { solved?: boolean; attempts?: number; time?: number; pending?: number }
 interface StandingsEntry { user_id?: string; username?: string; team_name?: string; institution?: string; rank?: number; total_solved?: number; total_penalty?: number; problems?: Record<string, StandingsCell> }
@@ -224,7 +225,6 @@ export default function ContestDetail() {
     const confirm = useConfirm()
     const toast = useToast()
     const { id } = useParams<{ id: string }>()
-    const pageVisible = usePageVisible()
     const role = decodeRole()
     const userId = decodeUserId()
     const isAdmin = role === 'admin' || role === 'owner'
@@ -250,10 +250,18 @@ export default function ContestDetail() {
     const [registered, setRegistered] = useState(false)
     const [registrationCount, setRegistrationCount] = useState(0)
 
-    // Clarifications
-    const [clarifications, setClarifications] = useState<ClarificationItem[]>([])
-    const [showForm, setShowForm] = useState(false)
-    const [question, setQuestion] = useState('')
+    // Clarifications. The queue is polled (see the hook) so a jury reply lands
+    // on the list without a reload, and the contestant's own question appears
+    // when they ask rather than when the tab next loads.
+    const clarificationsApi = useClarifications(id, {}, {
+        enabled: Boolean(id) && activeTab === 'clarifications',
+    })
+    // The problem picker for a question, in index order (the order the round is
+    // read in), which is not the order the API returns them.
+    const clarificationProblems = useMemo(() => [...problems]
+        .filter(p => p.problem_id && p.index)
+        .sort((a, b) => String(a.index).localeCompare(String(b.index)))
+        .map(p => ({ problem_id: p.problem_id as string, index: String(p.index), title: p.title || '' })), [problems])
 
     // Standings
     const [standings, setStandings] = useState<StandingsEntry[]>([])
@@ -280,10 +288,15 @@ export default function ContestDetail() {
         }
         return map
     }, [standings, standingsProblems, problems])
-    // Announcements
-    const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([])
+    // Announcements. Polling and the new-announcement popup live in one hook so
+    // every contest page shares the same behaviour — a contestant on a problem
+    // statement used to be the one place an announcement could not reach them.
+    // `enabled` keeps this page's list authoritative while it is mounted.
+    const announcementsApi = useContestAnnouncements(id, {
+        enabled: Boolean(id),
+        pollMs: 15_000,
+    })
     const [announceText, setAnnounceText] = useState('')
-    const [unreadAnnouncements, setUnreadAnnouncements] = useState(0)
     const [unreadClarifications, setUnreadClarifications] = useState(0)
 
     // Submissions
@@ -308,27 +321,6 @@ export default function ContestDetail() {
             setRegistrationCount(c.registration_count ?? 0)
         }).finally(() => setLoading(false))
     }, [id])
-
-    const fetchClarifications = useCallback(() => {
-        if (!id) return
-        const lastSeen = localStorage.getItem(`contest_${id}_last_clarif`) || '0'
-        api.clarifications.list(id).then((res: { data?: ClarificationItem[] }) => {
-            const items = res.data || []
-            const newCount = items.filter(c => new Date(c.created_at).getTime() > Number(lastSeen)).length
-            setUnreadClarifications(newCount)
-            setClarifications(items)
-        }).catch(() => { })
-    }, [id])
-
-    useEffect(() => {
-        if (activeTab === 'clarifications') {
-            fetchClarifications()
-            if (id) localStorage.setItem(`contest_${id}_last_clarif`, String(Date.now()))
-        }
-        if (activeTab === 'announcements' && id) {
-            localStorage.setItem(`contest_${id}_last_notice`, String(Date.now()))
-        }
-    }, [activeTab, fetchClarifications, id])
 
     useEffect(() => {
         if (activeTab === 'standings' && id) {
@@ -371,38 +363,12 @@ export default function ContestDetail() {
         return result
     }, [submissions, subFilterId, contest])
 
+    // Opening the announcements tab is the same as dismissing the popup: they
+    // have been seen. This also clears the unread badge on the tab.
+    const markAnnouncementsRead = announcementsApi.markAllRead
     useEffect(() => {
-        if (!id) return
-        const pollNotices = () => {
-            api.contests.announcements(id).then((res: AnnouncementItem[] | { data?: AnnouncementItem[] }) => {
-                const items = Array.isArray(res) ? res : res.data || []
-                // Show popup when new announcements arrive (after first load)
-                if (announcements.length > 0 && items.length > announcements.length) {
-                    const newest = items[items.length - 1]
-                    if (newest) {
-                        setUnreadAnnouncements(prev => prev + 1)
-                        if (Notification.permission === 'granted') {
-                            new Notification('New Announcement', { body: newest.content, tag: `contest_${id}_notice` })
-                        } else if (Notification.permission !== 'denied') {
-                            Notification.requestPermission()
-                        }
-                        toast.error(`New Announcement:\n\n${newest.content}`)
-                    }
-                }
-                setAnnouncements(items)
-                // Calculate unread from localStorage
-                const lastSeen = localStorage.getItem(`contest_${id}_last_notice`) || '0'
-                setUnreadAnnouncements(items.filter(a => new Date(a.created_at).getTime() > Number(lastSeen)).length)
-            }).catch(() => { })
-        }
-        pollNotices()
-        // Skip the interval when the tab is hidden — the server poll wastes
-        // DB work while the user isn't watching.  It restarts automatically
-        // when pageVisible becomes true again.
-        if (!pageVisible) return () => {}
-        const interval = setInterval(pollNotices, 15000)
-        return () => clearInterval(interval)
-    }, [id, pageVisible]) // eslint-disable-line react-hooks/exhaustive-deps -- notification loop keeps its established stale-closure behavior
+        if (activeTab === 'announcements') markAnnouncementsRead()
+    }, [activeTab, markAnnouncementsRead])
 
     const handleRegister = async () => {
         if (!id) return
@@ -422,13 +388,34 @@ export default function ContestDetail() {
         } catch (e) { toast.error(e instanceof Error ? e.message : String(e)) }
     }
 
-    const handleAsk = async () => {
-        if (!id || !question.trim()) return
+    const handleAsk = async (problemId: string | undefined, text: string) => {
+        if (!id) return
+        // Rethrow so the form can show its own inline error instead of the page
+        // losing the text the person just typed.
         try {
-            await api.clarifications.create(id, { question: question.trim() })
-            setQuestion('')
-            setShowForm(false)
-            fetchClarifications()
+            await api.clarifications.create(id, { problem_id: problemId, question: text })
+            await clarificationsApi.refresh()
+        } catch (e) {
+            toast.error(e instanceof Error ? e.message : String(e))
+            throw e
+        }
+    }
+
+    const handleAnswer = async (clarificationId: string, answer: string, isPublic: boolean) => {
+        if (!id) return
+        try {
+            const updated = await api.clarifications.answer(id, clarificationId, { answer, is_public: isPublic })
+            clarificationsApi.applyOne(updated)
+        } catch (e) { toast.error(e instanceof Error ? e.message : String(e)) }
+    }
+
+    const handleAnswerMany = async (ids: string[], answer: string, isPublic: boolean) => {
+        if (!id) return
+        try {
+            const { answered } = await api.clarifications.answerMany(id, { ids, answer, is_public: isPublic })
+            clarificationsApi.applyMany(ids)
+            clarificationsApi.clearNew()
+            toast.success(`Answered ${answered} question${answered === 1 ? '' : 's'}`)
         } catch (e) { toast.error(e instanceof Error ? e.message : String(e)) }
     }
 
@@ -437,7 +424,13 @@ export default function ContestDetail() {
         try {
             await api.contests.postAnnouncement(id, announceText.trim())
             setAnnounceText('')
-            api.contests.announcements(id).then((res: AnnouncementItem[] | { data?: AnnouncementItem[] }) => setAnnouncements(Array.isArray(res) ? res : res.data || [])).catch(() => { })
+            // Re-poll rather than pushing it into local state: the post is the
+            // authoritative record, and the list the popup reads from has to
+            // match it. The organizer's own announcement is not shown as a
+            // popup to them — that would be noise on the person who just typed
+            // it — so it is marked seen immediately.
+            await announcementsApi.refresh()
+            announcementsApi.markAllRead()
         } catch (e) { toast.error(e instanceof Error ? e.message : String(e)) }
     }
 
@@ -445,7 +438,8 @@ export default function ContestDetail() {
         if (!id || !(await confirm({ message: 'Delete this announcement?', variant: 'danger' }))) return
         try {
             await api.contests.deleteAnnouncement(id, announcementId)
-            setAnnouncements(a => a.filter(x => x.id !== announcementId))
+            announcementsApi.markAllRead()
+            await announcementsApi.refresh()
         } catch (e) { toast.error(e instanceof Error ? e.message : String(e)) }
     }
 
@@ -496,7 +490,7 @@ export default function ContestDetail() {
                         { key: 'standings', label: 'Standings', icon: 'standings' },
                         { key: 'submissions', label: 'Submissions', icon: 'submissions' },
                         { key: 'clarifications', label: 'Clarifications', icon: 'clarifications', unread: unreadClarifications },
-                        { key: 'announcements', label: 'Announcements', icon: 'announcements', unread: unreadAnnouncements },
+                        { key: 'announcements', label: 'Announcements', icon: 'announcements', unread: announcementsApi.unreadCount },
                     ] as { key: Tab; label: string; icon: string; unread?: number }[]).map(tab => (
                         <button
                             key={tab.key}
@@ -504,7 +498,6 @@ export default function ContestDetail() {
                                 if (tab.key !== activeTab) {
                                     setActiveTab(tab.key)
                                     if (tab.key === 'clarifications') setUnreadClarifications(0)
-                                    if (tab.key === 'announcements') setUnreadAnnouncements(0)
                                     if (tab.key !== 'standings') setStandingsPage(1)
                                 }
                             }}
@@ -1000,59 +993,33 @@ export default function ContestDetail() {
 
                     {activeTab === 'clarifications' && (
                         <div>
-                            <div className="flex items-center justify-between mb-4">
-                                <h2 className="text-xl font-bold text-ink">Clarifications</h2>
-                                {getAccessToken() && (
-                                    <button
-                                        onClick={() => setShowForm(!showForm)}
-                                        className="px-4 py-2 bg-brand text-on-brand text-sm font-semibold rounded-lg hover:bg-brand-hover transition-colors"
-                                    >
-                                        Ask Question
-                                    </button>
-                                )}
+                            <div className="mb-4 flex items-center justify-between gap-3">
+                                <div>
+                                    <h2 className="text-xl font-bold text-ink">Clarifications</h2>
+                                    <p className="text-xs text-muted">
+                                        Questions from contestants, and the organizers' answers.
+                                    </p>
+                                </div>
                             </div>
 
-                            {showForm && (
-                                <div className="bg-surface border border-brand/30 rounded-xl p-4 mb-4 shadow-sm">
-                                    <textarea
-                                        value={question}
-                                        onChange={e => setQuestion(e.target.value)}
-                                        placeholder="Type your question..."
-                                        className="w-full border border-hairline rounded-lg p-3 text-sm resize-none focus:ring-2 focus-visible:outline-[var(--ring)] focus:border-transparent"
-                                        rows={3}
+                            {getAccessToken() && (
+                                <div className="mb-4">
+                                    <AskClarificationForm
+                                        problems={clarificationProblems}
+                                        onSubmit={handleAsk}
                                     />
-                                    <div className="flex gap-2 mt-3">
-                                        <button onClick={handleAsk} className="px-4 py-2 bg-brand text-on-brand text-sm font-semibold rounded-lg hover:bg-brand-hover">Submit</button>
-                                        <button onClick={() => setShowForm(false)} className="px-4 py-2 bg-surface-3/30 text-muted text-sm font-semibold rounded-lg hover:bg-surface-3">Cancel</button>
-                                    </div>
                                 </div>
                             )}
 
-                            {clarifications.length === 0 ? (
-                                <EmptyState icon={<MessageSquare className="w-12 h-12 text-ink-soft" />} text="No clarifications yet" description="Questions from participants and official responses will appear here." />
-                            ) : (
-                                <div className="space-y-3">
-                                    {clarifications.map(c => (
-                                        <div key={c.id} className="bg-surface border border-hairline rounded-xl p-4 shadow-sm">
-                                            <div className="flex items-start justify-between mb-2">
-                                                <span className="text-xs font-medium text-muted">{c.username || 'Anonymous'}</span>
-                                                <span className="text-xs text-muted">{new Date(c.created_at).toLocaleString()}</span>
-                                            </div>
-                                            <p className="text-sm text-ink mb-2">{c.question}</p>
-                                            {c.answer && (
-                                                <div className={`mt-2 pl-3 border-l-2 ${c.is_public ? 'border-ok/40 bg-ok/10' : 'border-brand/40 bg-brand-soft'} rounded-r-lg p-3`}>
-                                                    <p className="text-sm text-ink-soft">{c.answer}</p>
-                                                    {c.is_public && (
-                                                        <span className="inline-block text-[10px] text-ok font-medium mt-1">
-                                                            <Megaphone className="w-3 h-3 inline mr-0.5" />Public response
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
+                            <ClarificationsPanel
+                                items={clarificationsApi.items}
+                                loading={clarificationsApi.loading}
+                                problems={clarificationProblems}
+                                isJudge={clarificationsApi.isJudge}
+                                newIds={clarificationsApi.newIds}
+                                onAnswer={clarificationsApi.isJudge ? handleAnswer : undefined}
+                                onAnswerMany={clarificationsApi.isJudge ? handleAnswerMany : undefined}
+                            />
                         </div>
                     )}
 
@@ -1085,11 +1052,11 @@ export default function ContestDetail() {
                                 </div>
                             )}
 
-                            {announcements.length === 0 ? (
+                            {announcementsApi.announcements.length === 0 ? (
                                 <EmptyState icon={<Megaphone className="w-12 h-12 text-ink-soft" />} text="No announcements yet" description="Announcements from judges will appear here" />
                             ) : (
                                 <div className="space-y-3">
-                                    {announcements.map((a, i) => (
+                                    {announcementsApi.announcements.map((a, i) => (
                                         <div key={a.id} className="bg-warn/10 border border-warn/30 rounded-lg p-4">
                                             <div className="flex items-start justify-between gap-3">
                                                 <div className="flex-1">
@@ -1266,6 +1233,20 @@ export default function ContestDetail() {
                     </div>
                 )}
             </div>
+
+            {/* A judge's announcement is the one message that has to be seen the
+                moment it is posted, whichever tab the competitor is on. */}
+            {announcementsApi.popup && (
+                <ContestAnnouncementPopup
+                    content={announcementsApi.popup.content}
+                    author={announcementsApi.popup.username}
+                    onDismiss={announcementsApi.dismissPopup}
+                    onViewAll={() => {
+                        setActiveTab('announcements')
+                        announcementsApi.markAllRead()
+                    }}
+                />
+            )}
         </div>
     )
 }

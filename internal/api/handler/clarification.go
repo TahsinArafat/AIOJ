@@ -1,8 +1,10 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
@@ -10,12 +12,20 @@ import (
 	"github.com/tahsinarafat/aioj/internal/store"
 )
 
-type ClarificationHandler struct {
-	clarificationStore store.ClarificationStore
-	contestStore       store.ContestStore
+// clarificationContest is the slice of ContestStore the clarification handlers
+// need. Narrower than the whole store so the permission rule can be tested
+// without standing up every contest method.
+type clarificationContest interface {
+	GetByID(ctx context.Context, id string) (*model.Contest, error)
+	HasAccess(ctx context.Context, contestID, userID string, levels ...string) bool
 }
 
-func NewClarificationHandler(cs store.ClarificationStore, cts store.ContestStore) *ClarificationHandler {
+type ClarificationHandler struct {
+	clarificationStore store.ClarificationStore
+	contestStore       clarificationContest
+}
+
+func NewClarificationHandler(cs store.ClarificationStore, cts clarificationContest) *ClarificationHandler {
 	return &ClarificationHandler{
 		clarificationStore: cs,
 		contestStore:       cts,
@@ -77,23 +87,107 @@ func (h *ClarificationHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var userID *string
+	isJudge := false
 	if claims != nil {
-		isJudge := claims.Role == "admin" || h.contestStore.HasAccess(r.Context(), contest.ID, claims.UserID, "manager", "judge")
+		isJudge = claims.Role == "admin" || h.contestStore.HasAccess(r.Context(), contest.ID, claims.UserID, "manager", "judge")
 		if !isJudge {
 			uid := claims.UserID
 			userID = &uid
 		}
 	}
 
-	clarifications, err := h.clarificationStore.ListByContest(r.Context(), contest.ID, userID)
+	// Filters are optional: an unfiltered list is what the tab has always
+	// fetched. They are what makes a round's clarification queue workable — the
+	// jury needs "unanswered, about problem C" rather than one long list.
+	var problemID *string
+	if v := strings.TrimSpace(r.URL.Query().Get("problem_id")); v != "" {
+		problemID = &v
+	}
+	var answered *bool
+	if v := strings.TrimSpace(r.URL.Query().Get("answered")); v != "" {
+		switch v {
+		case "true", "1":
+			t := true
+			answered = &t
+		case "false", "0":
+			f := false
+			answered = &f
+		}
+	}
+
+	clarifications, err := h.clarificationStore.ListByContest(r.Context(), contest.ID, userID, problemID, answered)
 	if err != nil {
 		http.Error(w, "failed to list clarifications: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	respondJSON(w, http.StatusOK, map[string]interface{}{
-		"data": clarifications,
+		"data":     clarifications,
+		"is_judge": isJudge,
 	})
+}
+
+// AnswerMany applies one answer to several clarifications at once, so a jury can
+// answer a run of questions with the same ruling instead of one at a time.
+func (h *ClarificationHandler) AnswerMany(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r)
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	contest, err := resolveContest(r.Context(), chi.URLParam(r, "contestId"), h.contestStore)
+	if err != nil {
+		respondContestLookupError(w, err)
+		return
+	}
+	if claims.Role != "admin" && !h.contestStore.HasAccess(r.Context(), contest.ID, claims.UserID, "manager", "judge") {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	var req struct {
+		IDs      []string `json:"ids"`
+		Answer   string   `json:"answer"`
+		IsPublic bool     `json:"is_public"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	if req.Answer == "" {
+		http.Error(w, "answer required", http.StatusBadRequest)
+		return
+	}
+	if len(req.IDs) == 0 {
+		http.Error(w, "no clarifications selected", http.StatusBadRequest)
+		return
+	}
+
+	// Only the ids that belong to this contest. The caller is authorized for the
+	// contest, so without this a judge of contest A could answer rows of contest B
+	// by guessing their ids.
+	scoped := make([]string, 0, len(req.IDs))
+	for _, id := range req.IDs {
+		c, err := h.clarificationStore.GetByID(r.Context(), id)
+		if err != nil || c == nil {
+			continue
+		}
+		if c.ContestID == contest.ID {
+			scoped = append(scoped, id)
+		}
+	}
+	if len(scoped) == 0 {
+		http.Error(w, "none of these clarifications belong to this contest", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.clarificationStore.AnswerMany(r.Context(), scoped, req.Answer, claims.UserID, req.IsPublic); err != nil {
+		http.Error(w, "failed to answer clarifications", http.StatusInternalServerError)
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{"answered": len(scoped)})
 }
 
 func (h *ClarificationHandler) Answer(w http.ResponseWriter, r *http.Request) {
@@ -134,7 +228,14 @@ func (h *ClarificationHandler) Answer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respondJSON(w, http.StatusOK, map[string]string{"status": "answered"})
+	// The row as it now stands, so the caller can replace it in place instead of
+	// refetching the whole list (which is what the queue does after every reply).
+	c, err := h.clarificationStore.GetByID(r.Context(), clarificationID)
+	if err != nil || c == nil {
+		respondJSON(w, http.StatusOK, map[string]string{"status": "answered"})
+		return
+	}
+	respondJSON(w, http.StatusOK, c)
 }
 
 type ContestNoticeHandler struct {

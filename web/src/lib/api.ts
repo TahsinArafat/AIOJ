@@ -944,7 +944,13 @@ export const api = {
             return request<ScoreboardData>(`/contests/${id}/scoreboard${qs ? '?' + qs : ''}`);
         },
         problems: (id: string) => request<ContestProblem[]>(`/contests/${id}/problems`),
-        announcements: (id: string) => request<ContestNotice[]>(`/contests/${id}/notices`),
+        /**
+         * Every notice for a contest, wrapped as { data } by the server.
+         * Typed correctly here because the poll that drives the popup needs the
+         * real shape: treating this as a bare array made the .data branch
+         * unreachable and "new" detection fall back to comparing lengths.
+         */
+        announcements: (id: string) => request<{ data: ContestNotice[] }>(`/contests/${id}/notices`),
         postAnnouncement: (id: string, message: string) =>
             request<ContestNotice>(`/contests/${id}/notices`, { method: 'POST', body: JSON.stringify({ content: message }) }),
         deleteAnnouncement: (id: string, announcementId: string) =>
@@ -961,12 +967,29 @@ export const api = {
         },
     },
     clarifications: {
-        list: (contestId: string) =>
-            request<{ data: Clarification[] }>(`/contests/${contestId}/clarifications`),
+        /**
+         * A round's clarification queue.
+         *
+         * `problem_id` and `answered` narrow it (the jury's "unanswered, about
+         * problem C"); omit both for the full list. `is_judge` tells the UI
+         * whether the caller is staff and so may answer.
+         */
+        list: (contestId: string, filters?: { problem_id?: string; answered?: boolean }) => {
+            const params = new URLSearchParams();
+            if (filters?.problem_id) params.set('problem_id', filters.problem_id);
+            if (filters?.answered !== undefined) params.set('answered', String(filters.answered));
+            const qs = params.toString();
+            return request<{ data: Clarification[]; is_judge: boolean }>(
+                `/contests/${contestId}/clarifications${qs ? '?' + qs : ''}`);
+        },
         create: (contestId: string, d: { problem_id?: string; question: string }) =>
             request<Clarification>(`/contests/${contestId}/clarifications`, { method: 'POST', body: JSON.stringify(d) }),
+        /** Returns the updated row, so the queue can replace it in place. */
         answer: (contestId: string, id: string, d: { answer: string; is_public: boolean }) =>
             request<Clarification>(`/contests/${contestId}/clarifications/${id}/answer`, { method: 'POST', body: JSON.stringify(d) }),
+        /** One answer applied to many questions; returns how many changed. */
+        answerMany: (contestId: string, d: { ids: string[]; answer: string; is_public: boolean }) =>
+            request<{ answered: number }>(`/contests/${contestId}/clarifications/bulk-answer`, { method: 'POST', body: JSON.stringify(d) }),
     },
     notices: {
         list: (contestId: string) =>

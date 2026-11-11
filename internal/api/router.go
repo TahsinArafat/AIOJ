@@ -423,6 +423,7 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 			r.Use(middleware.AuthMiddleware(jwtManager))
 			r.Post("/", clarificationH.Create)
 			r.Post("/{id}/answer", clarificationH.Answer)
+			r.Post("/bulk-answer", clarificationH.AnswerMany)
 		})
 	})
 

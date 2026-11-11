@@ -525,8 +525,12 @@ type OnsiteUserStore interface {
 type ClarificationStore interface {
 	Create(ctx context.Context, c *model.Clarification) error
 	GetByID(ctx context.Context, id string) (*model.Clarification, error)
-	ListByContest(ctx context.Context, contestID string, userID *string) ([]model.Clarification, error)
+	// ListByContest returns what the caller may see: their own questions plus
+	// public answers, or everything for the jury (userID nil). problemID and
+	// answered narrow the queue; both nil means no narrowing.
+	ListByContest(ctx context.Context, contestID string, userID *string, problemID *string, answered *bool) ([]model.Clarification, error)
 	Answer(ctx context.Context, id string, answer string, answeredBy string, isPublic bool) error
+	AnswerMany(ctx context.Context, ids []string, answer string, answeredBy string, isPublic bool) error
 }
 
 type ContestNoticeStore interface {

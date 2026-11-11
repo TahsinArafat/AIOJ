@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	"github.com/tahsinarafat/aioj/internal/model"
 )
 
@@ -47,17 +48,44 @@ func (s *ClarificationStoreImpl) GetByID(ctx context.Context, id string) (*model
 	return &c, nil
 }
 
-func (s *ClarificationStoreImpl) ListByContest(ctx context.Context, contestID string, userID *string) ([]model.Clarification, error) {
-	query := `SELECT c.id, c.contest_id, c.user_id, u.username, c.problem_id,
+// ListByContest returns the clarifications the caller may see.
+//
+// problem_id is the clarification's own problem reference; the contest_problem
+// index is what a contestant reads a round by, and it is only in the contest's
+// problem table. Joined on both ids so the UI can label a question "A — Sum
+// problem" without a second round trip per row.
+//
+// userID limits to the caller's own questions plus public answers, which is the
+// rule that matters in a round: a private question and its reply belong to the
+// person who asked. A nil userID means "the jury view" — every question.
+func (s *ClarificationStoreImpl) ListByContest(ctx context.Context, contestID string, userID *string, problemID *string, answered *bool) ([]model.Clarification, error) {
+	query := `SELECT c.id, c.contest_id, c.user_id, u.username, c.problem_id, cp.index,
 	                 c.question, c.answer, c.is_public, c.answered_by, c.created_at, c.updated_at
 	          FROM clarifications c
 	          JOIN users u ON c.user_id = u.id
+	          LEFT JOIN contest_problems cp
+	                 ON cp.contest_id = c.contest_id AND cp.problem_id = c.problem_id
 	          WHERE c.contest_id = $1`
 	args := []interface{}{contestID}
+	argN := 2
 
 	if userID != nil {
-		query += " AND (c.is_public = true OR c.user_id = $2)"
+		query += fmt.Sprintf(" AND (c.is_public = true OR c.user_id = $%d)", argN)
 		args = append(args, *userID)
+		argN++
+	}
+	if problemID != nil && *problemID != "" {
+		query += fmt.Sprintf(" AND c.problem_id = $%d", argN)
+		args = append(args, *problemID)
+		argN++
+	}
+	if answered != nil {
+		// "Answered" is a real answer, not a placeholder.
+		if *answered {
+			query += " AND c.answer IS NOT NULL AND c.answer <> ''"
+		} else {
+			query += " AND (c.answer IS NULL OR c.answer = '')"
+		}
 	}
 	query += " ORDER BY c.created_at DESC"
 
@@ -70,7 +98,7 @@ func (s *ClarificationStoreImpl) ListByContest(ctx context.Context, contestID st
 	var items []model.Clarification
 	for rows.Next() {
 		var c model.Clarification
-		if err := rows.Scan(&c.ID, &c.ContestID, &c.UserID, &c.Username, &c.ProblemID,
+		if err := rows.Scan(&c.ID, &c.ContestID, &c.UserID, &c.Username, &c.ProblemID, &c.ProblemIdx,
 			&c.Question, &c.Answer, &c.IsPublic, &c.AnsweredBy, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, err
 		}
@@ -80,6 +108,24 @@ func (s *ClarificationStoreImpl) ListByContest(ctx context.Context, contestID st
 		items = []model.Clarification{}
 	}
 	return items, nil
+}
+
+// AnswerMany applies one answer to several clarifications at once.
+//
+// A jury works a queue: the same ruling is usually the answer to a run of
+// questions, and answering them one at a time is how a round's clarifications
+// stop being answered at all. Scoped by the ids given, which the handler has
+// already authorized against this contest.
+func (s *ClarificationStoreImpl) AnswerMany(ctx context.Context, ids []string, answer string, answeredBy string, isPublic bool) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE clarifications
+		    SET answer = $1, answered_by = $2, is_public = $3, updated_at = now()
+		  WHERE id = ANY($4)`,
+		answer, answeredBy, isPublic, pq.Array(ids))
+	return err
 }
 
 func (s *ClarificationStoreImpl) Answer(ctx context.Context, id string, answer string, answeredBy string, isPublic bool) error {

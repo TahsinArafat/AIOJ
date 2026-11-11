@@ -16,6 +16,10 @@ import { useToast } from '../components/Toast'
 import { SubmissionStatusPanel } from '../components/SubmissionStatusPanel'
 import { errorMessage } from '../lib/errors'
 import { isRemotePlatform } from '../lib/platforms'
+import { useContestAnnouncements } from '../hooks/useContestAnnouncements'
+import { ContestAnnouncementPopup } from '../components/ContestAnnouncementPopup'
+import { useClarifications } from '../hooks/useClarifications'
+import { ClarificationsPanel, AskClarificationForm } from '../components/ClarificationsPanel'
 
 // Derived from the API so these track the real response shapes without
 // importing model types (shared type files are in flux).
@@ -306,6 +310,12 @@ export default function ContestProblem() {
     const toast = useToast()
     const { contestId, index } = useParams<{ contestId: string; index: string }>()
     const location = useLocation()
+    // Announcements are polled from here too: a competitor solving a problem is
+    // the one place an organizer's ruling cannot wait until they go back to the
+    // dashboard. ContestDetail polls them independently.
+    const announcements = useContestAnnouncements(contestId, {
+        enabled: Boolean(contestId),
+    })
     const [problem, setProblem] = useState<LoadedProblem | null>(null)
     const [contest, setContest] = useState<LoadedContest | null>(null)
     useDocumentTitle(problem?.title)
@@ -318,7 +328,43 @@ export default function ContestProblem() {
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
 
-    const [tab, setTab] = useState<'statement' | 'submissions'>('statement')
+    const [tab, setTab] = useState<'statement' | 'submissions' | 'clarifications'>('statement')
+
+    // The round's clarifications for the tab below. Polled only while that tab
+    // is open: this page's job is the statement and the editor, and a poll per
+    // problem page would be a lot of idle requests.
+    const clarifications = useClarifications(contestId, {}, {
+        enabled: Boolean(contestId) && tab === 'clarifications',
+    })
+
+    const handleAskAboutProblem = async (problemId: string | undefined, question: string) => {
+        if (!problemId) return
+        try {
+            await api.clarifications.create(contestId!, { problem_id: problemId, question })
+            await clarifications.refresh()
+        } catch (e) {
+            toast.error(errorMessage(e))
+            throw e
+        }
+    }
+
+    const handleAnswer = async (id: string, answer: string, isPublic: boolean) => {
+        if (!contestId) return
+        try {
+            const updated = await api.clarifications.answer(contestId, id, { answer, is_public: isPublic })
+            clarifications.applyOne(updated)
+        } catch (e) { toast.error(errorMessage(e)) }
+    }
+
+    const handleAnswerMany = async (ids: string[], answer: string, isPublic: boolean) => {
+        if (!contestId) return
+        try {
+            const { answered } = await api.clarifications.answerMany(contestId, { ids, answer, is_public: isPublic })
+            clarifications.applyMany(ids)
+            toast.success(`Answered ${answered} question${answered === 1 ? '' : 's'}`)
+        } catch (e) { toast.error(errorMessage(e)) }
+    }
+
 
     const [customInput, setCustomInput] = useState('')
     const [customOutput, setCustomOutput] = useState<RunResult | null>(null)
@@ -566,6 +612,21 @@ export default function ContestProblem() {
         }
     }
 
+    // Rendered on every return path below, so a ruling posted while the page is
+    // still loading or in an error state still reaches the competitor.
+    const announcementPopup = announcements.popup ? (
+        <ContestAnnouncementPopup
+            content={announcements.popup.content}
+            author={announcements.popup.username}
+            onDismiss={announcements.dismissPopup}
+            onViewAll={() => {
+                if (contestId) {
+                    window.location.assign(`/contests/${contestId}#announcements`)
+                }
+            }}
+        />
+    ) : null
+
     // Loading state
     if (loading) {
         return (
@@ -577,6 +638,7 @@ export default function ContestProblem() {
                     </svg>
                     <span>Loading problem...</span>
                 </div>
+                {announcementPopup}
             </div>
         )
     }
@@ -589,6 +651,7 @@ export default function ContestProblem() {
                 <Link to={`/contests/${contestId}`} className="text-brand hover:underline text-sm">
                     ← Back to Contest
                 </Link>
+                {announcementPopup}
             </div>
         )
     }
@@ -601,6 +664,7 @@ export default function ContestProblem() {
                 <Link to={`/contests/${contestId}`} className="text-brand hover:underline text-sm">
                     ← Back to Contest
                 </Link>
+                {announcementPopup}
             </div>
         )
     }
@@ -718,6 +782,22 @@ export default function ContestProblem() {
                                 My Submissions
                             </button>
                         )}
+                        {isLoggedIn && (
+                            <button
+                                onClick={() => setTab('clarifications')}
+                                className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${tab === 'clarifications'
+                                    ? 'border-brand text-brand'
+                                    : 'border-transparent text-muted hover:text-ink hover:border-hairline-strong'
+                                    }`}
+                            >
+                                Clarifications
+                                {(clarifications.newIds?.size ?? 0) > 0 && (
+                                    <span className="ml-1.5 rounded-full bg-warn/20 px-1.5 py-0.5 text-[10px] font-semibold text-warn">
+                                        {clarifications.newIds?.size}
+                                    </span>
+                                )}
+                            </button>
+                        )}
                     </div>
 
                     {/* Statement Tab */}
@@ -741,6 +821,29 @@ export default function ContestProblem() {
                         // so filtering by the slug matched nothing and the tab
                         // was always empty.
                         <MySubmissionsTab problemId={problem.id} contestId={contest?.id} />
+                    )}
+
+                    {/* Clarifications Tab — pre-bound to this problem, so the
+                        question is attributable and the jury can filter the
+                        queue by it. */}
+                    {tab === 'clarifications' && (
+                        <div className="space-y-4 pb-8">
+                            <AskClarificationForm
+                                problems={[{ problem_id: problem.id, index: index || '', title: problem.title }]}
+                                lockedProblemId={problem.id}
+                                onSubmit={handleAskAboutProblem}
+                            />
+                            <ClarificationsPanel
+                                items={clarifications.items.filter(c => c.problem_id === problem.id || !c.problem_id)}
+                                loading={clarifications.loading}
+                                problems={[{ problem_id: problem.id, index: index || '', title: problem.title }]}
+                                isJudge={clarifications.isJudge}
+                                newIds={clarifications.newIds}
+                                lockedProblemId={problem.id}
+                                onAnswer={clarifications.isJudge ? handleAnswer : undefined}
+                                onAnswerMany={clarifications.isJudge ? handleAnswerMany : undefined}
+                            />
+                        </div>
                     )}
                 </div>
 
@@ -980,6 +1083,7 @@ export default function ContestProblem() {
                     </div>
                 </div>
             </div>
+            {announcementPopup}
         </div>
     )
 }

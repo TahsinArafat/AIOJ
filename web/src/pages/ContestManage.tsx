@@ -14,6 +14,8 @@ import { useConfirm } from '../components/ConfirmDialog'
 import { useToast } from '../components/Toast'
 import { EmptyState } from '../components/EmptyState'
 import { isoToLocalInput, localInputToIso } from '../lib/datetime'
+import { useClarifications } from '../hooks/useClarifications'
+import { ClarificationsPanel } from '../components/ClarificationsPanel'
 
 function indexLabel(i: number): string {
     let s = ''
@@ -49,7 +51,6 @@ type TabKey = typeof TABS[number]['key']
 interface ManagedContest { title?: string }
 interface ChallengeRow { problem_id: string; index?: string; score?: number; sort_order?: number; title?: string; slug?: string }
 interface ProblemHit { id: string; title?: string; difficulty?: string }
-interface ClarificationRow { id: string; created_at: string; problem_index?: string; username?: string; answered?: boolean; question?: string; answer?: string | null }
 interface RegistrationList { data?: ParticipantRow[]; count?: number }
 interface ParticipantRow { user_id?: string; username?: string; registered_at: string }
 interface SubmissionRow { id?: string; username?: string; user_id?: string; problem_index?: string; problem_id?: string; language?: string; status: string; time_ms?: number; created_at?: string }
@@ -387,60 +388,57 @@ function BookletTab({ contestId }: { contestId: string }) {
 // CLARIFICATIONS TAB
 // ═══════════════════════════════════════════════
 function ClarificationsTab({ contestId }: { contestId: string }) {
-    const [items, setItems] = useState<ClarificationRow[]>([])
-    const [loading, setLoading] = useState(true)
-    const [answer, setAnswer] = useState<Record<string, string>>({})
-    const [publicAns, setPublicAns] = useState<Record<string, boolean>>({})
+    const toast = useToast()
+    // One implementation for the jury's queue, shared with the contestant's
+    // view (see ClarificationsPanel). This tab used to render a flat list with
+    // per-row inputs: no way to filter to what was still unanswered, no way to
+    // answer a run of questions with the same ruling, and no live updates while
+    // a round was in progress.
+    const [problems, setProblems] = useState<{ problem_id: string; index: string; title: string }[]>([])
+    const clarifications = useClarifications(contestId, {}, {
+        enabled: Boolean(contestId),
+        pollMs: 8_000,
+    })
 
-    const load = useCallback(() => {
-        api.clarifications.list(contestId).then(d => setItems(d.data || [])).finally(() => setLoading(false))
+    useEffect(() => {
+        api.contests.get(contestId)
+            .then(res => {
+                const rows = (res.problems || []) as {
+                    problem_id: string; index: string; title: string
+                }[]
+                // The round is read in index order, so the problem filter is too.
+                setProblems([...rows].sort((a, b) => a.index.localeCompare(b.index)))
+            })
+            .catch(() => { /* the queue still renders without the labels */ })
     }, [contestId])
-    useEffect(() => { load() }, [load])
 
-    const handleAnswer = async (id: string) => {
-        if (!answer[id]?.trim()) return
-        await api.clarifications.answer(contestId, id, { answer: answer[id], is_public: publicAns[id] || false })
-        setAnswer(p => ({ ...p, [id]: '' }))
-        load()
+    const handleAnswer = async (id: string, answer: string, isPublic: boolean) => {
+        const updated = await api.clarifications.answer(contestId, id, { answer, is_public: isPublic })
+        clarifications.applyOne(updated)
     }
 
-    if (loading) return <TabLoading />
+    const handleAnswerMany = async (ids: string[], answer: string, isPublic: boolean) => {
+        const { answered } = await api.clarifications.answerMany(contestId, { ids, answer, is_public: isPublic })
+        clarifications.applyMany(ids)
+        toast.success(`Answered ${answered} question${answered === 1 ? '' : 's'}`)
+    }
 
     return (
-        <TabShell title="Clarifications">
-            {items.length === 0 ? <EmptyState
-                icon={<MessageSquare className="w-5 h-5 text-muted-soft" />}
-                text="No clarifications yet"
-                description="Participant questions and your replies will appear here."
-            /> : (
-                <div className="space-y-3">
-                    {items.map((c) => (
-                        <div key={c.id} className="border border-hairline rounded-lg p-4">
-                            <div className="flex items-start justify-between mb-2">
-                                <div>
-                                    <span className="text-xs text-muted-soft">{new Date(c.created_at).toLocaleString()}</span>
-                                    {c.problem_index && <span className="ml-2 text-xs bg-surface-3 px-1.5 py-0.5 rounded font-mono">Problem {c.problem_index}</span>}
-                                    {c.username && <span className="ml-2 text-xs text-muted">by {c.username}</span>}
-                                </div>
-                                {c.answered ? <span className="text-xs text-ok font-medium">Answered</span> : <span className="text-xs text-warn font-medium">⏳ Pending</span>}
-                            </div>
-                            <p className="text-sm text-ink mb-2">{c.question}</p>
-                            {c.answer && <div className="bg-ok/10 border border-ok/30 rounded p-2 text-sm text-ok mt-2"><strong>Answer:</strong> {c.answer}</div>}
-                            {!c.answered && (
-                                <div className="mt-3 flex gap-2">
-                                    <input value={answer[c.id] || ''} onChange={e => setAnswer(p => ({ ...p, [c.id]: e.target.value }))}
-                                        placeholder="Type answer..." className="flex-1 border rounded-lg px-3 py-1.5 text-sm" />
-                                    <label className="flex items-center gap-1 text-xs text-muted">
-                                        <input type="checkbox" checked={publicAns[c.id] || false} onChange={e => setPublicAns(p => ({ ...p, [c.id]: e.target.checked }))} />
-                                        Public
-                                    </label>
-                                    <button onClick={() => handleAnswer(c.id)} className="px-3 py-1.5 bg-ok-fill text-white text-sm rounded-lg hover:bg-ok-fill">Reply</button>
-                                </div>
-                            )}
-                        </div>
-                    ))}
-                </div>
-            )}
+        <TabShell
+            title="Clarifications"
+            subtitle={clarifications.items.filter(c => !c.answer).length > 0
+                ? `${clarifications.items.filter(c => !c.answer).length} unanswered`
+                : undefined}
+        >
+            <ClarificationsPanel
+                items={clarifications.items}
+                loading={clarifications.loading}
+                problems={problems}
+                isJudge={clarifications.isJudge}
+                newIds={clarifications.newIds}
+                onAnswer={handleAnswer}
+                onAnswerMany={handleAnswerMany}
+            />
         </TabShell>
     )
 }
