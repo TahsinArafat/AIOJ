@@ -447,7 +447,9 @@ export default function SetterPanel() {
                                         </td>
                                         <td className="px-4 py-3 text-right flex gap-2 justify-end items-center">
                                             <Link to={`/contests/${c.id}`} className="text-brand hover:underline text-xs">View</Link>
-                                            <Link to={`/setter/contest/${c.id}/manage#settings`} className="bg-warn/10 dark:bg-warn/10 hover:bg-warn/15 border border-warn/30 text-warn px-2.5 py-1 rounded text-xs">Edit settings</Link>
+                                            {/* "Edit settings" used to sit here pointing at the same
+                                                page with a #settings hash. Two buttons, one route —
+                                                "Manage" already opens the settings tab. */}
                                             <Link to={`/setter/contest/${c.id}/manage`} className="bg-brand-soft hover:bg-brand/15 border border-brand/30 text-brand px-2.5 py-1 rounded text-xs">Manage</Link>
                                         </td>
                                     </tr>
