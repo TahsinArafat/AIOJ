@@ -113,7 +113,7 @@ These features differentiate a good platform from a basic one.
 - Flush handling documentation and examples
 - Local testing tools for interactive problems
 
-**6.2 Output-Only Problems**
+**6.2 Output-Only Problems** — IMPLEMENTED (frontier commit 13fceef)
 - Submit output files instead of source code
 - Useful when language shouldn't matter or judging capacity is limited
 - Partial scoring based on number of correct test cases
@@ -233,11 +233,14 @@ These features set a platform apart from competitors.
 
 ### 13. Onsite Contest Support
 
-**13.1 Contest Control System (CCS)**
-- ICPC-standard CCS implementation
-- Contest Data Server (CDS) for external integrations
-- Event feed for real-time contest data
-- Team workstation management
+**13.1 Contest Control System (CCS)** — PARTIAL (frontier commit 1e9e974)
+- Polled event feed at GET /api/contests/{id}/feed, cursor-based: DONE, but
+  "CCS-flavoured", NOT certified conformance
+- ICPC-standard CCS implementation: NOT DONE
+- Contest Data Server (CDS) for external integrations: NOT DONE
+- Scoreboard / freeze / contest-state events: NOT DONE
+- Integer run-id mapping: NOT DONE (runs are UUIDs)
+- Team workstation management: DONE via onsite batch accounts
 
 **13.2 Team Registration**
 - Team creation and management
@@ -421,7 +424,7 @@ These features set a platform apart from competitors.
 | Feature | Codeforces | DMOJ | AtCoder | DOMjudge | This Platform |
 |---------|-----------|------|---------|----------|---------------|
 | Interactive Problems | Yes | Yes | Yes | Yes | Yes |
-| Output-Only Problems | No | Limited | No | Planned | Yes |
+| Output-Only Problems | No | Limited | No | Planned | Yes (frontier 13fceef) |
 | Communication Problems | Yes (new) | No | No | No | Yes |
 | Polygon-like Tool | Yes | No | No | No | Yes |
 | Hacking System | Yes | No | No | No | Optional |

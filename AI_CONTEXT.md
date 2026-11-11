@@ -238,12 +238,12 @@ docker compose exec postgres psql -U aioj -d aioj \
 ```
 cmd/aioj/main.go                          Entry point
 internal/api/router.go                    All routes
-internal/api/handler/*.go                 21 handlers
+internal/api/handler/*.go                 76 handler files (~40 route groups)
 internal/api/middleware/*.go              Auth, role, logging
-internal/model/*.go                       18 model files
+internal/model/*.go                       35 model files
 internal/store/interfaces.go             All interfaces
-internal/store/postgres/*.go             Database implementations
-internal/store/migrations/*.sql          Migrations (000001-000016)
+internal/store/postgres/*.go             55 store implementations
+internal/store/migrations/*.sql          Migrations (000001-000083)
 internal/judge/worker.go                 Judging engine
 internal/judge/executor/executor.go      go-judge HTTP client
 internal/judge/checker/checker.go        Output checkers
