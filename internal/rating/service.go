@@ -2,8 +2,10 @@ package rating
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/tahsinarafat/aioj/internal/model"
+	"github.com/tahsinarafat/aioj/internal/notify"
 	"github.com/tahsinarafat/aioj/internal/store"
 )
 
@@ -17,6 +19,8 @@ type ContestStanding struct {
 type Service struct {
 	ratingStore store.RatingStore
 	userStore   store.UserStore
+	// notify is optional; a nil notifier is a no-op.
+	notify *notify.Notifier
 }
 
 func NewService(rs store.RatingStore, us store.UserStore) *Service {
@@ -24,6 +28,12 @@ func NewService(rs store.RatingStore, us store.UserStore) *Service {
 		ratingStore: rs,
 		userStore:   us,
 	}
+}
+
+// WithNotifier attaches a notifier and returns the service, for call-site chaining.
+func (s *Service) WithNotifier(n *notify.Notifier) *Service {
+	s.notify = n
+	return s
 }
 
 // CalculateContestRatings computes rating changes for all participants
@@ -81,7 +91,76 @@ func (s *Service) ApplyContestRatings(ctx context.Context, contestID string, cha
 				}
 			}
 		}
+
+		// A rating change is the one event every competitor wants told about, and
+		// it is low volume: once per contest per user, not once per submission.
+		// Notification preferences gate it (CategoryRating).
+		s.notify.Notify(ctx, change.UserID, "rating_change",
+			fmt.Sprintf("Rating %+d → %d", change.RatingChange, change.NewRating),
+			fmt.Sprintf("You placed #%d. Your rating is now %d.", change.Rank, change.NewRating),
+			"/rating-history", notify.CategoryRating)
 	}
 
+	return nil
+}
+
+// TeamRater is the slice of the team store team ratings need.
+type TeamRater interface {
+	GetMembers(ctx context.Context, teamID string) ([]model.TeamMember, error)
+	UpdateRating(ctx context.Context, teamID string, newRating int) error
+}
+
+// TeamRegistrar lists the teams registered for a contest.
+type TeamRegistrar interface {
+	ListTeamRegistrations(ctx context.Context, contestID string) ([]model.TeamRegistration, error)
+}
+
+// userRatingReader reads a user's current rating.
+type userRatingReader interface {
+	GetProfile(ctx context.Context, userID string) (*model.UserProfile, error)
+}
+
+// RecalculateTeamRatings updates every team registered for a contest.
+//
+// teams.rating and max_rating were permanently 0: TeamStore.UpdateRating existed
+// but nothing ever called it, and team_rating_history was never written, so team
+// rankings sorted by a column that never changed. A team's rating is the mean of
+// its members' ratings after the round — the simplest rule that is not arbitrary,
+// and one that moves when the members' own ratings move.
+//
+// Only called for a published, rated contest (see CalculateRatings), so an
+// unapproved draft can never move a team's standing.
+func (s *Service) RecalculateTeamRatings(ctx context.Context, contestID string, teams TeamRater, regs TeamRegistrar, profiles userRatingReader) error {
+	registered, err := regs.ListTeamRegistrations(ctx, contestID)
+	if err != nil {
+		return err
+	}
+	for _, reg := range registered {
+		members, err := teams.GetMembers(ctx, reg.TeamID)
+		if err != nil {
+			return err
+		}
+		if len(members) == 0 {
+			continue
+		}
+		sum, n := 0, 0
+		for _, m := range members {
+			p, err := profiles.GetProfile(ctx, m.UserID)
+			if err != nil || p == nil || p.Rating == 0 {
+				// An unrated member contributes nothing rather than pulling the
+				// mean to zero, which would punish a team for fielding a new
+				// account.
+				continue
+			}
+			sum += p.Rating
+			n++
+		}
+		if n == 0 {
+			continue
+		}
+		if err := teams.UpdateRating(ctx, reg.TeamID, sum/n); err != nil {
+			return err
+		}
+	}
 	return nil
 }

@@ -2,9 +2,11 @@ package api
 
 import (
 	"context"
+	"time"
 
 	"github.com/tahsinarafat/aioj/internal/api/handler"
 	"github.com/tahsinarafat/aioj/internal/feature"
+	"github.com/tahsinarafat/aioj/internal/model"
 )
 
 // Deps holds all HTTP handler dependencies for the router.
@@ -51,6 +53,11 @@ type Deps struct {
 	Blog           *handler.BlogHandler
 	Editorial      *handler.EditorialHandler
 	APIKey         *handler.APIKeyHandler
+	// APIKeys and Users back the X-API-Key middleware. They are the stores
+	// themselves rather than handlers because the middleware runs before any
+	// handler and needs no HTTP surface of its own.
+	APIKeys        APIVerifier
+	APIKeyUsers    APIUserLookup
 	Webhook        *handler.WebhookHandler
 	Recommendation *handler.RecommendationHandler
 	Rankings       *handler.RankingsHandler
@@ -104,4 +111,19 @@ type Deps struct {
 	// MetricsToken guards /metrics. Empty means only an admin access token can
 	// scrape it (anonymous scraping is never allowed).
 	MetricsToken string
+}
+
+// APIVerifier is the key store surface the API-key middleware needs. Declared
+// here rather than in the middleware package so the router's Deps stays the one
+// place that knows which stores exist.
+type APIVerifier interface {
+	GetByHash(ctx context.Context, keyHash string) (*model.APIKey, error)
+	UpdateLastUsed(ctx context.Context, id string) error
+	IncrementRequestCount(ctx context.Context, keyID string, windowStart time.Time) error
+	GetRequestCount(ctx context.Context, keyID string, windowStart time.Time) (int, error)
+}
+
+// APIUserLookup resolves the owner of an API key.
+type APIUserLookup interface {
+	GetByID(ctx context.Context, id string) (*model.User, error)
 }

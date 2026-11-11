@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -18,6 +19,7 @@ import (
 	_ "github.com/tahsinarafat/aioj/internal/contest/format/ioi"
 	_ "github.com/tahsinarafat/aioj/internal/contest/format/oi"
 	"github.com/tahsinarafat/aioj/internal/model"
+	"github.com/tahsinarafat/aioj/internal/notify"
 	pdfgen "github.com/tahsinarafat/aioj/internal/pdf"
 	"github.com/tahsinarafat/aioj/internal/rating"
 	"github.com/tahsinarafat/aioj/internal/store"
@@ -62,6 +64,14 @@ type ContestHandler struct {
 	userStore    store.UserStore
 	teamStore    store.TeamStore
 	cache        *scoreboardCache
+	// notify is optional; a nil notifier is a no-op.
+	notify *notify.Notifier
+}
+
+// WithNotifier attaches a notifier and returns the handler, for call-site chaining.
+func (h *ContestHandler) WithNotifier(n *notify.Notifier) *ContestHandler {
+	h.notify = n
+	return h
 }
 
 func NewContestHandler(s *postgres.ContestStore, rs *postgres.RatingStore, ps store.ProblemStore, us store.UserStore, ts store.TeamStore) *ContestHandler {
@@ -664,7 +674,7 @@ func (h *ContestHandler) CalculateRatings(w http.ResponseWriter, r *http.Request
 		})
 	}
 
-	ratingService := rating.NewService(h.ratingStore, h.userStore)
+	ratingService := rating.NewService(h.ratingStore, h.userStore).WithNotifier(h.notify)
 	changes := ratingService.CalculateContestRatings(standings)
 
 	if err := ratingService.ApplyContestRatings(r.Context(), contest.ID, changes); err != nil {
@@ -672,9 +682,22 @@ func (h *ContestHandler) CalculateRatings(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	respondJSON(w, http.StatusOK, map[string]interface{}{
-		"changes": changes,
-	})
+	// Team ratings never moved: UpdateRating existed with no caller, so a team's
+	// rating stayed 0 forever and team rankings sorted a constant. Recalculated
+	// here, after the member ratings are applied, so it reflects this round.
+	var teamErr string
+	if err := ratingService.RecalculateTeamRatings(r.Context(), contest.ID, h.teamStore, h.store, h.userStore); err != nil {
+		// The individual ratings are already committed; report the partial failure
+		// rather than failing the whole request and implying nothing was applied.
+		teamErr = err.Error()
+		slog.Error("team rating recalculation failed", "contest_id", contest.ID, "error", err)
+	}
+
+	resp := map[string]interface{}{"changes": changes}
+	if teamErr != "" {
+		resp["team_rating_error"] = teamErr
+	}
+	respondJSON(w, http.StatusOK, resp)
 }
 
 func (h *ContestHandler) CreateEducational(w http.ResponseWriter, r *http.Request) {
@@ -1127,5 +1150,14 @@ func (h *ContestHandler) ReviewContest(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+
+	title := "Your contest was " + req.Status
+	content := c.Title
+	if req.Note != "" {
+		content += " — " + req.Note
+	}
+	h.notify.Notify(r.Context(), c.CreatedBy, "contest_review", title, content,
+		"/contests/"+c.ID, notify.CategoryContest)
+
 	respondJSON(w, http.StatusOK, map[string]string{"status": req.Status})
 }

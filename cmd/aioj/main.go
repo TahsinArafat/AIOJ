@@ -30,6 +30,7 @@ import (
 	"github.com/tahsinarafat/aioj/internal/judge/executor"
 	"github.com/tahsinarafat/aioj/internal/judge/pressure"
 	"github.com/tahsinarafat/aioj/internal/mail"
+	"github.com/tahsinarafat/aioj/internal/notify"
 	"github.com/tahsinarafat/aioj/internal/oauth"
 	"github.com/tahsinarafat/aioj/internal/observability"
 	"github.com/tahsinarafat/aioj/internal/plagiarism"
@@ -273,6 +274,12 @@ func main() {
 	statsH := handler.NewStatsHandler(submissionStore, problemStore)
 	notifStore := postgres.NewNotificationStore(db)
 	notifH := handler.NewNotificationHandler(notifStore)
+	// The producer side of notifications: nothing wrote to the table before this,
+	// so the bell was permanently empty. Attached to the handlers that have a
+	// verdict to deliver.
+	notifier := notify.New(notifStore)
+	problemH.WithNotifier(notifier)
+	contestH.WithNotifier(notifier)
 	groupStore := postgres.NewGroupStore(db)
 	groupH := handler.NewGroupHandler(groupStore, userStore, contestStore)
 	teamH := handler.NewTeamHandler(teamStore, userStore)
@@ -791,6 +798,8 @@ func main() {
 		Blog:            blogH,
 		Editorial:       editorialH,
 		APIKey:          apiKeyH,
+		APIKeys:         apiKeyStore,
+		APIKeyUsers:     userStore,
 		Webhook:         webhookH,
 		Recommendation:  recommendationH,
 		Rankings:        rankingsH,

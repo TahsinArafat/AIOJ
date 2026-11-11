@@ -18,15 +18,25 @@ import (
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
 	"github.com/tahsinarafat/aioj/internal/fps"
 	"github.com/tahsinarafat/aioj/internal/model"
+	"github.com/tahsinarafat/aioj/internal/notify"
 	"github.com/tahsinarafat/aioj/internal/store"
 )
 
 type ProblemHandler struct {
 	store store.ProblemStore
+	// notify is optional: a nil notifier is a no-op, so constructing a handler
+	// without one (tests, the seeder) still works.
+	notify *notify.Notifier
 }
 
 func NewProblemHandler(s store.ProblemStore) *ProblemHandler {
 	return &ProblemHandler{store: s}
+}
+
+// WithNotifier attaches a notifier and returns the handler, for call-site chaining.
+func (h *ProblemHandler) WithNotifier(n *notify.Notifier) *ProblemHandler {
+	h.notify = n
+	return h
 }
 
 // initialStatus is the review state a newly created problem starts in. Only an
@@ -605,5 +615,17 @@ func (h *ProblemHandler) ReviewProblem(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+
+	// Tell the author. This is the notification that most needed to exist: a
+	// setter submits a problem and otherwise has to poll the archive to learn
+	// whether an admin ever looked at it.
+	title := "Your problem was " + req.Status
+	content := p.Title
+	if req.Note != "" {
+		content += " — " + req.Note
+	}
+	h.notify.Notify(r.Context(), p.CreatedBy, "problem_review", title, content,
+		"/problems/"+p.Slug, notify.CategorySystem)
+
 	respondJSON(w, http.StatusOK, map[string]string{"status": req.Status})
 }

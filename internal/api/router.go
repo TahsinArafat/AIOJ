@@ -325,6 +325,25 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 		})
 	})
 
+	// Public API v1: authenticated by X-API-Key instead of a JWT.
+	//
+	// Deliberately read-only and small. Keys could be minted since migration
+	// 000014 and authenticated nothing — GetByHash had no caller and no
+	// middleware read the header — so the feature was keys-only. A narrow,
+	// obviously-safe surface is the right first step; widening it later is easy
+	// and shrinking a wide one is not.
+	if d.APIKeys != nil && d.APIKeyUsers != nil {
+		r.Route("/api/v1", func(r chi.Router) {
+			r.Use(middleware.APIKeyAuth(d.APIKeys, d.APIKeyUsers))
+			r.Get("/problems", problemH.List)
+			r.Get("/problems/tags", problemH.ListTags)
+			r.With(middleware.OptionalAuthMiddleware(jwtManager)).Get("/problems/{slug}", problemH.GetBySlug)
+			r.Get("/contests", contestH.List)
+			r.Get("/contests/{id}", contestH.GetByID)
+			r.Get("/stats/me", statsH.GetUserStats)
+		})
+	}
+
 	r.Route("/api/submissions", func(r chi.Router) {
 		r.Use(gate(feature.KeySubmissions))
 		// The site-wide status page is readable without an account, so it is
