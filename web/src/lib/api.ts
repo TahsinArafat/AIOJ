@@ -180,42 +180,84 @@ async function ensureCsrfToken(): Promise<string> {
 // /auth/refresh independently, and because the server rotates refresh tokens
 // the later call presented an already-consumed token and logged the user out.
 // One shared promise means concurrent 401s all await the same refresh.
-let refreshInFlight: Promise<boolean> | null = null
+//
+// The outcome is three-valued because "could not ask" and "the token is dead"
+// demand opposite reactions: only the second may end the session. Treating a
+// failed request as a rejection is what used to sign users out on a deploy, a
+// restarted database or a dropped connection.
+type RefreshOutcome = 'ok' | 'rejected' | 'unavailable'
 
-async function refreshAccessToken(): Promise<boolean> {
+// A spent token is not instantly proof the session is over. Refresh tokens
+// rotate and localStorage is shared by every tab, so another tab may have
+// spent this one moments ago and simply not have stored the replacement yet.
+// Re-reading storage across a short backoff separates that race from a dead
+// session. The wait stays under a second so a genuine expiry still ends
+// promptly instead of hanging the request.
+const REFRESH_REREAD_DELAYS_MS = [150, 350]
+
+function delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+let refreshInFlight: Promise<RefreshOutcome> | null = null
+
+async function refreshAccessToken(): Promise<RefreshOutcome> {
     if (refreshInFlight) return refreshInFlight
 
     refreshInFlight = (async () => {
         try {
             const csrf = await ensureCsrfToken()
-            const attempted = new Set<string>()
-            // Two passes over the candidates. The first offers the token stored
-            // right now (freshest across tabs), then the copy this tab holds in
-            // memory. The second re-reads storage: another tab may have rotated
-            // the token while the first pass was in flight, and adopting its
-            // result is the difference between continuing and a bogus sign-out.
-            for (let pass = 0; pass < 2; pass++) {
-                for (const token of [readStoredRefreshToken(), refreshToken]) {
-                    if (!token || attempted.has(token)) continue
-                    attempted.add(token)
-                    const res = await fetch(BASE + '/auth/refresh', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
-                        body: JSON.stringify({ refresh_token: token }),
-                    })
-                    if (res.ok) {
-                        const data = await res.json()
-                        setTokens(data.access_token, data.refresh_token)
-                        return true
+            for (let attempt = 0; attempt <= REFRESH_REREAD_DELAYS_MS.length; attempt++) {
+                // Two passes over the candidates. The first offers the token
+                // stored right now (freshest across tabs), then the copy this
+                // tab holds in memory. The second re-reads storage: another tab
+                // may have rotated the token while the first pass was in
+                // flight, and adopting its result is the difference between
+                // continuing and a bogus sign-out.
+                const attempted = new Set<string>()
+                let tried = 0
+                let sawSpentToken = false
+                for (let pass = 0; pass < 2; pass++) {
+                    for (const token of [readStoredRefreshToken(), refreshToken]) {
+                        if (!token || attempted.has(token)) continue
+                        attempted.add(token)
+                        tried++
+                        let res: Response
+                        try {
+                            res = await fetch(BASE + '/auth/refresh', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
+                                body: JSON.stringify({ refresh_token: token }),
+                            })
+                        } catch {
+                            // The server never answered, so nothing at all is
+                            // known about the token.
+                            return 'unavailable'
+                        }
+                        if (res.ok) {
+                            const data = await res.json()
+                            setTokens(data.access_token, data.refresh_token)
+                            return 'ok'
+                        }
+                        if (res.status === 401) {
+                            sawSpentToken = true
+                            continue
+                        }
+                        // 403 is a policy answer (a suspended account). Every
+                        // other status is the server failing, not the session.
+                        return res.status === 403 ? 'rejected' : 'unavailable'
                     }
-                    // Anything but "this token is spent" is not a rotation race:
-                    // stop and let the caller report the real failure.
-                    if (res.status !== 401) return false
                 }
+                if (tried === 0) return 'rejected'
+                if (!sawSpentToken) return 'unavailable'
+                if (attempt === REFRESH_REREAD_DELAYS_MS.length) return 'rejected'
+                // Every candidate was spent. Another tab may be mid-rotation and
+                // about to store the replacement, so re-read before giving up.
+                await delay(REFRESH_REREAD_DELAYS_MS[attempt])
             }
-            return false
+            return 'rejected'
         } catch {
-            return false
+            return 'unavailable'
         } finally {
             // Cleared in a microtask so callers awaiting this promise all see
             // the same result before a new refresh can start.
@@ -241,12 +283,18 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
     let res = await fetch(BASE + path, { ...opts, headers })
 
     if (res.status === 401 && (refreshToken || readStoredRefreshToken())) {
-        if (await refreshAccessToken()) {
+        const outcome = await refreshAccessToken()
+        if (outcome === 'ok') {
             headers['Authorization'] = `Bearer ${accessToken}`
             res = await fetch(BASE + path, { ...opts, headers })
-        } else {
+        } else if (outcome === 'rejected') {
             clearTokens()
             throw new Error('session expired')
+        } else {
+            // The session store could not be reached. Keep the tokens: the next
+            // request retries, and clearing here would turn a server restart or
+            // a database blip into a sign-out.
+            throw new Error('connection lost, please try again')
         }
     }
 

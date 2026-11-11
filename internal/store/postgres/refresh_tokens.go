@@ -3,11 +3,19 @@ package postgres
 import (
 	"context"
 	"database/sql"
-	"fmt"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
 )
+
+// ErrRefreshTokenSpent reports a token that is unknown or past its expiry.
+//
+// Callers must be able to tell this apart from a failure to reach the store.
+// A spent token is a verdict on the session; a store failure is not, and
+// answering 401 for the latter makes a database blip indistinguishable from an
+// expired session — the client cannot retry, so it signs the user out.
+var ErrRefreshTokenSpent = errors.New("refresh token not found or expired")
 
 type RefreshTokenStore struct{ db *sql.DB }
 
@@ -29,8 +37,8 @@ func (s *RefreshTokenStore) Consume(ctx context.Context, tokenHash string) (stri
 		`DELETE FROM refresh_tokens WHERE token_hash=$1 AND expires_at > NOW() RETURNING user_id`,
 		tokenHash,
 	).Scan(&userID)
-	if err == sql.ErrNoRows {
-		return "", fmt.Errorf("token not found or expired")
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrRefreshTokenSpent
 	}
 	if err != nil {
 		return "", err

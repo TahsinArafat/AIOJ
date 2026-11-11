@@ -172,6 +172,9 @@ type RefreshTokenStore interface {
 	Create(ctx context.Context, userID, tokenHash string, expiresAt time.Time) error
 	// Consume deletes the token and returns its owner, giving at-most-once use.
 	// Refresh therefore rotates: a replayed token finds no row and is rejected.
+	//
+	// A miss must be reported as postgres.ErrRefreshTokenSpent. Any other error
+	// means the store could not answer, which is not a verdict on the token.
 	Consume(ctx context.Context, tokenHash string) (string, error)
 	// RevokeAll invalidates every refresh token for a user. Used on password
 	// change and reset so a stolen token cannot outlive the credential it came

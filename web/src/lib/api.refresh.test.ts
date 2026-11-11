@@ -154,3 +154,84 @@ describe('api token refresh across tabs', () => {
         expect(fetchMock.mock.calls.filter(c => String(c[0]).includes('/auth/refresh'))).toHaveLength(0)
     })
 })
+
+/**
+ * A refresh that could not be answered is not a verdict on the session.
+ *
+ * Refresh tokens rotate, so the client used to treat every failure — a 5xx, a
+ * dropped connection, a restart — as "the token is dead", clear localStorage and
+ * sign the user out. A deploy or a database blip was therefore enough to end a
+ * healthy session, and one tab's failure signed out every other tab too.
+ */
+describe('api token refresh under failure', () => {
+    test('a server failure during refresh keeps the session', async () => {
+        fetchMock.mockImplementation(async (url: string) => {
+            if (url.includes('/auth/refresh')) {
+                return jsonResponse({ error: 'session store unavailable' }, 503)
+            }
+            return jsonResponse({ error: 'expired' }, 401)
+        })
+
+        await expect(api.notifications.unreadCount()).rejects.toThrow('connection lost')
+        // The token is still valid, so the next request must be able to retry it.
+        expect(getAccessToken()).toBe(ORIGINAL_TOKEN)
+        expect(localStorage.getItem('refresh_token')).toBe(ORIGINAL_REFRESH)
+    })
+
+    test('a dropped connection during refresh keeps the session', async () => {
+        fetchMock.mockImplementation(async (url: string) => {
+            if (url.includes('/auth/refresh')) throw new TypeError('Failed to fetch')
+            return jsonResponse({ error: 'expired' }, 401)
+        })
+
+        await expect(api.notifications.unreadCount()).rejects.toThrow('connection lost')
+        expect(getAccessToken()).toBe(ORIGINAL_TOKEN)
+        expect(localStorage.getItem('refresh_token')).toBe(ORIGINAL_REFRESH)
+    })
+
+    test('a rejected account still ends the session', async () => {
+        // 403 is a policy answer (a suspended account), not a transport fault.
+        fetchMock.mockImplementation(async (url: string) => {
+            if (url.includes('/auth/refresh')) return jsonResponse({ error: 'suspended' }, 403)
+            return jsonResponse({ error: 'expired' }, 401)
+        })
+
+        await expect(api.notifications.unreadCount()).rejects.toThrow('session expired')
+        expect(localStorage.getItem('refresh_token')).toBeNull()
+    })
+})
+
+/**
+ * The rotation race across tabs.
+ *
+ * Single-flight only covers one tab. When two tabs hold the same token, one
+ * spends it and the other's refresh comes back 401 — and if the winner has not
+ * stored the replacement by the time the loser re-reads storage, the loser used
+ * to conclude the session was over and sign out. The re-read backoff separates
+ * "spent a moment ago by another tab" from "dead".
+ */
+describe('api token refresh race across tabs', () => {
+    test('adopts the replacement another tab stores mid-refresh', async () => {
+        let attempts = 0
+        fetchMock.mockImplementation(async (url: string) => {
+            if (url.includes('/auth/refresh')) {
+                attempts++
+                if (attempts === 1) {
+                    // The other tab spent this token and is about to store its
+                    // replacement; it simply has not got there yet.
+                    setTimeout(() => localStorage.setItem('refresh_token', 'winner-token'), 60)
+                    return jsonResponse({ error: 'invalid refresh token' }, 401)
+                }
+                return jsonResponse({ access_token: 'fresh-access', refresh_token: 'fresh-refresh' })
+            }
+            const auth = (fetchMock.mock.calls.at(-1)?.[1] as { headers?: Record<string, string> } | undefined)?.headers?.Authorization
+            return auth === 'Bearer fresh-access' ? jsonResponse({ count: 0 }) : jsonResponse({ error: 'expired' }, 401)
+        })
+
+        await api.notifications.unreadCount()
+
+        expect(attempts).toBeGreaterThanOrEqual(2)
+        expect(getAccessToken()).toBe('fresh-access')
+        expect(localStorage.getItem('refresh_token')).toBe('fresh-refresh')
+    })
+})

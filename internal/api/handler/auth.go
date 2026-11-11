@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"html/template"
 	"log/slog"
 	"net/http"
@@ -20,6 +21,7 @@ import (
 	"github.com/tahsinarafat/aioj/internal/mail"
 	"github.com/tahsinarafat/aioj/internal/model"
 	"github.com/tahsinarafat/aioj/internal/store"
+	"github.com/tahsinarafat/aioj/internal/store/postgres"
 )
 
 type AuthHandler struct {
@@ -262,6 +264,15 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 	// carries a rotated one and a replay of the old value is rejected.
 	userID, err := h.refreshToks.Consume(r.Context(), hex.EncodeToString(hsh[:]))
 	if err != nil {
+		// Only a spent token is a verdict on the session. A store that cannot
+		// answer is not: reporting 401 would make a database blip or a deploy
+		// look like an expired session, and the client would sign the user out
+		// with no way to retry. 503 keeps the token alive for the next attempt.
+		if !errors.Is(err, postgres.ErrRefreshTokenSpent) {
+			slog.Error("refresh token lookup failed", "error", err)
+			http.Error(w, "session store unavailable", http.StatusServiceUnavailable)
+			return
+		}
 		http.Error(w, "invalid refresh token", http.StatusUnauthorized)
 		return
 	}

@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -14,14 +15,19 @@ import (
 
 	"github.com/tahsinarafat/aioj/internal/auth"
 	"github.com/tahsinarafat/aioj/internal/model"
+	"github.com/tahsinarafat/aioj/internal/store/postgres"
 )
 
 // memoryRefreshStore models the real store's rotation contract: a token can be
 // consumed exactly once, and RevokeAll drops everything for a user.
+//
+// consumeErr models a store that cannot answer. It is separate from a miss
+// because Refresh has to tell those apart — see the sentinel test below.
 type memoryRefreshStore struct {
-	mu      sync.Mutex
-	tokens  map[string]string // hash -> userID
-	revoked int
+	mu         sync.Mutex
+	tokens     map[string]string // hash -> userID
+	revoked    int
+	consumeErr error
 }
 
 func newMemoryRefreshStore() *memoryRefreshStore {
@@ -38,9 +44,12 @@ func (s *memoryRefreshStore) Create(_ context.Context, userID, hash string, _ ti
 func (s *memoryRefreshStore) Consume(_ context.Context, hash string) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.consumeErr != nil {
+		return "", s.consumeErr
+	}
 	userID, ok := s.tokens[hash]
 	if !ok {
-		return "", context.Canceled // any error; callers only check err != nil
+		return "", postgres.ErrRefreshTokenSpent
 	}
 	delete(s.tokens, hash)
 	return userID, nil
@@ -156,6 +165,46 @@ func TestRefresh_RejectsUnknownToken(t *testing.T) {
 	rec := postJSON(t, h.Refresh, "/api/auth/refresh", map[string]string{"refresh_token": "nope"})
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("status = %d, want 401", rec.Code)
+	}
+}
+
+// TestRefresh_StoreFailureIsNotASessionRejection is the regression guard for
+// the auto sign-out.
+//
+// Consume reports a miss and a store failure through one error return, and
+// Refresh answered 401 for either. A restarted database or a failed query was
+// therefore indistinguishable from an expired session: the client cleared the
+// tokens and signed the user out, even though the token was still valid and the
+// next attempt would have worked. Only a spent token may end the session.
+func TestRefresh_StoreFailureIsNotASessionRejection(t *testing.T) {
+	store := newMemoryRefreshStore()
+	store.consumeErr = errors.New("connection reset by peer")
+	h := newAuthHandlerWithStore(t, store)
+
+	rec := postJSON(t, h.Refresh, "/api/auth/refresh", map[string]string{"refresh_token": "still-valid"})
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want 503: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// TestRefresh_SpentTokenIsARejection is the other half of the contract: the
+// client may only be told "this session is over" when the store actually
+// answered that the token is gone.
+func TestRefresh_SpentTokenIsARejection(t *testing.T) {
+	store := newMemoryRefreshStore()
+	if err := store.Create(context.Background(), "u1", hashToken("live"), time.Now().Add(time.Hour)); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	h := newAuthHandlerWithStore(t, store)
+
+	// Spend it, then present it again.
+	rec := postJSON(t, h.Refresh, "/api/auth/refresh", map[string]string{"refresh_token": "live"})
+	if rec.Code != http.StatusOK {
+		t.Fatalf("first use status = %d, want 200: %s", rec.Code, rec.Body.String())
+	}
+	rec = postJSON(t, h.Refresh, "/api/auth/refresh", map[string]string{"refresh_token": "live"})
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("replayed token status = %d, want 401", rec.Code)
 	}
 }
 
