@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -58,6 +59,23 @@ func (c *scoreboardCache) set(key string, data []byte) {
 	c.entries[key] = scoreboardCacheEntry{data: data, expiresAt: time.Now().Add(c.ttl)}
 }
 
+// invalidate drops every cached view of one contest.
+//
+// Keys are `contestID:view:page:limit:judge`, and a judge, a competitor and a
+// paginated reader all hold separate entries — so anything that changes the
+// standings (an adjustment, a freeze edit) has to clear them all or one visitor
+// keeps seeing the pre-correction board until the TTL expires.
+func (c *scoreboardCache) invalidate(contestID string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	prefix := contestID + ":"
+	for k := range c.entries {
+		if strings.HasPrefix(k, prefix) {
+			delete(c.entries, k)
+		}
+	}
+}
+
 type ContestHandler struct {
 	store        *postgres.ContestStore
 	ratingStore  *postgres.RatingStore
@@ -65,6 +83,10 @@ type ContestHandler struct {
 	userStore    store.UserStore
 	teamStore    store.TeamStore
 	cache        *scoreboardCache
+	// adjustments holds the manual corrections judges apply to a round. Optional
+	// so tests can build the handler without one; a nil store means corrections
+	// simply do not exist, which is the pre-feature behaviour.
+	adjustments store.ContestAdjustmentStore
 	// notify and hooks are optional; nil instances are no-ops.
 	notify *notify.Notifier
 	hooks  *webhook.Dispatcher
@@ -95,6 +117,35 @@ func (h *ContestHandler) WithNotifier(n *notify.Notifier) *ContestHandler {
 
 func NewContestHandler(s *postgres.ContestStore, rs *postgres.RatingStore, ps store.ProblemStore, us store.UserStore, ts store.TeamStore) *ContestHandler {
 	return &ContestHandler{store: s, ratingStore: rs, problemStore: ps, userStore: us, teamStore: ts, cache: newScoreboardCache(30 * time.Second)}
+}
+
+// WithAdjustments attaches the manual-correction ledger and returns the handler,
+// for call-site chaining.
+func (h *ContestHandler) WithAdjustments(as store.ContestAdjustmentStore) *ContestHandler {
+	h.adjustments = as
+	return h
+}
+
+// ScoreboardCache exposes the cache so the adjustment handler can drop a round's
+// cached standings the moment it writes a correction.
+func (h *ContestHandler) ScoreboardCache() *scoreboardCache { return h.cache }
+
+// adjustmentsFor loads the manual corrections for a round. A handler built
+// without the ledger (tests, older wiring) simply has none.
+func (h *ContestHandler) adjustmentsFor(r *http.Request, contestID string) (map[string]model.AdjustmentTotals, error) {
+	if h.adjustments == nil {
+		return nil, nil
+	}
+	return h.adjustments.TotalsByUser(r.Context(), contestID)
+}
+
+// adjustmentFor reports the deltas applied to one participant, or nil when the
+// round has not corrected them.
+func adjustmentFor(adjusted map[string]model.AdjustmentTotals, userID string) *model.AdjustmentTotals {
+	if adj, ok := adjusted[userID]; ok {
+		return &adj
+	}
+	return nil
 }
 
 // initialContestStatus mirrors the problem rule: an admin publishes directly,
@@ -204,16 +255,26 @@ func (h *ContestHandler) Create(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "create failed", http.StatusInternalServerError)
 		return
 	}
-	for i, pid := range req.ProblemIDs {
-		idx := string(rune('A' + i))
+	// Attach the problems that survived the permission check, then derive the
+	// letters from the result. Numbering the request as it is walked would leave
+	// a gap wherever a problem was skipped — the exact drift that made the
+	// problems tab and the standings disagree about which problem is "A".
+	attached := 0
+	for _, pid := range req.ProblemIDs {
 		// Skip problems this creator may not use rather than failing the whole
 		// contest: a bad id must not cost the round, and silently attaching
 		// somebody else's draft would leak it through the contest endpoint.
 		if p, err := h.problemStore.GetByID(r.Context(), pid); err == nil && p != nil &&
 			canReadProblem(r.Context(), h.problemStore, p, claims) {
-			h.store.AddProblem(r.Context(), c.ID, pid, idx, 100, i)
+			if err := h.store.AddProblem(r.Context(), c.ID, pid,
+				model.ContestProblemIndex(attached), 100, attached); err == nil {
+				attached++
+			}
 		}
 	}
+	// Derive the letters from the attached set, so a skipped problem cannot
+	// leave a hole.
+	h.store.RenumberProblems(r.Context(), c.ID)
 	respondJSON(w, http.StatusCreated, c)
 }
 
@@ -511,7 +572,15 @@ func (h *ContestHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 	// back to the username below.
 	displayNames, _ := h.store.GetDisplayNames(r.Context(), contest.ID, participants)
 
+	// Manual corrections, loaded once for the page. They are applied to each
+	// participant's totals BEFORE ranking, so a judge's decision actually moves
+	// the order here and on the full scoreboard — the two read the same function.
+	adjustments, _ := h.adjustmentsFor(r, contest.ID)
+
 	participantsScores := make([]format.ParticipantScore, 0, len(participants))
+	// Participants carrying a correction, so the row can be marked and a reader
+	// knows the number they see is not purely the judge's output.
+	adjustedUsers := make(map[string]model.AdjustmentTotals)
 	for _, uid := range participants {
 		uname := h.store.GetUsername(r.Context(), uid)
 		ps := format.ParticipantScore{
@@ -547,6 +616,25 @@ func (h *ContestHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 			ps.TotalPenalty += result.Penalty
 		}
 
+		// Layer the human correction over the computed totals. The submissions
+		// keep the verdicts they earned; this is a separate, reasoned delta, so
+		// the round stays reproducible and the correction stays visible.
+		if adj, ok := adjustments[uid]; ok && !adj.IsZero() {
+			ps.TotalScore += float64(adj.PointDelta)
+			ps.TotalSolved += adj.SolvedDelta
+			ps.TotalPenalty += adj.PenaltyDelta
+			// TotalSolved is a count of problems; a correction can never push it
+			// below zero, and a negative count would rank better than solving
+			// nothing.
+			if ps.TotalSolved < 0 {
+				ps.TotalSolved = 0
+			}
+			if ps.TotalPenalty < 0 {
+				ps.TotalPenalty = 0
+			}
+			adjustedUsers[uid] = adj
+		}
+
 		participantsScores = append(participantsScores, ps)
 	}
 
@@ -562,6 +650,9 @@ func (h *ContestHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 		TotalPenalty int                            `json:"total_penalty"`
 		TotalScore   int                            `json:"total_score"`
 		Problems     map[string]model.ProblemResult `json:"problems"`
+		// Set when a judge corrected this participant's standing: the deltas that
+		// were applied, so the scoreboard can mark the row as adjusted.
+		Adjustment *model.AdjustmentTotals `json:"adjustment,omitempty"`
 	}
 
 	entries := make([]*Entry, len(ranks))
@@ -590,6 +681,7 @@ func (h *ContestHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 			TotalPenalty: rank.Score.TotalPenalty,
 			TotalScore:   int(rank.Score.TotalScore),
 			Problems:     probMap,
+			Adjustment:   adjustmentFor(adjustedUsers, rank.Score.UserID),
 		}
 	}
 
@@ -831,15 +923,19 @@ func (h *ContestHandler) CreateEducational(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	for i, pid := range req.ProblemIDs {
-		idx := string(rune('A' + i))
+	attached := 0
+	for _, pid := range req.ProblemIDs {
 		// Same rule as Create: only attach a problem this creator may read, so an
 		// educational round cannot be used to surface someone else's draft.
 		if p, err := h.problemStore.GetByID(r.Context(), pid); err == nil && p != nil &&
 			canReadProblem(r.Context(), h.problemStore, p, claims) {
-			h.store.AddProblem(r.Context(), c.ID, pid, idx, 100, i)
+			if err := h.store.AddProblem(r.Context(), c.ID, pid,
+				model.ContestProblemIndex(attached), 100, attached); err == nil {
+				attached++
+			}
 		}
 	}
+	h.store.RenumberProblems(r.Context(), c.ID)
 
 	respondJSON(w, http.StatusCreated, c)
 }
@@ -978,10 +1074,22 @@ func (h *ContestHandler) AddProblem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.store.AddProblem(r.Context(), c.ID, req.ProblemID, req.Index, req.Score, 0); err != nil {
+	// Appended at the end and then renumbered: the letter is a function of
+	// position, so honouring a caller-supplied one is what let two problems share
+	// a letter (or skip one) in the first place. req.Index is accepted for
+	// compatibility but the stored value is derived below.
+	existing, _ := h.store.GetProblems(r.Context(), c.ID)
+	if len(existing) >= model.MaxContestProblems {
+		http.Error(w, fmt.Sprintf("a contest can hold at most %d problems", model.MaxContestProblems),
+			http.StatusBadRequest)
+		return
+	}
+	if err := h.store.AddProblem(r.Context(), c.ID, req.ProblemID,
+		model.ContestProblemIndex(len(existing)), req.Score, len(existing)); err != nil {
 		http.Error(w, "failed to add problem", http.StatusInternalServerError)
 		return
 	}
+	h.store.RenumberProblems(r.Context(), c.ID)
 
 	respondJSON(w, http.StatusOK, map[string]string{"status": "added"})
 }
@@ -1011,7 +1119,17 @@ func (h *ContestHandler) RemoveProblem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	respondJSON(w, http.StatusOK, map[string]string{"status": "removed"})
+	// Close the gap the removal left. Without this the round keeps the missing
+	// problem's letter, and every surface that computes its own letter (the
+	// standings header, the PDF booklet) disagrees with the one that reads the
+	// stored value.
+	problems, _ := h.store.RenumberProblems(r.Context(), c.ID)
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"status": "removed",
+		// The new letters, so the setter's UI can re-label without a refetch.
+		"problems": problems,
+	})
 }
 
 func (h *ContestHandler) DownloadPDF(w http.ResponseWriter, r *http.Request) {
@@ -1126,12 +1244,19 @@ func (h *ContestHandler) UpdateProblem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.store.UpdateProblem(r.Context(), c.ID, problemID, req.Index, req.Score, req.SortOrder); err != nil {
+	// Only position and score are writable per problem. The letter is derived
+	// from position, so setting it directly is what let the two disagree.
+	if err := h.store.UpdateProblem(r.Context(), c.ID, problemID,
+		model.ContestProblemIndex(req.SortOrder), req.Score, req.SortOrder); err != nil {
 		http.Error(w, "failed to update problem", http.StatusInternalServerError)
 		return
 	}
+	problems, _ := h.store.RenumberProblems(r.Context(), c.ID)
 
-	respondJSON(w, http.StatusOK, map[string]string{"status": "updated"})
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"status":   "updated",
+		"problems": problems,
+	})
 }
 
 func (h *ContestHandler) ListMyContests(w http.ResponseWriter, r *http.Request) {

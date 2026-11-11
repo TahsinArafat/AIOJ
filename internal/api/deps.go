@@ -37,22 +37,24 @@ type Deps struct {
 	Submission     *handler.SubmissionHandler
 	Contest        *handler.ContestHandler
 	ContestProblem *handler.ContestProblemHandler
-	VJudge         *handler.VJudgeHandler
-	Admin          *handler.AdminHandler
-	Testcase       *handler.TestcaseHandler
-	WS             *handler.WSManager
-	Rating         *handler.RatingHandler
-	Registration   *handler.RegistrationHandler
-	Virtual        *handler.VirtualHandler
-	Gym            *handler.GymHandler
-	Hack           *handler.HackHandler
-	Stats          *handler.StatsHandler
-	Notification   *handler.NotificationHandler
-	Group          *handler.GroupHandler
-	Team           *handler.TeamHandler
-	Blog           *handler.BlogHandler
-	Editorial      *handler.EditorialHandler
-	APIKey         *handler.APIKeyHandler
+	// ContestAdjustment is the jury's manual-correction ledger for standings.
+	ContestAdjustment *handler.ContestAdjustmentHandler
+	VJudge            *handler.VJudgeHandler
+	Admin             *handler.AdminHandler
+	Testcase          *handler.TestcaseHandler
+	WS                *handler.WSManager
+	Rating            *handler.RatingHandler
+	Registration      *handler.RegistrationHandler
+	Virtual           *handler.VirtualHandler
+	Gym               *handler.GymHandler
+	Hack              *handler.HackHandler
+	Stats             *handler.StatsHandler
+	Notification      *handler.NotificationHandler
+	Group             *handler.GroupHandler
+	Team              *handler.TeamHandler
+	Blog              *handler.BlogHandler
+	Editorial         *handler.EditorialHandler
+	APIKey            *handler.APIKeyHandler
 	// APIKeys and Users back the X-API-Key middleware. They are the stores
 	// themselves rather than handlers because the middleware runs before any
 	// handler and needs no HTTP surface of its own.

@@ -228,6 +228,9 @@ type ContestStore interface {
 	UpdateProblem(ctx context.Context, contestID, problemID, index string, score, sortOrder int) error
 	RemoveProblem(ctx context.Context, contestID, problemID string) error
 	GetProblems(ctx context.Context, contestID string) ([]model.ContestProblem, error)
+	// RenumberProblems rewrites every letter and sort_order from position,
+	// closing any gap left by a removal. Returns the new ordering.
+	RenumberProblems(ctx context.Context, contestID string) ([]model.ContestProblem, error)
 	// GetProblemProgress is the per-viewer solve state and round-wide solve count
 	// for each problem, keyed by problem id. viewerID may be empty.
 	GetProblemProgress(ctx context.Context, contestID, viewerID string, beforeTime *time.Time) (map[string]model.ContestProblemProgress, error)
@@ -584,4 +587,18 @@ type AIGenerationStore interface {
 	// were removed. Active jobs are never deleted, however old, so a long run
 	// cannot be purged out from under the worker holding its claim.
 	PurgeCompletedBefore(ctx context.Context, cutoff time.Time) (int, error)
+}
+
+// ContestAdjustmentStore is the manual-correction ledger for contest standings.
+//
+// A correction is a signed delta layered over the computed standings, so these
+// methods never touch submissions: the judge's verdict stays what it was, and
+// the human decision lives in its own row with a reason attached.
+type ContestAdjustmentStore interface {
+	Create(ctx context.Context, a *model.ContestAdjustment) error
+	ListByContest(ctx context.Context, contestID string) ([]model.ContestAdjustment, error)
+	Delete(ctx context.Context, contestID, id string) error
+	// TotalsByUser returns the summed deltas per participant, which is what the
+	// scoreboard applies after the format has scored the submissions.
+	TotalsByUser(ctx context.Context, contestID string) (map[string]model.AdjustmentTotals, error)
 }

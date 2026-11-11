@@ -52,6 +52,9 @@ func (s *bulkContestStore) GetByID(_ context.Context, id string) (*model.Contest
 func (s *bulkContestStore) HasAccess(context.Context, string, string, ...string) bool {
 	return s.allowed
 }
+func (s *bulkContestStore) GetProblems(context.Context, string) ([]model.ContestProblem, error) {
+	return nil, nil
+}
 
 func bulkHandler(t *testing.T, mine map[string]*model.Clarification, allowed bool) (*ClarificationHandler, *bulkClarificationStore) {
 	t.Helper()

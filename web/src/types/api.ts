@@ -269,6 +269,39 @@ export interface ContestNotice {
     created_at: string
 }
 
+/**
+ * A manual correction to a contest standing.
+ *
+ * A signed delta layered over the computed result — the submissions keep the
+ * verdicts they earned, and the reason is required so the correction can be
+ * understood months later.
+ */
+export interface ContestAdjustment {
+    id: string
+    contest_id: string
+    user_id: string
+    username?: string
+    /** The onsite team the account competes as, when it was minted for one. */
+    team_name?: string
+    scope: 'contest' | 'problem' | 'submission'
+    problem_id?: string | null
+    problem_index?: string | null
+    submission_id?: string | null
+    point_delta: number
+    solved_delta: number
+    penalty_delta: number
+    reason: string
+    created_by?: string | null
+    created_at: string
+}
+
+/** The deltas applied to one scoreboard row, present only when corrected. */
+export interface ScoreboardAdjustment {
+    PointDelta: number
+    SolvedDelta: number
+    PenaltyDelta: number
+}
+
 export interface ContestPermission {
     contest_id: string
     user_id: string

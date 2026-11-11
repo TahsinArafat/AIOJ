@@ -310,8 +310,17 @@ func (g *Generator) GenerateContestPDF(contest *model.Contest, problems []model.
 
 		memLimit := p.MemoryLimit / 1024
 
+		// The round's own letter, not this loop's position. The caller already
+		// resolved it from contest_problems; computing 'A' + i here meant a
+		// booklet printed after a problem was removed disagreed with every other
+		// surface about which problem was which.
+		letter := p.Index
+		if letter == "" {
+			letter = model.ContestProblemIndex(i)
+		}
+
 		probList = append(probList, problemData{
-			Index:        string(rune('A' + i)),
+			Index:        letter,
 			Title:        p.Title,
 			TimeLimit:    p.TimeLimit,
 			MemoryLimit:  memLimit,

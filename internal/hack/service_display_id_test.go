@@ -50,6 +50,9 @@ func (canonicalHackContestStore) RemoveProblem(context.Context, string, string) 
 func (canonicalHackContestStore) GetProblems(context.Context, string) ([]model.ContestProblem, error) {
 	return nil, nil
 }
+func (canonicalHackContestStore) RenumberProblems(context.Context, string) ([]model.ContestProblem, error) {
+	return nil, nil
+}
 func (canonicalHackContestStore) GetProblemProgress(context.Context, string, string, *time.Time) (map[string]model.ContestProblemProgress, error) {
 	return nil, nil
 }

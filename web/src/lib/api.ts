@@ -331,7 +331,7 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
     }
 }
 
-import type { AIBrief, AIBriefPreset, AIGenerationJob, AIModel, APIKey, ActivityItem, AdminBulkAction, AdminBulkResponse, AdminFeature, AdminUserDetail, AdminUserQuery, AdminAuthMethods, AdminUserRow, AuthMethods, AuthResponse, AuthSessionResponse, BackupFile, BlogListItem, BlogPost, BotAccount, Clarification, Class, ClassListItem, ClassMember, Comment, Contest, ContestDetailResponse, ContestNotice, ContestPermission, ContestProblem, ContestRegistration, ContestSubmissionsResponse, DetectedTool, Editorial, FeaturePolicy, Group, GroupListItem, GroupMember, GroupPendingInvite, GymContest, GymData, Hack, HackResult, HackSubmission, LanguageConfig, Notification, NotificationPreferences, OAuthUsernameCheck, OnsiteBatchUser, Organization, OrganizationListItem, OrganizationMember, PendingInvite, PendingRemoteSubmission, PlagiarismPairDetail, PlagiarismReport, Problem, ProblemI18n, ProblemListItem, ProblemPermission, ProblemStats, PublicProfile, RankingEntry, RatingHistoryEntry, RemoteLanguage, ResolvedFeature, ScoreboardData, SetterApplication, Submission, Team, TeamListItem, TeamMember, TestcaseFile, TestcaseFileContent, TestResult, TrainingPlan, TrainingPlanDetail, TrainingPlanEnrollment, TrainingPlanProblem, TrainingPlanProgress, TrainingPlanSection, User, UserAchievement, UserProblemStats, UserProfile, VirtualContest, VirtualStatusResponse, WeakTagsRecommendations, Webhook } from '../types/api'
+import type { AIBrief, ContestAdjustment, AIBriefPreset, AIGenerationJob, AIModel, APIKey, ActivityItem, AdminBulkAction, AdminBulkResponse, AdminFeature, AdminUserDetail, AdminUserQuery, AdminAuthMethods, AdminUserRow, AuthMethods, AuthResponse, AuthSessionResponse, BackupFile, BlogListItem, BlogPost, BotAccount, Clarification, Class, ClassListItem, ClassMember, Comment, Contest, ContestDetailResponse, ContestNotice, ContestPermission, ContestProblem, ContestRegistration, ContestSubmissionsResponse, DetectedTool, Editorial, FeaturePolicy, Group, GroupListItem, GroupMember, GroupPendingInvite, GymContest, GymData, Hack, HackResult, HackSubmission, LanguageConfig, Notification, NotificationPreferences, OAuthUsernameCheck, OnsiteBatchUser, Organization, OrganizationListItem, OrganizationMember, PendingInvite, PendingRemoteSubmission, PlagiarismPairDetail, PlagiarismReport, Problem, ProblemI18n, ProblemListItem, ProblemPermission, ProblemStats, PublicProfile, RankingEntry, RatingHistoryEntry, RemoteLanguage, ResolvedFeature, ScoreboardData, SetterApplication, Submission, Team, TeamListItem, TeamMember, TestcaseFile, TestcaseFileContent, TestResult, TrainingPlan, TrainingPlanDetail, TrainingPlanEnrollment, TrainingPlanProblem, TrainingPlanProgress, TrainingPlanSection, User, UserAchievement, UserProblemStats, UserProfile, VirtualContest, VirtualStatusResponse, WeakTagsRecommendations, Webhook } from '../types/api'
 
 export const api = {
     auth: {
@@ -965,6 +965,28 @@ export const api = {
             if (filters?.status) params.set('status', filters.status);
             return request<ContestSubmissionsResponse>(`/contests/${id}/submissions${params.toString() ? '?' + params : ''}`);
         },
+    },
+    /**
+     * Manual standings corrections. A delta layered over the computed result, so
+     * the submissions keep the verdicts they earned.
+     */
+    adjustments: {
+        list: (contestId: string) =>
+            request<{ data: ContestAdjustment[] }>(`/contests/${contestId}/adjustments`),
+        create: (contestId: string, d: {
+            user_id: string
+            scope: 'contest' | 'problem' | 'submission'
+            problem_id?: string
+            submission_id?: string
+            point_delta?: number
+            solved_delta?: number
+            penalty_delta?: number
+            reason: string
+        }) => request<ContestAdjustment>(`/contests/${contestId}/adjustments`, {
+            method: 'POST', body: JSON.stringify(d),
+        }),
+        remove: (contestId: string, id: string) =>
+            request(`/contests/${contestId}/adjustments/${id}`, { method: 'DELETE' }),
     },
     clarifications: {
         /**

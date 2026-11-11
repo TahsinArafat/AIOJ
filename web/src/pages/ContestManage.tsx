@@ -8,7 +8,7 @@ import { useTheme } from '../context/ThemeContext'
 import {
     FileText, FileDown, MessageSquare, Users, FileCode, Printer,
     Trophy, BarChart3, Search, CircleDot, Megaphone, Shield, Settings,
-    Loader2, Play, Check, EyeOff, UserPlus, ArrowDown, ArrowUp
+    Loader2, Play, Check, EyeOff, UserPlus, ArrowDown, ArrowUp, Scale
 } from 'lucide-react'
 import { useConfirm } from '../components/ConfirmDialog'
 import { useToast } from '../components/Toast'
@@ -16,6 +16,7 @@ import { EmptyState } from '../components/EmptyState'
 import { isoToLocalInput, localInputToIso } from '../lib/datetime'
 import { useClarifications } from '../hooks/useClarifications'
 import { ClarificationsPanel } from '../components/ClarificationsPanel'
+import { ContestAdjustmentsPanel } from './admin/ContestAdjustmentsPanel'
 
 function indexLabel(i: number): string {
     let s = ''
@@ -35,6 +36,7 @@ const TABS = [
     { key: 'submissions', label: 'Submissions', Icon: FileCode },
     { key: 'prints', label: 'Prints', Icon: Printer },
     { key: 'standings', label: 'Standings', Icon: Trophy },
+    { key: 'adjustments', label: 'Adjustments', Icon: Scale },
     { key: 'statistics', label: 'Statistics', Icon: BarChart3 },
     { key: 'plagiarisms', label: 'Plagiarisms', Icon: Search },
     { key: 'balloons', label: 'Balloons', Icon: CircleDot },
@@ -78,7 +80,7 @@ export default function ContestManage() {
         const hash = window.location.hash.replace('#', '') as TabKey
         const validTabs: TabKey[] = [
             'challenges', 'booklet', 'clarifications', 'participants', 'submissions',
-            'prints', 'standings', 'statistics', 'plagiarisms', 'balloons',
+            'prints', 'standings', 'adjustments', 'statistics', 'plagiarisms', 'balloons',
             'announcements', 'moderators', 'onsite-teams', 'settings'
         ]
         return validTabs.includes(hash) ? hash : 'challenges'
@@ -97,7 +99,7 @@ export default function ContestManage() {
             const next = window.location.hash.replace('#', '') as TabKey
             const valid: TabKey[] = [
                 'challenges', 'booklet', 'clarifications', 'participants', 'submissions',
-                'prints', 'standings', 'statistics', 'plagiarisms', 'balloons',
+                'prints', 'standings', 'adjustments', 'statistics', 'plagiarisms', 'balloons',
                 'announcements', 'moderators', 'onsite-teams', 'settings'
             ]
             if (valid.includes(next)) setTab(next)
@@ -164,6 +166,7 @@ export default function ContestManage() {
                     {tab === 'submissions' && <SubmissionsTab contestId={id!} />}
                     {tab === 'prints' && <PrintsTab contestId={id!} />}
                     {tab === 'standings' && <StandingsTab contestId={id!} />}
+                    {tab === 'adjustments' && <ContestAdjustmentsPanel contestId={id!} />}
                     {tab === 'statistics' && <StatisticsTab contestId={id!} />}
                     {tab === 'plagiarisms' && <PlagiarismsTab contestId={id!} />}
                     {tab === 'balloons' && <BalloonsTab contestId={id!} />}

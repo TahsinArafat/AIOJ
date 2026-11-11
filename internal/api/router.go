@@ -20,6 +20,7 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 	submissionH := d.Submission
 	contestH := d.Contest
 	contestProblemH := d.ContestProblem
+	contestAdjH := d.ContestAdjustment
 	vjudgeH := d.VJudge
 	adminH := d.Admin
 	testcaseH := d.Testcase
@@ -414,6 +415,18 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 		r.With(middleware.AuthMiddleware(jwtManager)).Post("/{id}/register-team", contestH.RegisterTeam)
 		// The roster is organizer information; the handler checks manager/judge.
 		r.With(middleware.AuthMiddleware(jwtManager)).Get("/{id}/team-registrations", contestH.ListTeamRegistrations)
+	})
+
+	// Manual score corrections. Deliberately NOT inside the setter-workspace
+	// group above: a correction is a judging action, and a judge of a round does
+	// not necessarily have authoring access. The handler itself checks
+	// manager|judge|admin against the specific contest.
+	r.Route("/api/contests/{id}/adjustments", func(r chi.Router) {
+		r.Use(gate(feature.KeyContests))
+		r.Use(middleware.AuthMiddleware(jwtManager))
+		r.Get("/", contestAdjH.List)
+		r.Post("/", contestAdjH.Create)
+		r.Delete("/{adjustmentId}", contestAdjH.Delete)
 	})
 
 	r.Route("/api/contests/{contestId}/clarifications", func(r chi.Router) {

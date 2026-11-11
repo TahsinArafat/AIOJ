@@ -12,20 +12,23 @@ import (
 	"github.com/tahsinarafat/aioj/internal/store"
 )
 
-// clarificationContest is the slice of ContestStore the clarification handlers
-// need. Narrower than the whole store so the permission rule can be tested
-// without standing up every contest method.
-type clarificationContest interface {
+// contestStaffStore is the slice of ContestStore the staff-only per-contest
+// handlers need: resolve the round, check whether the caller may act on it, and
+// read its problems. Narrower than the whole store so the permission rules can be
+// tested without standing up every contest method. (Distinct from
+// contest_access.go's contestAccess, which is the read-visibility seam.)
+type contestStaffStore interface {
 	GetByID(ctx context.Context, id string) (*model.Contest, error)
 	HasAccess(ctx context.Context, contestID, userID string, levels ...string) bool
+	GetProblems(ctx context.Context, contestID string) ([]model.ContestProblem, error)
 }
 
 type ClarificationHandler struct {
 	clarificationStore store.ClarificationStore
-	contestStore       clarificationContest
+	contestStore       contestStaffStore
 }
 
-func NewClarificationHandler(cs store.ClarificationStore, cts clarificationContest) *ClarificationHandler {
+func NewClarificationHandler(cs store.ClarificationStore, cts contestStaffStore) *ClarificationHandler {
 	return &ClarificationHandler{
 		clarificationStore: cs,
 		contestStore:       cts,

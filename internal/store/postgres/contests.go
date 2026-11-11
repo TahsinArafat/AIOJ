@@ -323,6 +323,61 @@ func (s *ContestStore) RemoveProblem(ctx context.Context, contestID, problemID s
 	return err
 }
 
+// RenumberProblems rewrites every problem's index and sort_order from its
+// position, closing any gap left by a removal.
+//
+// The order is the existing sort_order with index as the tie-break, so a round
+// whose sort_order was never maintained still comes out in the order a reader
+// expects. One transaction: a half-applied renumber would leave duplicate or
+// missing letters, which is exactly the state this exists to remove.
+//
+// Returns the new ordering so the caller can answer with what it wrote.
+func (s *ContestStore) RenumberProblems(ctx context.Context, contestID string) ([]model.ContestProblem, error) {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	rows, err := tx.QueryContext(ctx,
+		`SELECT problem_id FROM contest_problems
+		  WHERE contest_id = $1
+		  ORDER BY sort_order, index`, contestID)
+	if err != nil {
+		return nil, fmt.Errorf("list contest problems: %w", err)
+	}
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	out := make([]model.ContestProblem, 0, len(ids))
+	for i, pid := range ids {
+		idx := model.ContestProblemIndex(i)
+		if _, err := tx.ExecContext(ctx,
+			`UPDATE contest_problems SET index = $3, sort_order = $4
+			  WHERE contest_id = $1 AND problem_id = $2`,
+			contestID, pid, idx, i); err != nil {
+			return nil, fmt.Errorf("renumber %s: %w", pid, err)
+		}
+		out = append(out, model.ContestProblem{ContestID: contestID, ProblemID: pid, Index: idx, SortOrder: i})
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("commit: %w", err)
+	}
+	return out, nil
+}
+
 func (s *ContestStore) GetProblems(ctx context.Context, contestID string) ([]model.ContestProblem, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT cp.contest_id,cp.problem_id,cp.index,cp.score,cp.sort_order,COALESCE(p.title,''),COALESCE(p.slug,'')

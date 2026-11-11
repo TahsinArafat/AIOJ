@@ -15,6 +15,7 @@ import { useConfirm } from '../components/ConfirmDialog'
 import { useToast } from '../components/Toast'
 import { ContestCountdown, ContestRunningClock } from '../components/ContestClock'
 import { formatDuration } from '../lib/contestTime'
+import { problemLetter } from '../lib/contestProblems'
 import { useContestAnnouncements } from '../hooks/useContestAnnouncements'
 import { useClarifications } from '../hooks/useClarifications'
 import { ClarificationsPanel, AskClarificationForm } from '../components/ClarificationsPanel'
@@ -200,7 +201,7 @@ export default function ContestDetail() {
         const bestTime: Record<string, number> = {}
         for (const row of standings) {
             for (let pi = 0; pi < probList.length; pi++) {
-                const pidx = probList[pi].index || String.fromCharCode(65 + pi)
+                const pidx = problemLetter(probList[pi], pi)
                 const c = row.problems?.[pidx]
                 if (c?.solved && (c.attempts ?? 0) > 0) {
                     if (!(pidx in bestTime) || (c.time ?? Infinity) < bestTime[pidx]) {
@@ -467,7 +468,7 @@ export default function ContestDetail() {
                                         </thead>
                                         <tbody>
                                             {problems.map((p, i) => {
-                                                const letter = p.index || String.fromCharCode(65 + i)
+                                                const letter = problemLetter(p, i)
                                                 // A green tick means solved. An amber dot
                                                 // means tried but not yet solved, so a
                                                 // half-finished problem is not mistaken
@@ -577,7 +578,10 @@ export default function ContestDetail() {
                                                 {(standingsProblems.length > 0 ? standingsProblems : problems).map((p, i) => (
                                                     <th key={i} className="text-center px-1 py-3 font-bold text-xs uppercase tracking-wider w-16">
                                                         <div className="flex flex-col items-center">
-                                                            <span className="text-base">{String.fromCharCode(65 + i)}</span>
+                                                            {/* The stored letter, not this list's position:
+                                                                a removed problem used to leave the header
+                                                                saying "A" while the problems tab said "B". */}
+                                                            <span className="text-base">{problemLetter(p, i)}</span>
                                                             {p.title && <span className="text-[11px] text-muted font-normal normal-case truncate max-w-[60px]" title={p.title}>{p.title}</span>}
                                                         </div>
                                                     </th>
@@ -619,7 +623,7 @@ export default function ContestDetail() {
                                                         </td>
                                                         <td className="text-center px-3 py-2.5 font-mono text-muted text-xs">{penaltyStr}</td>
                                                         {probList.map((p, i) => {
-                                                            const pidx = p.index || String.fromCharCode(65 + i)
+                                                            const pidx = problemLetter(p, i)
                                                             const cell = row.problems?.[pidx] || {}
                                                             const solved = cell.solved
                                                             const attempts = cell.attempts || 0

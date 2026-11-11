@@ -64,6 +64,28 @@ const (
 	ContestPermissionTester  = "tester"
 )
 
+// MaxContestProblems bounds a round at the 26 single-letter indices the schema
+// stores (contest_problems.index is CHAR(1)).
+const MaxContestProblems = 26
+
+// ContestProblemIndex is the single place a round's problem letter is derived.
+//
+// The letter is a function of position in sort_order, never a stored fact that
+// can drift: removing a problem closes the gap and re-letters what follows, so
+// every surface (problems tab, standings, booklet, PDF) reads the same letter
+// for the same problem. Before this there were four independent computations and
+// a removal left the stored index stale, which is how a contest ended up showing
+// "B" on one tab and "A" in the standings for the same problem.
+func ContestProblemIndex(position int) string {
+	if position < 0 {
+		position = 0
+	}
+	if position >= MaxContestProblems {
+		position = MaxContestProblems - 1
+	}
+	return string(rune('A' + position))
+}
+
 type ContestProblem struct {
 	ContestID string `json:"contest_id"`
 	ProblemID string `json:"problem_id"`
