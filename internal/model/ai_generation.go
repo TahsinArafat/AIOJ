@@ -55,8 +55,12 @@ type ProblemGenerationAsset struct {
 	GeneratorSource           string
 	ReferenceSolutionLanguage string
 	ReferenceSolutionSource   string
-	SeedManifest              json.RawMessage
-	ValidationSummary         json.RawMessage
-	TestdataPath              string
-	CreatedAt                 time.Time
+	// ValidatorLanguage/ValidatorSource carry the AI-produced validator, which
+	// used to die with the job's workspace because nothing stored it.
+	ValidatorLanguage string
+	ValidatorSource   string
+	SeedManifest      json.RawMessage
+	ValidationSummary json.RawMessage
+	TestdataPath      string
+	CreatedAt         time.Time
 }

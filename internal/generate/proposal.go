@@ -32,26 +32,30 @@ type ValidationReport struct {
 }
 
 type Proposal struct {
-	Title               string              `json:"title"`
-	Description         string              `json:"description"`
-	Constraints         string              `json:"constraints"`
-	InputFormat         string              `json:"input_format"`
-	OutputFormat        string              `json:"output_format"`
-	Hint                string              `json:"hint"`
-	SampleCases         []model.SampleCase  `json:"sample_cases"`
-	TimeLimitMs         int                 `json:"time_limit_ms"`
-	MemoryLimitKB       int                 `json:"memory_limit_kb"`
-	Tags                []string            `json:"tags"`
-	Difficulty          string              `json:"difficulty"`
-	SolutionCode        string              `json:"solution_code"`
-	SolutionLanguage    string              `json:"solution_language"`
-	EditorialTitle      string              `json:"editorial_title"`
-	EditorialContent    string              `json:"editorial_content"`
-	EditorialApproach   string              `json:"editorial_approach"`
-	TimeComplexity      string              `json:"time_complexity"`
-	SpaceComplexity     string              `json:"space_complexity"`
-	GeneratorCode       string              `json:"generator_code"`
-	GeneratorLanguage   string              `json:"generator_language"`
+	Title             string             `json:"title"`
+	Description       string             `json:"description"`
+	Constraints       string             `json:"constraints"`
+	InputFormat       string             `json:"input_format"`
+	OutputFormat      string             `json:"output_format"`
+	Hint              string             `json:"hint"`
+	SampleCases       []model.SampleCase `json:"sample_cases"`
+	TimeLimitMs       int                `json:"time_limit_ms"`
+	MemoryLimitKB     int                `json:"memory_limit_kb"`
+	Tags              []string           `json:"tags"`
+	Difficulty        string             `json:"difficulty"`
+	SolutionCode      string             `json:"solution_code"`
+	SolutionLanguage  string             `json:"solution_language"`
+	EditorialTitle    string             `json:"editorial_title"`
+	EditorialContent  string             `json:"editorial_content"`
+	EditorialApproach string             `json:"editorial_approach"`
+	TimeComplexity    string             `json:"time_complexity"`
+	SpaceComplexity   string             `json:"space_complexity"`
+	GeneratorCode     string             `json:"generator_code"`
+	GeneratorLanguage string             `json:"generator_language"`
+	// The harness already produces a validator (ArtifactValidator); the proposal
+	// had no field to carry it, so it was discarded on the way to the database.
+	ValidatorCode       string              `json:"validator_code"`
+	ValidatorLanguage   string              `json:"validator_language"`
 	Seeds               []int64             `json:"seeds"`
 	CuratedCases        []CuratedCase       `json:"curated_cases"`
 	DifficultyRationale DifficultyRationale `json:"difficulty_rationale"`

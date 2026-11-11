@@ -150,7 +150,7 @@ func (s *ApplyService) Apply(ctx context.Context, job *model.AIGenerationJob, ac
 		}
 		seeds, _ := json.Marshal(p.Seeds)
 		report := job.ValidationReport
-		a := &model.ProblemGenerationAsset{ProblemID: problem.ID, JobID: job.ID, GeneratorLanguage: p.GeneratorLanguage, GeneratorSource: p.GeneratorCode, ReferenceSolutionLanguage: p.SolutionLanguage, ReferenceSolutionSource: p.SolutionCode, SeedManifest: seeds, ValidationSummary: report}
+		a := &model.ProblemGenerationAsset{ProblemID: problem.ID, JobID: job.ID, GeneratorLanguage: p.GeneratorLanguage, GeneratorSource: p.GeneratorCode, ReferenceSolutionLanguage: p.SolutionLanguage, ReferenceSolutionSource: p.SolutionCode, ValidatorLanguage: p.ValidatorLanguage, ValidatorSource: p.ValidatorCode, SeedManifest: seeds, ValidationSummary: report}
 		if err = s.Assets.Create(ctx, a); err != nil {
 			return nil, err
 		}

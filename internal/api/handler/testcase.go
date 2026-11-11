@@ -15,6 +15,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
 	"github.com/tahsinarafat/aioj/internal/fps"
+	"github.com/tahsinarafat/aioj/internal/judge/compiler"
+	"github.com/tahsinarafat/aioj/internal/judge/validator"
 	"github.com/tahsinarafat/aioj/internal/model"
 	"github.com/tahsinarafat/aioj/internal/store"
 )
@@ -43,10 +45,53 @@ var (
 type TestcaseHandler struct {
 	store   store.ProblemStore
 	dataDir string
+	// validators is optional; nil means the endpoint reports "not configured".
+	validators *validator.Runner
+	// langs resolves a validator's language; nil falls back to the runner's
+	// default, which is what an unconfigured deployment wants.
+	langs func() map[string]*compiler.LangConfig
 }
 
 func NewTestcaseHandler(s store.ProblemStore, dataDir string) *TestcaseHandler {
 	return &TestcaseHandler{store: s, dataDir: dataDir}
+}
+
+// WithValidator attaches a validator runner and its language resolver.
+func (h *TestcaseHandler) WithValidator(r *validator.Runner, langs func() map[string]*compiler.LangConfig) *TestcaseHandler {
+	h.validators = r
+	h.langs = langs
+	return h
+}
+
+// ValidateCases runs the problem's stored validator over every input file and
+// reports which cases it rejects.
+//
+// A validator existed only inside the AI harness sandbox: a hand-authored problem
+// could ship with inputs no validator had ever seen. This is the setter-facing run.
+func (h *TestcaseHandler) ValidateCases(w http.ResponseWriter, r *http.Request) {
+	p := h.authorProblem(w, r)
+	if p == nil {
+		return
+	}
+	if h.validators == nil {
+		http.Error(w, "validator runner is not configured", http.StatusServiceUnavailable)
+		return
+	}
+	if p.ValidatorSource == "" {
+		http.Error(w, "this problem has no validator", http.StatusBadRequest)
+		return
+	}
+
+	var langs map[string]*compiler.LangConfig
+	if h.langs != nil {
+		langs = h.langs()
+	}
+	report, err := h.validators.Validate(r.Context(), p, langs)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	respondJSON(w, http.StatusOK, report)
 }
 
 // testcaseFile is one file in a problem's testdata directory.

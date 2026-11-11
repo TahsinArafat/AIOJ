@@ -379,6 +379,13 @@ export const api = {
         // for review rather than to flip a visible flag.
         submitForReview: (slug: string) =>
             request(`/problems/${slug}/submit`, { method: 'POST' }),
+        // Run the problem's validator over its inputs. A validator existed only
+        // inside the AI harness before this; a setter can now run it by hand.
+        validateCases: (slug: string) =>
+            request<{ checked: number; failed: number; cases: { name: string; ok: boolean; message?: string }[] }>(
+                `/problems/${slug}/validate-cases`,
+                { method: 'POST' },
+            ),
         // The contest problem picker: the archive plus the caller's own
         // unpublished drafts, which the archive listing can never return.
         listSelectable: (search: string, offset = 0, limit = 20) => {

@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 	"unicode/utf8"
@@ -27,8 +28,10 @@ import (
 	"github.com/tahsinarafat/aioj/internal/harness"
 	"github.com/tahsinarafat/aioj/internal/harness/problemgen"
 	"github.com/tahsinarafat/aioj/internal/judge"
+	"github.com/tahsinarafat/aioj/internal/judge/compiler"
 	"github.com/tahsinarafat/aioj/internal/judge/executor"
 	"github.com/tahsinarafat/aioj/internal/judge/pressure"
+	"github.com/tahsinarafat/aioj/internal/judge/validator"
 	"github.com/tahsinarafat/aioj/internal/mail"
 	"github.com/tahsinarafat/aioj/internal/notify"
 	"github.com/tahsinarafat/aioj/internal/oauth"
@@ -259,6 +262,22 @@ func main() {
 	adminH := handler.NewAdminHandler(userStore, setterStore, refreshTokenStore)
 
 	testcaseH := handler.NewTestcaseHandler(problemStore, "./testdata")
+	// The validator exists only inside the AI harness today; this gives setters the
+	// same check on hand-authored problems. Languages are loaded once and shared.
+	validatorRunner := validator.New(compiler.New(execClient), execClient)
+	var validatorLangsOnce sync.Once
+	var validatorLangs map[string]*compiler.LangConfig
+	testcaseH.WithValidator(validatorRunner, func() map[string]*compiler.LangConfig {
+		validatorLangsOnce.Do(func() {
+			l, err := compiler.LoadLanguages(cfg.LangDir)
+			if err != nil {
+				slog.Error("validator: failed to load language configs", "error", err)
+				l = map[string]*compiler.LangConfig{}
+			}
+			validatorLangs = l
+		})
+		return validatorLangs
+	})
 	importH := handler.NewImportHandler(problemStore, "./testdata")
 	ratingH := handler.NewRatingHandler(ratingStore, contestStore)
 	registrationStore := postgres.NewRegistrationStore(db)

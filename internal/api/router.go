@@ -303,6 +303,8 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 			r.Post("/{slug}/permissions", problemH.AddPermission)
 			r.Delete("/{slug}/permissions/{userId}", problemH.RemovePermission)
 			r.Post("/{slug}/testcases", testcaseH.Upload)
+			// Run the problem's validator over its inputs. Authoring rights only.
+			r.Post("/{slug}/validate-cases", testcaseH.ValidateCases)
 			r.Get("/{slug}/testcases", testcaseH.List)
 			r.Get("/{slug}/testcases/{name}", testcaseH.Get)
 			r.Put("/{slug}/testcases/{name}", testcaseH.Save)

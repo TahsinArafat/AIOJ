@@ -52,7 +52,11 @@ type Problem struct {
 	// ProblemType is "standard", "interactive" or "output_only". The judge has
 	// always supported all three; only output_only had no way to be declared,
 	// which is why the contestant could never submit an output file.
-	ProblemType        string          `json:"problem_type"`
+	ProblemType string `json:"problem_type"`
+	// ValidatorLanguage/ValidatorSource hold the program that checks an input
+	// file satisfies the problem's constraints. Empty means no validator.
+	ValidatorLanguage  string          `json:"validator_language,omitempty"`
+	ValidatorSource    string          `json:"validator_source,omitempty"`
 	ScoringMode        string          `json:"scoring_mode"`        // "complete" or "partial"
 	SubtaskAggregation string          `json:"subtask_aggregation"` // "min" or "sum"
 	LanguageLimits     []LanguageLimit `json:"language_limits,omitempty"`

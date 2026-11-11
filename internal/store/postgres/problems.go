@@ -69,14 +69,16 @@ func (s *ProblemStore) Create(ctx context.Context, p *model.Problem) error {
 		 time_limit,memory_limit,difficulty,rating,tags,visible,testdata_path,testcase_score,
 		 spj,spj_language,spj_source_code,spj_version,source,remote_id,created_by,
 		 checker_type,float_epsilon,interactive,interactor_language,interactor_source_code,
-		 scoring_mode,subtask_aggregation,ai_generated,status,review_note,reviewed_at,problem_type)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36)
+		 scoring_mode,subtask_aggregation,ai_generated,status,review_note,reviewed_at,problem_type,
+		 validator_language,validator_source)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38)
 		RETURNING created_at,updated_at`,
 		p.ID, p.Slug, p.Title, p.Description, p.Constraints, p.InputFormat, p.OutputFormat, p.Hint, samples,
 		p.TimeLimit, p.MemoryLimit, p.Difficulty, p.Rating, pq.Array(p.Tags), p.Visible, p.TestdataPath, scores,
 		p.SPJ, p.SPJLanguage, p.SPJSourceCode, p.SPJVersion, p.Source, p.RemoteID, p.CreatedBy,
 		p.CheckerType, p.FloatEpsilon, p.Interactive, p.InteractorLanguage, p.InteractorSourceCode,
 		p.ScoringMode, p.SubtaskAggregation, p.AIGenerated, p.Status, p.ReviewNote, p.ReviewedAt, p.ProblemType,
+		p.ValidatorLanguage, p.ValidatorSource,
 	).Scan(&p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
 		return fmt.Errorf("insert problem: %w", err)
@@ -121,7 +123,8 @@ const problemColumns = `p.id, p.slug, p.title, p.description, COALESCE(p.constra
 	COALESCE(p.scoring_mode,'complete'), COALESCE(p.subtask_aggregation,'min'),
 	COALESCE(p.ai_generated,false),
 	COALESCE(p.status,'draft'), COALESCE(p.review_note,''), p.reviewed_at,
-	COALESCE(p.problem_type,'standard')`
+	COALESCE(p.problem_type,'standard'),
+	COALESCE(p.validator_language,''), COALESCE(p.validator_source,'')`
 
 // unreleasedContestSQL is true when the problem belongs to a contest that has not
 // finished yet. Such a problem is not part of the archive: it is reachable through
@@ -183,6 +186,7 @@ func scanProblem(row problemScanner, p *model.Problem) error {
 		&p.Interactive, &p.InteractorLanguage, &p.InteractorSourceCode, &p.ScoringMode, &p.SubtaskAggregation,
 		&p.AIGenerated,
 		&p.Status, &p.ReviewNote, &p.ReviewedAt, &p.ProblemType,
+		&p.ValidatorLanguage, &p.ValidatorSource,
 	); err != nil {
 		return err
 	}
@@ -273,12 +277,14 @@ func (s *ProblemStore) Update(ctx context.Context, id string, p *model.Problem) 
 		testdata_path=$15, testcase_score=$16, spj=$17, spj_language=$18, spj_source_code=$19, checker_type=$20, float_epsilon=$21,
 		interactive=$22, interactor_language=$23, interactor_source_code=$24,
 		scoring_mode=$25, subtask_aggregation=$26,
-		status=$27, review_note=$28, reviewed_at=$29, problem_type=$30, updated_at=NOW() WHERE id=$1`,
+		status=$27, review_note=$28, reviewed_at=$29, problem_type=$30,
+		validator_language=$31, validator_source=$32, updated_at=NOW() WHERE id=$1`,
 		id, p.Title, p.Description, p.Constraints, p.InputFormat, p.OutputFormat, p.Hint, samples,
 		p.TimeLimit, p.MemoryLimit, p.Difficulty, p.Rating, pq.Array(p.Tags), p.Visible, p.TestdataPath,
 		scores, p.SPJ, p.SPJLanguage, p.SPJSourceCode, p.CheckerType, p.FloatEpsilon,
 		p.Interactive, p.InteractorLanguage, p.InteractorSourceCode,
-		p.ScoringMode, p.SubtaskAggregation, p.Status, p.ReviewNote, p.ReviewedAt, p.ProblemType)
+		p.ScoringMode, p.SubtaskAggregation, p.Status, p.ReviewNote, p.ReviewedAt, p.ProblemType,
+		p.ValidatorLanguage, p.ValidatorSource)
 	return err
 }
 
