@@ -331,16 +331,52 @@ var pdfTemplate = `<!DOCTYPE html>
 <head>
 <meta charset="UTF-8">
 <title>{{.Title}}</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
-<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
-  onload="renderMathInElement(document.body, {delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}]}); window.print();"></script>
+<!-- KaTeX is self-hosted (web/scripts/copy-katex.mjs copies it to dist/katex)
+     and every script is an external file. Both matter: the CSP is
+     script-src 'self' blob:, which permits no CDN origin AND no inline script
+     or inline event handler. Loading KaTeX from jsdelivr meant it never ran;
+     putting the render call in an inline <script> meant it still never ran. -->
+<link rel="stylesheet" href="/katex/katex.min.css">
+<script defer src="/katex/katex.min.js"></script>
+<script defer src="/katex/auto-render.min.js"></script>
+<script defer src="/booklet/booklet.js"></script>
+
 <style>
   @page {
     size: A4;
     margin: 22mm 20mm 22mm 20mm;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  /* Text must be selectable: the booklet is read on screen and quoted from, and
+     a page that cannot be copied is a documented complaint. */
+  html, body, .problem-page, .cover, .sample-box, code, pre, .katex {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+  /* Screen-only toolbar: never printed, never part of the booklet itself. */
+  .toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 4mm;
+    padding: 3mm 20mm;
+    background: #f4f4f4;
+    border-bottom: 1px solid #ddd;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  .toolbar button {
+    font: inherit;
+    font-weight: 600;
+    padding: 2mm 5mm;
+    border: 1px solid #333;
+    border-radius: 2mm;
+    background: #1a1a1a;
+    color: #fff;
+    cursor: pointer;
+  }
+  .toolbar-hint { font-size: 9pt; color: #666; }
   body {
     font-family: "Latin Modern Roman", "Computer Modern Roman", "Times New Roman", Georgia, serif;
     font-size: 11pt;
@@ -521,12 +557,21 @@ var pdfTemplate = `<!DOCTYPE html>
   }
 
   @media print {
+    .no-print, .toolbar { display: none !important; }
     .problem-page { page-break-before: always; }
     body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   }
 </style>
 </head>
 <body>
+
+<!-- Screen-only toolbar. The booklet used to call window.print() from an onload
+     handler, which opened the dialog unprompted and (when the CSP blocked the
+     script) not at all. The reader decides when to print now. -->
+<div class="toolbar no-print">
+  <button type="button" id="aioj-print">Print / Save as PDF</button>
+  <span class="toolbar-hint">Math may take a moment to typeset &mdash; print after it settles.</span>
+</div>
 
 <!-- COVER PAGE -->
 <div class="cover">
