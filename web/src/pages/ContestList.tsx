@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { Search, Trophy } from 'lucide-react'
 import { api, contestSlug } from '../lib/api'
+import { formatCountdown, formatDuration } from '../lib/contestTime'
 import DivisionBadge from '../components/DivisionBadge'
 import { DIVISIONS, type Division } from '../lib/divisions'
 import { Badge, type BadgeTone } from '../components/ui/Badge'
@@ -40,35 +41,15 @@ function formatDate(iso: string): string {
     return `${mm} ${dd}, ${yyyy} ${hh}:${mi}`
 }
 
-function formatDuration(startIso: string, endIso: string): string {
-    const ms = new Date(endIso).getTime() - new Date(startIso).getTime()
-    const totalMin = Math.floor(ms / 60000)
-    const h = Math.floor(totalMin / 60)
-    const m = totalMin % 60
-    return `${String(h).padStart(2, '0')}h ${String(m).padStart(2, '0')}m`
-}
-
-function pad(n: number): string {
-    return String(Math.max(0, Math.floor(n))).padStart(2, '0')
-}
-
-function formatCountdown(ms: number): string {
-    if (ms <= 0) return '00d 00:00:00'
-    const d = Math.floor(ms / 86400000)
-    const h = Math.floor((ms % 86400000) / 3600000)
-    const m = Math.floor((ms % 3600000) / 60000)
-    const s = Math.floor((ms % 60000) / 1000)
-    if (d > 0) return `${pad(d)}d ${pad(h)}:${pad(m)}:${pad(s)}`
-    return `${pad(h)}:${pad(m)}:${pad(s)}`
+// formatDuration/formatCountdown are the shared ones (see ContestClock): this
+// file used to carry copies that printed "00d 00:00:00" where the cards printed
+// "00:00:00" for the same instant.
+function listDuration(startIso: string, endIso: string): string {
+    return formatDuration(new Date(endIso).getTime() - new Date(startIso).getTime())
 }
 
 function formatElapsed(startIso: string): string {
-    const ms = Date.now() - new Date(startIso).getTime()
-    if (ms <= 0) return '00:00:00'
-    const h = Math.floor(ms / 3600000)
-    const m = Math.floor((ms % 3600000) / 60000)
-    const s = Math.floor((ms % 60000) / 1000)
-    return `${pad(h)}:${pad(m)}:${pad(s)}`
+    return formatCountdown(Date.now() - new Date(startIso).getTime())
 }
 
 type ContestStatus = 'upcoming' | 'running' | 'ended'
@@ -308,7 +289,7 @@ export default function ContestList() {
                                                 {formatDate(c.start_time)}
                                             </Td>
                                             <Td className="tnum hidden whitespace-nowrap text-xs text-muted md:table-cell">
-                                                {formatDuration(c.start_time, c.end_time)}
+                                                {listDuration(c.start_time, c.end_time)}
                                             </Td>
                                             <Td className="whitespace-nowrap">
                                                 {status === 'upcoming' && <CountdownTimer targetIso={c.start_time} />}
@@ -369,7 +350,7 @@ export default function ContestList() {
                                             {formatDate(c.start_time)}
                                         </Td>
                                         <Td className="tnum hidden whitespace-nowrap text-xs text-muted md:table-cell">
-                                            {formatDuration(c.start_time, c.end_time)}
+                                            {listDuration(c.start_time, c.end_time)}
                                         </Td>
                                         <Td>
                                             <div className="flex items-center gap-3">

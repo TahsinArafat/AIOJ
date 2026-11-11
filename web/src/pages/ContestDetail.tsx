@@ -13,6 +13,8 @@ import {
 } from 'lucide-react'
 import { useConfirm } from '../components/ConfirmDialog'
 import { useToast } from '../components/Toast'
+import { ContestCountdown, ContestRunningClock } from '../components/ContestClock'
+import { formatDuration } from '../lib/contestTime'
 import { useContestAnnouncements } from '../hooks/useContestAnnouncements'
 import { useClarifications } from '../hooks/useClarifications'
 import { ClarificationsPanel, AskClarificationForm } from '../components/ClarificationsPanel'
@@ -30,29 +32,6 @@ function decodeUserId(): string | null {
 }
 
 // ─── Countdown / Timer Utilities ───────────────────────────────────────────────
-
-function pad2(n: number): string {
-    return n < 10 ? `0${n}` : `${n}`
-}
-
-function formatCountdown(diffMs: number): string {
-    if (diffMs <= 0) return '00:00:00'
-    const totalSeconds = Math.floor(diffMs / 1000)
-    const days = Math.floor(totalSeconds / 86400)
-    const hours = Math.floor((totalSeconds % 86400) / 3600)
-    const minutes = Math.floor((totalSeconds % 3600) / 60)
-    const seconds = totalSeconds % 60
-    if (days > 0) return `${days}d ${pad2(hours)}:${pad2(minutes)}:${pad2(seconds)}`
-    return `${pad2(hours)}:${pad2(minutes)}:${pad2(seconds)}`
-}
-
-function formatDuration(ms: number): string {
-    const totalMinutes = Math.floor(ms / 60000)
-    const hours = Math.floor(totalMinutes / 60)
-    const minutes = totalMinutes % 60
-    if (hours > 0) return `${hours}h ${minutes}m`
-    return `${minutes}m`
-}
 
 function formatDateTime(iso: string): string {
     const d = new Date(iso)
@@ -92,61 +71,6 @@ function getStatus(start: string, end: string, freeze?: string): ContestStatus {
     if (now > e) return 'ended'
     if (f && now >= f) return 'frozen'
     return 'running'
-}
-
-// ─── Timer Displays ────────────────────────────────────────────────────────────
-
-function CountdownTimer({ target, label }: { target: string; label: string }) {
-    const [remaining, setRemaining] = useState(() => new Date(target).getTime() - Date.now())
-
-    useEffect(() => {
-        const iv = setInterval(() => setRemaining(new Date(target).getTime() - Date.now()), 1000)
-        return () => clearInterval(iv)
-    }, [target])
-
-    if (remaining <= 0) return null
-
-    return (
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl px-6 py-4 flex items-center gap-6 shadow-lg">
-            <div className="text-sm font-medium opacity-90">{label}</div>
-            <div className="font-mono text-3xl font-bold tracking-wider">{formatCountdown(remaining)}</div>
-        </div>
-    )
-}
-
-function RunningTimer({ start, end }: { start: string; end: string }) {
-    const [now, setNow] = useState(() => Date.parse(start))
-
-    useEffect(() => {
-        const iv = setInterval(() => setNow(Date.now()), 1000)
-        const seed = setTimeout(() => setNow(Date.now()), 0)
-        return () => { clearInterval(iv); clearTimeout(seed) }
-    }, [])
-
-    const startTime = new Date(start).getTime()
-    const endTime = new Date(end).getTime()
-    const total = endTime - startTime
-    const elapsed = now - startTime
-    const remaining = endTime - now
-    const progress = Math.min(100, Math.max(0, (elapsed / total) * 100))
-
-    return (
-        <div className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl px-6 py-4 shadow-lg">
-            <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-surface animate-pulse" />
-                    <span className="text-sm font-medium opacity-90">Contest is running</span>
-                </div>
-                <span className="text-sm opacity-75">Elapsed: {formatDuration(elapsed)}</span>
-            </div>
-            <div className="font-mono text-3xl font-bold tracking-wider mb-3">
-                {formatCountdown(remaining)} <span className="text-base font-normal opacity-70">remaining</span>
-            </div>
-            <div className="w-full bg-white/20 rounded-full h-2">
-                <div className="bg-surface rounded-full h-2 transition-all duration-1000" style={{ width: `${progress}%` }} />
-            </div>
-        </div>
-    )
 }
 
 // ─── SidebarBox ────────────────────────────────────────────────────────────────
@@ -467,15 +391,15 @@ export default function ContestDetail() {
                 </div>
             </div>
 
-            {/* ── Timer ────────────────────────────────────────────────────── */}
+            {/* ── Clock ────────────────────────────────────────────────────── */}
             {isUpcoming && (
                 <div className="mb-6">
-                    <CountdownTimer target={contest.start_time} label="Contest starts in" />
+                    <ContestCountdown target={contest.start_time} label="Starts in" />
                 </div>
             )}
             {isRunning && (
                 <div className="mb-6">
-                    <RunningTimer start={contest.start_time} end={contest.end_time} />
+                    <ContestRunningClock start={contest.start_time} end={contest.end_time} />
                 </div>
             )}
 
