@@ -224,13 +224,18 @@ func (s *ContestStore) Update(ctx context.Context, c *model.Contest) error {
 	if c.Status == "" {
 		c.Status = model.ContestStatusDraft
 	}
+	// Every placeholder must be both referenced and supplied. This statement
+	// once carried visible=$10 while also deriving visible from status, which
+	// left $10 dangling: Postgres cannot infer the type of a parameter that
+	// appears nowhere, so every settings save failed with 500 "update failed".
 	_, err := s.db.ExecContext(ctx,
 		`UPDATE contests SET title=$1, type=$2, format=$3, format_config=$4, start_time=$5, end_time=$6,
-	 freeze_time=$7, password=$8, description=$9, visible=($17::varchar='published'), pdf_enabled=$11, statement_hidden=$12,
-	 slug=$14, upsolving_enabled=$15, virtual_contest_enabled=$16,
-	 status=$17, is_rated=$18, rated_for_min=$19, rated_for_max=$20
-	 WHERE id=$13`,
-		c.Title, c.Type, c.Format, formatConfigJSON, c.StartTime, c.EndTime, c.FreezeTime, c.Password, c.Description, c.Visible, c.PDFEnabled, c.StatementHidden, c.ID, slug, c.UpsolvingEnabled, c.VirtualContestEnabled,
+	 freeze_time=$7, password=$8, description=$9, pdf_enabled=$10, statement_hidden=$11,
+	 slug=$13, upsolving_enabled=$14, virtual_contest_enabled=$15,
+	 visible=($16::varchar='published'), status=$16, is_rated=$17, rated_for_min=$18, rated_for_max=$19
+	 WHERE id=$12`,
+		c.Title, c.Type, c.Format, formatConfigJSON, c.StartTime, c.EndTime, c.FreezeTime, c.Password, c.Description,
+		c.PDFEnabled, c.StatementHidden, c.ID, slug, c.UpsolvingEnabled, c.VirtualContestEnabled,
 		c.Status, c.IsRated, c.RatedForMin, c.RatedForMax)
 	if err != nil {
 		return err

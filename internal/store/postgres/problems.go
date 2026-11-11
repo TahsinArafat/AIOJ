@@ -270,17 +270,20 @@ func (s *ProblemStore) Update(ctx context.Context, id string, p *model.Problem) 
 	// visible:true on a draft must not be able to publish it by editing. The
 	// CHECK constraint from migration 000081 enforces the same invariant in the
 	// database, so this cannot drift even if a future caller forgets.
+	// Every placeholder must be both referenced and supplied. This statement
+	// once carried visible=$14 while also deriving visible from status, which
+	// left $14 dangling: Postgres cannot infer the type of a parameter that
+	// appears nowhere, so every problem save failed with a 500.
 	_, err = s.db.ExecContext(ctx, `UPDATE problems SET
 		title=$2, description=$3, constraints=$4, input_format=$5, output_format=$6, hint=$7, sample_cases=$8,
 		time_limit=$9, memory_limit=$10, difficulty=$11, rating=$12, tags=$13,
-		visible=($27::varchar='published'),
-		testdata_path=$15, testcase_score=$16, spj=$17, spj_language=$18, spj_source_code=$19, checker_type=$20, float_epsilon=$21,
-		interactive=$22, interactor_language=$23, interactor_source_code=$24,
-		scoring_mode=$25, subtask_aggregation=$26,
-		status=$27, review_note=$28, reviewed_at=$29, problem_type=$30,
-		validator_language=$31, validator_source=$32, updated_at=NOW() WHERE id=$1`,
+		testdata_path=$14, testcase_score=$15, spj=$16, spj_language=$17, spj_source_code=$18, checker_type=$19, float_epsilon=$20,
+		interactive=$21, interactor_language=$22, interactor_source_code=$23,
+		scoring_mode=$24, subtask_aggregation=$25,
+		visible=($26::varchar='published'), status=$26, review_note=$27, reviewed_at=$28, problem_type=$29,
+		validator_language=$30, validator_source=$31, updated_at=NOW() WHERE id=$1`,
 		id, p.Title, p.Description, p.Constraints, p.InputFormat, p.OutputFormat, p.Hint, samples,
-		p.TimeLimit, p.MemoryLimit, p.Difficulty, p.Rating, pq.Array(p.Tags), p.Visible, p.TestdataPath,
+		p.TimeLimit, p.MemoryLimit, p.Difficulty, p.Rating, pq.Array(p.Tags), p.TestdataPath,
 		scores, p.SPJ, p.SPJLanguage, p.SPJSourceCode, p.CheckerType, p.FloatEpsilon,
 		p.Interactive, p.InteractorLanguage, p.InteractorSourceCode,
 		p.ScoringMode, p.SubtaskAggregation, p.Status, p.ReviewNote, p.ReviewedAt, p.ProblemType,
