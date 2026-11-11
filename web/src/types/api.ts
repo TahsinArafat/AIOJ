@@ -100,6 +100,9 @@ export interface BalloonRequest {
     submission_id: string
     user_id: string
     username: string
+    /** Set for a generated onsite account: the team it was minted for. */
+    team_name?: string
+    institution?: string
     problem_id: string
     problem_index: string
     color: string
@@ -1464,6 +1467,9 @@ export interface ScoreboardEntry {
     rank: number
     user_id: string
     username: string
+    /** Set for a generated onsite account: the team it was minted for. */
+    team_name?: string
+    institution?: string
     rating?: number
     total_solved: number
     total_penalty: number

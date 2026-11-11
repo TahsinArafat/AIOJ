@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/tahsinarafat/aioj/internal/api/middleware"
+	"github.com/tahsinarafat/aioj/internal/model"
 	"github.com/tahsinarafat/aioj/internal/store/postgres"
 )
 
@@ -42,5 +44,12 @@ func (h *SearchHandler) Search(w http.ResponseWriter, r *http.Request) {
 
 	// Problems still in play in a contest are already excluded from the archive
 	// query, so nothing has to be stripped here.
+	//
+	// The archive is off limits to a generated contestant account, and search is
+	// the second way to enumerate it, so its problem rows are dropped for that
+	// role. Users and contests stay: the round's own pages use them.
+	if isArchiveBlocked(middleware.GetUserClaims(r)) {
+		result.Problems = []model.ProblemListItem{}
+	}
 	respondJSON(w, http.StatusOK, result)
 }

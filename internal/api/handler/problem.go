@@ -59,6 +59,16 @@ func initialStatus(requested bool, role string) string {
 }
 
 func (h *ProblemHandler) List(w http.ResponseWriter, r *http.Request) {
+	// A contestant account exists for one round and is not an archive citizen.
+	// Answered as an empty page rather than 403 so the SPA renders its normal
+	// "no problems" state instead of an error banner it has no copy for.
+	if isArchiveBlocked(middleware.GetUserClaims(r)) {
+		respondJSON(w, http.StatusOK, map[string]interface{}{
+			"data": []model.ProblemListItem{}, "total": 0, "offset": 0, "limit": 0,
+		})
+		return
+	}
+
 	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 	if limit <= 0 || limit > 100 {

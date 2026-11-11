@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { ClassMember, ClassInfo } from '../types/community'
 import { errorMessage } from '../lib/errors'
 import { useParams, Link } from 'react-router-dom'
-import { api, getAccessToken } from '../lib/api'
+import { api, currentUser } from '../lib/api'
 import { useDocumentTitle } from '../lib/documentTitle'
 
 export default function ClassDetail() {
@@ -24,14 +24,12 @@ export default function ClassDetail() {
 			setC(classData)
 			setMembers(memberData.data || [])
 
-			const token = getAccessToken()
-			if (token) {
-				try {
-					const payload = JSON.parse(atob(token.split('.')[1]))
-					const currentUserID = payload.user_id
-					const member = memberData.data?.find((m: ClassMember) => m.user_id === currentUserID)
-					setIsTeacher(member?.role === 'teacher' || payload.role === 'admin')
-				} catch { /* malformed JWT — keep default role */ }
+			// The JWT claim is `uid`; reading `user_id` always yielded null, so
+			// the viewer was never recognised as a member of their own class.
+			const me = currentUser()
+			if (me) {
+				const member = memberData.data?.find((m: ClassMember) => m.user_id === me.id)
+				setIsTeacher(member?.role === 'teacher' || me.role === 'admin')
 			}
 		}).catch(() => { }).finally(() => setLoading(false))
 	}, [id])

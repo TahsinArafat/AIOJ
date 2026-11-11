@@ -13,6 +13,7 @@ import {
 import { useConfirm } from '../components/ConfirmDialog'
 import { useToast } from '../components/Toast'
 import { EmptyState } from '../components/EmptyState'
+import { isoToLocalInput, localInputToIso } from '../lib/datetime'
 
 function indexLabel(i: number): string {
     let s = ''
@@ -61,7 +62,7 @@ interface ContestStats {
     languages?: Record<string, number>
     verdicts?: Record<string, number>
 }
-interface BalloonRow { id: string; dispatched?: boolean; problem_index?: string; username?: string; color?: string; created_at: string }
+interface BalloonRow { id: string; dispatched?: boolean; problem_index?: string; username?: string; team_name?: string; institution?: string; color?: string; created_at: string }
 interface NoticeRow { id: string; content?: string; created_at: string }
 interface ModeratorRow { user_id: string; username?: string; access_level: string }
 interface OnsiteTeamRow { id: string; team_name?: string; institution?: string; username?: string; password?: string; is_used?: boolean }
@@ -779,7 +780,13 @@ function BalloonsTab({ contestId }: { contestId: string }) {
                                 <div>
                                     <div className="flex items-center gap-2">
                                         <span className="font-mono font-bold text-brand">{b.problem_index}</span>
-                                        <span className="text-sm font-medium">{b.username}</span>
+                                        {/* A generated onsite account's username is a
+                                            throwaway handle; the runner needs the team
+                                            name to know where to deliver. */}
+                                        <span className="text-sm font-medium">{b.team_name || b.username}</span>
+                                        {b.team_name && b.institution && (
+                                            <span className="text-xs text-muted">({b.institution})</span>
+                                        )}
                                         {b.color && <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: theme === 'dark' ? b.color + '40' : b.color + '20', color: b.color }}>{b.color}</span>}
                                     </div>
                                     <span className="text-xs text-muted-soft">{new Date(b.created_at).toLocaleTimeString()}</span>
@@ -1052,6 +1059,7 @@ function SettingsTab({ contestId }: { contestId: string }) {
         upsolving_enabled: true, virtual_contest_enabled: true,
         visibility: 'public',
         group_id: '',
+        is_rated: true, rated_for_min: 0, rated_for_max: 9999,
     })
     const [groups, setGroups] = useState<GroupOption[]>([])
     const [loading, setLoading] = useState(true)
@@ -1070,9 +1078,10 @@ function SettingsTab({ contestId }: { contestId: string }) {
             setForm({
                 title: c.title || '',
                 description: c.description || '',
-                start_time: c.start_time ? new Date(c.start_time).toISOString().slice(0, 16) : '',
-                end_time: c.end_time ? new Date(c.end_time).toISOString().slice(0, 16) : '',
-                freeze_time: c.freeze_time ? new Date(c.freeze_time).toISOString().slice(0, 16) : '',
+                // Local wall-clock for the input, not a sliced UTC instant.
+                start_time: isoToLocalInput(c.start_time),
+                end_time: isoToLocalInput(c.end_time),
+                freeze_time: isoToLocalInput(c.freeze_time),
                 password: '',
                 has_password: !!c.has_password,
                 pdf_enabled: c.pdf_enabled ?? true,
@@ -1081,6 +1090,9 @@ function SettingsTab({ contestId }: { contestId: string }) {
                 virtual_contest_enabled: c.virtual_contest_enabled ?? true,
                 visibility: vis,
                 group_id: c.group_id || '',
+                is_rated: c.is_rated ?? true,
+                rated_for_min: c.rated_for_min ?? 0,
+                rated_for_max: c.rated_for_max ?? 9999,
             })
         }).finally(() => setLoading(false))
 
@@ -1101,9 +1113,11 @@ function SettingsTab({ contestId }: { contestId: string }) {
             await api.contests.update(contestId, {
                 title: form.title,
                 description: form.description || undefined,
-                start_time: new Date(form.start_time).toISOString(),
-                end_time: new Date(form.end_time).toISOString(),
-                freeze_time: form.freeze_time ? new Date(form.freeze_time).toISOString() : undefined,
+                // The input holds a local wall clock; this is the one place it
+                // becomes the UTC instant the API expects.
+                start_time: localInputToIso(form.start_time),
+                end_time: localInputToIso(form.end_time),
+                freeze_time: localInputToIso(form.freeze_time),
                 visible: true,
                 password: form.visibility === 'private' ? (form.password.trim() || undefined) : '',
                 group_id: form.visibility === 'group' ? form.group_id : '',
@@ -1111,6 +1125,9 @@ function SettingsTab({ contestId }: { contestId: string }) {
                 statement_hidden: form.statement_hidden,
                 upsolving_enabled: form.upsolving_enabled,
                 virtual_contest_enabled: form.virtual_contest_enabled,
+                is_rated: form.is_rated,
+                rated_for_min: form.rated_for_min,
+                rated_for_max: form.rated_for_max,
             })
         } catch (err) {
             setError(errorMessage(err) || 'Failed to save')
@@ -1210,6 +1227,43 @@ function SettingsTab({ contestId }: { contestId: string }) {
                             </label>
                         ))}
                     </div>
+                </div>
+
+                {/* Rating. is_rated has been in the schema since migration
+                    000003 but no screen ever offered it, so every contest was
+                    silently rated. An unrated round is a real choice — a
+                    practice or onsite round must not move anyone's rating. */}
+                <div>
+                    <label className="block text-sm font-medium text-ink-soft mb-2">Rating</label>
+                    <label className="flex items-start gap-2 cursor-pointer p-2 rounded-lg hover:bg-surface-2 border border-hairline">
+                        <input type="checkbox" checked={form.is_rated}
+                            onChange={e => setForm(p => ({ ...p, is_rated: e.target.checked }))}
+                            className="mt-0.5 rounded border-hairline-strong text-brand focus-visible:outline-[var(--ring)]" />
+                        <span className="text-sm">
+                            Rated contest
+                            <span className="block text-xs text-muted mt-0.5">
+                                {form.is_rated
+                                    ? 'Rating changes are calculated when the round ends.'
+                                    : 'The round will not change anyone’s rating.'}
+                            </span>
+                        </span>
+                    </label>
+                    {form.is_rated && (
+                        <div className="mt-3 grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="block text-xs font-medium text-muted mb-1">Rated for rating ≥</label>
+                                <input aria-label="Rated from rating" type="number" min={0} value={form.rated_for_min}
+                                    onChange={e => setForm(p => ({ ...p, rated_for_min: Number(e.target.value) || 0 }))}
+                                    className="w-full border border-hairline-strong rounded-lg px-3 py-2 text-sm focus:ring-2 focus-visible:outline-[var(--ring)] focus:border-brand" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-muted mb-1">Rated for rating ≤</label>
+                                <input aria-label="Rated to rating" type="number" min={0} value={form.rated_for_max}
+                                    onChange={e => setForm(p => ({ ...p, rated_for_max: Number(e.target.value) || 0 }))}
+                                    className="w-full border border-hairline-strong rounded-lg px-3 py-2 text-sm focus:ring-2 focus-visible:outline-[var(--ring)] focus:border-brand" />
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Save */}

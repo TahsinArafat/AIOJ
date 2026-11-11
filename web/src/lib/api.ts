@@ -640,6 +640,30 @@ export const api = {
                 passed: boolean | null;
                 expected: string;
             }>('/submissions/run', { method: 'POST', body: JSON.stringify(d) }),
+        /**
+         * Run every sample case in one request. One quota token covers the
+         * sweep, so a problem with more samples than /run's burst (3) no longer
+         * fails partway through. Results come back in the order sent.
+         */
+        runBatch: (d: {
+            source_code: string;
+            language: string;
+            cases: { input: string; expected?: string }[];
+            time_limit_ms?: number;
+            memory_limit_kb?: number;
+        }) =>
+            request<{
+                results: {
+                    status: string;
+                    stdout?: string;
+                    stderr?: string;
+                    time_used: number;
+                    memory_used: number;
+                    compile_output?: string;
+                    passed?: boolean | null;
+                    expected?: string;
+                }[];
+            }>('/submissions/run-batch', { method: 'POST', body: JSON.stringify(d) }),
         get: (id: string) => request<Submission>(`/submissions/${id}`),
         retryRemote: (id: string) => request<{ status: string }>(`/submissions/${id}/retry-remote`, { method: 'POST' }),
         recheckRemote: (id: string) => request<{ status: string }>(`/submissions/${id}/recheck-remote`, { method: 'POST' }),

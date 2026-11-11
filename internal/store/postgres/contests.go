@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	"github.com/tahsinarafat/aioj/internal/model"
 )
 
@@ -382,6 +383,39 @@ func (s *ContestStore) GetUsername(ctx context.Context, userID string) string {
 	var username string
 	s.db.QueryRowContext(ctx, "SELECT username FROM users WHERE id=$1", userID).Scan(&username)
 	return username
+}
+
+// GetDisplayNames resolves the team label for generated onsite accounts in this
+// contest. Accounts minted by the Onsite Teams panel never had their team name
+// copied onto users, so a scoreboard that read only users.username showed a
+// throwaway handle where the competitor expects their team. The join is the one
+// the ICPC feed already uses (submissions.go ListFeed).
+//
+// One query for the whole page rather than per row: a standings page carries up
+// to 500 entries and this used to be N+1 for the username alone.
+func (s *ContestStore) GetDisplayNames(ctx context.Context, contestID string, userIDs []string) (map[string]model.ContestDisplayName, error) {
+	out := make(map[string]model.ContestDisplayName, len(userIDs))
+	if len(userIDs) == 0 {
+		return out, nil
+	}
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT used_by, team_name, COALESCE(institution,'')
+		   FROM onsite_batch_users
+		  WHERE contest_id = $1 AND used_by = ANY($2)`,
+		contestID, pq.Array(userIDs))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var userID string
+		var name model.ContestDisplayName
+		if err := rows.Scan(&userID, &name.TeamName, &name.Institution); err != nil {
+			return nil, err
+		}
+		out[userID] = name
+	}
+	return out, rows.Err()
 }
 
 type ScoreboardRow struct {

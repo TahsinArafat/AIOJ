@@ -20,6 +20,9 @@ interface ScoreboardEntry {
   rank: number;
   user_id: string;
   username: string;
+  /** Set for a generated onsite account: the team it was minted for. */
+  team_name?: string;
+  institution?: string;
   rating?: number;
   total_solved: number;
   total_penalty: number;
@@ -389,12 +392,24 @@ export default function ContestScoreboard() {
                     {/* Username */}
                     <td className={`px-4 py-2.5 font-semibold ${isMe ? 'text-brand' : 'text-ink'}`}>
                       <div className="flex items-center gap-1.5 min-w-0">
-                        <Link
-                          to={`/user/${entry.username}`}
-                          className="font-medium truncate hover:underline"
-                        >
-                          {entry.username}
-                        </Link>
+                        {/* A generated onsite account has no profile page worth
+                            opening and a handle nobody recognises, so the team
+                            it was minted for is shown unlinked. */}
+                        {entry.team_name ? (
+                          <span className="font-medium truncate" title={entry.username}>
+                            {entry.team_name}
+                          </span>
+                        ) : (
+                          <Link
+                            to={`/user/${entry.username}`}
+                            className="font-medium truncate hover:underline"
+                          >
+                            {entry.username}
+                          </Link>
+                        )}
+                        {entry.institution && (
+                          <span className="text-[11px] font-normal text-muted truncate">{entry.institution}</span>
+                        )}
                         {entry.rating != null && (
                           <span className="flex-shrink-0">
                             <RatingBadge rating={entry.rating} size="sm" />

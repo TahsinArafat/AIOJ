@@ -273,49 +273,36 @@ export default function ProblemDetail() {
         setLastTestTime(now)
         setRunningSamples(true)
         setSampleResults([])
-        const results: SampleRunResult[] = []
-        for (let i = 0; i < problem.sample_cases.length; i++) {
-            const sc = problem.sample_cases[i]
-            try {
-                const res = await api.submissions.run({
-                    source_code: code,
-                    language: lang,
-                    input: sc.input,
-                    expected: sc.output,
-                })
-                const actual = (res.stdout || '').trim().replace(/\r\n/g, '\n')
-                const expected = (res.expected || sc.output || '').trim().replace(/\r\n/g, '\n')
-                const passed = res.passed ?? false
-                results.push({
+        try {
+            // One request for the whole sweep. Firing a /run per sample burned
+            // through /run's burst of 3 and the remaining cases answered 429,
+            // which looked like the button was stuck.
+            const { results: raw } = await api.submissions.runBatch({
+                source_code: code,
+                language: lang,
+                cases: problem.sample_cases.map(sc => ({ input: sc.input, expected: sc.output })),
+            })
+            if (!isMountedRef.current) return
+            const results: SampleRunResult[] = (raw || []).map((res, i) => {
+                const sc = problem.sample_cases![i] ?? { input: '', output: '' }
+                return {
                     index: i + 1,
                     input: sc.input,
-                    expected,
-                    actual,
-                    passed,
+                    expected: (res.expected || sc.output || '').trim().replace(/\r\n/g, '\n'),
+                    actual: (res.stdout || '').trim().replace(/\r\n/g, '\n'),
+                    passed: res.passed ?? false,
                     status: res.status,
                     time: res.time_used,
                     memory: res.memory_used,
                     stderr: res.stderr,
                     compile_output: res.compile_output,
-                })
-            } catch (e) {
-                results.push({
-                    index: i + 1,
-                    input: sc.input,
-                    expected: sc.output,
-                    actual: '',
-                    passed: false,
-                    status: 'error',
-                    time: 0,
-                    error: e instanceof Error ? e.message : String(e),
-                })
-            }
-            if (isMountedRef.current) {
-                setSampleResults([...results])
-            }
-        }
-        if (isMountedRef.current) {
-            setRunningSamples(false)
+                }
+            })
+            setSampleResults(results)
+        } catch (e) {
+            toast.error('Test Samples failed: ' + (e instanceof Error ? e.message : String(e)))
+        } finally {
+            if (isMountedRef.current) setRunningSamples(false)
         }
     }
 
@@ -786,8 +773,8 @@ export default function ProblemDetail() {
                         <span className="font-semibold text-sm text-ink-soft">Custom Stdin / Scratchpad</span>
                         <button
                             onClick={runCustomCode}
-                            disabled={runningCustom || !code.trim() || problem?.source !== 'local'}
-                            title={problem?.source !== 'local' ? 'Custom run is only available for local problems' : undefined}
+                            disabled={runningCustom || !code.trim() || isRemotePlatform(problem?.source)}
+                            title={isRemotePlatform(problem?.source) ? 'Custom run is only available for locally judged problems' : undefined}
                             className="bg-brand hover:bg-brand-hover text-on-brand text-xs font-semibold px-3 py-1.5 rounded disabled:opacity-50 transition-colors cursor-pointer"
                         >
                             {runningCustom ? 'Running...' : 'Run Code'}

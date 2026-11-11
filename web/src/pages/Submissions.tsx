@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../lib/api'
 import { languageName } from '../lib/languages'
 import { EmptyState } from '../components/EmptyState'
@@ -35,10 +35,16 @@ export default function Submissions() {
     const [offset, setOffset] = useState(0)
     const [loading, setLoading] = useState(true)
     const limit = 20
+    // The contest problem page links here scoped to a problem and round. Those
+    // params were ignored, so the link landed on the unfiltered list.
+    const [searchParams] = useSearchParams()
+    const problemId = searchParams.get('problem_id') || undefined
+    const contestId = searchParams.get('contest_id') || undefined
+    const scoped = !!(problemId || contestId)
 
     useEffect(() => {
         let cancelled = false
-        api.submissions.list(offset, limit).then(d => {
+        api.submissions.list(offset, limit, problemId, contestId).then(d => {
             if (cancelled) return
             setSubs(d.data || [])
             setTotal(d.total || 0)
@@ -48,13 +54,17 @@ export default function Submissions() {
             if (!cancelled) setLoading(false)
         })
         return () => { cancelled = true }
-    }, [offset])
+    }, [offset, problemId, contestId])
 
     return (
         <div>
             <PageHeader
                 title="My Submissions"
-                description={total > 0 ? `${total.toLocaleString()} submissions on record` : 'Your judged solutions'}
+                description={
+                    scoped
+                        ? 'Your submissions for this contest problem'
+                        : total > 0 ? `${total.toLocaleString()} submissions on record` : 'Your judged solutions'
+                }
             />
 
             {loading && subs.length === 0 ? (

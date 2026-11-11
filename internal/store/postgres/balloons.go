@@ -60,12 +60,19 @@ func (s *BalloonStore) CreateRequest(ctx context.Context, contestID, submissionI
 }
 
 func (s *BalloonStore) ListByContest(ctx context.Context, contestID string) ([]model.BalloonRequest, error) {
+	// The LEFT JOIN to onsite_batch_users is what makes a generated account
+	// identifiable at the runners' desk: its username is a throwaway handle, and
+	// the team name the competitor actually answers to exists only there. The
+	// join is scoped by contest_id so a user who competed in two rounds is
+	// labelled with the team they had in this one.
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT br.id, br.contest_id, br.submission_id, br.user_id, u.username, 
+		`SELECT br.id, br.contest_id, br.submission_id, br.user_id, u.username,
+		        COALESCE(ob.team_name, ''), COALESCE(ob.institution, ''),
 		        br.problem_id, cp.index, br.color, br.dispatched, br.created_at
 		 FROM balloon_requests br
 		 JOIN users u ON br.user_id = u.id
 		 JOIN contest_problems cp ON br.contest_id = cp.contest_id AND br.problem_id = cp.problem_id
+		 LEFT JOIN onsite_batch_users ob ON ob.used_by = br.user_id AND ob.contest_id = br.contest_id
 		 WHERE br.contest_id = $1
 		 ORDER BY br.created_at DESC`, contestID)
 	if err != nil {
@@ -77,6 +84,7 @@ func (s *BalloonStore) ListByContest(ctx context.Context, contestID string) ([]m
 	for rows.Next() {
 		var r model.BalloonRequest
 		err := rows.Scan(&r.ID, &r.ContestID, &r.SubmissionID, &r.UserID, &r.Username,
+			&r.TeamName, &r.Institution,
 			&r.ProblemID, &r.ProblemIndex, &r.Color, &r.Dispatched, &r.CreatedAt)
 		if err != nil {
 			return nil, err

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { api, getAccessToken } from '../lib/api'
+import { api, getAccessToken, currentUser } from '../lib/api'
 import { useDocumentTitle } from '../lib/documentTitle'
 import { usePageVisible } from '../hooks/usePageVisible'
 import DivisionBadge from '../components/DivisionBadge'
@@ -16,25 +16,14 @@ import { useConfirm } from '../components/ConfirmDialog'
 import { useToast } from '../components/Toast'
 
 function decodeRole(): string | null {
-    const token = localStorage.getItem('access_token')
-    if (!token) return null
-    try {
-        const payload = JSON.parse(atob(token.split('.')[1]))
-        return payload.role ?? null
-    } catch {
-        return null
-    }
+    return currentUser()?.role ?? null
 }
 
+// The JWT claim is `uid`, not `user_id`. Reading the wrong key meant this always
+// returned null, so no standings row or submission row ever matched the viewer
+// and neither was highlighted or clickable.
 function decodeUserId(): string | null {
-    const token = localStorage.getItem('access_token')
-    if (!token) return null
-    try {
-        const payload = JSON.parse(atob(token.split('.')[1]))
-        return payload.user_id ?? null
-    } catch {
-        return null
-    }
+    return currentUser()?.id ?? null
 }
 
 // ─── Countdown / Timer Utilities ───────────────────────────────────────────────
@@ -212,7 +201,18 @@ interface ClarificationItem { id?: string; created_at: string; question?: string
 interface AnnouncementItem { id: string; created_at: string; content?: string; username?: string }
 interface SubmissionRow { id?: string; created_at: string; status: string; language?: string; problem_id?: string; user_id?: string; username?: string; time_used?: number; memory_used?: number; score?: number }
 interface StandingsCell { solved?: boolean; attempts?: number; time?: number; pending?: number }
-interface StandingsEntry { user_id?: string; username?: string; rank?: number; total_solved?: number; total_penalty?: number; problems?: Record<string, StandingsCell> }
+interface StandingsEntry { user_id?: string; username?: string; team_name?: string; institution?: string; rank?: number; total_solved?: number; total_penalty?: number; problems?: Record<string, StandingsCell> }
+
+/**
+ * The name to print for a standings row.
+ *
+ * A generated onsite account signs in as a throwaway handle ("team_1a2b3c4d")
+ * that means nothing to the people in the room, so the team it was minted for
+ * wins when the API supplies one. Everyone else is their username.
+ */
+function standingsLabel(row: StandingsEntry): string {
+    return row.team_name || row.username || '—'
+}
 
 export default function ContestDetail() {
     const confirm = useConfirm()
@@ -643,7 +643,10 @@ export default function ContestDetail() {
                                                             )}
                                                         </td>
                                                         <td className={`px-4 py-2.5 font-semibold ${isMe ? 'text-brand' : 'text-ink'}`}>
-                                                            {row.username}
+                                                            {standingsLabel(row)}
+                                                            {row.institution && (
+                                                                <span className="ml-2 text-[11px] font-normal text-muted">{row.institution}</span>
+                                                            )}
                                                             {isMe && <span className="ml-2 text-[11px] bg-brand-soft text-brand px-1.5 py-0.5 rounded font-bold border border-brand/30">YOU</span>}
                                                         </td>
                                                         <td className="text-center px-3 py-2.5">

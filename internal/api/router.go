@@ -181,7 +181,9 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 		})
 	}
 
-	r.Get("/api/search", searchH.Search)
+	// Optional auth: the global search returns problem rows, and a generated
+	// contestant account must not be able to enumerate the archive through it.
+	r.With(middleware.OptionalAuthMiddleware(jwtManager)).Get("/api/search", searchH.Search)
 
 	// Mint the double-submit cookie on demand: the SPA is served by nginx, so a
 	// cold visitor on /login or /register has no csrf cookie before its first
@@ -258,7 +260,10 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 
 	r.Route("/api/problems", func(r chi.Router) {
 		r.Use(gate(feature.KeyProblems))
-		r.Get("/", problemH.List)
+		// Optional auth: the archive itself is public, but a generated contestant
+		// account must be refused it, and that needs the caller's role.
+		// Anonymous and ordinary visitors are unaffected.
+		r.With(middleware.OptionalAuthMiddleware(jwtManager)).Get("/", problemH.List)
 		r.Get("/tags", problemH.ListTags)
 		r.With(middleware.AuthMiddleware(jwtManager)).Get("/my", problemH.ListMyProblems)
 		// The contest problem picker searches a wider set than the archive: it
@@ -356,6 +361,10 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 			r.Post("/", submissionH.Create)
 			r.Post("/upsolving", submissionH.CreateUpsolving)
 			r.Post("/run", submissionH.CustomRun)
+			// One compile-and-execute per sample case under a single quota
+			// token. The client used to fire N /run calls, and /run's burst is
+			// 3, so any problem with more samples than that failed partway.
+			r.Post("/run-batch", submissionH.BatchRun)
 			r.Get("/", submissionH.ListByUser)
 			r.Get("/{id}", submissionH.GetByID)
 			r.Post("/{id}/retry-remote", submissionH.RetryRemote)

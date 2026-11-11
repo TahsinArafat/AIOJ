@@ -99,6 +99,18 @@ type ContestPermission struct {
 	AccessLevel string `json:"access_level"`
 }
 
+// ContestDisplayName is what a standings row should be labelled.
+//
+// A generated onsite account is a users row whose username is a throwaway
+// handle ("team_1a2b3c4d"); the competitor knows themselves as the team name
+// entered in the Onsite Teams panel. That name lives in onsite_batch_users,
+// keyed by (contest_id, used_by), so labelling a scoreboard is a lookup across
+// both tables. Empty fields mean "fall back to the username".
+type ContestDisplayName struct {
+	TeamName    string `json:"team_name,omitempty"`
+	Institution string `json:"institution,omitempty"`
+}
+
 type CreateContestRequest struct {
 	Title                 string          `json:"title"`
 	Slug                  string          `json:"slug,omitempty"`
@@ -129,9 +141,12 @@ type CreateContestRequest struct {
 	// Rating controls. is_rated has existed in the schema since migration 000003
 	// but was absent from every Go struct, so a contest could not be declared
 	// unrated. RatedForMin/Max bound which competitors the round counts for.
-	IsRated     bool `json:"is_rated"`
-	RatedForMin int  `json:"rated_for_min"`
-	RatedForMax int  `json:"rated_for_max"`
+	// Pointers because this DTO backs both create and update: on update an
+	// omitted field must mean "leave it alone", which a zero-valued bool cannot
+	// express (false is a real choice — an unrated round).
+	IsRated     *bool `json:"is_rated,omitempty"`
+	RatedForMin *int  `json:"rated_for_min,omitempty"`
+	RatedForMax *int  `json:"rated_for_max,omitempty"`
 }
 
 type ContestRegistration struct {

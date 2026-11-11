@@ -232,6 +232,10 @@ type ContestStore interface {
 	GetParticipants(ctx context.Context, contestID string) ([]string, error)
 	IsParticipant(ctx context.Context, contestID, userID string) (bool, error)
 	GetUsername(ctx context.Context, userID string) string
+	// GetDisplayNames maps user id to the name a scoreboard should show. For a
+	// generated contestant account that is the team it was minted for, not the
+	// throwaway username. A missing key means "use the username".
+	GetDisplayNames(ctx context.Context, contestID string, userIDs []string) (map[string]model.ContestDisplayName, error)
 	AddPermission(ctx context.Context, contestID, userID, accessLevel string) error
 	RemovePermission(ctx context.Context, contestID, userID string) error
 	GetPermissions(ctx context.Context, contestID string) ([]model.ContestPermission, error)

@@ -6,6 +6,10 @@ const (
 	RoleSetter = "setter"
 	RoleUser   = "user"
 	RoleBot    = "bot"
+	// RoleContestant is the account a contest setter generates in bulk (the
+	// "Onsite Teams" panel). It exists for one round only: it may reach that
+	// contest and nothing else, so it is deliberately not an archive citizen.
+	RoleContestant = "contestant"
 )
 
 // Problem/contest collaboration access levels.

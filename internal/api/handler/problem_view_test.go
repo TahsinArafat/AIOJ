@@ -118,3 +118,43 @@ func TestGetBySlugKeepsAccessForAdmins(t *testing.T) {
 		t.Fatalf("an admin must keep the full view: %+v", got)
 	}
 }
+
+// A generated onsite account ("Onsite Teams" panel) exists for one round. It is
+// an ordinary users row with role = "contestant", so nothing about the archive
+// predicate excludes it: the published-problem shortcut in canReadProblem would
+// hand it every problem on the platform.
+func TestContestantCannotReadTheArchive(t *testing.T) {
+	store := &mockProblemStore{getBySlug: spoiledProblem(), unreleasedContest: false}
+
+	code, _ := getBySlugWith(t, store, &auth.Claims{UserID: "team_1a2b3c4d", Role: model.RoleContestant})
+
+	if code != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403 for a generated contestant account", code)
+	}
+}
+
+// The archive list is answered as an empty page rather than 403: the SPA has a
+// "no problems" state and no copy for an error banner here.
+func TestContestantSeesAnEmptyArchiveList(t *testing.T) {
+	h := NewProblemHandler(&mockProblemStore{})
+	req := httptest.NewRequest("GET", "/api/problems", nil)
+	req = req.WithContext(context.WithValue(req.Context(), middleware.UserContextKey,
+		&auth.Claims{UserID: "team_1a2b3c4d", Role: model.RoleContestant}))
+	w := httptest.NewRecorder()
+
+	h.List(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", w.Code)
+	}
+	var body struct {
+		Data  []model.ProblemListItem `json:"data"`
+		Total int                     `json:"total"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(body.Data) != 0 || body.Total != 0 {
+		t.Fatalf("a contestant must get an empty archive, got %d items (total %d)", len(body.Data), body.Total)
+	}
+}

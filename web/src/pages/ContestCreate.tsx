@@ -100,6 +100,11 @@ export default function ContestCreate() {
     const [pdfEnabled, setPdfEnabled] = useState(true)
     const [statementHidden, setStatementHidden] = useState(false)
     const [password, setPassword] = useState('')
+    // Rated by default, matching the schema default and what a competitive
+    // round means. An onsite or practice round turns it off.
+    const [isRated, setIsRated] = useState(true)
+    const [ratedForMin, setRatedForMin] = useState(0)
+    const [ratedForMax, setRatedForMax] = useState(9999)
 
     // UI state
     const [error, setError] = useState('')
@@ -239,6 +244,9 @@ export default function ContestCreate() {
                 division: Number(division),
                 pdf_enabled: pdfEnabled,
                 statement_hidden: statementHidden,
+                is_rated: isRated,
+                rated_for_min: ratedForMin,
+                rated_for_max: ratedForMax,
             })
             nav(`/contests/${contestSlug(contest)}`)
         } catch (err) {
@@ -639,6 +647,37 @@ export default function ContestCreate() {
                                 placeholder="Leave empty for public contest"
                                 className={inputCls}
                             />
+                        </div>
+                        <div className="border-t border-hairline pt-4 space-y-3">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={isRated}
+                                    onChange={e => setIsRated(e.target.checked)}
+                                    className="rounded border-hairline-strong text-brand focus-visible:outline-[var(--ring)]"
+                                />
+                                <span className="text-sm text-ink-soft">Rated contest</span>
+                            </label>
+                            {isRated && (
+                                <div className="grid grid-cols-2 gap-3 max-w-sm">
+                                    <div>
+                                        <label className={labelCls}>Rated for rating ≥</label>
+                                        <input aria-label="Rated from rating" type="number" min={0}
+                                            value={ratedForMin}
+                                            onChange={e => setRatedForMin(Number(e.target.value) || 0)}
+                                            className={inputCls}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className={labelCls}>Rated for rating ≤</label>
+                                        <input aria-label="Rated to rating" type="number" min={0}
+                                            value={ratedForMax}
+                                            onChange={e => setRatedForMax(Number(e.target.value) || 0)}
+                                            className={inputCls}
+                                        />
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </section>

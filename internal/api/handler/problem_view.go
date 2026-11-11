@@ -83,10 +83,30 @@ func isAdmin(claims *auth.Claims) bool {
 // problemAccessLevels are the permission levels that may read a private problem.
 var problemAccessLevels = []string{"owner", "co_author", "tester"}
 
+/**
+ * Archive access for generated contestant accounts.
+ *
+ * The "Onsite Teams" panel mints throwaway accounts for one round. They are
+ * ordinary users rows with role = "contestant" and are auto-registered into
+ * their own contest, so the contest surface already works for them. The public
+ * archive is a different matter: an account handed out for a two-hour onsite
+ * round has no business browsing every problem on the platform, and nothing
+ * else marks it. This is the one place that decision lives.
+ */
+func isArchiveBlocked(claims *auth.Claims) bool {
+	return claims != nil && claims.Role == model.RoleContestant
+}
+
 // canReadProblem reports whether claims may read p at all. It answers only the
 // draft question; whether a *published* problem is currently hidden because its
 // contest is still running is problemIsLive's business, not this one's.
 func canReadProblem(ctx context.Context, problems store.ProblemStore, p *model.Problem, claims *auth.Claims) bool {
+	// A contestant account is scoped to its own round and gets no archive reads,
+	// even for a published problem. Checked before the visible shortcut, which
+	// would otherwise let it through.
+	if isArchiveBlocked(claims) {
+		return false
+	}
 	if p.Visible {
 		return true
 	}

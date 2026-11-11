@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -149,5 +150,43 @@ func TestCustomRun_EnforcesRunQuota(t *testing.T) {
 	h.CustomRun(rec, second)
 	if rec.Code != http.StatusTooManyRequests {
 		t.Fatalf("status = %d, want 429 on the second immediate /run", rec.Code)
+	}
+}
+
+// "Test Samples" fires one case per sample. Used to be one /run per case, and
+// /run's burst is 3, so a problem with four samples failed partway through: the
+// fourth case answered 429 and the button looked stuck.
+//
+// BatchRun spends a single token for the whole sweep, so the number of sample
+// cases no longer decides whether the run succeeds.
+func TestBatchRunSpendsOneQuotaTokenForTheWholeSweep(t *testing.T) {
+	q := newUserQuota("run-test", 0.0001, 3) // burst 3, effectively no refill
+	h := &SubmissionHandler{runQuota: q}
+
+	// Three sweeps of many cases each must all be admitted: 9 tokens would have
+	// been needed by the old per-case approach.
+	for i := 0; i < 3; i++ {
+		if !checkQuota(httptest.NewRecorder(), h.runQuota, "u1") {
+			t.Fatalf("sweep %d was refused; the sweep must spend one token, not one per case", i+1)
+		}
+	}
+	// The fourth exceeds the burst, proving the budget is still enforced.
+	if checkQuota(httptest.NewRecorder(), h.runQuota, "u1") {
+		t.Fatal("a fourth sweep must be refused: the per-user budget still applies")
+	}
+}
+
+// A batch request with no cases is a client bug, and running code for zero
+// cases would spend a token for nothing.
+func TestBatchRunRejectsAnEmptySweep(t *testing.T) {
+	h := &SubmissionHandler{}
+	body := strings.NewReader(`{"source_code":"print(1)","language":"python","cases":[]}`)
+	req := withUser(httptest.NewRequest(http.MethodPost, "/api/submissions/run-batch", body), "u1")
+	w := httptest.NewRecorder()
+
+	h.BatchRun(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400 for an empty case list", w.Code)
 	}
 }

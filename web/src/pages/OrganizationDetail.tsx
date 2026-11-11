@@ -3,7 +3,7 @@ import type { ClassMember, ClassInfo } from '../types/community'
 import { errorMessage } from '../lib/errors'
 import { EmptyState } from '../components/EmptyState'
 import { useParams, Link } from 'react-router-dom'
-import { api, getAccessToken } from '../lib/api'
+import { api, getAccessToken, currentUser } from '../lib/api'
 import { useDocumentTitle } from '../lib/documentTitle'
 import { useToast } from '../components/Toast'
 
@@ -43,15 +43,13 @@ useDocumentTitle(org?.name)
 			setClasses(classData.data || [])
 			setMembers(memberData.data || [])
 
-			const token = getAccessToken()
-			if (token) {
-				try {
-					const payload = JSON.parse(atob(token.split('.')[1]))
-					const currentUserID = payload.user_id
-					const member = memberData.data?.find((m: ClassMember) => m.user_id === currentUserID)
-					setIsMember(!!member)
-					setIsOwner(member?.role === 'owner' || member?.role === 'admin' || payload.role === 'admin')
-				} catch { /* malformed JWT — keep default role */ }
+			// The JWT claim is `uid`; reading `user_id` always yielded null, so
+			// the viewer was never recognised as a member of their organization.
+			const me = currentUser()
+			if (me) {
+				const member = memberData.data?.find((m: ClassMember) => m.user_id === me.id)
+				setIsMember(!!member)
+				setIsOwner(member?.role === 'owner' || member?.role === 'admin' || me.role === 'admin')
 			}
 		}).catch(() => { }).finally(() => setLoading(false))
 	}, [id])

@@ -580,6 +580,83 @@ func (h *SubmissionHandler) CustomRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	respondJSON(w, http.StatusOK, h.runOnce(r.Context(), req, cfg))
+}
+
+// BatchRun is the "Test Samples" button: one compile-and-execute per sample
+// case under a single quota token for the whole sweep.
+//
+// The client used to fire N separate /run calls. /run is deliberately the
+// tightest budget on the platform (burst 3, 0.2 rps) because it compiles and
+// executes arbitrary code on demand, so a problem with more than three sample
+// cases blew the budget partway through: the later cases answered 429 and the
+// button sat in "Testing..." behind a five-second cooldown.
+func (h *SubmissionHandler) BatchRun(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r)
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if !h.requireVerifiedEmail(w, r, claims.UserID) {
+		return
+	}
+
+	var req struct {
+		SourceCode string `json:"source_code"`
+		Language   string `json:"language"`
+		Cases      []struct {
+			Input    string `json:"input"`
+			Expected string `json:"expected"`
+		} `json:"cases"`
+		TimeLimitMs   int `json:"time_limit_ms,omitempty"`
+		MemoryLimitKB int `json:"memory_limit_kb,omitempty"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	if req.SourceCode == "" || req.Language == "" {
+		http.Error(w, "source_code and language are required", http.StatusBadRequest)
+		return
+	}
+	// A sweep is bounded so one request cannot occupy a judge worker for an
+	// unbounded stretch. Twenty covers any realistic sample set.
+	const maxBatchCases = 20
+	if len(req.Cases) == 0 {
+		http.Error(w, "at least one case is required", http.StatusBadRequest)
+		return
+	}
+	if len(req.Cases) > maxBatchCases {
+		req.Cases = req.Cases[:maxBatchCases]
+	}
+
+	cfg := h.loadLangs()[req.Language]
+	if cfg == nil {
+		http.Error(w, "unsupported language: "+req.Language, http.StatusBadRequest)
+		return
+	}
+
+	if !checkQuota(w, h.runQuota, claims.UserID) {
+		return
+	}
+
+	results := make([]CustomRunResponse, 0, len(req.Cases))
+	for _, c := range req.Cases {
+		results = append(results, h.runOnce(r.Context(), CustomRunRequest{
+			SourceCode:    req.SourceCode,
+			Language:      req.Language,
+			Input:         c.Input,
+			Expected:      c.Expected,
+			TimeLimitMs:   req.TimeLimitMs,
+			MemoryLimitKB: req.MemoryLimitKB,
+		}, cfg))
+	}
+	respondJSON(w, http.StatusOK, map[string]interface{}{"results": results})
+}
+
+// runOnce performs one compile-and-execute. Split out of CustomRun so BatchRun
+// can reuse it without re-running the auth, decode and quota preamble per case.
+func (h *SubmissionHandler) runOnce(ctx context.Context, req CustomRunRequest, cfg *compiler.LangConfig) CustomRunResponse {
 	compileOutput := ""
 	copyIn := map[string]executor.CmdFile{}
 	var args []string
@@ -636,7 +713,7 @@ func (h *SubmissionHandler) CustomRun(w http.ResponseWriter, r *http.Request) {
 	}
 
 	start := time.Now()
-	resp, err := h.exec.Run(r.Context(), &executor.ExecRequest{
+	resp, err := h.exec.Run(ctx, &executor.ExecRequest{
 		Cmd: []executor.Cmd{{
 			Args:        args,
 			Env:         []string{"PATH=/usr/bin:/bin", "HOME=/tmp"},
@@ -650,19 +727,17 @@ func (h *SubmissionHandler) CustomRun(w http.ResponseWriter, r *http.Request) {
 	elapsed := int(time.Since(start).Milliseconds())
 
 	if err != nil {
-		respondJSON(w, http.StatusOK, CustomRunResponse{
+		return CustomRunResponse{
 			Status:        "SE",
 			CompileOutput: "execution client error: " + err.Error(),
-		})
-		return
+		}
 	}
 
 	if len(resp) == 0 {
-		respondJSON(w, http.StatusOK, CustomRunResponse{
+		return CustomRunResponse{
 			Status:        "SE",
 			CompileOutput: "no execution response received",
-		})
-		return
+		}
 	}
 
 	cr := resp[0]
@@ -691,11 +766,10 @@ func (h *SubmissionHandler) CustomRun(w http.ResponseWriter, r *http.Request) {
 		if compileOutput == "" {
 			compileOutput = "Compilation failed (no error output captured)"
 		}
-		respondJSON(w, http.StatusOK, CustomRunResponse{
+		return CustomRunResponse{
 			Status:        "CE",
 			CompileOutput: compileOutput,
-		})
-		return
+		}
 	}
 
 	status := "success"
@@ -712,7 +786,7 @@ func (h *SubmissionHandler) CustomRun(w http.ResponseWriter, r *http.Request) {
 		status = "RE"
 	}
 
-	respondJSON(w, http.StatusOK, CustomRunResponse{
+	return CustomRunResponse{
 		Status:        status,
 		Stdout:        stdout,
 		Stderr:        stderr,
@@ -721,7 +795,7 @@ func (h *SubmissionHandler) CustomRun(w http.ResponseWriter, r *http.Request) {
 		CompileOutput: compileOutput,
 		Passed:        compareOutput(status, stdout, req.Expected),
 		Expected:      req.Expected,
-	})
+	}
 }
 
 func compareOutput(status, stdout, expected string) *bool {

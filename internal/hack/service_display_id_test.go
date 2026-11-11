@@ -59,6 +59,9 @@ func (canonicalHackContestStore) IsParticipant(context.Context, string, string) 
 	return false, nil
 }
 func (canonicalHackContestStore) GetUsername(context.Context, string) string { return "" }
+func (canonicalHackContestStore) GetDisplayNames(context.Context, string, []string) (map[string]model.ContestDisplayName, error) {
+	return nil, nil
+}
 func (canonicalHackContestStore) AddPermission(context.Context, string, string, string) error {
 	return nil
 }

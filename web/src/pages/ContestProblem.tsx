@@ -15,6 +15,7 @@ import { ClipboardList, BarChart3, FileText } from 'lucide-react'
 import { useToast } from '../components/Toast'
 import { SubmissionStatusPanel } from '../components/SubmissionStatusPanel'
 import { errorMessage } from '../lib/errors'
+import { isRemotePlatform } from '../lib/platforms'
 
 // Derived from the API so these track the real response shapes without
 // importing model types (shared type files are in flux).
@@ -471,48 +472,35 @@ export default function ContestProblem() {
         setLastTestTime(now)
         setRunningSamples(true)
         setSampleResults([])
-        const results: SampleRunResult[] = []
-        for (let i = 0; i < problem.sample_cases.length; i++) {
-            const sc = problem.sample_cases[i]
-            try {
-                const res = await api.submissions.run({
-                    source_code: code,
-                    language: language,
-                    input: sc.input,
-                    expected: sc.output,
-                })
-                const actual = (res.stdout || '').trim().replace(/\r\n/g, '\n')
-                const expected = (res.expected || sc.output || '').trim().replace(/\r\n/g, '\n')
-                const passed = res.passed ?? false
-                results.push({
+        try {
+            // One request for the whole sweep: /run's burst is 3, so a /run per
+            // sample failed partway on any problem with more cases than that.
+            const { results: raw } = await api.submissions.runBatch({
+                source_code: code,
+                language: language,
+                cases: problem.sample_cases.map(sc => ({ input: sc.input, expected: sc.output })),
+            })
+            if (!isMounted.current) return
+            const results: SampleRunResult[] = (raw || []).map((res, i) => {
+                const sc = problem.sample_cases![i] ?? { input: '', output: '' }
+                return {
                     index: i + 1,
                     input: sc.input,
-                    expected,
-                    actual,
-                    passed,
+                    expected: (res.expected || sc.output || '').trim().replace(/\r\n/g, '\n'),
+                    actual: (res.stdout || '').trim().replace(/\r\n/g, '\n'),
+                    passed: res.passed ?? false,
                     status: res.status,
                     time: res.time_used,
                     memory: res.memory_used,
                     stderr: res.stderr,
                     compile_output: res.compile_output,
-                })
-            } catch (e) {
-                results.push({
-                    index: i + 1,
-                    input: sc.input,
-                    expected: sc.output,
-                    actual: '',
-                    passed: false,
-                    status: 'error',
-                    error: errorMessage(e),
-                })
-            }
-            if (isMounted.current) {
-                setSampleResults([...results])
-            }
-        }
-        if (isMounted.current) {
-            setRunningSamples(false)
+                }
+            })
+            setSampleResults(results)
+        } catch (e) {
+            toast.error('Test Samples failed: ' + errorMessage(e))
+        } finally {
+            if (isMounted.current) setRunningSamples(false)
         }
     }
 
@@ -748,7 +736,11 @@ export default function ContestProblem() {
 
                     {/* Submissions Tab */}
                     {tab === 'submissions' && (
-                        <MySubmissionsTab problemId={problem.id} contestId={contestId} />
+                        // contest.id, not the route param: the URL carries a slug
+                        // ("test-round-1") and submissions.contest_id is a UUID,
+                        // so filtering by the slug matched nothing and the tab
+                        // was always empty.
+                        <MySubmissionsTab problemId={problem.id} contestId={contest?.id} />
                     )}
                 </div>
 
@@ -786,8 +778,8 @@ export default function ContestProblem() {
                                 <div className="flex gap-2">
                                     <button
                                         onClick={testWithSamples}
-                                        disabled={runningSamples || !code.trim() || problem?.source !== 'local'}
-                                        title={problem?.source !== 'local' ? 'Test Samples is only available for local problems' : undefined}
+                                        disabled={runningSamples || !code.trim() || isRemotePlatform(problem?.source)}
+                                        title={isRemotePlatform(problem?.source) ? 'Test Samples is only available for locally judged problems' : undefined}
                                         className="bg-brand text-on-brand px-3 py-1.5 rounded text-sm font-medium hover:bg-brand-hover disabled:opacity-50 transition-colors cursor-pointer"
                                     >
                                         {runningSamples ? 'Testing...' : 'Test Samples'}
@@ -871,8 +863,8 @@ export default function ContestProblem() {
                                     <span className="font-semibold text-sm text-ink-soft">Custom Stdin / Scratchpad</span>
                                     <button
                                         onClick={runCustomCode}
-                                        disabled={runningCustom || !code.trim() || problem?.source !== 'local'}
-                                        title={problem?.source !== 'local' ? 'Custom run is only available for local problems' : undefined}
+                                        disabled={runningCustom || !code.trim() || isRemotePlatform(problem?.source)}
+                                        title={isRemotePlatform(problem?.source) ? 'Custom run is only available for locally judged problems' : undefined}
                                         className="bg-brand hover:bg-brand-hover text-on-brand text-xs font-semibold px-3 py-1.5 rounded disabled:opacity-50 transition-colors cursor-pointer"
                                     >
                                         {runningCustom ? 'Running...' : 'Run Code'}
@@ -978,7 +970,7 @@ export default function ContestProblem() {
                             </Link>
                             {isLoggedIn && (
                                 <Link
-                                    to={`/submissions?problem_id=${problem.id}&contest_id=${contestId}`}
+                                    to={`/submissions?problem_id=${problem.id}&contest_id=${contest?.id ?? ''}`}
                                     className="block text-sm text-brand hover:underline"
                                 >
                                     <FileText className="w-3.5 h-3.5" /> All Submissions for this Problem

@@ -107,6 +107,23 @@ func initialContestStatus(role string) string {
 	return model.ContestStatusDraft
 }
 
+// derefBool/derefInt apply a default when an optional request field is absent.
+// The create path needs them because the request DTO marks these fields optional
+// to keep update's "omitted means unchanged" semantics.
+func derefBool(v *bool, fallback bool) bool {
+	if v == nil {
+		return fallback
+	}
+	return *v
+}
+
+func derefInt(v *int, fallback int) int {
+	if v == nil {
+		return fallback
+	}
+	return *v
+}
+
 func (h *ContestHandler) Create(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetUserClaims(r)
 	if claims == nil {
@@ -175,9 +192,12 @@ func (h *ContestHandler) Create(w http.ResponseWriter, r *http.Request) {
 		RegistrationRequired: req.RegistrationRequired,
 		RegistrationDeadline: req.RegistrationDeadline,
 		MaxParticipants:      req.MaxParticipants,
-		IsRated:              req.IsRated,
-		RatedForMin:          req.RatedForMin,
-		RatedForMax:          req.RatedForMax,
+		// A new round is rated by default: that is what the schema default
+		// (is_rated=true) and every competitive round mean. An omitted field on
+		// create therefore must not silently produce an unrated contest.
+		IsRated:     derefBool(req.IsRated, true),
+		RatedForMin: derefInt(req.RatedForMin, 0),
+		RatedForMax: derefInt(req.RatedForMax, 9999),
 	}
 
 	if err := h.store.Create(r.Context(), c); err != nil {
@@ -318,6 +338,19 @@ func (h *ContestHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if req.VirtualContestEnabled != nil {
 		c.VirtualContestEnabled = *req.VirtualContestEnabled
 	}
+	// Rating controls. Create already read these; Update did not, so is_rated
+	// could be chosen once and never changed — the Settings tab had no control
+	// for it because the server would have dropped the value anyway. The store
+	// writes all three (contests.go Update), so nothing else is needed here.
+	if req.IsRated != nil {
+		c.IsRated = *req.IsRated
+	}
+	if req.RatedForMin != nil {
+		c.RatedForMin = *req.RatedForMin
+	}
+	if req.RatedForMax != nil {
+		c.RatedForMax = *req.RatedForMax
+	}
 	if req.Visible != nil {
 		c.Visible = *req.Visible
 	}
@@ -446,6 +479,11 @@ func (h *ContestHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// One lookup for the whole page: a generated onsite account is labelled with
+	// the team it was minted for, not its throwaway username. Missing keys fall
+	// back to the username below.
+	displayNames, _ := h.store.GetDisplayNames(r.Context(), contest.ID, participants)
+
 	participantsScores := make([]format.ParticipantScore, 0, len(participants))
 	for _, uid := range participants {
 		uname := h.store.GetUsername(r.Context(), uid)
@@ -491,6 +529,8 @@ func (h *ContestHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 		Rank         int                            `json:"rank"`
 		UserID       string                         `json:"user_id"`
 		Username     string                         `json:"username"`
+		TeamName     string                         `json:"team_name,omitempty"`
+		Institution  string                         `json:"institution,omitempty"`
 		TotalSolved  int                            `json:"total_solved"`
 		TotalPenalty int                            `json:"total_penalty"`
 		TotalScore   int                            `json:"total_score"`
@@ -517,6 +557,8 @@ func (h *ContestHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 			Rank:         rank.Position,
 			UserID:       rank.Score.UserID,
 			Username:     rank.Score.Username,
+			TeamName:     displayNames[rank.Score.UserID].TeamName,
+			Institution:  displayNames[rank.Score.UserID].Institution,
 			TotalSolved:  rank.Score.TotalSolved,
 			TotalPenalty: rank.Score.TotalPenalty,
 			TotalScore:   int(rank.Score.TotalScore),
