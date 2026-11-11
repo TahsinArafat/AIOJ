@@ -839,6 +839,7 @@ export const api = {
         // A setter proposes a round; only an admin can publish it.
         submitForReview: (id: string) =>
             request(`/contests/${id}/submit`, { method: 'POST' }),
+
         get: (id: string) => request<ContestDetailResponse>(`/contests/${id}`),
         create: (d: unknown) => request<Contest>('/contests', { method: 'POST', body: JSON.stringify(d) }),
         getFormats: () => request<{ formats: string[] }>('/contests/formats'),

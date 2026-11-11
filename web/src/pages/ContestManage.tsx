@@ -1,7 +1,7 @@
 import React from 'react'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { api } from '../lib/api'
+import { api, getAccessToken } from '../lib/api'
 import { errorMessage } from '../lib/errors'
 import { PageHeader } from '../components/ui/PageHeader'
 import { useTheme } from '../context/ThemeContext'
@@ -360,16 +360,23 @@ export function ChallengesTab({ contestId }: { contestId: string }) {
 // BOOKLET TAB
 // ═══════════════════════════════════════════════
 function BookletTab({ contestId }: { contestId: string }) {
+    // A plain link is correct here because the endpoint accepts ?token=: a
+    // browser navigation cannot set an Authorization header, and the booklet is
+    // public for a published round but staff-only for a draft. The server-side
+    // facade (middleware.OptionalAuthMiddleware with a query-token prefix) is what
+    // makes one URL work for both callers, instead of the client fetching a blob.
+    const token = getAccessToken()
+    const href = `/api/contests/${contestId}/pdf${token ? `?token=${encodeURIComponent(token)}` : ''}`
     return (
         <TabShell title="Booklet">
             <div className="text-center py-10">
                 <FileDown className="w-16 h-16 text-muted mx-auto mb-4" />
-                <p className="text-muted mb-4">Generate and download the contest problem booklet as PDF</p>
-                <a href={`/api/contests/${contestId}/pdf`} target="_blank" rel="noopener noreferrer"
+                <p className="text-muted mb-4">Generate and download the contest problem booklet for printing</p>
+                <a href={href} target="_blank" rel="noopener noreferrer"
                     className="inline-flex items-center gap-2 px-5 py-2.5 bg-brand text-on-brand rounded-lg hover:bg-brand-hover font-medium">
                     Open Booklet (Print to Save)
                 </a>
-                <p className="text-xs text-muted-soft mt-3">Opens in a new tab with print dialog for PDF export</p>
+                <p className="text-xs text-muted-soft mt-3">Opens in a new tab with the print dialog for PDF export</p>
             </div>
         </TabShell>
     )

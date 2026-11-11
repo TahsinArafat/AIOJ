@@ -372,7 +372,12 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 		r.With(middleware.OptionalAuthMiddleware(jwtManager)).Get("/{id}/scoreboard", contestH.Scoreboard)
 		r.With(middleware.OptionalAuthMiddleware(jwtManager)).Get("/{id}/stats", contestH.ContestStats)
 		r.With(middleware.OptionalAuthMiddleware(jwtManager)).Get("/{contestId}/problems/{index}", contestProblemH.GetByIndex)
-		r.With(middleware.OptionalAuthMiddleware(jwtManager)).Get("/{id}/pdf", contestH.DownloadPDF)
+		// The booklet is opened by a browser navigation: public for a published
+		// round, staff-only for a draft. A navigation cannot set an Authorization
+		// header, so this prefix accepts ?token= — the same facade the backup
+		// download uses. Without it a setter could not fetch their own draft's
+		// booklet, which is exactly what broke.
+		r.With(middleware.OptionalAuthMiddleware(jwtManager, "/api/contests/")).Get("/{id}/pdf", contestH.DownloadPDF)
 		// ICPC-style event feed for an external scorer. Authorized by an
 		// operator-configured shared token, not a user session, so it is
 		// deliberately outside the JWT machinery.

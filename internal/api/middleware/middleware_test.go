@@ -187,3 +187,83 @@ func TestGetUserClaims(t *testing.T) {
 		}
 	})
 }
+
+// A browser navigation cannot set an Authorization header, so a file download that
+// is public for some callers and staff-only for others needs ?token= to
+// authenticate the private case. This is the facade the backup download already
+// uses; these pin that it works here too, and only on the opted-in prefixes.
+func TestOptionalAuthMiddlewareQueryToken(t *testing.T) {
+	jwtMgr := auth.NewJWTManager("test-secret-key", time.Hour, 24*time.Hour)
+	token, _ := jwtMgr.GenerateAccessToken("setter-1", "setter", "setter")
+
+	cases := []struct {
+		name       string
+		path       string
+		query      string
+		prefixes   []string
+		wantClaims bool
+	}{
+		{
+			name: "query token accepted on an opted-in prefix", path: "/api/contests/c1/pdf",
+			query: "?token=" + token, prefixes: []string{"/api/contests/"},
+			wantClaims: true,
+		},
+		{
+			// The leak guard: a query token must not authenticate anywhere the
+			// route did not explicitly opt in, or it ends up in access logs and
+			// Referer headers for ordinary pages.
+			name: "query token ignored without an opted-in prefix", path: "/api/contests/c1/pdf",
+			query: "?token=" + token, prefixes: nil,
+			wantClaims: false,
+		},
+		{
+			name: "query token ignored on another path", path: "/api/problems/x",
+			query: "?token=" + token, prefixes: []string{"/api/contests/"},
+			wantClaims: false,
+		},
+		{
+			name: "header still works without any prefix", path: "/api/anything",
+			query: "", prefixes: nil, wantClaims: true,
+		},
+		{
+			name: "invalid query token yields anonymous, not an error", path: "/api/contests/c1/pdf",
+			query: "?token=bogus", prefixes: []string{"/api/contests/"},
+			wantClaims: false,
+		},
+		{
+			name: "no credential is anonymous", path: "/api/contests/c1/pdf",
+			query: "", prefixes: []string{"/api/contests/"},
+			wantClaims: false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var got *auth.Claims
+			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				got = GetUserClaims(r)
+				w.WriteHeader(http.StatusOK)
+			})
+			mid := OptionalAuthMiddleware(jwtMgr, tc.prefixes...)(handler)
+
+			req := httptest.NewRequest("GET", tc.path+tc.query, nil)
+			// "header still works" uses the header form.
+			if tc.name == "header still works without any prefix" {
+				req.Header.Set("Authorization", "Bearer "+token)
+			}
+			rec := httptest.NewRecorder()
+			mid.ServeHTTP(rec, req)
+
+			// Optional auth never rejects: every case is 200.
+			if rec.Code != http.StatusOK {
+				t.Fatalf("status = %d, want 200", rec.Code)
+			}
+			if tc.wantClaims && got == nil {
+				t.Fatal("expected claims, got nil")
+			}
+			if !tc.wantClaims && got != nil {
+				t.Fatalf("expected anonymous, got claims for %s", got.Username)
+			}
+		})
+	}
+}

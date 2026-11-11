@@ -89,10 +89,26 @@ func writePasswordChangeRequired(w http.ResponseWriter) {
 	_, _ = w.Write([]byte(`{"error":"password change required","code":"password_change_required"}`))
 }
 
-func OptionalAuthMiddleware(jwtManager *auth.JWTManager) func(http.Handler) http.Handler {
+// OptionalAuthMiddleware attaches claims when a credential is present and lets
+// anonymous requests through otherwise.
+//
+// queryTokenPrefixes works exactly as it does on AuthMiddleware: on the listed
+// path prefixes a ?token= query parameter may stand in for the Authorization
+// header, because a browser navigation cannot set one. Without this, a download
+// that is public for some callers and private for others has no way to
+// authenticate the private case — a setter could not fetch their own draft's
+// booklet, which is what a plain <a href> on a gated endpoint amounts to.
+//
+// The same caution applies: a query token leaks into access logs, Referer and
+// browser history, so only file-download prefixes may opt in.
+func OptionalAuthMiddleware(jwtManager *auth.JWTManager, queryTokenPrefixes ...string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if token := bearerToken(r); token != "" {
+			token := bearerToken(r)
+			if token == "" && allowsQueryToken(r, queryTokenPrefixes) {
+				token = r.URL.Query().Get("token")
+			}
+			if token != "" {
 				if claims, err := jwtManager.ValidateToken(token); err == nil {
 					ctx := context.WithValue(r.Context(), UserContextKey, claims)
 					next.ServeHTTP(w, r.WithContext(ctx))
