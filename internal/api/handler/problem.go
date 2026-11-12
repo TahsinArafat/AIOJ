@@ -58,6 +58,38 @@ func initialStatus(requested bool, role string) string {
 	return model.ProblemStatusDraft
 }
 
+// slugFromTitle derives a URL segment from a problem title.
+//
+// The setter's create screen asks for a name and nothing else, so the slug can
+// no longer come from the client. Anything that is not a letter or digit folds
+// to a hyphen, and a title with nothing usable left (CJK, emoji) falls back to a
+// random suffix rather than an empty segment.
+func slugFromTitle(title string) string {
+	var b strings.Builder
+	lastHyphen := true // leading separators are dropped
+	for _, r := range strings.ToLower(title) {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			b.WriteRune(r)
+			lastHyphen = false
+			continue
+		}
+		if !lastHyphen {
+			b.WriteByte('-')
+			lastHyphen = true
+		}
+	}
+	slug := strings.Trim(b.String(), "-")
+	if len(slug) > 60 {
+		slug = strings.Trim(slug[:60], "-")
+	}
+	if slug == "" {
+		// A non-Latin title ("素数筛法") yields no ASCII at all; the slug still has
+		// to be unique and non-empty, and the title stays intact on the problem.
+		return "problem-" + strings.Split(uuid.New().String(), "-")[0]
+	}
+	return slug
+}
+
 func (h *ProblemHandler) List(w http.ResponseWriter, r *http.Request) {
 	// A contestant account exists for one round and is not an archive citizen.
 	// Answered as an empty page rather than 403 so the SPA renders its normal
@@ -352,9 +384,19 @@ func (h *ProblemHandler) Create(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid body", http.StatusBadRequest)
 		return
 	}
-	if req.Slug == "" || req.Title == "" || req.Description == "" {
-		http.Error(w, "slug, title, description required", http.StatusBadRequest)
+	var slugDerived bool
+	if req.Title == "" {
+		http.Error(w, "title required", http.StatusBadRequest)
 		return
+	}
+	// The create screen is a name prompt: it hands over a title and nothing
+	// else, and the statement is written in the workspace it redirects to. A
+	// title-only request therefore has to produce a usable problem, which means
+	// deriving the slug here and accepting an empty description (the column is
+	// NOT NULL, so this has to be an explicit "").
+	if req.Slug == "" {
+		req.Slug = slugFromTitle(req.Title)
+		slugDerived = true
 	}
 	if req.TimeLimit <= 0 {
 		req.TimeLimit = 1000
@@ -400,7 +442,25 @@ func (h *ProblemHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Visible:              req.Visible && claims.Role == "admin",
 		CreatedBy:            claims.UserID,
 	}
-	if err := h.store.Create(r.Context(), prob); err != nil {
+	// A derived slug can collide: nothing stops two setters naming a problem
+	// "Two Sum", and the reporter above turns that into a 409 the user cannot
+	// act on from a name-only form. Suffix a counter instead, but only for
+	// derived slugs — an explicitly requested slug is still the caller's to
+	// resolve, so the seeder keeps seeing 409 and skipping.
+	var err error
+	for attempt := 0; attempt < 50; attempt++ {
+		err = h.store.Create(r.Context(), prob)
+		if err == nil {
+			break
+		}
+		var pqErr *pq.Error
+		if !slugDerived || !errors.As(err, &pqErr) || pqErr.Code != "23505" {
+			break
+		}
+		prob.ID = uuid.New().String()
+		prob.Slug = slugFromTitle(req.Title) + "-" + strconv.Itoa(attempt+2)
+	}
+	if err != nil {
 		// A duplicate slug is a client-level conflict, not a server fault. The
 		// seeder (and any retrying caller) treats 409 as "already exists, carry
 		// on", but this used to leak the raw pq 23505 as a 500 — which made
