@@ -1,7 +1,8 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useParams, Link, useLocation } from 'react-router-dom'
 import { EmptyState } from '../components/EmptyState'
-import { LANGUAGE_OPTIONS } from '../lib/languages'
+import { DEFAULT_LANGUAGE, languageName, languageTemplate } from '../lib/languages'
+import { useLanguages } from '../lib/useLanguages'
 import { ProblemStatement } from '../components/ProblemStatement'
 import { ProblemMeta } from '../components/ProblemMeta'
 import { Badge } from '../components/ui/Badge'
@@ -46,17 +47,6 @@ interface SampleRunResult { index: number; input: string; expected?: string; act
 function isNarrowViewport(): boolean {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false
     return window.matchMedia('(max-width: 1023px)').matches
-}
-
-const TEMPLATE_CODE: Record<string, string> = {
-    'cpp-gpp-64': `#include <iostream>\nusing namespace std;\n\nint main() {\n    // Your code here\n    \n    return 0;\n}`,
-    'cpp-gpp-32': `#include <iostream>\nusing namespace std;\n\nint main() {\n    // Your code here\n    \n    return 0;\n}`,
-    'c-gcc-64': `#include <stdio.h>\n\nint main() {\n    // Your code here\n    \n    return 0;\n}`,
-    'python': `# Your code here\n`,
-    'java': `import java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        Scanner sc = new Scanner(System.in);\n        // Your code here\n        \n    }\n}`,
-    'rust': `fn main() {\n    // Your code here\n    \n}`,
-    'nodejs': `// Your code here\n`,
-    'csharp': `using System;\n\nclass Program {\n    static void Main() {\n        // Your code here\n        \n    }\n}`,
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -145,6 +135,10 @@ function SubmissionResult({ result, polling }: { result: SubmissionView; polling
 }
 
 function MySubmissionsTab({ problemId, contestId }: { problemId: string; contestId?: string }) {
+    // Shares the module-level cache with the page's own useLanguages() call, so
+    // this costs no extra request. Resolving a submission's display name needs
+    // the judge's names, not the raw key.
+    const { languages } = useLanguages()
     const [subs, setSubs] = useState<SubRow[]>([])
     const [loading, setLoading] = useState(true)
     const isMounted = useRef(true)
@@ -214,7 +208,7 @@ function MySubmissionsTab({ problemId, contestId }: { problemId: string; contest
                                     {s.memory_used != null ? `${Math.round(s.memory_used / 1024)} MB` : '—'}
                                 </td>
                                 <td className="py-2.5 px-3 text-muted whitespace-nowrap">
-                                    {s.language || '—'}
+                                    {s.language ? languageName(s.language, languages) : '—'}
                                 </td>
                                 <td className="py-2.5 px-3">
                                     <Link
@@ -300,7 +294,11 @@ export default function ContestProblem() {
     const [runningSamples, setRunningSamples] = useState(false)
     const [lastTestTime, setLastTestTime] = useState(0)
 
-    const [language, setLanguage] = useState('cpp-gpp-64')
+    // The judge's own list, from GET /api/languages. ContestProblem used to
+    // carry a third hardcoded copy of both the languages and their templates,
+    // so a round hid Clang, PyPy, JavaScript and C 32-bit entirely.
+    const { languages, options: languageOptions } = useLanguages()
+    const [language, setLanguage] = useState(DEFAULT_LANGUAGE)
     const [code, setCode] = useState('')
     const [submitting, setSubmitting] = useState(false)
     const [result, setResult] = useState<SubmissionView | null>(null)
@@ -403,8 +401,8 @@ export default function ContestProblem() {
         if (!problem?.id) return
         const key = `aioj_contest_draft_${problem.id}_${language}`
         const saved = localStorage.getItem(key)
-        queueMicrotask(() => setCode(saved || TEMPLATE_CODE[language] || ''))
-    }, [problem?.id, language])
+        queueMicrotask(() => setCode(saved || languageTemplate(language, languages)))
+    }, [problem?.id, language, languages])
 
     const handleCodeChange = (newCode: string) => {
         setCode(newCode)
@@ -803,7 +801,7 @@ export default function ContestProblem() {
                                     aria-label="Solution language"
                                     className="border border-hairline-strong rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)]"
                                 >
-                                    {LANGUAGE_OPTIONS.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
+                                    {languageOptions.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
                                 </select>
                                 <div className="flex gap-2">
                                     <button

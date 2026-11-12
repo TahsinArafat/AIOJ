@@ -1609,6 +1609,13 @@ export interface VirtualStatusResponse extends VirtualStatus {
     original_contest_id: string
 }
 
+/** GET /api/languages — one judge-selectable language, as the server sees it. */
+export interface PublicLanguage {
+    key: string
+    name: string
+    extensions: string[]
+}
+
 /** Admin language config rows (YAML-backed, not DB models). */
 export interface LanguageConfig {
     name: string

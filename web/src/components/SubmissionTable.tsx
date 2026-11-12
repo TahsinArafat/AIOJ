@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { RefreshCw } from 'lucide-react'
 import { languageName } from '../lib/languages'
+import { useLanguages } from '../lib/useLanguages'
 import { Button } from './ui/Button'
 import { Table, TableShell, Td, Th, THead, Tr } from './ui/Table'
 import { VerdictBadge } from './ui/VerdictBadge'
@@ -47,6 +48,9 @@ export function SubmissionTable({
     onRejudge?: (row: Submission) => void
     busyIds?: Set<string>
 }) {
+    // Resolve display names against the judge's own list, so a language an
+    // admin renamed in the panel shows its current name here too.
+    const { languages } = useLanguages()
     // The inline failure row below a System Error spans every column.
     const columns = 5 + (showUser ? 1 : 0) + (showProblem ? 1 : 0) + (onRejudge ? 1 : 0)
 
@@ -110,7 +114,7 @@ export function SubmissionTable({
                                         )}
                                     </Td>
                                 )}
-                                <Td className="text-xs text-ink-soft">{languageName(row.language)}</Td>
+                                <Td className="text-xs text-ink-soft">{languageName(row.language, languages)}</Td>
                                 <Td>
                                     <VerdictBadge status={row.status} />
                                 </Td>

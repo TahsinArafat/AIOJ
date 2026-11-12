@@ -11,19 +11,35 @@ vi.mock('../../lib/api', () => ({
                 list: vi.fn(),
                 detect: vi.fn(),
                 templates: vi.fn(),
+                reset: vi.fn(),
+                get: vi.fn(),
+                getRaw: vi.fn(),
+                update: vi.fn(),
+                create: vi.fn(),
+                delete: vi.fn(),
+                test: vi.fn(),
             },
         },
     },
 }))
 
+// The panel invalidates the SPA's cached language list after a save or reset;
+// that is a side effect on a different module, so stub it rather than assert it
+// through the real cache.
+vi.mock('../../lib/useLanguages', () => ({
+    invalidateLanguages: vi.fn(),
+    useLanguages: () => ({ languages: [], loading: false, options: [], refresh: vi.fn() }),
+}))
+
 const toastError = vi.fn()
+const confirmMock = vi.fn()
 
 vi.mock('../../components/Toast', () => ({
     useToast: () => ({ success: vi.fn(), error: toastError, info: vi.fn() }),
 }))
 
 vi.mock('../../components/ConfirmDialog', () => ({
-    useConfirm: () => vi.fn(),
+    useConfirm: () => confirmMock,
 }))
 
 function renderPanel() {
@@ -37,6 +53,7 @@ function renderPanel() {
 beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(api.admin.languages.list).mockResolvedValue({ data: [] } as never)
+    confirmMock.mockResolvedValue(true)
 })
 
 // The original bug: Detect answered `"compilers": null` on a server with no
@@ -98,4 +115,71 @@ test('Detect reports failure and closes the panel', async () => {
 
     await waitFor(() => expect(toastError).toHaveBeenCalledWith('Detection failed: sandbox offline'))
     expect(screen.queryByText(/Detected Compilers/i)).not.toBeInTheDocument()
+})
+
+// --- Reset to Default ------------------------------------------------------
+
+const oneLang = {
+    data: [{
+        name: 'C++ (G++ 64-bit)',
+        key: 'cpp-gpp-64',
+        compile: '/usr/bin/g++ -O2 -o {{exe}} {{src}}',
+        runtime: '',
+        copy_in: {},
+        time_limit_multiplier: 1,
+        memory_limit_multiplier: 1,
+        seccomp_rule: 'c_cpp',
+        extensions: ['.cpp'],
+        mono: false,
+        file_path: 'cpp-gpp-64.yaml',
+    }],
+}
+
+function renderWithOneLang() {
+    vi.mocked(api.admin.languages.list).mockResolvedValue(oneLang as never)
+    return renderPanel()
+}
+
+// Reset exists because the panel edits lang/*.yaml in place: a bad save could
+// otherwise only be undone by a redeploy.
+test('Reset restores the language after confirmation', async () => {
+    vi.mocked(api.admin.languages.reset).mockResolvedValue(oneLang.data[0] as never)
+
+    renderWithOneLang()
+    await screen.findByText('C++ (G++ 64-bit)')
+
+    fireEvent.click(screen.getByTitle('Reset to Default'))
+
+    await waitFor(() => expect(api.admin.languages.reset).toHaveBeenCalledWith('cpp-gpp-64'))
+})
+
+// A destructive action must be cancellable, and a cancelled reset must not
+// touch the server.
+test('Reset is skipped when the confirmation is declined', async () => {
+    confirmMock.mockResolvedValue(false)
+
+    renderWithOneLang()
+    await screen.findByText('C++ (G++ 64-bit)')
+
+    fireEvent.click(screen.getByTitle('Reset to Default'))
+
+    await waitFor(() => expect(confirmMock).toHaveBeenCalled())
+    expect(api.admin.languages.reset).not.toHaveBeenCalled()
+})
+
+// A language an operator created has no shipped default; the server answers 404
+// with an explanation, which the panel must show rather than swallow.
+test('a failed Reset reports why', async () => {
+    vi.mocked(api.admin.languages.reset).mockRejectedValue(
+        new Error('language "operator-made" has no built-in default to restore'),
+    )
+
+    renderWithOneLang()
+    await screen.findByText('C++ (G++ 64-bit)')
+
+    fireEvent.click(screen.getByTitle('Reset to Default'))
+
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith(
+        expect.stringContaining('no built-in default'),
+    ))
 })

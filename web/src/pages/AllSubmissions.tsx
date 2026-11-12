@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { api } from '../lib/api'
 import { errorMessage } from '../lib/errors'
 import { useDocumentTitle } from '../lib/documentTitle'
-import { LANGUAGE_OPTIONS } from '../lib/languages'
+import { useLanguages } from '../lib/useLanguages'
 import { EmptyState } from '../components/EmptyState'
 import { SubmissionTable } from '../components/SubmissionTable'
 import { Button } from '../components/ui/Button'
@@ -34,6 +34,8 @@ const EMPTY_FILTERS: Filters = { handle: '', problem: '', status: '', language: 
 
 export default function AllSubmissions() {
     useDocumentTitle('Status')
+    // The judge's own languages, so the filter matches what can actually be submitted.
+    const { options: languageOptions } = useLanguages()
     const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS)
     const [applied, setApplied] = useState<Filters>(EMPTY_FILTERS)
     const [rows, setRows] = useState<Submission[]>([])
@@ -136,7 +138,7 @@ export default function AllSubmissions() {
                         onChange={e => setFilters(f => ({ ...f, language: e.target.value }))}
                     >
                         <option value="">Any language</option>
-                        {LANGUAGE_OPTIONS.map(o => (
+                        {languageOptions.map(o => (
                             <option key={o.value} value={o.value}>{o.label}</option>
                         ))}
                     </Select>

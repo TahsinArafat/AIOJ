@@ -4,7 +4,8 @@ import { lazy } from 'react'
 const CodeEditor = lazy(() => import('../components/CodeEditor'))
 import { api, getAccessToken } from '../lib/api'
 import { loginHref } from '../lib/authRedirect'
-import { DEFAULT_LANGUAGE, LANGUAGE_OPTIONS, languageTemplate } from '../lib/languages'
+import { DEFAULT_LANGUAGE, languageTemplate } from '../lib/languages'
+import { useLanguages } from '../lib/useLanguages'
 import { VerdictBadge } from '../components/ui/VerdictBadge'
 import { Play, Clock, Cpu, AlertTriangle, Maximize2, Minimize2 } from 'lucide-react'
 
@@ -29,6 +30,9 @@ const MAX_OUTPUT_LENGTH = 100000
 
 export default function IDE() {
     const location = useLocation()
+    // The judge's own config, from GET /api/languages. A hardcoded list here
+    // meant an admin edit in admin#languages never reached the IDE.
+    const { languages, options: languageOptions } = useLanguages()
     const [language, setLanguage] = useState(() => localStorage.getItem('aioj_ide_lang') || DEFAULT_LANGUAGE)
     const [code, setCode] = useState('')
     const [customInput, setCustomInput] = useState('')
@@ -62,11 +66,26 @@ export default function IDE() {
         return s.slice(0, MAX_OUTPUT_LENGTH) + `\n\n... [truncated ${s.length - MAX_OUTPUT_LENGTH} more chars]`
     }
 
+    // A language saved in localStorage can be gone: the admin may have deleted
+    // it from lang/. Left alone, the select would show no matching option and
+    // the run would be rejected server-side with an opaque error, so fall back
+    // to the default once the real list arrives.
+    useEffect(() => {
+        if (languages.length === 0) return
+        if (languages.some(l => l.key === language)) return
+        // deferred a microtask, matching the draft effect below and the
+        // react-hooks/set-state-in-effect rule
+        queueMicrotask(() => {
+            setLanguage(DEFAULT_LANGUAGE)
+            localStorage.setItem('aioj_ide_lang', DEFAULT_LANGUAGE)
+        })
+    }, [languages, language])
+
     useEffect(() => {
         const saved = localStorage.getItem(`aioj_ide_code_${language}`)
         // deferred a microtask: draft lands pre-paint (react-hooks/set-state-in-effect)
-        queueMicrotask(() => setCode(saved || languageTemplate(language)))
-    }, [language])
+        queueMicrotask(() => setCode(saved || languageTemplate(language, languages)))
+    }, [language, languages])
 
     const handleCodeChange = (newCode: string) => {
         setCode(newCode)
@@ -175,7 +194,7 @@ export default function IDE() {
                     onChange={e => handleLanguageChange(e.target.value)}
                     className="h-9 rounded-lg border border-hairline-strong bg-surface px-2 text-sm text-ink-soft transition-colors hover:border-muted-soft focus:border-brand focus:outline-none min-w-0 max-w-[50vw] md:max-w-none"
                 >
-                    {LANGUAGE_OPTIONS.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
+                    {languageOptions.map(l => <option key={l.value} value={l.value}>{l.label}</option>)}
                 </select>
                 <div className="flex-1" />
             </div>

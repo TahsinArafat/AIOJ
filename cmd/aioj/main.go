@@ -870,6 +870,7 @@ func main() {
 		BotAccount:        botAccountH,
 		Settings:          settingsH,
 		LangAdmin:         langAdminH,
+		PublicLanguages:   handler.NewPublicLanguageHandler(cfg.LangDir),
 		RemoteLang:        remoteLangH,
 		AdminSub:          adminSubH,
 		Backup:            backupH,

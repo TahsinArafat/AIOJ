@@ -1,26 +1,29 @@
 /**
- * Canonical judge languages.
+ * Judge languages, as configured on the server.
  *
- * `key` and `name` mirror `lang/*.yaml` on the backend, which is the only place
- * a language is actually defined. Before this module existed the list was
- * copy-pasted into IDE, ProblemDetail, ContestProblem, Submissions and
- * SubmissionDetail, and the copies had drifted in ways that mattered:
+ * `lang/*.yaml` on the backend is the only place a language is defined, and
+ * GET /api/languages serves that same directory live — so an admin edit in
+ * admin#languages, or a language added there, shows up in the IDE and the
+ * submit forms without a rebuild.
  *
- *   * every copy advertised stale compiler versions ("GNU G++17 7.3.0",
- *     "Python 3.8.10") that no longer matched what the judge runs;
- *   * the same submission read "C++ 20 (GCC)" in the submission list and
- *     "GNU G++17 7.3.0 (64 bit)" in the IDE;
- *   * ContestProblem's list was missing Clang, PyPy, JavaScript and C 32-bit,
- *     so a contestant could not submit in those languages in a contest even
- *     though the judge supports them everywhere else.
+ * History worth keeping: this module used to be a hardcoded array, copied again
+ * into IDE, ProblemDetail, ContestProblem, Submissions and SubmissionDetail.
+ * The copies drifted — stale compiler versions, the same submission reading
+ * "C++ 20 (GCC)" in one place and "GNU G++17 7.3.0" in another, and a contest
+ * picker that hid Clang, PyPy, JavaScript and C 32-bit entirely. Then the array
+ * itself became the problem: it was still shipped in the bundle, so the panel
+ * could add or rename a language and every dropdown kept offering the old set.
  *
- * Adding a language now means adding one entry here plus the `lang/*.yaml`.
+ * The data now comes from the server. FALLBACK_LANGUAGES exists only so a
+ * dropdown is never empty when the request fails; it is deliberately the same
+ * twelve keys the repo ships, and a test pins it to `lang/*.yaml` so it cannot
+ * drift into a second, wrong source of truth.
  */
 
 export interface Language {
     /** Judge key — what goes on the wire. */
     key: string
-    /** Display name, matching `lang/<key>.yaml`. */
+    /** Display name, as set in `lang/<key>.yaml`. */
     name: string
     /** Starter template offered in the IDE and the submit pane. */
     template: string
@@ -62,7 +65,53 @@ class Program {
     }
 }`
 
-export const LANGUAGES: Language[] = [
+/**
+ * Templates are editor conveniences, not judge config — the server has no
+ * opinion about what starter code to show. Keyed by language key, with a
+ * family fallback in `templateFor` for keys this table has not seen (an admin
+ * can add any key they like, and a submission still needs something to start
+ * from).
+ */
+const TEMPLATES: Record<string, string> = {
+    'cpp-gpp-64': CPP_TEMPLATE,
+    'cpp-gpp-32': CPP_TEMPLATE,
+    'cpp-clang': CPP_TEMPLATE,
+    'c-gcc-64': C_TEMPLATE,
+    'c-gcc-32': C_TEMPLATE,
+    java: JAVA_TEMPLATE,
+    csharp: CSHARP_TEMPLATE,
+    rust: 'fn main() {\n    // Your code here\n\n}\n',
+    python: '# Your code here\n',
+    pypy: '# Your code here\n',
+    nodejs: '// Your code here\n',
+    javascript: '// Your code here\n',
+}
+
+/** Family fallback for keys the TEMPLATES table does not know. */
+function templateFor(key: string, extensions: string[] = []): string {
+    const known = TEMPLATES[key]
+    if (known) return known
+    // Order matters: check the language families before the key, because an
+    // admin is free to name a C++ key anything at all.
+    const ext = extensions[0] ?? ''
+    if (ext === '.cpp' || ext === '.cc' || ext === '.cxx') return CPP_TEMPLATE
+    if (ext === '.c') return C_TEMPLATE
+    if (ext === '.java') return JAVA_TEMPLATE
+    if (ext === '.cs') return CSHARP_TEMPLATE
+    if (ext === '.rs') return 'fn main() {\n    // Your code here\n\n}\n'
+    if (ext === '.py' || ext === '.js' || ext === '.ts') return '# Your code here\n'
+    if (ext === '.go') return 'package main\n\nimport "fmt"\n\nfunc main() {\n    // Your code here\n    _ = fmt.Sprint()\n}\n'
+    return ''
+}
+
+/**
+ * Shipped languages, kept only as the offline fallback.
+ *
+ * A test asserts these keys match `lang/*.yaml` exactly, so this cannot become
+ * stale the way the old copies did. Do not add a language here — add it to
+ * `lang/` and it will arrive over the API.
+ */
+export const FALLBACK_LANGUAGES: Language[] = [
     { key: 'cpp-gpp-64', name: 'C++ (G++ 64-bit)', template: CPP_TEMPLATE },
     { key: 'cpp-gpp-32', name: 'C++ (G++ 32-bit)', template: CPP_TEMPLATE },
     { key: 'cpp-clang', name: 'C++ (Clang)', template: CPP_TEMPLATE },
@@ -79,19 +128,54 @@ export const LANGUAGES: Language[] = [
 
 export const DEFAULT_LANGUAGE = 'cpp-gpp-64'
 
-const BY_KEY = new Map(LANGUAGES.map(l => [l.key, l]))
+/** A row from GET /api/languages. */
+interface PublicLanguageRow {
+    key: string
+    name: string
+    extensions?: string[]
+}
 
-/** Display name for a judge key, falling back to the raw key. */
-export function languageName(key: string | undefined | null): string {
+/** Turn the server's rows into the shape the UI expects. */
+export function toLanguages(rows: PublicLanguageRow[] | undefined | null): Language[] {
+    if (!rows || rows.length === 0) return FALLBACK_LANGUAGES
+    return rows.map(r => ({
+        key: r.key,
+        name: r.name || r.key,
+        template: templateFor(r.key, r.extensions),
+    }))
+}
+
+/**
+ * Display name for a judge key.
+ *
+ * Falls back to the raw key rather than blanking: a submission in a language
+ * that has since been deleted from `lang/` must still render as something, and
+ * the key is at least truthful.
+ */
+export function languageName(key: string | undefined | null, languages: Language[] = FALLBACK_LANGUAGES): string {
     if (!key) return '—'
-    return BY_KEY.get(key)?.name ?? key
+    return languages.find(l => l.key === key)?.name ?? key
 }
 
 /** Starter code for a judge key. */
-export function languageTemplate(key: string | undefined | null): string {
+export function languageTemplate(key: string | undefined | null, languages: Language[] = FALLBACK_LANGUAGES): string {
     if (!key) return ''
-    return BY_KEY.get(key)?.template ?? ''
+    return languages.find(l => l.key === key)?.template ?? ''
 }
 
 /** Options for a `<select>`. */
-export const LANGUAGE_OPTIONS = LANGUAGES.map(l => ({ value: l.key, label: l.name }))
+export function languageOptions(languages: Language[] = FALLBACK_LANGUAGES) {
+    return languages.map(l => ({ value: l.key, label: l.name }))
+}
+
+// --- Backwards-compatible module-level exports -----------------------------
+//
+// Several pages import these directly. They keep working against the fallback
+// until each page moves to the `useLanguages()` hook, which is what actually
+// reads the server. New code should use the hook, not these.
+
+/** @deprecated Use `useLanguages()` — this is the offline fallback only. */
+export const LANGUAGES = FALLBACK_LANGUAGES
+
+/** @deprecated Use `useLanguages()` — this is the offline fallback only. */
+export const LANGUAGE_OPTIONS = languageOptions(FALLBACK_LANGUAGES)

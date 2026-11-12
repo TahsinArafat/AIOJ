@@ -232,6 +232,14 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 		r.Get("/api/auth/oauth/username-available", d.OAuthCallback.UsernameAvailable)
 	}
 
+	// The judge's own language list. Public and unauthenticated because the IDE
+	// and the submit forms render it before sign-in, and because it is the same
+	// information a visitor gets by opening any submission. The SPA used to keep
+	// its own hardcoded copy, so an admin edit in the panel never reached it.
+	if d.PublicLanguages != nil {
+		r.Get("/api/languages", d.PublicLanguages.List)
+	}
+
 	r.Get("/api/users/{username}", usersH.GetByUsername)
 	r.Get("/api/users/{username}/submissions", usersH.GetUserSubmissions)
 	r.Get("/api/users/{username}/blogs", usersH.GetUserBlogs)
@@ -575,6 +583,9 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 			r.Get("/{key}/raw", langAdminH.GetRaw)
 			r.Put("/{key}/raw", langAdminH.UpdateRaw)
 			r.Post("/{key}/test", langAdminH.Test)
+			// Restores the shipped lang/<key>.yaml. POST because it is an action
+			// with an effect, not a document the client supplies.
+			r.Post("/{key}/reset", langAdminH.Reset)
 		})
 
 		r.Route("/remote-languages", func(r chi.Router) {

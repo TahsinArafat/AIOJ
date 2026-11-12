@@ -81,13 +81,16 @@ type Deps struct {
 	BotAccount     *handler.AdminBotAccountHandler
 	Settings       *handler.AdminSystemSettingsHandler
 	LangAdmin      *handler.AdminLanguageHandler
-	RemoteLang     *handler.RemoteLanguageHandler
-	AdminSub       *handler.AdminSubmissionHandler
-	Backup         *handler.AdminBackupHandler
-	CDN            *handler.CDNHandler
-	Achievements   *handler.AchievementHandler
-	Friendships    *handler.FriendshipHandler
-	AuditLog       *handler.AuditLogHandler
+	// PublicLanguages serves the judge's language list to the SPA, so the IDE
+	// and the submit forms offer exactly what lang/*.yaml defines.
+	PublicLanguages *handler.PublicLanguageHandler
+	RemoteLang      *handler.RemoteLanguageHandler
+	AdminSub        *handler.AdminSubmissionHandler
+	Backup          *handler.AdminBackupHandler
+	CDN             *handler.CDNHandler
+	Achievements    *handler.AchievementHandler
+	Friendships     *handler.FriendshipHandler
+	AuditLog        *handler.AuditLogHandler
 	// Health is optional; when set, /api/health reports dependency status.
 	Health       *handler.HealthChecker
 	Activity     *handler.ActivityHandler

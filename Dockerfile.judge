@@ -26,3 +26,29 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     nodejs npm \
     mono-mcs mono-runtime \
     && rm -rf /var/lib/apt/lists/*
+
+# Replace the vendor sandbox mount list. go-judge reads MountConf as the whole
+# mount table, not an overlay, and the vendor copy binds /bin /lib /lib64 /usr
+# without /lib32 — so `gcc -m32` linked against a /lib32/libc.so.6 that the
+# sandbox never exposed:
+#
+#   /usr/bin/ld: cannot find /lib32/libc.so.6: No such file or directory
+#   /usr/bin/ld: cannot find /lib/ld-linux.so.2: No such file or directory
+#
+# Installing multilib alone cannot fix it: the packages were always present and
+# only the mount was missing, which is why a host-side `gcc -m32` succeeded while
+# every submission failed. deploy/judge/mount.yaml is the vendor file plus the
+# /lib32 bind, and keeping it in the repo makes the delta reviewable.
+COPY deploy/judge/mount.yaml /opt/mount.yaml
+
+# Verify the two halves of 32-bit support agree — multilib installed, and the
+# mount file we ship actually exposing it. Deliberately static: a compile here
+# runs on the image's own filesystem and would succeed even with the mount file
+# broken, which is the false confidence that let this ship. The live check is
+# the sandbox smoke test in docs/DEPLOYMENT.md; this only catches the pieces
+# drifting apart at build time.
+RUN test -e /lib32/libc.so.6 \
+    && test -e /lib/ld-linux.so.2 \
+    && grep -qE '^[[:space:]]*source:[[:space:]]*/lib32$' /opt/mount.yaml \
+    && grep -qE '^[[:space:]]*target:[[:space:]]*/lib32$' /opt/mount.yaml \
+    || { echo "sandbox mount.yaml must expose /lib32 for the 32-bit languages; see deploy/judge/mount.yaml" >&2; exit 1; }

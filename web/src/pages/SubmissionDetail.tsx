@@ -5,6 +5,7 @@ import { api, currentUser } from '../lib/api'
 import { useDocumentTitle } from '../lib/documentTitle'
 import { resolveProblemSlug, resolveProblemTitle } from '../lib/problemSlugResolver'
 import { languageName } from '../lib/languages'
+import { useLanguages } from '../lib/useLanguages'
 import { useToast } from '../components/Toast'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
@@ -46,6 +47,8 @@ interface SubmissionRecord {
 export default function SubmissionDetail() {
     const toast = useToast()
     const { id } = useParams<{ id: string }>()
+    // Resolve the language name from the judge's list, so a rename shows here.
+    const { languages } = useLanguages()
     const [sub, setSub] = useState<SubmissionRecord | null>(null)
     const [loading, setLoading] = useState(true)
     const [problemSlug, setProblemSlug] = useState<string | null>(null)
@@ -185,7 +188,7 @@ export default function SubmissionDetail() {
                                 </>
                             )}
                             <span aria-hidden="true">·</span>
-                            <span>{languageName(sub.language)}</span>
+                            <span>{languageName(sub.language, languages)}</span>
                             <span aria-hidden="true">·</span>
                             <time dateTime={sub.created_at}>{new Date(sub.created_at).toLocaleString()}</time>
                         </p>
@@ -294,7 +297,7 @@ export default function SubmissionDetail() {
                 <div className="overflow-hidden rounded-xl border border-code-border">
                     <div className="flex items-center justify-between border-b border-code-border bg-code px-4 py-2">
                         <span className="text-xs font-medium text-code-ink/70">
-                            {languageName(sub.language)}
+                            {languageName(sub.language, languages)}
                         </span>
                         {sub.code_size ? (
                             <span className="tnum text-[11px] text-code-ink/50">{sub.code_size.toLocaleString()} bytes</span>

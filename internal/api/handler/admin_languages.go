@@ -16,6 +16,7 @@ import (
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
 	"github.com/tahsinarafat/aioj/internal/judge/compiler"
 	"github.com/tahsinarafat/aioj/internal/judge/executor"
+	"github.com/tahsinarafat/aioj/lang"
 	"gopkg.in/yaml.v3"
 )
 
@@ -83,16 +84,20 @@ var knownCompilers = []toolProbe{
 	{Name: "Clang", Binary: "/usr/bin/clang", Probe: "clang --version", Version: "--version"},
 	{Name: "Clang++", Binary: "/usr/bin/clang++", Probe: "clang++ --version", Version: "--version"},
 	{
+		// The probe compiles *and* runs. A -m32 link that finds /lib32 but not
+		// the dynamic loader still produces a binary that dies at exec, and this
+		// list is what the panel offers as "detected" — so it has to prove the
+		// whole path a submission takes, not just the link.
 		Name:     "GCC 32-bit",
 		Binary:   "/usr/bin/gcc",
-		Probe:    `printf 'int main(void){return 0;}' > t.c && gcc -m32 -o t32 t.c`,
+		Probe:    `printf 'int main(void){return 0;}' > t.c && gcc -m32 -o t32 t.c && ./t32`,
 		Version:  "--version",
 		Compiles: true,
 	},
 	{
 		Name:     "G++ 32-bit",
 		Binary:   "/usr/bin/g++",
-		Probe:    `printf 'int main(){return 0;}' > t.cpp && g++ -m32 -o t32cpp t.cpp`,
+		Probe:    `printf 'int main(){return 0;}' > t.cpp && g++ -m32 -o t32cpp t.cpp && ./t32cpp`,
 		Version:  "--version",
 		Compiles: true,
 	},
@@ -421,6 +426,62 @@ func (h *AdminLanguageHandler) loadLang(key string) (*compiler.LangConfig, error
 		return nil, err
 	}
 	return &cfg, nil
+}
+
+// Reset restores a language to the config that ships in lang/*.yaml.
+//
+// The panel edits those files in place, so a save that drops a field — or an
+// operator clearing a command by hand — leaves the language broken with no way
+// back short of a redeploy. Reset is that way back, and it restores the real
+// shipped bytes rather than a second hardcoded copy, so the two cannot drift.
+//
+// A language an operator created has no shipped default; that is a 404 with a
+// message saying so, not a silent no-op.
+func (h *AdminLanguageHandler) Reset(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r)
+	if claims == nil || claims.Role != "admin" {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	key := chi.URLParam(r, "key")
+	defaults, ok := lang.Default(key)
+	if !ok {
+		http.Error(w, fmt.Sprintf("language %q has no built-in default to restore "+
+			"(only keys shipped in lang/*.yaml can be reset)", key), http.StatusNotFound)
+		return
+	}
+
+	// Validate before writing. A malformed shipped file would otherwise be
+	// written to disk and then ignored by the judge's loader, which skips
+	// unparseable configs — the language would disappear from every submission
+	// dropdown with no error anywhere.
+	var cfg compiler.LangConfig
+	if err := yaml.Unmarshal(defaults, &cfg); err != nil {
+		http.Error(w, "embedded default is invalid: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	filePath := filepath.Join(h.langDir, key+".yaml")
+	if err := os.WriteFile(filePath, defaults, 0644); err != nil {
+		http.Error(w, "failed to write file: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(LanguageConfigResponse{
+		Name:                  cfg.Name,
+		Key:                   cfg.Key,
+		CompileCmd:            cfg.CompileCmd,
+		Runtime:               cfg.Runtime,
+		CopyIn:                cfg.CopyIn,
+		TimeLimitMultiplier:   cfg.TimeLimitMultiplier,
+		MemoryLimitMultiplier: cfg.MemoryLimitMultiplier,
+		SeccompRule:           cfg.SeccompRule,
+		Extensions:            cfg.Extensions,
+		Mono:                  cfg.Mono,
+		FilePath:              key + ".yaml",
+	})
 }
 
 func (h *AdminLanguageHandler) Detect(w http.ResponseWriter, r *http.Request) {

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../lib/api'
 import { languageName } from '../lib/languages'
+import { useLanguages } from '../lib/useLanguages'
 import { EmptyState } from '../components/EmptyState'
 import { Button } from '../components/ui/Button'
 import { PageHeader, Skeleton } from '../components/ui/PageHeader'
@@ -30,6 +31,8 @@ function formatMemory(kb: number): string {
 }
 
 export default function Submissions() {
+    // Resolve names against the judge's list, so an admin rename shows here.
+    const { languages } = useLanguages()
     const [subs, setSubs] = useState<SubRow[]>([])
     const [total, setTotal] = useState(0)
     const [offset, setOffset] = useState(0)
@@ -105,7 +108,7 @@ export default function Submissions() {
                                             </Link>
                                         </Td>
                                         <Td className="text-xs text-ink-soft">
-                                            {languageName(s.language)}
+                                            {languageName(s.language, languages)}
                                         </Td>
                                         <Td>
                                             <VerdictBadge status={s.status} />

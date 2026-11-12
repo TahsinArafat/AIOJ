@@ -15,7 +15,8 @@ import { useTranslation } from 'react-i18next'
 import { useToast } from '../components/Toast'
 import { Badge } from '../components/ui/Badge'
 import { ProblemMeta } from '../components/ProblemMeta'
-import { DEFAULT_LANGUAGE, LANGUAGE_OPTIONS, languageName, languageTemplate } from '../lib/languages'
+import { DEFAULT_LANGUAGE, languageName, languageTemplate } from '../lib/languages'
+import { useLanguages } from '../lib/useLanguages'
 import { isRemotePlatform } from '../lib/platforms'
 import { Skeleton } from '../components/ui/PageHeader'
 import { VerdictBadge } from '../components/ui/VerdictBadge'
@@ -85,7 +86,12 @@ export default function ProblemDetail() {
     // so the PDF-vs-markdown branch and the markdown body can't disagree.
     const effectiveDescription = translation?.description || problem?.description
     const [lang, setLang] = useState(DEFAULT_LANGUAGE)
-    const [languages, setLanguages] = useState(LANGUAGE_OPTIONS)
+    // The judge's own languages, from GET /api/languages. A remote problem
+    // replaces this with its own list; a local one uses it directly, so an
+    // admin edit in admin#languages reaches this page.
+    const { languages: judgeLanguages, options: judgeOptions } = useLanguages()
+    const [remoteOptions, setRemoteOptions] = useState<{ value: string; label: string }[] | null>(null)
+    const languages = remoteOptions ?? judgeOptions
     const [code, setCode] = useState('')
     const [result, setResult] = useState<SubmissionStatusData | null>(null)
     // True while the poller is still chasing a verdict for the submission above.
@@ -151,9 +157,10 @@ export default function ProblemDetail() {
         if (slug) {
             api.problems.get(slug).then(p => {
                 setProblem(p)
-                // local/default problems render the built-in language list; previously
-                // this reset was a synchronous setLanguages in the languages effect
-                if (!isRemotePlatform(p?.source)) setLanguages(LANGUAGE_OPTIONS)
+                // A local problem falls back to the judge's list, which the
+                // hook already supplies — clear any remote list left over from
+                // a previously viewed remote problem.
+                if (!isRemotePlatform(p?.source)) setRemoteOptions(null)
             }).catch(() => {
                 // A problem that is live in a contest answers 404 here: it is not
                 // part of the archive until the round ends. Swallowing the error
@@ -194,7 +201,7 @@ export default function ProblemDetail() {
                         .sort((a: RemoteLangOption, b: RemoteLangOption) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
                         .map((rl: RemoteLangOption) => ({ value: rl.local_id, label: rl.display_name }))
                     if (langs.length > 0) {
-                        setLanguages(langs)
+                        setRemoteOptions(langs)
                         setLang(langs[0].value)
                     }
                 })
@@ -231,9 +238,9 @@ export default function ProblemDetail() {
             const key = `aioj_draft_${problem?.id || slug}_${lang}`
             const saved = localStorage.getItem(key)
             // deferred a microtask: draft still lands pre-paint (react-hooks/set-state-in-effect)
-            queueMicrotask(() => setCode(saved || languageTemplate(lang)))
+            queueMicrotask(() => setCode(saved || languageTemplate(lang, judgeLanguages)))
         }
-    }, [slug, problem?.id, lang])
+    }, [slug, problem?.id, lang, judgeLanguages])
 
     const handleCodeChange = (newCode: string) => {
         setCode(newCode)
@@ -644,7 +651,7 @@ export default function ProblemDetail() {
                                                         {s.id?.substring(0, 8)}...
                                                     </Link>
                                                 </td>
-                                                <td className="px-4 py-2 text-muted">{languageName(s.language)}</td>
+                                                <td className="px-4 py-2 text-muted">{languageName(s.language, judgeLanguages)}</td>
                                                 <td className="px-4 py-2">
                                                     <VerdictBadge status={s.status} />
                                                 </td>

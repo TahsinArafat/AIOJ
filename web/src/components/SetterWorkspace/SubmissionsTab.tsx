@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { api } from '../../lib/api'
 import { errorMessage } from '../../lib/errors'
-import { LANGUAGE_OPTIONS } from '../../lib/languages'
+import { useLanguages } from '../../lib/useLanguages'
 import { useConfirm } from '../ConfirmDialog'
 import { useToast } from '../Toast'
 import { EmptyState } from '../EmptyState'
@@ -35,6 +35,8 @@ const EMPTY_FILTERS: Filters = { handle: '', status: '', language: '' }
 export default function SubmissionsTab({ problemSlug }: { problemSlug: string }) {
     const confirm = useConfirm()
     const toast = useToast()
+    // The judge's own languages, so the filter offers what can actually be submitted.
+    const { options: languageOptions } = useLanguages()
     const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS)
     const [applied, setApplied] = useState<Filters>(EMPTY_FILTERS)
     const [rows, setRows] = useState<Submission[]>([])
@@ -175,7 +177,7 @@ export default function SubmissionsTab({ problemSlug }: { problemSlug: string })
                         onChange={e => setFilters(f => ({ ...f, language: e.target.value }))}
                     >
                         <option value="">Any language</option>
-                        {LANGUAGE_OPTIONS.map(o => (
+                        {languageOptions.map(o => (
                             <option key={o.value} value={o.value}>{o.label}</option>
                         ))}
                     </Select>

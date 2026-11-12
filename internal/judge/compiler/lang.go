@@ -8,17 +8,26 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// LangConfig is both the on-disk shape (lang/*.yaml) and the admin API body.
+//
+// The JSON tags are not decoration. The admin handler decoded the request body
+// straight into this struct, and with no json tags encoding/json matched keys
+// to field names case-insensitively — so "compile" never matched CompileCmd and
+// "copy_in" never matched CopyIn. Every form save silently wrote an empty
+// compile command back over the working one, which is why the field appeared to
+// vanish. The tags must stay in step with LanguageConfigResponse in
+// internal/api/handler/admin_languages.go.
 type LangConfig struct {
-	Name                  string            `yaml:"name"`
-	Key                   string            `yaml:"key"`
-	CompileCmd            string            `yaml:"compile"`
-	CopyIn                map[string]string `yaml:"copy_in"`
-	TimeLimitMultiplier   float64           `yaml:"time_limit_multiplier"`
-	MemoryLimitMultiplier float64           `yaml:"memory_limit_multiplier"`
-	SeccompRule           string            `yaml:"seccomp_rule"`
-	Extensions            []string          `yaml:"extensions"`
-	Mono                  bool              `yaml:"mono,omitempty"`
-	Runtime               string            `yaml:"runtime,omitempty"`
+	Name                  string            `yaml:"name" json:"name"`
+	Key                   string            `yaml:"key" json:"key"`
+	CompileCmd            string            `yaml:"compile" json:"compile"`
+	CopyIn                map[string]string `yaml:"copy_in" json:"copy_in"`
+	TimeLimitMultiplier   float64           `yaml:"time_limit_multiplier" json:"time_limit_multiplier"`
+	MemoryLimitMultiplier float64           `yaml:"memory_limit_multiplier" json:"memory_limit_multiplier"`
+	SeccompRule           string            `yaml:"seccomp_rule" json:"seccomp_rule"`
+	Extensions            []string          `yaml:"extensions" json:"extensions"`
+	Mono                  bool              `yaml:"mono,omitempty" json:"mono"`
+	Runtime               string            `yaml:"runtime,omitempty" json:"runtime"`
 }
 
 func LoadLanguages(dir string) (map[string]*LangConfig, error) {

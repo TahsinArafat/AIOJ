@@ -530,6 +530,42 @@ When deployed behind Caddy, Nginx, or NPM, only these ports should be open to th
 | `login form not found. CF blocked: False` | Proxy not working or JS rendering failed | Verify proxy: `curl -s localhost:8003/health` should show `"proxy":true`. Clear stale browser profile: `rm -rf /tmp/cb-profile`. Check screenshots in `/tmp/cf-screenshots/`. |
 | `login form not found. CF blocked: True` | Cloudflare challenge page returned | Your proxy is not working. Codeforces sees your real (datacenter) IP. Get a residential proxy. |
 | `cf-submit error: crash: ... ImportError: geoip2 is required` | `cloakbrowser[geoip]` not installed | Reinstall: `pip install "cloakbrowser[geoip]" --break-system-packages` |
+| 32-bit C/C++ submits fail with `/usr/bin/ld: cannot find /lib32/libc.so.6` | The go-judge sandbox mount table does not expose `/lib32` | Rebuild the judge image: `docker compose build judge && docker compose up -d judge`. See [Sandbox Smoke Test](#sandbox-smoke-test). |
+| A language saved in admin#languages shows an empty compile command | A `LangConfig` that decodes the JSON body without matching field tags | Fixed in-tree; see `internal/judge/compiler/lang.go`. Use "Reset to Default" to restore the shipped config. |
+
+---
+
+### Sandbox Smoke Test
+
+Run this after any change to `Dockerfile.judge` or `deploy/judge/mount.yaml`, and
+after bumping the go-judge tag. It is the only check that proves a language
+actually compiles **inside the sandbox** — a compile on the host image's own
+filesystem succeeds even when the mount table is wrong, which is exactly how the
+32-bit languages shipped broken.
+
+```bash
+# Ask the sandbox to compile and run a 32-bit C program, the way a submission does.
+docker compose exec judge sh -c '
+  cd /w &&
+  printf "int main(void){return 0;}" > t.c &&
+  gcc -m32 -o t32 t.c &&
+  ./t32 &&
+  echo "32-bit C OK"
+'
+```
+
+Expect `32-bit C OK`. The same check for the other shipped toolchains:
+
+```bash
+docker compose exec judge sh -c 'cd /w && printf "int main(){return 0;}" > t.cpp && g++ -m32 -o t32cpp t.cpp && ./t32cpp && echo "32-bit C++ OK"'
+docker compose exec judge sh -c 'cd /w && printf "print(1)" > t.py && python3 t.py && echo "Python OK"'
+docker compose exec judge sh -c 'cd /w && printf "public class Main{public static void main(String[] a){System.out.println(1);}}" > Main.java && javac -d /w Main.java && java -cp /w Main && echo "Java OK"'
+docker compose exec judge sh -c 'cd /w && printf "print 1" > t.rs && rustc -O -o t t.rs && ./t && echo "Rust OK"'
+```
+
+The admin panel's **Detect Tools** button runs the same probes through the
+sandbox and lists what actually works, so a green `GCC 32-bit` entry there means
+the mount is correct.
 
 ---
 

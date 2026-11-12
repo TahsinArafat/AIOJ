@@ -4,6 +4,7 @@ import { Check, Copy, Loader2 } from 'lucide-react'
 import { VerdictBadge } from './ui/VerdictBadge'
 import { isPendingVerdict } from './ui/verdict'
 import { languageName } from '../lib/languages'
+import { useLanguages } from '../lib/useLanguages'
 
 /**
  * The submission the user just created — id plus a live verdict.
@@ -60,6 +61,8 @@ export function SubmissionStatusPanel({
     polling?: boolean
     className?: string
 }) {
+    // Names come from the judge's list, so a rename in admin#languages shows here.
+    const { languages } = useLanguages()
     const [copied, setCopied] = useState(false)
 
     const copyId = async () => {
@@ -77,7 +80,7 @@ export function SubmissionStatusPanel({
     const pending = isPendingVerdict(status)
     const time = formatTime(submission.time_used)
     const memory = formatMemory(submission.memory_used)
-    const language = submission.language ? languageName(submission.language) : null
+    const language = submission.language ? languageName(submission.language, languages) : null
     const score = typeof submission.score === 'number' && submission.score > 0 ? String(submission.score) : null
     const showCompileOutput = status === 'ce' && !!submission.compile_output
 

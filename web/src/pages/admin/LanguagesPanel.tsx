@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../../lib/api'
-import { Save, RefreshCw, Play, Trash2, Plus, X, Code, Cpu, Zap } from 'lucide-react'
+import { Save, RefreshCw, Play, Trash2, Plus, X, Code, Cpu, Zap, RotateCcw } from 'lucide-react'
+import { invalidateLanguages } from '../../lib/useLanguages'
 import { useConfirm } from '../../components/ConfirmDialog'
 import { useToast } from '../../components/Toast'
 
@@ -92,6 +93,7 @@ export default function LanguagesPanel() {
             } else {
                 await api.admin.languages.update(editKey, form)
             }
+            invalidateLanguages()
             setEditKey(null)
             loadLangs()
         } catch (e) {
@@ -106,6 +108,7 @@ export default function LanguagesPanel() {
         setSaving(true)
         try {
             await api.admin.languages.create(form)
+            invalidateLanguages()
             setShowCreate(false)
             setForm(emptyLang)
             loadLangs()
@@ -120,9 +123,32 @@ export default function LanguagesPanel() {
         if (!(await confirm({ message: `Delete language "${key}"? This cannot be undone.`, variant: 'danger' }))) return
         try {
             await api.admin.languages.delete(key)
+            invalidateLanguages()
             loadLangs()
         } catch (e) {
             toast.error('Delete failed: ' + (e instanceof Error ? e.message : String(e)))
+        }
+    }
+
+    // Restores lang/<key>.yaml to the config that ships with the repo. The
+    // panel edits those files in place, so a bad save (or a hand edit) could
+    // otherwise only be undone by a redeploy.
+    const handleReset = async (key: string) => {
+        if (!(await confirm({
+            message: `Reset "${key}" to the configuration shipped with the app? Local edits to this language will be lost.`,
+            variant: 'danger',
+        }))) return
+        setSaving(true)
+        try {
+            await api.admin.languages.reset(key)
+            invalidateLanguages()
+            await loadLangs()
+        } catch (e) {
+            // A language an operator created has no shipped default; the server
+            // answers 404 with that explanation, which is worth showing as-is.
+            toast.error('Reset failed: ' + (e instanceof Error ? e.message : String(e)))
+        } finally {
+            setSaving(false)
         }
     }
 
@@ -329,6 +355,15 @@ export default function LanguagesPanel() {
                     )}
 
                     <div className="flex justify-end gap-2 pt-2">
+                        {/* Only for shipped languages: one an operator created has
+                            no built-in default, and the server answers 404. */}
+                        {!showCreate && editKey && (
+                            <button onClick={() => handleReset(editKey)} disabled={saving}
+                                className="mr-auto flex items-center gap-1.5 px-3 py-2 text-sm text-warn border border-warn/40 rounded hover:bg-warn/10 disabled:opacity-50 cursor-pointer"
+                                title="Restore the configuration shipped with the app">
+                                <RotateCcw size={14} /> Reset to Default
+                            </button>
+                        )}
                         <button onClick={() => { setEditKey(null); setShowCreate(false) }}
                             className="px-4 py-2 text-sm border border-hairline-strong rounded hover:bg-surface-2 cursor-pointer">Cancel</button>
                         <button onClick={showCreate ? handleCreate : handleSave} disabled={saving}
@@ -454,6 +489,11 @@ export default function LanguagesPanel() {
                                 <td className="px-4 py-2 text-center text-xs">{lang.memory_limit_multiplier}×</td>
                                 <td className="px-4 py-2 text-right">
                                     <div className="flex items-center justify-end gap-1">
+                                        <button onClick={() => handleReset(lang.key)} disabled={saving}
+                                            className="p-1.5 text-muted-soft hover:text-warn hover:bg-warn/10 rounded cursor-pointer disabled:opacity-50"
+                                            title="Reset to Default">
+                                            <RotateCcw size={14} />
+                                        </button>
                                         <button onClick={() => handleTest(lang.key)} disabled={testing === lang.key}
                                             className="p-1.5 text-muted-soft hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded cursor-pointer disabled:opacity-50" title="Test Config">
                                             <Play size={14} />

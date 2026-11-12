@@ -1,0 +1,149 @@
+# Sandbox filesystem for go-judge.
+#
+# Based on the mount.yaml baked into criyle/go-judge:v1.11.4 (/opt/mount.yaml).
+# It replaces that file wholesale — go-judge takes MountConf as the complete
+# mount list, not a patch — so every entry below mirrors the vendor file, and
+# diffing this against the image's copy is the check to run when bumping the
+# go-judge tag.
+#
+# Why this file exists at all: the vendor list binds /bin, /lib, /lib64 and
+# /usr but NOT /lib32. On Debian, gcc-multilib's 32-bit libc lives in /lib32,
+# and the 32-bit linker script /usr/lib32/libc.so points at an absolute path
+# (/lib32/libc.so.6) plus the /lib/ld-linux.so.2 symlink. With /lib32 absent
+# from the sandbox, every -m32 compile died at link time with:
+#
+#   /usr/bin/ld: cannot find /lib32/libc.so.6: No such file or directory
+#   /usr/bin/ld: cannot find /lib/ld-linux.so.2: No such file or directory
+#
+# while 64-bit compiles kept working — the image had installed the packages,
+# so a host-side `gcc -m32` succeeded and hid the breakage. The mount, not the
+# package, was what was missing.
+#
+# go-judge filters mounts whose source does not exist, so the /lib32 entries are
+# inert on an image without multilib instead of failing the sandbox outright.
+mount:
+  # 32-bit runtime + link-time libc (gcc-multilib / libc6-dev-i386).
+  # Debian usrmerge makes /lib32 a symlink to /usr/lib32; /usr/lib32 is already
+  # reachable through the /usr bind below, but the linker and dynamic loader
+  # resolve the literal /lib32 path, so it must be mounted.
+  - type: bind
+    source: /lib32
+    target: /lib32
+    readonly: true
+  # Basic binaries and libraries
+  - type: bind
+    source: /bin
+    target: /bin
+    readonly: true
+  - type: bind
+    source: /lib
+    target: /lib
+    readonly: true
+  - type: bind
+    source: /lib64
+    target: /lib64
+    readonly: true
+  - type: bind
+    source: /usr
+    target: /usr
+    readonly: true
+  - type: bind
+    source: /etc/ld.so.cache
+    target: /etc/ld.so.cache
+    readonly: true
+  # Some compiler have multiple versions
+  - type: bind
+    source: /etc/alternatives
+    target: /etc/alternatives
+    readonly: true
+  # fpc wants /etc/fpc.cfg
+  - type: bind
+    source: /etc/fpc.cfg
+    target: /etc/fpc.cfg
+    readonly: true
+  # mono wants /etc/mono
+  - type: bind
+    source: /etc/mono
+    target: /etc/mono
+    readonly: true
+  # ghc wants /var/lib/ghc
+  - type: bind
+    source: /var/lib/ghc
+    target: /var/lib/ghc
+    readonly: true
+  # go wants /dev/null
+  - type: bind
+    source: /dev/null
+    target: /dev/null
+  # java 21 wants /etc/java-21-openjdk — dropping this breaks every Java run
+  - type: bind
+    source: /etc/java-21-openjdk
+    target: /etc/java-21-openjdk
+    readonly: true
+  # node wants /dev/urandom
+  - type: bind
+    source: /dev/urandom
+    target: /dev/urandom
+  # additional devices
+  - type: bind
+    source: /dev/random
+    target: /dev/random
+  - type: bind
+    source: /dev/zero
+    target: /dev/zero
+  - type: bind
+    source: /dev/full
+    target: /dev/full
+  # work dir
+  - type: tmpfs
+    target: /w
+    data: size=128m,nr_inodes=4k
+  # tmp dir
+  - type: tmpfs
+    target: /tmp
+    data: size=128m,nr_inodes=4k
+  # (optional) bind a /etc/passwd to show customized user name
+  - type: bind
+    source: containerPasswd.txt
+    target: /etc/passwd
+  # (optional) bind a /.env to load default environment variable for the container
+  - type: bind
+    source: dotenv
+    target: /.env
+# java & ghc wants /proc/self/exe
+proc: true
+# create /dev standard io
+symLink:
+  - linkPath: /dev/fd
+    target: /proc/self/fd
+  - linkPath: /dev/stdin
+    target: /proc/self/fd/0
+  - linkPath: /dev/stdout
+    target: /proc/self/fd/1
+  - linkPath: /dev/stderr
+    target: /proc/self/fd/2
+# mask mounted paths with empty / null mount
+maskPath:
+  - /sys/firmware
+  - /sys/devices/virtual/powercap
+  - /proc/acpi
+  - /proc/asound
+  - /proc/kcore
+  - /proc/keys
+  - /proc/latency_stats
+  - /proc/timer_list
+  - /proc/timer_stats
+  - /proc/sched_debug
+  - /proc/scsi
+  - /usr/lib/wsl/drivers
+  - /usr/lib/wsl/lib
+# container work directory
+workDir: /w
+# container host name
+hostName: go-judge
+# container domain name
+domainName: go-judge
+# container user uid
+uid: 1536
+# container user gid
+gid: 1536
