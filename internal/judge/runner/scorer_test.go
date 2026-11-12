@@ -183,3 +183,73 @@ func TestScorer_Subtask_SumAggregation_PartialPass(t *testing.T) {
 		t.Errorf("expected 70%%, got %d", out.Score)
 	}
 }
+
+// A case outside every subtask must still be judged AND still count toward the
+// total. GetSubtasks omits it, so building the run list from that alone skipped
+// it entirely, and counting only subtasked cases in the denominator let a
+// submission that failed the ungrouped ones still report 100%.
+func TestSubtaskOrderedCasesKeepsUngroupedCases(t *testing.T) {
+	prob := &model.Problem{
+		ScoringMode: "partial",
+		TestCaseScore: []model.TestCaseScore{
+			{InputName: "1.in", Score: 10, SubtaskID: 1},
+			{InputName: "2.in", Score: 10}, // belongs to no subtask
+			{InputName: "3.in", Score: 10, SubtaskID: 2},
+		},
+	}
+
+	got := subtaskOrderedCases(prob)
+	if len(got) != 3 {
+		t.Fatalf("only %d of 3 cases would run", len(got))
+	}
+	seen := map[string]bool{}
+	for _, c := range got {
+		seen[c.InputName] = true
+	}
+	if !seen["2.in"] {
+		t.Error("the ungrouped case was dropped from the run list")
+	}
+}
+
+func TestScorer_UngroupedCaseCountsTowardTotal(t *testing.T) {
+	prob := &model.Problem{
+		ScoringMode:        "partial",
+		SubtaskAggregation: "min",
+		TestCaseScore: []model.TestCaseScore{
+			{InputName: "1.in", Score: 50, SubtaskID: 1},
+			{InputName: "2.in", Score: 50}, // no subtask
+		},
+	}
+	// Subtask 1 passes; the ungrouped case fails.
+	results := []model.TestCaseResult{
+		{CaseName: "1.in", Status: model.StatusAC, Score: 50},
+		{CaseName: "2.in", Status: model.StatusWA, Score: 0},
+	}
+
+	out := NewScorer().Aggregate(prob, results)
+	if out.Score != 50 {
+		t.Errorf("score = %d, want 50: the failed ungrouped case must count against the total", out.Score)
+	}
+	if out.FinalStatus != model.StatusWA {
+		t.Errorf("status = %s, want WA", out.FinalStatus)
+	}
+}
+
+func TestScorer_UngroupedCaseAloneScoresFull(t *testing.T) {
+	prob := &model.Problem{
+		ScoringMode:        "partial",
+		SubtaskAggregation: "sum",
+		TestCaseScore: []model.TestCaseScore{
+			{InputName: "1.in", Score: 40, SubtaskID: 1},
+			{InputName: "2.in", Score: 60}, // no subtask
+		},
+	}
+	results := []model.TestCaseResult{
+		{CaseName: "1.in", Status: model.StatusAC, Score: 40},
+		{CaseName: "2.in", Status: model.StatusAC, Score: 60},
+	}
+
+	if out := NewScorer().Aggregate(prob, results); out.Score != 100 {
+		t.Errorf("score = %d, want 100 for an all-AC submission", out.Score)
+	}
+}

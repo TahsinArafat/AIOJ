@@ -458,6 +458,24 @@ useDocumentTitle(problem ? `${problem.title} — setter` : null)
     }
   }
 
+  // 0 clears the assignment. A case in no subtask is still judged and still
+  // scores; it just forms its own bucket rather than joining a group.
+  const handleUpdateSubtask = async (index: number, subtaskId: number) => {
+    if (!problem) return
+    setError(null)
+    setSuccess(null)
+    const next = subtaskId > 0 ? subtaskId : 0
+    const updated = formState.testcases.map((tc, i) =>
+      i === index ? { ...tc, subtask_id: next } : tc,
+    )
+    setFormState(prev => ({ ...prev, testcases: updated }))
+    try {
+      await api.problems.update(problem.slug as string, buildPayload({ testcases: updated }))
+    } catch (err) {
+      setError(errorMessage(err) || 'Failed to save subtask assignment')
+    }
+  }
+
   const handleImageUpload = async (file: File) => {
     if (!problem) return
     setUploadingImage(true)
@@ -690,6 +708,7 @@ useDocumentTitle(problem ? `${problem.title} — setter` : null)
               onAdd={handleAddTestCaseScore}
               onRemove={handleRemoveTestCaseScore}
               onScoreChange={handleUpdateTestCaseScore}
+              onSubtaskChange={handleUpdateSubtask}
               onBatchSet={handleBatchSetScores}
               onUpload={handleUploadTestcases}
               onNewTestCaseChange={setNewTestCase}

@@ -263,7 +263,13 @@ func buildRunArgs(langCfg *compiler.LangConfig, cr *compiler.CompileResult) []st
 	return []string{"/bin/sh", "-c", "./Main < input.txt > output.txt 2> error.txt"}
 }
 
-// subtaskOrderedCases returns test cases in subtask-ID order (ascending).
+// subtaskOrderedCases returns test cases grouped by subtask (ascending), with
+// any case that belongs to no subtask last.
+//
+// Ungrouped cases still have to run. GetSubtasks only collects SubtaskID > 0, so
+// building the run list from it alone silently skipped every case outside a
+// subtask — a problem with a few grouped cases and a handful of plain ones
+// judged only the grouped ones and never looked at the rest.
 func subtaskOrderedCases(prob *model.Problem) []model.TestCaseScore {
 	subtasks := prob.GetSubtasks()
 	var ids []int
@@ -272,9 +278,14 @@ func subtaskOrderedCases(prob *model.Problem) []model.TestCaseScore {
 	}
 	sort.Ints(ids)
 
-	var out []model.TestCaseScore
+	out := make([]model.TestCaseScore, 0, len(prob.TestCaseScore))
 	for _, id := range ids {
 		out = append(out, subtasks[id]...)
+	}
+	for _, tc := range prob.TestCaseScore {
+		if tc.SubtaskID <= 0 {
+			out = append(out, tc)
+		}
 	}
 	return out
 }

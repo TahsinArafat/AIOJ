@@ -19,6 +19,7 @@ interface TestCasesTabProps {
   onAdd: () => void
   onRemove: (index: number) => void
   onScoreChange: (index: number, score: number) => void
+  onSubtaskChange: (index: number, subtaskId: number) => void
   onBatchSet: () => void
   onUpload: (e: React.ChangeEvent<HTMLInputElement>) => void
   onNewTestCaseChange: (tc: TestCase) => void
@@ -143,6 +144,7 @@ export default function TestCasesTab({
   onAdd,
   onRemove,
   onScoreChange,
+  onSubtaskChange,
   onBatchSet,
   onUpload,
   onNewTestCaseChange,
@@ -300,6 +302,7 @@ export default function TestCasesTab({
                 <Th>Input File</Th>
                 <Th>Output File</Th>
                 <Th>Score</Th>
+                <Th>Subtask</Th>
                 <Th className="text-right">Action</Th>
               </tr>
             </THead>
@@ -329,6 +332,25 @@ export default function TestCasesTab({
                     </div>
                   </Td>
                   <Td>
+                    {/* 0 is "no subtask". Cases left ungrouped are still judged
+                        and still score — they just form their own bucket. */}
+                    <input
+                      key={`${tc.input_name}-sub-${tc.subtask_id ?? 0}`}
+                      aria-label={`Subtask for ${tc.input_name}`}
+                      type="number"
+                      min={0}
+                      placeholder="—"
+                      defaultValue={tc.subtask_id || ''}
+                      onBlur={e => {
+                        const raw = e.target.value.trim()
+                        const next = raw === '' ? 0 : Number(raw)
+                        if (!Number.isFinite(next) || next < 0) return
+                        if (next !== (tc.subtask_id ?? 0)) onSubtaskChange(idx, next)
+                      }}
+                      className="w-16 rounded border border-hairline-strong bg-surface px-2 py-1 text-xs text-ink focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)]"
+                    />
+                  </Td>
+                  <Td>
                     <div className="text-right">
                       <button
                         type="button"
@@ -343,7 +365,7 @@ export default function TestCasesTab({
               ))}
               {testcases.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-4 py-6 text-center text-xs text-muted-soft">
+                  <td colSpan={5} className="px-4 py-6 text-center text-xs text-muted-soft">
                     No testcase scores registered. Add a pair below, or upload a ZIP to auto-discover
                     pairs.
                   </td>

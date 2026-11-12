@@ -28,6 +28,7 @@ function renderTab(overrides: Partial<ComponentProps<typeof TestCasesTab>> = {})
     onAdd: vi.fn(),
     onRemove: vi.fn(),
     onScoreChange: vi.fn(),
+    onSubtaskChange: vi.fn(),
     onBatchSet: vi.fn(),
     onUpload: vi.fn(),
     onNewTestCaseChange: vi.fn(),
@@ -161,4 +162,55 @@ test('calls onRemove with the row index', () => {
   renderTab({ testcases, onRemove })
   fireEvent.click(screen.getAllByText('Remove')[0])
   expect(onRemove).toHaveBeenCalledWith(0)
+})
+
+// Subtask grouping is what makes "partial" scoring mean anything: without it
+// every problem falls back to a single all-or-nothing bucket.
+test('shows a subtask field per case', () => {
+  renderTab({ testcases: [{ input_name: '01.in', output_name: '01.out', score: 10, subtask_id: 2 }] })
+
+  const field = screen.getByLabelText('Subtask for 01.in')
+  expect(field).toHaveValue(2)
+})
+
+test('commits a subtask change on blur', () => {
+  const onSubtaskChange = vi.fn()
+  renderTab({
+    testcases: [{ input_name: '01.in', output_name: '01.out', score: 10 }],
+    onSubtaskChange,
+  })
+
+  const field = screen.getByLabelText('Subtask for 01.in')
+  fireEvent.change(field, { target: { value: '3' } })
+  fireEvent.blur(field)
+
+  expect(onSubtaskChange).toHaveBeenCalledWith(0, 3)
+})
+
+// Clearing the field detaches the case from every subtask; it is still judged.
+test('clearing the subtask field sends 0', () => {
+  const onSubtaskChange = vi.fn()
+  renderTab({
+    testcases: [{ input_name: '01.in', output_name: '01.out', score: 10, subtask_id: 5 }],
+    onSubtaskChange,
+  })
+
+  const field = screen.getByLabelText('Subtask for 01.in')
+  fireEvent.change(field, { target: { value: '' } })
+  fireEvent.blur(field)
+
+  expect(onSubtaskChange).toHaveBeenCalledWith(0, 0)
+})
+
+test('does not save when the subtask is unchanged', () => {
+  const onSubtaskChange = vi.fn()
+  renderTab({
+    testcases: [{ input_name: '01.in', output_name: '01.out', score: 10, subtask_id: 2 }],
+    onSubtaskChange,
+  })
+
+  const field = screen.getByLabelText('Subtask for 01.in')
+  fireEvent.blur(field)
+
+  expect(onSubtaskChange).not.toHaveBeenCalled()
 })

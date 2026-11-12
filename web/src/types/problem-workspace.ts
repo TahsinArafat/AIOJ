@@ -2,6 +2,8 @@ export interface TestCase {
   input_name: string
   output_name: string
   score: number
+  /** 0 means "not in a subtask". Cases sharing an id are graded together. */
+  subtask_id?: number
 }
 
 export interface Collaborator {

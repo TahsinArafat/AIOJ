@@ -113,6 +113,12 @@ func percentage(earned, available int) int {
 
 // aggregateSubtasks: groups results back into subtasks and applies
 // min/sum aggregation within each group.
+//
+// A case with SubtaskID == 0 belongs to no subtask but is still scored: it forms
+// its own bucket, worth exactly its own score, so it neither inflates nor
+// vanishes from the total. GetSubtasks omits those cases, so relying on it alone
+// dropped them from the denominator and let a submission that failed them still
+// report 100%.
 func (s *Scorer) aggregateSubtasks(prob *model.Problem, results []model.TestCaseResult) RunOutput {
 	// Build a name→result lookup so we can map subtask test cases.
 	byName := make(map[string]model.TestCaseResult, len(results))
@@ -171,6 +177,34 @@ func (s *Scorer) aggregateSubtasks(prob *model.Problem, results []model.TestCase
 			}
 		}
 		totalScore += subtaskScore
+	}
+
+	// Cases outside every subtask are their own bucket: worth exactly their own
+	// points, so they count in both the numerator and the denominator rather
+	// than disappearing from the total.
+	for _, tc := range prob.TestCaseScore {
+		if tc.SubtaskID > 0 {
+			continue
+		}
+		maxScore += tc.Score
+		r, ok := byName[tc.InputName]
+		if !ok {
+			if finalStatus == model.StatusAC {
+				finalStatus = model.StatusSE
+			}
+			continue
+		}
+		if r.Time > maxTime {
+			maxTime = r.Time
+		}
+		if r.Memory > maxMem {
+			maxMem = r.Memory
+		}
+		if r.Status == model.StatusAC {
+			totalScore += tc.Score
+		} else if finalStatus == model.StatusAC {
+			finalStatus = r.Status
+		}
 	}
 
 	percentageScore := percentage(totalScore, maxScore)
