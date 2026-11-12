@@ -21,6 +21,7 @@ import { ContestAnnouncementPopup } from '../components/ContestAnnouncementPopup
 import { ContestCountdown, ContestRunningClock } from '../components/ContestClock'
 import { useClarifications } from '../hooks/useClarifications'
 import { ClarificationsPanel, AskClarificationForm } from '../components/ClarificationsPanel'
+import { runStatus } from '../components/ui/verdict'
 
 // Derived from the API so these track the real response shapes without
 // importing model types (shared type files are in flux).
@@ -911,18 +912,20 @@ export default function ContestProblem() {
                                         />
                                     </div>
 
-                                    {customOutput && (
+                                    {customOutput && (() => {
+                                        const st = runStatus(customOutput.status)
+                                        return (
                                         <div className="space-y-3 pt-2 border-t border-hairline">
                                             <div className="flex items-center justify-between text-xs">
-                                                <span className={`font-semibold uppercase tracking-wider ${customOutput.status === 'success' ? 'text-ok' :
-                                                    customOutput.status === 'ce' ? 'text-accent' : 'text-bad'
+                                                <span className={`font-semibold uppercase tracking-wider ${st === 'success' ? 'text-ok' :
+                                                    st === 'ce' ? 'text-accent' : 'text-bad'
                                                     }`}>
                                                     Execution: {
-                                                        customOutput.status === 'success' ? 'Completed' :
-                                                            customOutput.status === 'ce' ? 'Compilation Error' :
-                                                                customOutput.status === 'tle' ? 'Time Limit Exceeded' :
-                                                                    customOutput.status === 'mle' ? 'Memory Limit Exceeded' :
-                                                                        customOutput.status === 're' ? 'Runtime Error' :
+                                                        st === 'success' ? 'Completed' :
+                                                            st === 'ce' ? 'Compilation Error' :
+                                                                st === 'tle' ? 'Time Limit Exceeded' :
+                                                                    st === 'mle' ? 'Memory Limit Exceeded' :
+                                                                        st === 're' ? 'Runtime Error' :
                                                                             customOutput.status
                                                     }
                                                 </span>
@@ -940,7 +943,7 @@ export default function ContestProblem() {
                                                 </div>
                                             )}
 
-                                            {customOutput.status !== 'ce' && (
+                                            {st !== 'ce' && (
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                                     <div>
                                                         <span className="block text-xs font-semibold text-muted mb-1">Standard Output (Stdout)</span>
@@ -953,7 +956,8 @@ export default function ContestProblem() {
                                                 </div>
                                             )}
                                         </div>
-                                    )}
+                                        )
+                                    })()}
                                 </div>
                             </div>
                         </>

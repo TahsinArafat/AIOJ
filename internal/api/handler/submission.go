@@ -687,6 +687,37 @@ func (h *SubmissionHandler) BatchRun(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, map[string]interface{}{"results": results})
 }
 
+// runShellCommand builds the single shell command that compiles and runs the
+// submission inside the sandbox.
+//
+// The compile step redirects its own stderr into error.txt. Without that the
+// compiler's diagnostics went to the shell's stderr, which the sandbox does not
+// return — only files named in CopyOut come back. On a failed compile `&&` then
+// short-circuits, so error.txt was never even created and the IDE reported
+// "Compilation failed (no error output captured)" instead of the real error.
+// The braces group the redirect so it also covers compound compile commands.
+func runShellCommand(cfg *compiler.LangConfig, srcName string) string {
+	fill := func(s string) string {
+		s = strings.ReplaceAll(s, "{{exe}}", "Main")
+		s = strings.ReplaceAll(s, "{{src}}", srcName)
+		return strings.ReplaceAll(s, "{{dir}}", ".")
+	}
+
+	const captureRun = " < input.txt > output.txt 2> error.txt"
+
+	if cfg.CompileCmd != "" {
+		compile := "{ " + fill(cfg.CompileCmd) + " ; } 2> error.txt && "
+		if cfg.Runtime != "" {
+			return compile + strings.Join(strings.Fields(fill(cfg.Runtime)), " ") + captureRun
+		}
+		return compile + "./Main" + captureRun
+	}
+	if cfg.Runtime != "" {
+		return strings.Join(strings.Fields(fill(cfg.Runtime)), " ") + " " + srcName + captureRun
+	}
+	return "./Main" + captureRun
+}
+
 // runOnce performs one compile-and-execute. Split out of CustomRun so BatchRun
 // can reuse it without re-running the auth, decode and quota preamble per case.
 func (h *SubmissionHandler) runOnce(ctx context.Context, req CustomRunRequest, cfg *compiler.LangConfig) CustomRunResponse {
@@ -698,33 +729,7 @@ func (h *SubmissionHandler) runOnce(ctx context.Context, req CustomRunRequest, c
 	copyIn[srcName] = executor.CmdFile{Content: req.SourceCode}
 	copyIn["input.txt"] = executor.CmdFile{Content: req.Input}
 
-	if cfg.CompileCmd != "" && cfg.Runtime != "" {
-		compileCmd := cfg.CompileCmd
-		compileCmd = strings.ReplaceAll(compileCmd, "{{exe}}", "Main")
-		compileCmd = strings.ReplaceAll(compileCmd, "{{src}}", srcName)
-		compileCmd = strings.ReplaceAll(compileCmd, "{{dir}}", ".")
-		rtParts := strings.Fields(cfg.Runtime)
-		for i, p := range rtParts {
-			rtParts[i] = strings.ReplaceAll(p, "{{dir}}", ".")
-			rtParts[i] = strings.ReplaceAll(rtParts[i], "{{exe}}", "Main")
-		}
-		runCmd := compileCmd + " && " + strings.Join(rtParts, " ") + " < input.txt > output.txt 2> error.txt"
-		args = []string{"/bin/sh", "-c", runCmd}
-	} else if cfg.CompileCmd != "" {
-		compileCmd := cfg.CompileCmd
-		compileCmd = strings.ReplaceAll(compileCmd, "{{exe}}", "Main")
-		compileCmd = strings.ReplaceAll(compileCmd, "{{src}}", srcName)
-		compileCmd = strings.ReplaceAll(compileCmd, "{{dir}}", ".")
-		runCmd := compileCmd + " && ./Main < input.txt > output.txt 2> error.txt"
-		args = []string{"/bin/sh", "-c", runCmd}
-	} else if cfg.Runtime != "" {
-		rtParts := strings.Fields(cfg.Runtime)
-		runCmd := strings.Join(rtParts, " ") + " " + srcName + " < input.txt > output.txt 2> error.txt"
-		args = []string{"/bin/sh", "-c", runCmd}
-	} else {
-		runCmd := "./Main < input.txt > output.txt 2> error.txt"
-		args = []string{"/bin/sh", "-c", runCmd}
-	}
+	args = []string{"/bin/sh", "-c", runShellCommand(cfg, srcName)}
 
 	// Client-supplied limits are honored only up to hard ceilings (2x the
 	// defaults) so a single user cannot pin shared judge workers for minutes.

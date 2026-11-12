@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Editor, { type OnMount } from '@monaco-editor/react'
+import type { editor as monacoEditor } from 'monaco-editor'
 import { Settings, Eye, EyeOff, WrapText } from 'lucide-react'
 import { useTheme } from '../context/ThemeContext'
 
@@ -241,6 +242,29 @@ export default function CodeEditor({
   const { theme: appTheme } = useTheme()
   const [settings, setSettings] = useState<EditorSettings>(loadSettings)
 
+  const editorRef = useRef<monacoEditor.IStandaloneCodeEditor | null>(null)
+
+  // Content the editor produced itself.
+  //
+  // Handing Monaco a controlled `value` races React's batching: the prop can
+  // still be a keystroke behind when the effect that syncs it runs, and
+  // @monaco-editor/react answers any mismatch with `executeEdits` over the
+  // *whole* buffer plus `forceMoveMarkers`. That rewrote the file on almost
+  // every keystroke and threw the caret to the last line, so typing was
+  // impossible. The editor is therefore uncontrolled, and the `value` prop is
+  // only pushed in when it did not come from here (a language switch loading a
+  // different draft, or a reset).
+  //
+  // Bounded on purpose: it only needs to cover the handful of renders a stale
+  // prop can lag behind, not the whole editing session.
+  const localValues = useRef<string[]>([value])
+
+  const rememberLocalValue = useCallback((next: string) => {
+    const seen = localValues.current
+    seen.push(next)
+    if (seen.length > 100) seen.splice(0, seen.length - 100)
+  }, [])
+
   // Sync settings to localStorage whenever they change
   useEffect(() => {
     saveSettings(settings)
@@ -258,6 +282,7 @@ export default function CodeEditor({
 
   const handleMount: OnMount = useCallback(
     (editor) => {
+      editorRef.current = editor
       editor.updateOptions({
         fontSize: settings.fontSize,
         tabSize: settings.tabSize,
@@ -276,10 +301,34 @@ export default function CodeEditor({
 
   const handleChange = useCallback(
     (val: string | undefined) => {
-      onChange(val ?? '')
+      const next = val ?? ''
+      rememberLocalValue(next)
+      onChange(next)
     },
-    [onChange],
+    [onChange, rememberLocalValue],
   )
+
+  // Adopt an external `value` (new draft, language switch, programmatic reset).
+  // `setValue` keeps the caret when the text matches and only moves it when the
+  // document genuinely changed underneath the user.
+  useEffect(() => {
+    const editor = editorRef.current
+    if (!editor) return
+    if (value === editor.getValue()) return
+    if (localValues.current.includes(value)) return
+    editor.setValue(value)
+  }, [value])
+
+  // Keep options live so the settings toolbar takes effect without a remount.
+  useEffect(() => {
+    editorRef.current?.updateOptions({
+      fontSize: settings.fontSize,
+      tabSize: settings.tabSize,
+      wordWrap: settings.wordWrap,
+      minimap: { enabled: settings.minimap },
+      readOnly,
+    })
+  }, [settings, readOnly])
 
   return (
     <div
@@ -292,7 +341,7 @@ export default function CodeEditor({
         <Editor
           height="100%"
           language={monacoLang}
-          value={value}
+          defaultValue={value}
           theme={resolvedTheme}
           onChange={handleChange}
           onMount={handleMount}

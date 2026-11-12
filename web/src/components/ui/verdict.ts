@@ -41,3 +41,15 @@ export function isPendingVerdict(status: string | undefined | null): boolean {
     const key = (status || '').toLowerCase()
     return key === 'pending' || key === 'judging' || key === 'running'
 }
+
+/**
+ * Normalise a `/run` status for comparison.
+ *
+ * `/run` answers in upper case ("CE", "TLE", "success") while stored
+ * submissions are lower case. The in-problem IDE compared the raw value
+ * against lower case, so a compile error never matched: it rendered the bare
+ * string "CE" and kept the empty stdout/stderr panels on screen.
+ */
+export function runStatus(status: string | undefined | null): string {
+    return (status || '').toLowerCase()
+}
