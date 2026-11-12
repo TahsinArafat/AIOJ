@@ -12,10 +12,15 @@ const (
 	RoleContestant = "contestant"
 )
 
-// Problem/contest collaboration access levels.
+// Problem/contest collaboration access levels. These must match the CHECK
+// constraints in migration 000002 (problem_permissions) and 000039
+// (contest_permissions): co_author is an underscore there, and every handler plus
+// the collaborator picker already spell it that way. The constant said
+// "co-author" — a value the column rejects — so anything that used the constant
+// instead of a literal would have failed the insert.
 const (
 	AccessLevelOwner    = "owner"
-	AccessLevelCoAuthor = "co-author"
+	AccessLevelCoAuthor = "co_author"
 	AccessLevelManager  = "manager"
 	AccessLevelJudge    = "judge"
 	AccessLevelTester   = "tester"

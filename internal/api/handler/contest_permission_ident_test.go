@@ -66,7 +66,7 @@ func (s *refStub) GetByUsername(_ context.Context, name string) (*model.User, er
 func TestResolveUserRefAcceptsAUsername(t *testing.T) {
 	stub := &refStub{id: permTestUserID, username: "alice"}
 
-	got, err := resolveUserRef(context.Background(), stub, "alice")
+	got, err := resolveUserRef(context.Background(), stub, "alice", "")
 	if err != nil {
 		t.Fatalf("a known username must resolve, got error: %v", err)
 	}
@@ -80,7 +80,7 @@ func TestResolveUserRefAcceptsAUsername(t *testing.T) {
 func TestResolveUserRefNeverReturnsAnUnknownName(t *testing.T) {
 	stub := &refStub{id: permTestUserID, username: "alice"}
 
-	got, err := resolveUserRef(context.Background(), stub, "nobody")
+	got, err := resolveUserRef(context.Background(), stub, "nobody", "")
 	if err != nil {
 		t.Fatalf("an unknown name is not a lookup failure: %v", err)
 	}
@@ -92,7 +92,7 @@ func TestResolveUserRefNeverReturnsAnUnknownName(t *testing.T) {
 func TestResolveUserRefAcceptsAUserID(t *testing.T) {
 	stub := &refStub{id: permTestUserID, username: "alice"}
 
-	got, err := resolveUserRef(context.Background(), stub, permTestUserID)
+	got, err := resolveUserRef(context.Background(), stub, permTestUserID, "")
 	if err != nil {
 		t.Fatalf("a known id must resolve: %v", err)
 	}
@@ -108,7 +108,7 @@ func TestResolveUserRefAcceptsAUserID(t *testing.T) {
 func TestResolveUserRefRejectsAStaleUUID(t *testing.T) {
 	stub := &refStub{id: permTestUserID, username: "alice"}
 
-	got, err := resolveUserRef(context.Background(), stub, "11111111-1111-1111-1111-111111111111")
+	got, err := resolveUserRef(context.Background(), stub, "11111111-1111-1111-1111-111111111111", "")
 	if err != nil {
 		t.Fatalf("a stale id is not a lookup failure: %v", err)
 	}
@@ -120,7 +120,7 @@ func TestResolveUserRefRejectsAStaleUUID(t *testing.T) {
 func TestResolveUserRefTrimsWhitespace(t *testing.T) {
 	stub := &refStub{id: permTestUserID, username: "alice"}
 
-	got, err := resolveUserRef(context.Background(), stub, "  alice  ")
+	got, err := resolveUserRef(context.Background(), stub, "  alice  ", "")
 	if err != nil {
 		t.Fatalf("pasted whitespace must not break the lookup: %v", err)
 	}
@@ -135,7 +135,7 @@ func TestResolveUserRefSurfacesLookupFailures(t *testing.T) {
 	boom := errors.New("connection refused")
 	stub := &refStub{id: permTestUserID, username: "alice", byNameEr: boom}
 
-	if _, err := resolveUserRef(context.Background(), stub, "alice"); !errors.Is(err, boom) {
+	if _, err := resolveUserRef(context.Background(), stub, "alice", ""); !errors.Is(err, boom) {
 		t.Fatalf("want the underlying error, got %v", err)
 	}
 }
@@ -143,7 +143,7 @@ func TestResolveUserRefSurfacesLookupFailures(t *testing.T) {
 // With no user store wired in, an unresolvable reference must still not reach the
 // uuid column.
 func TestResolveUserRefWithoutAStoreRejectsNonUUIDs(t *testing.T) {
-	got, err := resolveUserRef(context.Background(), nil, "alice")
+	got, err := resolveUserRef(context.Background(), nil, "alice", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -151,7 +151,7 @@ func TestResolveUserRefWithoutAStoreRejectsNonUUIDs(t *testing.T) {
 		t.Fatalf("a non-UUID must not pass through without a store, got %q", got)
 	}
 
-	got, err = resolveUserRef(context.Background(), nil, permTestUserID)
+	got, err = resolveUserRef(context.Background(), nil, permTestUserID, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

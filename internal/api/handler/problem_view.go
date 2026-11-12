@@ -116,5 +116,15 @@ func canReadProblem(ctx context.Context, problems store.ProblemStore, p *model.P
 	if claims.Role == "admin" || p.CreatedBy == claims.UserID {
 		return true
 	}
-	return problems.HasAccess(ctx, p.ID, claims.UserID, problemAccessLevels...)
+	if problems.HasAccess(ctx, p.ID, claims.UserID, problemAccessLevels...) {
+		return true
+	}
+	// A draft attached to a contest is readable by that contest's staff. Two
+	// setters co-running one round is the ordinary case: one attaches the problem
+	// and the other cannot open it, which is what "another judge cannot access the
+	// problem" described. This grants nothing on the public archive — the answer
+	// is scoped to this problem and requires a manager/judge/tester row on a round
+	// that actually contains it.
+	staffed, err := problems.StaffedByContest(ctx, p.ID, claims.UserID)
+	return err == nil && staffed
 }

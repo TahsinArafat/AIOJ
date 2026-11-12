@@ -202,7 +202,7 @@ func main() {
 	}
 
 	authH := handler.NewAuthHandler(userStore, refreshTokenStore, passwordResetTokenStore, onsiteUserStore, contestStore, jwtManager, evtStore, totpStore, mailSender, mailTpl, publicURL, mailFrom)
-	problemH := handler.NewProblemHandler(problemStore)
+	problemH := handler.NewProblemHandler(problemStore).WithUsers(userStore)
 	problemI18nH := handler.NewProblemI18nHandler(problemI18nStore, problemStore)
 
 	botAccountStore := postgres.NewBotAccountStore(db)

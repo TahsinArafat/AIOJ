@@ -915,9 +915,10 @@ func (h *ContestHandler) AddPermission(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// resolveUserRef is the handler's view of the free function below.
+// resolveUserRef is the contest handler's view of the free function below. The
+// moderators box takes either spelling in one field.
 func (h *ContestHandler) resolveUserRef(ctx context.Context, ref string) (string, error) {
-	return resolveUserRef(ctx, h.userStore, ref)
+	return resolveUserRef(ctx, h.userStore, ref, "")
 }
 
 // userRefLookup is the slice of the user store this resolution needs, declared on
@@ -927,13 +928,22 @@ type userRefLookup interface {
 	GetByUsername(ctx context.Context, username string) (*model.User, error)
 }
 
-// resolveUserRef turns what an operator typed in the moderators box into a user
-// id. A UUID is checked for existence; anything else is looked up as a username,
-// so "alice" and alice's id are equally valid input. Returns "" when the user does
-// not exist, and an error only when the lookup itself failed — the caller answers
-// 404 and 500 respectively.
-func resolveUserRef(ctx context.Context, users userRefLookup, ref string) (string, error) {
-	ref = strings.TrimSpace(ref)
+// resolveUserRef turns an operator-supplied reference into a user id.
+//
+// Two callers, two shapes: the moderators box has a single field that may hold
+// either spelling, while the collaborator form sends username and user_id
+// separately. Both route through here so there is one answer to "who is this".
+//
+// A UUID is checked for existence; anything else is looked up as a username.
+// Returns "" when the user does not exist, and an error only when the lookup
+// itself failed — the caller answers 404 and 500 respectively. An empty
+// username with a non-empty id is the normal collaborator shape and is not an
+// error.
+func resolveUserRef(ctx context.Context, users userRefLookup, username, userID string) (string, error) {
+	ref := strings.TrimSpace(username)
+	if ref == "" {
+		ref = strings.TrimSpace(userID)
+	}
 	if ref == "" {
 		return "", nil
 	}

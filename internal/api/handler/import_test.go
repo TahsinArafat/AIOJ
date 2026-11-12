@@ -25,6 +25,9 @@ type mockProblemStore struct {
 	// access maps "userID/problemID" -> access level. A nil map means nobody
 	// has access anywhere, which is what the import tests rely on.
 	access map[string]string
+	// staffProblems maps "userID/problemID" -> true when the user staffs a contest
+	// the problem is attached to.
+	staffProblems map[string]bool
 	// updated records the last problem handed to Update, so the review tests can
 	// assert on what a handler tried to persist.
 	updated *model.Problem
@@ -55,6 +58,14 @@ func (m *mockProblemStore) GetAllTags(_ context.Context) ([]string, error) { ret
 func (m *mockProblemStore) InUnreleasedContest(_ context.Context, _ string) (bool, error) {
 	return m.unreleasedContest, nil
 }
+
+// StaffedByContest answers "does this user staff a contest holding this problem".
+// staffProblems maps "userID/problemID" -> true so a test can model a judge of the
+// round a draft belongs to. A nil map means nobody staffs anything.
+func (m *mockProblemStore) StaffedByContest(_ context.Context, problemID, userID string) (bool, error) {
+	return m.staffProblems[userID+"/"+problemID], nil
+}
+
 func (m *mockProblemStore) UpdateCounts(_ context.Context, _ string, _, _ int) error { return nil }
 func (m *mockProblemStore) Update(_ context.Context, _ string, p *model.Problem) error {
 	m.updated = p

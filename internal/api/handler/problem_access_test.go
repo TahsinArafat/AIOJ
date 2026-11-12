@@ -64,22 +64,34 @@ func TestCanReadProblem(t *testing.T) {
 		p      *model.Problem
 		claims *auth.Claims
 		access map[string]string
-		want   bool
+		// staffed marks the caller as manager/judge/tester of a contest this
+		// problem is attached to.
+		staffed bool
+		want    bool
 	}{
-		{"published problem is public", published, nil, nil, true},
-		{"draft is closed to anonymous", draft, nil, nil, false},
-		{"draft is closed to a plain user", draft, &auth.Claims{UserID: "u", Role: "user"}, nil, false},
+		{name: "published problem is public", p: published, want: true},
+		{name: "draft is closed to anonymous", p: draft},
+		{name: "draft is closed to a plain user", p: draft, claims: &auth.Claims{UserID: "u", Role: "user"}},
 		// The reported bug: role "setter" must grant nothing by itself.
-		{"draft is closed to a different setter", draft, &auth.Claims{UserID: "setter2", Role: "setter"}, nil, false},
-		{"draft is open to its creator", draft, &auth.Claims{UserID: "author1", Role: "setter"}, nil, true},
-		{"draft is open to an admin", draft, &auth.Claims{UserID: "admin1", Role: "admin"}, nil, true},
-		{"draft is open to a co-author", draft, &auth.Claims{UserID: "co1", Role: "setter"}, map[string]string{"co1/p1": "co_author"}, true},
-		{"draft is open to a tester", draft, &auth.Claims{UserID: "t1", Role: "setter"}, map[string]string{"t1/p1": "tester"}, true},
+		{name: "draft is closed to a different setter", p: draft, claims: &auth.Claims{UserID: "setter2", Role: "setter"}},
+		{name: "draft is open to its creator", p: draft, claims: &auth.Claims{UserID: "author1", Role: "setter"}, want: true},
+		{name: "draft is open to an admin", p: draft, claims: &auth.Claims{UserID: "admin1", Role: "admin"}, want: true},
+		{name: "draft is open to a co-author", p: draft, claims: &auth.Claims{UserID: "co1", Role: "setter"}, access: map[string]string{"co1/p1": "co_author"}, want: true},
+		{name: "draft is open to a tester", p: draft, claims: &auth.Claims{UserID: "t1", Role: "setter"}, access: map[string]string{"t1/p1": "tester"}, want: true},
+		// A judge of a contest this draft is attached to may open it, even though
+		// they did not write it. This is the reported "another judge cannot access
+		// the problem" bug. The grant is scoped to the contest, not to the role:
+		// being a setter is still not enough (see the case above).
+		{name: "draft is open to a judge of its contest", p: draft, claims: &auth.Claims{UserID: "judge1", Role: "user"}, staffed: true, want: true},
+		{name: "draft stays closed to a judge of some other contest", p: draft, claims: &auth.Claims{UserID: "judge2", Role: "user"}},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			store := &mockProblemStore{access: tc.access}
+			if tc.staffed && tc.claims != nil {
+				store.staffProblems = map[string]bool{tc.claims.UserID + "/" + tc.p.ID: true}
+			}
 			if got := canReadProblem(context.Background(), store, tc.p, tc.claims); got != tc.want {
 				t.Fatalf("canReadProblem = %v, want %v", got, tc.want)
 			}

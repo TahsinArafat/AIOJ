@@ -25,6 +25,10 @@ import (
 
 type ProblemHandler struct {
 	store store.ProblemStore
+	// userStore resolves a collaborator reference to an account. Optional so the
+	// seeder and tests can build a handler without one; a nil store means only a
+	// literal UUID can be added, never a username.
+	userStore userRefLookup
 	// notify and hooks are optional: nil instances are no-ops, so constructing a
 	// handler without them (tests, the seeder) still works.
 	notify *notify.Notifier
@@ -33,6 +37,13 @@ type ProblemHandler struct {
 
 func NewProblemHandler(s store.ProblemStore) *ProblemHandler {
 	return &ProblemHandler{store: s}
+}
+
+// WithUsers attaches the user store the collaborator form needs to turn a typed
+// username into an account id. Returns the handler for call-site chaining.
+func (h *ProblemHandler) WithUsers(us userRefLookup) *ProblemHandler {
+	h.userStore = us
+	return h
 }
 
 // WithNotifier attaches a notifier and returns the handler, for call-site chaining.
@@ -529,13 +540,39 @@ func (h *ProblemHandler) AddPermission(w http.ResponseWriter, r *http.Request) {
 	}
 	var req struct {
 		UserID string `json:"user_id"`
-		Level  string `json:"access_level"`
+		// Username is what the collaborator form actually sends. The handler only
+		// read user_id, so the field arrived empty and the insert put "" into a
+		// uuid column: "invalid input syntax for type uuid" and a bare 500, every
+		// time. Both keys are accepted so a raw id stays valid input.
+		Username string `json:"username"`
+		Level    string `json:"access_level"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid body", http.StatusBadRequest)
 		return
 	}
-	if err := h.store.AddPermission(r.Context(), p.ID, req.UserID, req.Level); err != nil {
+	// The level reaches a CHECK constraint, so an unknown one is a client mistake
+	// and must answer 400 rather than a 500 that says nothing.
+	switch req.Level {
+	case model.AccessLevelOwner, model.AccessLevelCoAuthor, model.AccessLevelTester:
+	default:
+		http.Error(w, "access_level must be owner, co_author or tester", http.StatusBadRequest)
+		return
+	}
+
+	// Resolve the reference to a real account before it reaches a uuid column.
+	// A typed username is the common case here, so "no such user" is a 404 and only
+	// a genuine lookup failure stays a 500.
+	userID, err := resolveUserRef(r.Context(), h.userStore, req.Username, req.UserID)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if userID == "" {
+		http.Error(w, "user not found", http.StatusNotFound)
+		return
+	}
+	if err := h.store.AddPermission(r.Context(), p.ID, userID, req.Level); err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}

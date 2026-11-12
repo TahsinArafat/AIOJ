@@ -198,6 +198,36 @@ func (s *ProblemStore) InUnreleasedContest(ctx context.Context, problemID string
 	return locked, err
 }
 
+// StaffedByContest reports whether userID staffs a contest this problem is
+// attached to. It answers "may I read this draft because I run the round it
+// belongs to", which is not the same question as "may I read the archive".
+//
+// Without this, a problem a different setter attached to a round could not be
+// opened by that round's judges at all: contest_problems deliberately skips
+// p.visible so the statement opens during the round, but the draft then went back
+// to being its author's private business the moment the round ended, and the
+// problem page refused every judge with 403 in the meantime.
+//
+// Deliberately narrow: any contest the problem is attached to counts, and the
+// caller must hold manager/judge/tester on it. An author, a co-author or a tester
+// of the problem itself is a separate question answered by problem_permissions,
+// and this does not widen it.
+func (s *ProblemStore) StaffedByContest(ctx context.Context, problemID, userID string) (bool, error) {
+	if userID == "" {
+		return false, nil
+	}
+	var staffed bool
+	err := s.db.QueryRowContext(ctx,
+		`SELECT EXISTS (
+		    SELECT 1 FROM contest_problems cp
+		    JOIN contest_permissions perm ON perm.contest_id = cp.contest_id
+		    WHERE cp.problem_id = $1
+		      AND perm.user_id = $2
+		      AND perm.access_level IN ('manager','judge','tester')
+		 )`, problemID, userID).Scan(&staffed)
+	return staffed, err
+}
+
 // problemScanner is the *sql.Row / *sql.Rows shape scanProblem needs.
 type problemScanner interface {
 	Scan(dest ...any) error

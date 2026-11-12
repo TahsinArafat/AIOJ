@@ -84,6 +84,11 @@ type ProblemStore interface {
 	// that is open right now, so public reads can withhold its difficulty metadata
 	// and keep it out of the archive. An upcoming or unpublished round is false.
 	InUnreleasedContest(ctx context.Context, problemID string) (bool, error)
+	// StaffedByContest reports whether userID staffs (manager/judge/tester) a
+	// contest this problem is attached to. This is what lets one judge open a
+	// problem a different setter attached to the round they both run, without
+	// granting anything on the public archive.
+	StaffedByContest(ctx context.Context, problemID, userID string) (bool, error)
 	UpdateCounts(ctx context.Context, id string, addSubmission, addAccepted int) error
 	Update(ctx context.Context, id string, p *model.Problem) error
 	Delete(ctx context.Context, id string) error
