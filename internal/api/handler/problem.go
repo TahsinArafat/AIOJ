@@ -85,14 +85,20 @@ func (h *ProblemHandler) List(w http.ResponseWriter, r *http.Request) {
 		filterTags = strings.Split(tagsStr, ",")
 	}
 
+	// The archive is published-only for everyone except an admin, who sees every
+	// problem regardless of review state (drafts included). This is the one
+	// listing surface, so deciding it here covers the plain archive, the
+	// filtered archive, and the setter workspace's "All Problems" tab.
+	admin := isAdmin(middleware.GetUserClaims(r))
+
 	var items []model.ProblemListItem
 	var total int
 	var err error
 
 	if difficulty != "" || len(filterTags) > 0 || search != "" || source != "" || rating != "" || sortBy != "" {
-		items, total, err = h.store.ListWithFilter(r.Context(), offset, limit, difficulty, filterTags, search, source, rating, sortBy)
+		items, total, err = h.store.ListWithFilter(r.Context(), offset, limit, admin, difficulty, filterTags, search, source, rating, sortBy)
 	} else {
-		items, total, err = h.store.List(r.Context(), offset, limit)
+		items, total, err = h.store.List(r.Context(), offset, limit, admin)
 	}
 
 	if err != nil {

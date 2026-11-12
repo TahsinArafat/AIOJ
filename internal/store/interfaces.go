@@ -70,8 +70,11 @@ type ProblemStore interface {
 	Create(ctx context.Context, p *model.Problem) error
 	GetByID(ctx context.Context, id string) (*model.Problem, error)
 	GetBySlug(ctx context.Context, slug string) (*model.Problem, error)
-	List(ctx context.Context, offset, limit int) ([]model.ProblemListItem, int, error)
-	ListWithFilter(ctx context.Context, offset, limit int, difficulty string, tags []string, search string, source string, rating string, sortBy string) ([]model.ProblemListItem, int, error)
+	// List returns the public archive for ordinary callers. admin=true widens
+	// it to every problem regardless of review state, including drafts, so an
+	// admin can see the problems still waiting for approval.
+	List(ctx context.Context, offset, limit int, admin bool) ([]model.ProblemListItem, int, error)
+	ListWithFilter(ctx context.Context, offset, limit int, admin bool, difficulty string, tags []string, search string, source string, rating string, sortBy string) ([]model.ProblemListItem, int, error)
 	ListByCreatedBy(ctx context.Context, userID string, offset, limit int) ([]model.ProblemListItem, int, error)
 	// ListSelectable is the contest problem picker: the public archive plus the
 	// problems this user may attach (created by them, or shared with them).

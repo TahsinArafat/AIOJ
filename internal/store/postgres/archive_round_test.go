@@ -176,7 +176,7 @@ func TestArchivedProblemListAgreesWithThePredicate(t *testing.T) {
 
 	listed := func() bool {
 		t.Helper()
-		items, _, err := problems.List(ctx, 0, 500)
+		items, _, err := problems.List(ctx, 0, 500, false)
 		if err != nil {
 			t.Fatalf("List: %v", err)
 		}

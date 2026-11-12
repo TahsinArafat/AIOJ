@@ -39,10 +39,10 @@ func (m *mockProblemStore) GetByID(_ context.Context, _ string) (*model.Problem,
 func (m *mockProblemStore) GetBySlug(_ context.Context, _ string) (*model.Problem, error) {
 	return m.getBySlug, nil
 }
-func (m *mockProblemStore) List(_ context.Context, _, _ int) ([]model.ProblemListItem, int, error) {
+func (m *mockProblemStore) List(_ context.Context, _, _ int, _ bool) ([]model.ProblemListItem, int, error) {
 	return m.listItems, len(m.listItems), nil
 }
-func (m *mockProblemStore) ListWithFilter(_ context.Context, _, _ int, _ string, _ []string, _ string, _ string, _ string, _ string) ([]model.ProblemListItem, int, error) {
+func (m *mockProblemStore) ListWithFilter(_ context.Context, _, _ int, _ bool, _ string, _ []string, _ string, _ string, _ string, _ string) ([]model.ProblemListItem, int, error) {
 	return nil, 0, nil
 }
 func (m *mockProblemStore) ListByCreatedBy(_ context.Context, _ string, _, _ int) ([]model.ProblemListItem, int, error) {

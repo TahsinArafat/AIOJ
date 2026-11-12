@@ -247,13 +247,25 @@ func (s *ProblemStore) getBy(ctx context.Context, field, value string) (*model.P
 	return &p, nil
 }
 
-func (s *ProblemStore) List(ctx context.Context, offset, limit int) ([]model.ProblemListItem, int, error) {
+// List returns the public archive (published, not currently in play in a live
+// contest) for ordinary callers. An admin passes admin=true and gets every
+// problem regardless of review state — including drafts — so the setter
+// workspace's "All Problems" tab shows the person who approves problems the
+// ones still waiting. The admin flag is a handler decision, never read from the
+// problem row.
+func (s *ProblemStore) List(ctx context.Context, offset, limit int, admin bool) ([]model.ProblemListItem, int, error) {
+	where := archivedProblemSQL
+	if admin {
+		// An admin sees every problem regardless of review state, so an
+		// unpublished draft is not invisible to the person who approves it.
+		where = "TRUE"
+	}
 	var total int
 	s.db.QueryRowContext(ctx,
-		"SELECT COUNT(*) FROM problems p WHERE "+archivedProblemSQL).Scan(&total)
+		"SELECT COUNT(*) FROM problems p WHERE "+where).Scan(&total)
 	query := fmt.Sprintf(`SELECT p.id, p.slug, p.title, p.difficulty, COALESCE(p.rating,0), p.tags,
-		 p.submission_count, p.accepted_count, p.source
-		 FROM problems p WHERE %s ORDER BY p.created_at DESC OFFSET $1 LIMIT $2`, archivedProblemSQL)
+		 p.submission_count, p.accepted_count, p.source, COALESCE(p.status,'draft')
+		 FROM problems p WHERE %s ORDER BY p.created_at DESC OFFSET $1 LIMIT $2`, where)
 	rows, err := s.db.QueryContext(ctx, query, offset, limit)
 	if err != nil {
 		return nil, 0, err
@@ -264,7 +276,7 @@ func (s *ProblemStore) List(ctx context.Context, offset, limit int) ([]model.Pro
 		var item model.ProblemListItem
 		var tags []string
 		rows.Scan(&item.ID, &item.Slug, &item.Title, &item.Difficulty, &item.Rating, pq.Array(&tags),
-			&item.SubmissionCount, &item.AcceptedCount, &item.Source)
+			&item.SubmissionCount, &item.AcceptedCount, &item.Source, &item.Status)
 		item.Tags = tags
 		items = append(items, item)
 	}
@@ -414,8 +426,14 @@ func (s *ProblemStore) HasAccess(ctx context.Context, problemID, userID string, 
 	return false
 }
 
-func (s *ProblemStore) ListWithFilter(ctx context.Context, offset, limit int, difficulty string, tags []string, search string, source string, rating string, sortBy string) ([]model.ProblemListItem, int, error) {
+func (s *ProblemStore) ListWithFilter(ctx context.Context, offset, limit int, admin bool, difficulty string, tags []string, search string, source string, rating string, sortBy string) ([]model.ProblemListItem, int, error) {
+	// The archive restricts to published, non-live problems. An admin sees every
+	// problem regardless of review state (drafts included), so the restriction
+	// is lifted only for them and the admin flag stays a handler decision.
 	where := []string{archivedProblemSQL}
+	if admin {
+		where = []string{"TRUE"}
+	}
 	args := []interface{}{}
 	argIdx := 1
 
@@ -491,7 +509,7 @@ func (s *ProblemStore) ListWithFilter(ctx context.Context, offset, limit int, di
 	}
 
 	selectQuery := fmt.Sprintf(`SELECT p.id, p.slug, p.title, p.difficulty, COALESCE(p.rating,0), p.tags,
-		p.submission_count, p.accepted_count, p.source
+		p.submission_count, p.accepted_count, p.source, COALESCE(p.status,'draft')
 		FROM problems p WHERE %s ORDER BY %s OFFSET $%d LIMIT $%d`, whereClause, orderClause, argIdx, argIdx+1)
 	args = append(args, offset, limit)
 
@@ -506,7 +524,7 @@ func (s *ProblemStore) ListWithFilter(ctx context.Context, offset, limit int, di
 		var item model.ProblemListItem
 		var tagArr []string
 		rows.Scan(&item.ID, &item.Slug, &item.Title, &item.Difficulty, &item.Rating, pq.Array(&tagArr),
-			&item.SubmissionCount, &item.AcceptedCount, &item.Source)
+			&item.SubmissionCount, &item.AcceptedCount, &item.Source, &item.Status)
 		item.Tags = tagArr
 		items = append(items, item)
 	}
