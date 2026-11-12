@@ -53,9 +53,13 @@ func TestBookletRequiresAReadableContest(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := canReadContest(t.Context(), contestAccessStub{access: tc.staff}, tc.contest, tc.claims)
-			if got != tc.want {
-				t.Fatalf("canReadContest = %v, want %v", got, tc.want)
+			p := newContestAccessPolicy(&accessStub{staff: tc.staff, groupOK: true}, grantStub{})
+			decision, err := p.Decide(t.Context(), tc.contest, tc.claims)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if decision.Allowed() != tc.want {
+				t.Fatalf("Decide.Allowed() = %v, want %v", decision.Allowed(), tc.want)
 			}
 		})
 	}

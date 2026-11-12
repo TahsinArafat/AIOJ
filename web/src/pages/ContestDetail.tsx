@@ -10,7 +10,7 @@ import { EmptyState } from '../components/EmptyState'
 import {
     Trophy, FileText, MessageSquare, Users, Zap, FileDown, Pencil, Gamepad2,
     AlertTriangle, Megaphone, Settings, BookOpen, Info, Clock, Shield, CheckCircle2, X, ExternalLink,
-    ChevronLeft, ChevronRight, Send, Filter, Eye, EyeOff
+    ChevronLeft, ChevronRight, Send, Filter, Eye, EyeOff, Lock
 } from 'lucide-react'
 import { useConfirm } from '../components/ConfirmDialog'
 import { useToast } from '../components/Toast'
@@ -161,7 +161,16 @@ export default function ContestDetail() {
     // there" are different messages and used to be the same one; tagged because
     // this component is reused when the route id changes, and an untagged message
     // would follow the viewer from one contest to the next.
-    const [loadError, setLoadError] = useState<{ id: string; message: string } | null>(null)
+    // code is kept because "password_required" needs a prompt, not an apology: a
+    // contestant who simply has not unlocked the round must be able to type the
+    // password, and everything else stays a plain error.
+    const [loadError, setLoadError] = useState<{ id: string; message: string; code?: string } | null>(null)
+    const [unlockPassword, setUnlockPassword] = useState('')
+    const [unlocking, setUnlocking] = useState(false)
+    const [unlockError, setUnlockError] = useState('')
+    // reloadKey lets the unlock flow re-run the fetch effect below without
+    // duplicating its body.
+    const [reloadKey, setReloadKey] = useState(0)
     // The route map only knows it is a contest; the real title arrives with
     // the fetch and replaces "Contest" in the tab.
     useDocumentTitle(contest?.title)
@@ -258,9 +267,27 @@ export default function ContestDetail() {
         }).catch((e: unknown) => {
             // setState from a promise callback, not the effect body: this is the
             // async result of an external request, which is what an effect is for.
-            setLoadError({ id, message: errorMessage(e) })
+            const code = (e as { code?: string } | null)?.code
+            setLoadError({ id, message: errorMessage(e), code })
         }).finally(() => setLoading(false))
-    }, [id])
+    }, [id, reloadKey])
+
+    const submitUnlock = async () => {
+        if (!id || !unlockPassword) return
+        setUnlocking(true)
+        setUnlockError('')
+        try {
+            await api.contests.unlock(id, unlockPassword)
+            setUnlockPassword('')
+            // Re-fetch: the round is now readable, so the page loads normally.
+            setLoading(true)
+            setReloadKey(k => k + 1)
+        } catch (e) {
+            setUnlockError(errorMessage(e) || 'Incorrect password')
+        } finally {
+            setUnlocking(false)
+        }
+    }
 
     useEffect(() => {
         if (activeTab === 'standings' && id) {
@@ -390,6 +417,44 @@ export default function ContestDetail() {
         // Only this contest's own failure explains its absence; a message left
         // over from a previously viewed round would be about a different contest.
         const reason = loadError && loadError.id === id ? loadError.message : ''
+        const locked = Boolean(loadError && loadError.id === id && loadError.code === 'password_required')
+
+        if (locked) {
+            return (
+                <div className="max-w-md mx-auto py-20">
+                    <div className="text-center mb-6">
+                        <Lock className="w-12 h-12 text-ink-soft mx-auto mb-3" />
+                        <h1 className="text-xl font-bold text-ink">This contest is private</h1>
+                        <p className="text-sm text-muted-soft mt-2">
+                            Enter the contest password to open the problems and submit.
+                        </p>
+                    </div>
+                    <form
+                        onSubmit={e => { e.preventDefault(); void submitUnlock() }}
+                        className="space-y-3"
+                    >
+                        <input
+                            type="password"
+                            aria-label="Contest password"
+                            autoFocus
+                            value={unlockPassword}
+                            onChange={e => setUnlockPassword(e.target.value)}
+                            placeholder="Contest password"
+                            className="w-full border border-hairline-strong rounded-lg px-3 py-2 text-sm focus:ring-2 focus-visible:outline-[var(--ring)] focus:border-brand"
+                        />
+                        {unlockError && <p className="text-sm text-danger">{unlockError}</p>}
+                        <button
+                            type="submit"
+                            disabled={unlocking || !unlockPassword}
+                            className="w-full bg-brand text-on-brand rounded-lg px-4 py-2 text-sm font-medium disabled:opacity-50"
+                        >
+                            {unlocking ? 'Unlocking...' : 'Unlock contest'}
+                        </button>
+                    </form>
+                </div>
+            )
+        }
+
         return (
             <EmptyState
                 icon={<AlertTriangle className="w-12 h-12 text-ink-soft" />}

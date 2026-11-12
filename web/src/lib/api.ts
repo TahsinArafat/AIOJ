@@ -913,6 +913,13 @@ export const api = {
             request(`/contests/${id}/submit`, { method: 'POST' }),
 
         get: (id: string) => request<ContestDetailResponse>(`/contests/${id}`),
+        /**
+         * Redeem a private round's password for access. 204 on success; the grant is
+         * what the server checks on every later read and on submit, so this only has
+         * to be called once.
+         */
+        unlock: (id: string, password: string) =>
+            request(`/contests/${id}/unlock`, { method: 'POST', body: JSON.stringify({ password }) }),
         create: (d: unknown) => request<Contest>('/contests', { method: 'POST', body: JSON.stringify(d) }),
         getFormats: () => request<{ formats: string[] }>('/contests/formats'),
         scoreboard: (id: string, view?: string, page?: number) => {

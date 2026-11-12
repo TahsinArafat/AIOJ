@@ -33,9 +33,11 @@ type Deps struct {
 	// Open Graph tags. nginx routes social-network user agents to it, because
 	// those crawlers do not execute JavaScript and so never see the SPA's
 	// client-set page title.
-	Meta           *handler.MetaHandler
-	Submission     *handler.SubmissionHandler
-	Contest        *handler.ContestHandler
+	Meta       *handler.MetaHandler
+	Submission *handler.SubmissionHandler
+	Contest    *handler.ContestHandler
+	// ContestUnlock redeems a round's password for an access grant.
+	ContestUnlock  *handler.ContestUnlockHandler
 	ContestProblem *handler.ContestProblemHandler
 	// ContestAdjustment is the jury's manual-correction ledger for standings.
 	ContestAdjustment *handler.ContestAdjustmentHandler

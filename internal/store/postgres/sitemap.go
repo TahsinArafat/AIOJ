@@ -67,10 +67,16 @@ func (s *SitemapStore) PublicProblems(ctx context.Context, origin string) ([]Sit
 func (s *SitemapStore) PublicContests(ctx context.Context, origin string) ([]SitemapEntry, error) {
 	// contests has created_at but no updated_at, so the timestamp comes from
 	// created_at alone. (The problems table does have updated_at.)
+	// A sitemap is submitted to search engines and is served to anonymous crawlers,
+	// so it may only contain rounds that need no invitation. The previous query
+	// filtered on visible alone and published password-protected contest URLs to
+	// crawlers, from a method whose own comment claimed otherwise.
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT slug, created_at
 		   FROM contests
 		  WHERE visible = true
+		    AND password_hash = ''
+		    AND NOT EXISTS (SELECT 1 FROM group_contests gc WHERE gc.contest_id = contests.id)
 		  ORDER BY created_at DESC
 		  LIMIT 50000`)
 	if err != nil {

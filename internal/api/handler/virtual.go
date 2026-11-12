@@ -12,6 +12,9 @@ import (
 )
 
 type VirtualHandler struct {
+	// contestHandlerAccess carries the shared contest access policy, so this
+	// handler asks the same object every other surface asks.
+	contestHandlerAccess
 	service      *virtual.Service
 	virtualStore *postgres.VirtualStore
 	// contestStore is needed to refuse starting a virtual contest on a contest
@@ -19,8 +22,17 @@ type VirtualHandler struct {
 	contestStore *postgres.ContestStore
 }
 
+// WithGrants attaches the password-entitlement store and rebuilds the access
+// policy so it can consult it. Returns the handler for call-site chaining.
+func (h *VirtualHandler) WithGrants(gs *postgres.ContestGrantStore) *VirtualHandler {
+	h.rebuildWithGrants(h.contestStore, gs)
+	return h
+}
+
 func NewVirtualHandler(s *virtual.Service, vs *postgres.VirtualStore, cs *postgres.ContestStore) *VirtualHandler {
-	return &VirtualHandler{service: s, virtualStore: vs, contestStore: cs}
+	h := &VirtualHandler{service: s, virtualStore: vs, contestStore: cs}
+	h.access = newContestAccessPolicy(cs, nil)
+	return h
 }
 
 func (h *VirtualHandler) Start(w http.ResponseWriter, r *http.Request) {
@@ -43,7 +55,11 @@ func (h *VirtualHandler) Start(w http.ResponseWriter, r *http.Request) {
 	// caller cannot read would hand them its problem set, so the contest has to be
 	// readable first — same rule as every other contest read.
 	contest, err := h.contestStore.GetByID(r.Context(), req.ContestID)
-	if err != nil || contest == nil || !canReadContest(r.Context(), h.contestStore, contest, claims) {
+	if err != nil || contest == nil {
+		http.Error(w, "contest not found", http.StatusNotFound)
+		return
+	}
+	if decision, derr := h.access.Decide(r.Context(), contest, claims); derr != nil || !decision.Allowed() {
 		http.Error(w, "contest not found", http.StatusNotFound)
 		return
 	}

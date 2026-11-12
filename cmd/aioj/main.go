@@ -221,10 +221,20 @@ func main() {
 	}
 	atcoderSubmit := vjudge.NewAtCoderSubmitClient(atcoderSubmitURL)
 
-	submissionH := handler.NewSubmissionHandler(submissionStore, problemStore, contestStore, judgeQueue, wsManager, execClient, cfg.LangDir, vjService, userStore)
+	// Grants is the password-entitlement store. Every handler that reads or writes
+	// contest data is given it, so an unlocked round is openable on all of them;
+	// a handler left on the default nil checker would fail closed on a password
+	// round (safe, but the contestant could never get in).
+	contestGrantStore := postgres.NewContestGrantStore(db)
+
+	submissionH := handler.NewSubmissionHandler(submissionStore, problemStore, contestStore, judgeQueue, wsManager, execClient, cfg.LangDir, vjService, userStore).
+		WithGrants(contestGrantStore)
 	teamStore := postgres.NewTeamStore(db)
-	contestH := handler.NewContestHandler(contestStore, ratingStore, problemStore, userStore, teamStore)
-	contestProblemH := handler.NewContestProblemHandler(contestStore, problemStore)
+	contestH := handler.NewContestHandler(contestStore, ratingStore, problemStore, userStore, teamStore).
+		WithGrants(contestGrantStore)
+	contestProblemH := handler.NewContestProblemHandler(contestStore, problemStore).
+		WithGrants(contestGrantStore)
+	contestUnlockH := handler.NewContestUnlockHandler(contestStore, contestGrantStore)
 
 	platforms := []string{"codeforces", "atcoder", "cses", "toph", "qoj"}
 	for _, platform := range platforms {
@@ -284,9 +294,11 @@ func main() {
 	registrationH := handler.NewRegistrationHandler(registrationStore, contestStore)
 	virtualStore := postgres.NewVirtualStore(db)
 	virtualService := virtual.NewService(virtualStore)
-	virtualH := handler.NewVirtualHandler(virtualService, virtualStore, contestStore)
+	virtualH := handler.NewVirtualHandler(virtualService, virtualStore, contestStore).
+		WithGrants(contestGrantStore)
 	gymStore := postgres.NewGymStore(db)
-	gymH := handler.NewGymHandler(gymStore, contestStore)
+	gymH := handler.NewGymHandler(gymStore, contestStore).
+		WithGrants(contestGrantStore)
 	hackStore := postgres.NewHackStore(db)
 	hackService := hack.NewService(hackStore, contestStore, submissionStore).
 		WithJudge(problemStore, hack.NewJudge(execClient, cfg.LangDir))
@@ -308,12 +320,14 @@ func main() {
 	// The dispatcher is attached to the review handlers below, once webhookStore
 	// exists. (Instantiated at its own creation site.)
 	groupStore := postgres.NewGroupStore(db)
-	groupH := handler.NewGroupHandler(groupStore, userStore, contestStore)
+	groupH := handler.NewGroupHandler(groupStore, userStore, contestStore).
+		WithGrants(contestGrantStore)
 	teamH := handler.NewTeamHandler(teamStore, userStore)
 	blogStore := postgres.NewBlogStore(db)
 	blogH := handler.NewBlogHandler(blogStore)
 	editorialStore := postgres.NewEditorialStore(db)
-	editorialH := handler.NewEditorialHandler(editorialStore, problemStore, contestStore)
+	editorialH := handler.NewEditorialHandler(editorialStore, problemStore, contestStore).
+		WithGrants(contestGrantStore)
 	apiKeyStore := postgres.NewAPIKeyStore(db)
 	apiKeyH := handler.NewAPIKeyHandler(apiKeyStore)
 	webhookStore := postgres.NewWebhookStore(db)
@@ -816,6 +830,7 @@ func main() {
 		}(),
 		Submission:        submissionH,
 		Contest:           contestH,
+		ContestUnlock:     contestUnlockH,
 		ContestProblem:    contestProblemH,
 		ContestAdjustment: contestAdjH,
 		VJudge:            vjH,

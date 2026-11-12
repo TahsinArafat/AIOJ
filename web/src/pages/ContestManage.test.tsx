@@ -2,6 +2,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, expect, test, vi } from 'vitest'
 import { ChallengesTab } from './ContestManage'
+import { contestVisibilityPayload } from '../lib/contestVisibility'
 import { ToastProvider } from '../components/Toast'
 import { ConfirmProvider } from '../components/ConfirmDialog'
 
@@ -141,4 +142,32 @@ test('empty challenge list points at the Add Problem flow', async () => {
     expect(
         screen.getByText('Use Add Problem to build the contest challenge list.')
     ).toBeInTheDocument()
+})
+
+/**
+ * The reported bug began here: "Private (Password/Invite required)" saved with
+ * visible: true, so the round was listed publicly. These pin the pairing.
+ */
+test('a private contest is saved hidden and keeps its password', () => {
+    const payload = contestVisibilityPayload({ visibility: 'private', password: 'hunter2', group_id: '' })
+    expect(payload.visible).toBe(false)
+    expect(payload.password).toBe('hunter2')
+    expect(payload.group_id).toBe('')
+})
+
+test('switching a private contest back to public clears the password', () => {
+    const payload = contestVisibilityPayload({ visibility: 'public', password: 'hunter2', group_id: '' })
+    expect(payload.visible).toBe(true)
+    expect(payload.password).toBe('')
+})
+
+test('a private contest with a blank field leaves the stored password alone', () => {
+    const payload = contestVisibilityPayload({ visibility: 'private', password: '   ', group_id: '' })
+    expect(payload.password).toBeUndefined()
+})
+
+test('a group contest is visible but scoped to the group', () => {
+    const payload = contestVisibilityPayload({ visibility: 'group', password: '', group_id: 'g1' })
+    expect(payload.visible).toBe(true)
+    expect(payload.group_id).toBe('g1')
 })

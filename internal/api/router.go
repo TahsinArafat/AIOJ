@@ -19,6 +19,7 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 	problemI18nH := d.ProblemI18n
 	submissionH := d.Submission
 	contestH := d.Contest
+	contestUnlockH := d.ContestUnlock
 	contestProblemH := d.ContestProblem
 	contestAdjH := d.ContestAdjustment
 	vjudgeH := d.VJudge
@@ -382,6 +383,11 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 		r.With(middleware.OptionalAuthMiddleware(jwtManager)).Get("/{id}/scoreboard", contestH.Scoreboard)
 		r.With(middleware.OptionalAuthMiddleware(jwtManager)).Get("/{id}/stats", contestH.ContestStats)
 		r.With(middleware.OptionalAuthMiddleware(jwtManager)).Get("/{contestId}/problems/{index}", contestProblemH.GetByIndex)
+		// Unlock is a credential check, so it gets StrictAuth: it is the one contest
+		// endpoint a stranger would hammer to guess a round's password, and bcrypt
+		// alone does not stop an online guessing loop. Mirrors the onsite-login
+		// route further down.
+		r.With(middleware.AuthMiddleware(jwtManager), rl.StrictAuth).Post("/{id}/unlock", contestUnlockH.Unlock)
 		// The booklet is opened by a browser navigation: public for a published
 		// round, staff-only for a draft. A navigation cannot set an Authorization
 		// header, so this prefix accepts ?token= — the same facade the backup

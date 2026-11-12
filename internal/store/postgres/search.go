@@ -74,16 +74,21 @@ func (s *SearchStore) SearchUsers(ctx context.Context, query string, limit int) 
 	return items, nil
 }
 
-func (s *SearchStore) SearchContests(ctx context.Context, query string, limit int) ([]model.Contest, error) {
+// SearchContests is the contest half of global search, as one caller sees it.
+//
+// It used to list every visible round by title, so searching any word surfaced the
+// title of invite-only rounds — enumerable by anybody, without a grant.
+func (s *SearchStore) SearchContests(ctx context.Context, query string, limit int, viewerID string) ([]model.Contest, error) {
+	visibility := fmt.Sprintf(contestVisibilityPredicate, 3, 3, 3, 3, 3, 3)
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, display_id, slug, title, type, start_time, end_time, visible, description,
 		        registration_required, registration_deadline, max_participants, division,
 		        created_by, created_at
 		 FROM contests
-		 WHERE visible = true AND title ILIKE '%' || $1 || '%'
+		 WHERE visible = true AND title ILIKE '%' || $1 || '%' AND `+visibility+`
 		 ORDER BY title
 		 LIMIT $2`,
-		query, limit)
+		query, limit, viewerID)
 	if err != nil {
 		return nil, err
 	}
@@ -115,7 +120,10 @@ type SearchResult struct {
 	Contests []model.Contest         `json:"contests"`
 }
 
-func (s *SearchStore) SearchAll(ctx context.Context, query string, limit int) (*SearchResult, error) {
+// SearchAll runs every search kind for one caller. viewerID is "" for anonymous,
+// and it is threaded through to the contest half because an invite-only round's
+// title must not be discoverable by someone who has not unlocked it.
+func (s *SearchStore) SearchAll(ctx context.Context, query string, limit int, viewerID string) (*SearchResult, error) {
 	problems, err := s.SearchProblems(ctx, query, limit)
 	if err != nil {
 		return nil, err
@@ -126,7 +134,7 @@ func (s *SearchStore) SearchAll(ctx context.Context, query string, limit int) (*
 		return nil, err
 	}
 
-	contests, err := s.SearchContests(ctx, query, limit)
+	contests, err := s.SearchContests(ctx, query, limit, viewerID)
 	if err != nil {
 		return nil, err
 	}

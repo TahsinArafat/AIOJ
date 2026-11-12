@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { api, getAccessToken } from '../lib/api'
 import { errorMessage } from '../lib/errors'
+import { contestVisibilityPayload } from '../lib/contestVisibility'
 import { PageHeader } from '../components/ui/PageHeader'
 import { useTheme } from '../context/ThemeContext'
 import {
@@ -1119,9 +1120,7 @@ function SettingsTab({ contestId }: { contestId: string }) {
                 start_time: localInputToIso(form.start_time),
                 end_time: localInputToIso(form.end_time),
                 freeze_time: localInputToIso(form.freeze_time),
-                visible: true,
-                password: form.visibility === 'private' ? (form.password.trim() || undefined) : '',
-                group_id: form.visibility === 'group' ? form.group_id : '',
+                ...contestVisibilityPayload(form),
                 pdf_enabled: form.pdf_enabled,
                 statement_hidden: form.statement_hidden,
                 upsolving_enabled: form.upsolving_enabled,

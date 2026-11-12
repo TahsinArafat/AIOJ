@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/tahsinarafat/aioj/internal/api/middleware"
 	"github.com/tahsinarafat/aioj/internal/model"
 	"github.com/tahsinarafat/aioj/internal/store"
+	"github.com/tahsinarafat/aioj/internal/store/postgres"
 )
 
 // contestProblemStore is the slice of the contest store this handler needs.
@@ -17,20 +17,34 @@ import (
 type contestProblemStore interface {
 	GetByID(ctx context.Context, id string) (*model.Contest, error)
 	HasAccess(ctx context.Context, contestID, userID string, requiredLevels ...string) bool
+	CheckGroupRestriction(ctx context.Context, contestID, userID string) (bool, error)
 	GetContestProblemByIndex(ctx context.Context, contestID, index string) (*model.Problem, error)
 	IsParticipant(ctx context.Context, contestID, userID string) (bool, error)
 }
 
 type ContestProblemHandler struct {
+	contestHandlerAccess
 	contestStore contestProblemStore
 	problemStore store.ProblemStore
 }
 
+// WithGrants attaches the password-entitlement store and rebuilds the access
+// policy so it can consult it. Returns the handler for call-site chaining.
+func (h *ContestProblemHandler) WithGrants(gs *postgres.ContestGrantStore) *ContestProblemHandler {
+	h.rebuildWithGrants(h.contestStore, gs)
+	return h
+}
+
 func NewContestProblemHandler(cs contestProblemStore, ps store.ProblemStore) *ContestProblemHandler {
-	return &ContestProblemHandler{
+	h := &ContestProblemHandler{
 		contestStore: cs,
 		problemStore: ps,
 	}
+	// The store interface here is the narrow one, which carries both questions the
+	// policy asks (HasAccess and CheckGroupRestriction), so no extra dependency is
+	// needed to build the policy.
+	h.access = newContestAccessPolicy(cs, nil)
+	return h
 }
 
 func (h *ContestProblemHandler) GetByIndex(w http.ResponseWriter, r *http.Request) {
@@ -44,12 +58,16 @@ func (h *ContestProblemHandler) GetByIndex(w http.ResponseWriter, r *http.Reques
 	}
 
 	now := time.Now()
-	claims := middleware.GetUserClaims(r)
 
-	if !canReadContest(r.Context(), h.contestStore, contest, claims) {
-		http.Error(w, "forbidden", http.StatusForbidden)
+	// The statement is the surface that leaked most: this check used to be the
+	// visible/started rule only, so a group-restricted or password-protected round
+	// handed its problems to anyone who knew the id. 404 rather than 403 so a draft
+	// is not confirmed to exist.
+	viewer, ok := h.requireContestAccess(w, r, contest, true)
+	if !ok {
 		return
 	}
+	claims := viewer.claims
 
 	problem, err := h.contestStore.GetContestProblemByIndex(r.Context(), contest.ID, index)
 	if err != nil || problem == nil {
@@ -74,7 +92,7 @@ func (h *ContestProblemHandler) GetByIndex(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	isJudge := claims != nil && (claims.Role == "admin" || h.contestStore.HasAccess(r.Context(), contest.ID, claims.UserID, "manager", "judge"))
+	isJudge := viewer.decision.IsJudge()
 
 	// Difficulty, rating, tags, the hint and the solve counts stay hidden until
 	// every contest using this problem is over, the way Codeforces reveals tags

@@ -13,14 +13,26 @@ import (
 )
 
 type GymHandler struct {
+	// contestHandlerAccess carries the shared contest access policy, so this
+	// handler asks the same object every other surface asks.
+	contestHandlerAccess
 	store *postgres.GymStore
 	// contestStore is needed to answer "may this caller see the contest this gym
 	// points at" — the check the handler shipped without.
 	contestStore store.ContestStore
 }
 
+// WithGrants attaches the password-entitlement store and rebuilds the access
+// policy so it can consult it. Returns the handler for call-site chaining.
+func (h *GymHandler) WithGrants(gs *postgres.ContestGrantStore) *GymHandler {
+	h.rebuildWithGrants(h.contestStore, gs)
+	return h
+}
+
 func NewGymHandler(s *postgres.GymStore, cs store.ContestStore) *GymHandler {
-	return &GymHandler{store: s, contestStore: cs}
+	h := &GymHandler{store: s, contestStore: cs}
+	h.access = newContestAccessPolicy(cs, nil)
+	return h
 }
 
 func (h *GymHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -46,7 +58,11 @@ func (h *GymHandler) Create(w http.ResponseWriter, r *http.Request) {
 	// and slug through the gym list. Gyms stay auto-approved (no review queue):
 	// the guard is on the contest, not on the gym.
 	contest, err := h.contestStore.GetByID(r.Context(), req.ContestID)
-	if err != nil || contest == nil || !canReadContest(r.Context(), h.contestStore, contest, claims) {
+	if err != nil || contest == nil {
+		http.Error(w, "contest not found", http.StatusNotFound)
+		return
+	}
+	if decision, derr := h.access.Decide(r.Context(), contest, claims); derr != nil || !decision.Allowed() {
 		// 404 rather than 403 so gym creation is not an oracle for which private
 		// contest ids exist.
 		http.Error(w, "contest not found", http.StatusNotFound)

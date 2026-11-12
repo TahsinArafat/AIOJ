@@ -26,6 +26,9 @@ func (s *contestStub) GetByID(_ context.Context, _ string) (*model.Contest, erro
 	return s.contest, nil
 }
 func (s *contestStub) HasAccess(_ context.Context, _, _ string, _ ...string) bool { return s.judge }
+func (s *contestStub) CheckGroupRestriction(context.Context, string, string) (bool, error) {
+	return true, nil
+}
 func (s *contestStub) GetContestProblemByIndex(_ context.Context, _, _ string) (*model.Problem, error) {
 	return s.problem, nil
 }

@@ -77,6 +77,10 @@ func (c *scoreboardCache) invalidate(contestID string) {
 }
 
 type ContestHandler struct {
+	// contestHandlerAccess embeds the shared access policy. ContestHandler
+	// satisfies contestAccessStore directly (it holds the contest store), so the
+	// policy is built in NewContestHandler.
+	contestHandlerAccess
 	store        *postgres.ContestStore
 	ratingStore  *postgres.RatingStore
 	problemStore store.ProblemStore
@@ -94,6 +98,10 @@ type ContestHandler struct {
 	// with no token the endpoint answers 503 rather than exposing the feed.
 	feedStore feedLister
 	feedToken string
+	// grants is the password-entitlement store. Optional so tests can build the
+	// handler without one; a nil store means no round can be unlocked, which
+	// fails closed for password-protected contests.
+	grants *postgres.ContestGrantStore
 }
 
 // WithFeed enables the event feed. An empty token leaves it disabled.
@@ -116,7 +124,18 @@ func (h *ContestHandler) WithNotifier(n *notify.Notifier) *ContestHandler {
 }
 
 func NewContestHandler(s *postgres.ContestStore, rs *postgres.RatingStore, ps store.ProblemStore, us store.UserStore, ts store.TeamStore) *ContestHandler {
-	return &ContestHandler{store: s, ratingStore: rs, problemStore: ps, userStore: us, teamStore: ts, cache: newScoreboardCache(30 * time.Second)}
+	h := &ContestHandler{store: s, ratingStore: rs, problemStore: ps, userStore: us, teamStore: ts, cache: newScoreboardCache(30 * time.Second)}
+	h.access = newContestAccessPolicy(s, nil)
+	return h
+}
+
+// WithGrants attaches the password-entitlement store and rebuilds the access
+// policy so it can consult it. Returns the handler for call-site chaining, matching
+// WithAdjustments/WithFeed/WithNotifier.
+func (h *ContestHandler) WithGrants(gs *postgres.ContestGrantStore) *ContestHandler {
+	h.grants = gs
+	h.access = newContestAccessPolicy(h.store, gs)
+	return h
 }
 
 // WithAdjustments attaches the manual-correction ledger and returns the handler,
@@ -219,9 +238,13 @@ func (h *ContestHandler) Create(w http.ResponseWriter, r *http.Request) {
 		formatConfigJSON = f.DefaultConfig()
 	}
 
-	password := ""
-	if req.Password != nil {
-		password = *req.Password
+	// The password is hashed at the boundary, exactly once, and only the hash goes
+	// any further. Before this the plaintext was stored and never compared to
+	// anything, so a "password protected" round was readable by anyone.
+	passwordHash, err := hashContestPassword(req.Password)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 
 	c := &model.Contest{
@@ -234,7 +257,7 @@ func (h *ContestHandler) Create(w http.ResponseWriter, r *http.Request) {
 		StartTime:            req.StartTime,
 		EndTime:              req.EndTime,
 		FreezeTime:           req.FreezeTime,
-		Password:             password,
+		PasswordHash:         passwordHash,
 		Description:          req.Description,
 		Status:               initialContestStatus(claims.Role),
 		Visible:              claims.Role == "admin",
@@ -289,34 +312,36 @@ func (h *ContestHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	claims := middleware.GetUserClaims(r)
+	// One gate replaces the three hand-written ones that used to live here (group
+	// membership, visible/started, and clearing the password field). They were
+	// enforced here and nowhere else, which is why the statements, the booklet, the
+	// standings and submit stayed open on a round this function refused.
+	//
+	// This one surface asks for the *shell*: an upcoming round must render its
+	// title, its times and a countdown, and refusing it here is what showed
+	// "Contest not found" on a contest that existed and had merely not begun.
+	viewer, ok := h.requireContestShellAccess(w, r, c, false)
+	if !ok {
+		return
+	}
+	claims := viewer.claims
 	userID := ""
 	if claims != nil {
 		userID = claims.UserID
 	}
-
-	allowed, err := h.store.CheckGroupRestriction(r.Context(), c.ID, userID)
-	if err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-	isManager := claims != nil && (claims.Role == "admin" || h.store.HasAccess(r.Context(), c.ID, claims.UserID, "manager", "tester", "judge"))
-	if !allowed && !isManager {
-		http.Error(w, "forbidden: restricted to group members", http.StatusForbidden)
-		return
-	}
-
+	isManager := viewer.decision.IsStaff()
+	upcoming := viewer.decision.IsUpcoming()
 	now := time.Now()
-	if !c.Visible || now.Before(c.StartTime) {
-		if claims == nil || !isManager {
-			http.Error(w, "forbidden", http.StatusForbidden)
-			return
-		}
+
+	// The problem list is part of the round's content, not its shell, so it waits
+	// for the start. Titles and letters are exactly what a round keeps secret
+	// before it opens, and it would be incoherent to publish them while every
+	// statement behind them refuses to open. An empty slice, not nil, so the wire
+	// shape stays the same for a client that expects a list.
+	problems := []model.ContestProblem{}
+	if !upcoming {
+		problems, _ = h.store.GetProblems(r.Context(), c.ID)
 	}
-	if !isManager {
-		c.Password = ""
-	}
-	problems, _ := h.store.GetProblems(r.Context(), c.ID)
 
 	// Per-problem solve state for the problem list: a green tick for the problems
 	// this viewer has solved, and the round-wide solve count so they can see what
@@ -346,6 +371,16 @@ func (h *ContestHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 
 	ratings, _ := h.ratingStore.GetByContest(r.Context(), c.ID)
 	c.RatingCalculated = len(ratings) > 0
+
+	// An upcoming round reports that it has no password, whatever the truth is.
+	// The policy deliberately answers "not started" before it looks at the
+	// password, so that a round which has not begun does not reveal whether it is
+	// invite-only — and this field would give that away in the shell. Staff are
+	// unaffected: they are granted at an earlier step, so `upcoming` is false for
+	// them and the setter workspace still sees the real value.
+	if upcoming && !isManager {
+		c.HasPassword = false
+	}
 	respondJSON(w, http.StatusOK, map[string]interface{}{"contest": c, "problems": problems})
 }
 
@@ -364,7 +399,14 @@ func (h *ContestHandler) List(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	items, total, _ := h.store.ListWithDivision(r.Context(), offset, limit, division)
+	// The listing is viewer-aware: an invite-only or group-restricted round is
+	// omitted unless this caller is entitled to it. Anonymous callers have no
+	// grants, so they simply do not see such rounds.
+	viewerID := ""
+	if claims := middleware.GetUserClaims(r); claims != nil {
+		viewerID = claims.UserID
+	}
+	items, total, _ := h.store.ListForViewer(r.Context(), offset, limit, division, viewerID)
 	respondJSON(w, http.StatusOK, map[string]interface{}{"data": items, "total": total})
 }
 
@@ -408,8 +450,24 @@ func (h *ContestHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if req.FreezeTime != nil {
 		c.FreezeTime = req.FreezeTime
 	}
+	// Password semantics on update, matching every other optional field here:
+	// nil means "leave it alone", "" means "remove the password" (which also drops
+	// the grants, or the round would stay readable to whoever unlocked the old
+	// secret), anything else is a new password and invalidates the old grants.
+	passwordChanged := false
 	if req.Password != nil {
-		c.Password = *req.Password
+		if *req.Password == "" {
+			passwordChanged = c.PasswordHash != ""
+			c.PasswordHash = ""
+		} else {
+			hash, herr := hashContestPassword(req.Password)
+			if herr != nil {
+				http.Error(w, herr.Error(), http.StatusBadRequest)
+				return
+			}
+			passwordChanged = true
+			c.PasswordHash = hash
+		}
 	}
 	if req.Description != "" {
 		c.Description = req.Description
@@ -450,6 +508,15 @@ func (h *ContestHandler) Update(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "update failed", http.StatusInternalServerError)
 		return
 	}
+	// Grants were proof of the OLD secret. Revoking them is what makes rotating the
+	// password meaningful: everyone who knew the previous one is back outside.
+	if passwordChanged && h.grants != nil {
+		if err := h.grants.RevokeAll(r.Context(), c.ID); err != nil {
+			http.Error(w, "password saved but revoking previous access failed", http.StatusInternalServerError)
+			return
+		}
+	}
+	h.cache.invalidate(c.ID)
 	respondJSON(w, http.StatusOK, c)
 }
 
@@ -483,14 +550,14 @@ func (h *ContestHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	now := time.Now()
-	claims := middleware.GetUserClaims(r)
-
-	if !canReadContest(r.Context(), h.store, contest, claims) {
-		http.Error(w, "forbidden", http.StatusForbidden)
+	viewer, ok := h.requireContestAccess(w, r, contest, false)
+	if !ok {
 		return
 	}
-
-	isJudge := claims != nil && (claims.Role == "admin" || h.store.HasAccess(r.Context(), contest.ID, claims.UserID, "manager", "judge"))
+	// IsJudge, not IsStaff: a tester may open the round but must not see past the
+	// freeze or be labelled a judge. That distinction was in the original condition
+	// (manager|judge) and is preserved here deliberately.
+	isJudge := viewer.decision.IsJudge()
 	canSeeJudge := isJudge // preserve original capability before view override
 
 	// Allow admins/judges to explicitly request the public (frozen) view via ?view=public
@@ -1146,7 +1213,6 @@ func (h *ContestHandler) RemoveProblem(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ContestHandler) DownloadPDF(w http.ResponseWriter, r *http.Request) {
-	claims := middleware.GetUserClaims(r)
 	id := chi.URLParam(r, "id")
 
 	contest, err := h.store.GetByID(r.Context(), id)
@@ -1155,16 +1221,16 @@ func (h *ContestHandler) DownloadPDF(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	isJudge := claims != nil && (claims.Role == "admin" || h.store.HasAccess(r.Context(), contest.ID, claims.UserID, "manager", "judge"))
-
-	// A PDF is the whole round's statements in one file, so it needs the same
-	// guard the contest page has and this endpoint shipped without: an
-	// unpublished or not-yet-started contest must not hand its statements to an
-	// anonymous visitor just because statement_hidden defaults to false.
-	if !canReadContest(r.Context(), h.store, contest, claims) {
-		http.Error(w, "contest not found", http.StatusNotFound)
+	// A PDF is the whole round's statements in one file, so it needs the same guard
+	// the contest page has and this endpoint shipped without: an unpublished or
+	// not-yet-started contest must not hand its statements to an anonymous visitor
+	// just because statement_hidden defaults to false. Answering 404 (not 403) keeps
+	// a draft's existence unconfirmed.
+	viewer, ok := h.requireContestAccess(w, r, contest, true)
+	if !ok {
 		return
 	}
+	isJudge := viewer.decision.IsJudge()
 
 	if (contest.StatementHidden || !contest.PDFEnabled) && !isJudge {
 		http.Error(w, "PDF generation is disabled or hidden for this contest", http.StatusForbidden)
@@ -1211,9 +1277,7 @@ func (h *ContestHandler) ContestStats(w http.ResponseWriter, r *http.Request) {
 	// Per-problem stats carry the problem title, so the contest's own visibility
 	// has to be checked here too — "public like the scoreboard" is only true once
 	// the round is public.
-	claims := middleware.GetUserClaims(r)
-	if !canReadContest(r.Context(), h.store, contest, claims) {
-		http.Error(w, "not found", http.StatusNotFound)
+	if _, ok := h.requireContestAccess(w, r, contest, true); !ok {
 		return
 	}
 

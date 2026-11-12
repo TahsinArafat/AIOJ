@@ -18,6 +18,7 @@ import (
 	"github.com/tahsinarafat/aioj/internal/model"
 	"github.com/tahsinarafat/aioj/internal/queue"
 	"github.com/tahsinarafat/aioj/internal/store"
+	"github.com/tahsinarafat/aioj/internal/store/postgres"
 	"github.com/tahsinarafat/aioj/internal/vjudge"
 )
 
@@ -35,6 +36,11 @@ const (
 )
 
 type SubmissionHandler struct {
+	// contestHandlerAccess carries the shared contest access policy. Submit is the
+	// surface the exploit actually hit: the password and group gates were simply
+	// absent here, so a contestant could post a solution to a round they could not
+	// even read.
+	contestHandlerAccess
 	subStore     store.SubmissionStore
 	probStore    store.ProblemStore
 	contestStore store.ContestStore
@@ -64,11 +70,20 @@ func (h *SubmissionHandler) WithAudit(a *AuditLogHandler) *SubmissionHandler {
 	return h
 }
 
+// WithGrants attaches the password-entitlement store and rebuilds the access
+// policy so it can consult it. Returns the handler for call-site chaining.
+func (h *SubmissionHandler) WithGrants(gs *postgres.ContestGrantStore) *SubmissionHandler {
+	h.rebuildWithGrants(h.contestStore, gs)
+	return h
+}
+
 func NewSubmissionHandler(sub store.SubmissionStore, prob store.ProblemStore, contest store.ContestStore,
 	q queue.JudgeQueue, ws *WSManager, exec *executor.Client, langDir string, vjSvc *vjudge.Service,
 	users store.UserStore) *SubmissionHandler {
-	return &SubmissionHandler{subStore: sub, probStore: prob, contestStore: contest, queue: q, wsManager: ws, exec: exec, langDir: langDir, vjudgeSvc: vjSvc, users: users,
+	h := &SubmissionHandler{subStore: sub, probStore: prob, contestStore: contest, queue: q, wsManager: ws, exec: exec, langDir: langDir, vjudgeSvc: vjSvc, users: users,
 		submitQuota: newSubmissionQuota(), runQuota: newRunQuota()}
+	h.access = newContestAccessPolicy(contest, nil)
+	return h
 }
 
 // loadLangs returns the cached language map, initialising it on first call.
@@ -289,6 +304,18 @@ func (h *SubmissionHandler) Create(w http.ResponseWriter, r *http.Request) {
 		}
 		req.ContestID = contest.ID
 
+		// The gate that was missing entirely. Time-window and registration checks
+		// below only decide whether a submitter is *eligible*; they say nothing about
+		// whether this caller is allowed in the round at all. Without this, a
+		// password-protected or group-restricted contest accepted submissions from
+		// anyone who knew its id - the exploit that was reported.
+		//
+		// Decided before the isJudge test on purpose: staff bypassing the time window
+		// is a separate rule, and a denied caller must be refused regardless of it.
+		if err := h.requireContestSubmissionAccess(w, r, contest); err != nil {
+			return
+		}
+
 		now := time.Now()
 		if now.After(contest.StartTime) && now.Before(contest.EndTime) {
 			isJudge := claims.Role == "admin" || contest.CreatedBy == claims.UserID || h.contestStore.HasAccess(r.Context(), contest.ID, claims.UserID, "manager", "judge", "tester")
@@ -379,6 +406,12 @@ func (h *SubmissionHandler) CreateUpsolving(w http.ResponseWriter, r *http.Reque
 	contest, err := h.contestStore.GetByID(r.Context(), req.ContestID)
 	if err != nil || contest == nil {
 		http.Error(w, "contest not found", http.StatusNotFound)
+		return
+	}
+	// /run is a free compile-and-execute against the round's problems, so it needs
+	// the same gate as submit: unlocking the round is what makes a contest problem
+	// actionable.
+	if err := h.requireContestSubmissionAccess(w, r, contest); err != nil {
 		return
 	}
 	req.ContestID = contest.ID
@@ -915,4 +948,33 @@ func (h *SubmissionHandler) RecheckRemote(w http.ResponseWriter, r *http.Request
 	}
 
 	respondJSON(w, http.StatusOK, map[string]string{"status": "refreshing"})
+}
+
+// requireContestSubmissionAccess decides whether the caller may act on a contest
+// problem at all (submit, or /run it). It writes the response and returns an error
+// when access is refused, so callers just `if err != nil { return }`.
+//
+// Kept separate from requireContestAccess because a refused submission has to
+// distinguish "unlock it" from "forbidden": a contestant who simply has not typed
+// the password yet needs a 403 password_required so the UI can prompt, whereas a
+// non-member of a restricted group gets a flat refusal they cannot act on.
+func (h *SubmissionHandler) requireContestSubmissionAccess(w http.ResponseWriter, r *http.Request, contest *model.Contest) error {
+	decision, err := h.access.Decide(r.Context(), contest, middleware.GetUserClaims(r))
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return err
+	}
+	switch {
+	case decision.Allowed():
+		return nil
+	case decision.NeedsPassword():
+		respondJSON(w, http.StatusForbidden, map[string]string{
+			"error": "password_required",
+			"code":  "password_required",
+		})
+		return errContestAccessDenied
+	default:
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return errContestAccessDenied
+	}
 }

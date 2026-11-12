@@ -13,7 +13,7 @@ import (
 // searchStore is the one method this handler uses, so the redaction below can be
 // tested without a database.
 type searchStore interface {
-	SearchAll(ctx context.Context, query string, limit int) (*postgres.SearchResult, error)
+	SearchAll(ctx context.Context, query string, limit int, viewerID string) (*postgres.SearchResult, error)
 }
 
 type SearchHandler struct {
@@ -36,7 +36,11 @@ func (h *SearchHandler) Search(w http.ResponseWriter, r *http.Request) {
 		limit = 10
 	}
 
-	result, err := h.searchStore.SearchAll(r.Context(), query, limit)
+	viewerID := ""
+	if claims := middleware.GetUserClaims(r); claims != nil {
+		viewerID = claims.UserID
+	}
+	result, err := h.searchStore.SearchAll(r.Context(), query, limit, viewerID)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return

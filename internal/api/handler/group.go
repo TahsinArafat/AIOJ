@@ -13,6 +13,9 @@ import (
 )
 
 type GroupHandler struct {
+	// contestHandlerAccess carries the shared contest access policy, so this
+	// handler asks the same object every other surface asks.
+	contestHandlerAccess
 	store     *postgres.GroupStore
 	userStore store.UserStore
 	// contestStore answers "may this group's manager see the contest they are
@@ -21,8 +24,17 @@ type GroupHandler struct {
 	contestStore store.ContestStore
 }
 
+// WithGrants attaches the password-entitlement store and rebuilds the access
+// policy so it can consult it. Returns the handler for call-site chaining.
+func (h *GroupHandler) WithGrants(gs *postgres.ContestGrantStore) *GroupHandler {
+	h.rebuildWithGrants(h.contestStore, gs)
+	return h
+}
+
 func NewGroupHandler(s *postgres.GroupStore, us store.UserStore, cs store.ContestStore) *GroupHandler {
-	return &GroupHandler{store: s, userStore: us, contestStore: cs}
+	h := &GroupHandler{store: s, userStore: us, contestStore: cs}
+	h.access = newContestAccessPolicy(cs, nil)
+	return h
 }
 
 func (h *GroupHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -165,7 +177,11 @@ func (h *GroupHandler) AddContest(w http.ResponseWriter, r *http.Request) {
 	// check a group owner could attach any contest — including a private draft —
 	// and surface it to every group member.
 	contest, err := h.contestStore.GetByID(r.Context(), req.ContestID)
-	if err != nil || contest == nil || !canReadContest(r.Context(), h.contestStore, contest, claims) {
+	if err != nil || contest == nil {
+		http.Error(w, "contest not found", http.StatusNotFound)
+		return
+	}
+	if decision, derr := h.access.Decide(r.Context(), contest, claims); derr != nil || !decision.Allowed() {
 		http.Error(w, "contest not found", http.StatusNotFound)
 		return
 	}

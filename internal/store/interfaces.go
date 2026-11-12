@@ -249,6 +249,20 @@ type ContestStore interface {
 	CheckGroupRestriction(ctx context.Context, contestID, userID string) (bool, error)
 }
 
+// ContestGrantStore holds proof that a contestant typed a round's access
+// password. Kept apart from ContestStore because the read side of access control
+// needs only the one question (IsGranted) and the write side only ever happens
+// from the unlock and password-change flows — folding it into ContestStore would
+// hand every consumer three methods it must not call.
+type ContestGrantStore interface {
+	// Grant records an entitlement. Idempotent: unlocking twice is not an error.
+	Grant(ctx context.Context, contestID, userID string) error
+	IsGranted(ctx context.Context, contestID, userID string) (bool, error)
+	// RevokeAll drops every entitlement for a round. Called when the password
+	// changes, so an old password's grants die with it.
+	RevokeAll(ctx context.Context, contestID string) error
+}
+
 type RatingStore interface {
 	CreateHistory(ctx context.Context, h *model.RatingHistory) error
 	GetByUser(ctx context.Context, userID string, limit int) ([]model.RatingHistory, error)

@@ -13,13 +13,25 @@ import (
 )
 
 type EditorialHandler struct {
+	// contestHandlerAccess carries the shared contest access policy, so this
+	// handler asks the same object every other surface asks.
+	contestHandlerAccess
 	store        *postgres.EditorialStore
 	problemStore store.ProblemStore
 	contestStore store.ContestStore
 }
 
+// WithGrants attaches the password-entitlement store and rebuilds the access
+// policy so it can consult it. Returns the handler for call-site chaining.
+func (h *EditorialHandler) WithGrants(gs *postgres.ContestGrantStore) *EditorialHandler {
+	h.rebuildWithGrants(h.contestStore, gs)
+	return h
+}
+
 func NewEditorialHandler(s *postgres.EditorialStore, ps store.ProblemStore, cs store.ContestStore) *EditorialHandler {
-	return &EditorialHandler{store: s, problemStore: ps, contestStore: cs}
+	h := &EditorialHandler{store: s, problemStore: ps, contestStore: cs}
+	h.access = newContestAccessPolicy(cs, nil)
+	return h
 }
 
 func (h *EditorialHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -61,7 +73,11 @@ func (h *EditorialHandler) Create(w http.ResponseWriter, r *http.Request) {
 		// editorialVisible() keys off the contest, so an arbitrary contest id would
 		// control when this editorial becomes readable. Require a readable one.
 		contest, err := h.contestStore.GetByID(r.Context(), req.ContestID)
-		if err != nil || contest == nil || !canReadContest(r.Context(), h.contestStore, contest, claims) {
+		if err != nil || contest == nil {
+			http.Error(w, "contest not found", http.StatusNotFound)
+			return
+		}
+		if decision, derr := h.access.Decide(r.Context(), contest, claims); derr != nil || !decision.Allowed() {
 			http.Error(w, "contest not found", http.StatusNotFound)
 			return
 		}

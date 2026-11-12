@@ -50,11 +50,11 @@ func (s *ContestStore) Create(ctx context.Context, c *model.Contest) error {
 	c.Visible = c.Status == model.ContestStatusPublished
 
 	err = tx.QueryRowContext(ctx,
-		`INSERT INTO contests(id,slug,title,type,format,format_config,start_time,end_time,freeze_time,password,visible,description,
+		`INSERT INTO contests(id,slug,title,type,format,format_config,start_time,end_time,freeze_time,password_hash,visible,description,
 		                    registration_required,registration_deadline,max_participants,division,educational_config,created_by,
 		                    status,is_rated,rated_for_min,rated_for_max)
 		 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22) RETURNING created_at`,
-		c.ID, slug, c.Title, c.Type, c.Format, formatConfigJSON, c.StartTime, c.EndTime, c.FreezeTime, c.Password, c.Visible, c.Description,
+		c.ID, slug, c.Title, c.Type, c.Format, formatConfigJSON, c.StartTime, c.EndTime, c.FreezeTime, c.PasswordHash, c.Visible, c.Description,
 		c.RegistrationRequired, c.RegistrationDeadline, c.MaxParticipants, c.Division, configJSON, c.CreatedBy,
 		c.Status, c.IsRated, c.RatedForMin, c.RatedForMax,
 	).Scan(&c.CreatedAt)
@@ -102,7 +102,7 @@ func (s *ContestStore) getByWhere(ctx context.Context, where string, args ...int
 	var slug sql.NullString
 	var groupID sql.NullString
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id,display_id,slug,title,type,format,format_config,start_time,end_time,freeze_time,password,visible,description,
+		`SELECT id,display_id,slug,title,type,format,format_config,start_time,end_time,freeze_time,password_hash,visible,description,
 		        registration_required,registration_deadline,max_participants,division,educational_config,
 		        upsolving_enabled,virtual_contest_enabled,pdf_enabled,statement_hidden,created_by,created_at,
 		        COALESCE(status,'draft'), COALESCE(review_note,''),
@@ -110,7 +110,7 @@ func (s *ContestStore) getByWhere(ctx context.Context, where string, args ...int
 		        (SELECT group_id::text FROM group_contests WHERE contest_id = id LIMIT 1) AS group_id
 		 FROM contests WHERE `+where, args...).Scan(
 		&c.ID, &c.DisplayID, &slug, &c.Title, &c.Type, &c.Format, &formatConfigJSON, &c.StartTime, &c.EndTime, &c.FreezeTime,
-		&c.Password, &c.Visible, &c.Description,
+		&c.PasswordHash, &c.Visible, &c.Description,
 		&c.RegistrationRequired, &c.RegistrationDeadline, &c.MaxParticipants,
 		&c.Division, &configJSON,
 		&c.UpsolvingEnabled, &c.VirtualContestEnabled, &c.PDFEnabled, &c.StatementHidden,
@@ -137,21 +137,30 @@ func (s *ContestStore) getByWhere(ctx context.Context, where string, args ...int
 	if len(formatConfigJSON) > 0 {
 		c.FormatConfig = formatConfigJSON
 	}
-	if c.Password != "" {
+	if c.PasswordHash != "" {
 		c.HasPassword = true
 	}
 	return &c, nil
 }
 
 func (s *ContestStore) List(ctx context.Context, offset, limit int) ([]model.Contest, int, error) {
-	return s.ListWithDivision(ctx, offset, limit, nil)
+	return s.ListForViewer(ctx, offset, limit, nil, "")
 }
 
-func (s *ContestStore) ListWithDivision(ctx context.Context, offset, limit int, division *int) ([]model.Contest, int, error) {
+// ListForViewer is the catalog listing as one caller sees it. viewerID is ""
+// for an anonymous visitor.
+//
+// A password-protected or group-restricted round is omitted unless the viewer is
+// entitled to it. Before this the listing filtered on visible alone, so every
+// invite-only round was enumerable by anybody — which is how people found
+// contests they had not been invited to.
+func (s *ContestStore) ListForViewer(ctx context.Context, offset, limit int, division *int, viewerID string) ([]model.Contest, int, error) {
+	visibility := fmt.Sprintf(contestVisibilityPredicate, 1, 1, 1, 1, 1, 1)
+
 	var total int
-	countQuery := "SELECT COUNT(*) FROM contests WHERE visible=true"
-	args := []interface{}{}
-	argIdx := 1
+	countQuery := "SELECT COUNT(*) FROM contests WHERE visible=true AND " + visibility
+	args := []interface{}{viewerID}
+	argIdx := 2
 
 	if division != nil {
 		countQuery += fmt.Sprintf(" AND division = $%d", argIdx)
@@ -160,10 +169,10 @@ func (s *ContestStore) ListWithDivision(ctx context.Context, offset, limit int, 
 	}
 	s.db.QueryRowContext(ctx, countQuery, args...).Scan(&total)
 
-	rowsQuery := `SELECT id,display_id,slug,title,type,format,format_config,start_time,end_time,freeze_time,password,visible,description,
+	rowsQuery := `SELECT id,display_id,slug,title,type,format,format_config,start_time,end_time,freeze_time,password_hash,visible,description,
 	              registration_required,registration_deadline,max_participants,division,educational_config,
 	              created_at
-	              FROM contests WHERE visible=true`
+	              FROM contests WHERE visible=true AND ` + visibility
 	if division != nil {
 		rowsQuery += fmt.Sprintf(" AND division = $%d", argIdx)
 		argIdx++
@@ -182,7 +191,7 @@ func (s *ContestStore) ListWithDivision(ctx context.Context, offset, limit int, 
 		var configJSON []byte
 		var formatConfigJSON []byte
 		var slug sql.NullString
-		rows.Scan(&c.ID, &c.DisplayID, &slug, &c.Title, &c.Type, &c.Format, &formatConfigJSON, &c.StartTime, &c.EndTime, &c.FreezeTime, &c.Password, &c.Visible, &c.Description,
+		rows.Scan(&c.ID, &c.DisplayID, &slug, &c.Title, &c.Type, &c.Format, &formatConfigJSON, &c.StartTime, &c.EndTime, &c.FreezeTime, &c.PasswordHash, &c.Visible, &c.Description,
 			&c.RegistrationRequired, &c.RegistrationDeadline, &c.MaxParticipants, &c.Division, &configJSON, &c.CreatedAt)
 		if slug.Valid {
 			c.Slug = slug.String
@@ -196,7 +205,7 @@ func (s *ContestStore) ListWithDivision(ctx context.Context, offset, limit int, 
 		if len(formatConfigJSON) > 0 {
 			c.FormatConfig = formatConfigJSON
 		}
-		if c.Password != "" {
+		if c.PasswordHash != "" {
 			c.HasPassword = true
 		}
 		items = append(items, c)
@@ -231,11 +240,11 @@ func (s *ContestStore) Update(ctx context.Context, c *model.Contest) error {
 	// appears nowhere, so every settings save failed with 500 "update failed".
 	_, err := s.db.ExecContext(ctx,
 		`UPDATE contests SET title=$1, type=$2, format=$3, format_config=$4, start_time=$5, end_time=$6,
-	 freeze_time=$7, password=$8, description=$9, pdf_enabled=$10, statement_hidden=$11,
+	 freeze_time=$7, password_hash=$8, description=$9, pdf_enabled=$10, statement_hidden=$11,
 	 slug=$13, upsolving_enabled=$14, virtual_contest_enabled=$15,
 	 visible=($16::varchar='published'), status=$16, is_rated=$17, rated_for_min=$18, rated_for_max=$19
 	 WHERE id=$12`,
-		c.Title, c.Type, c.Format, formatConfigJSON, c.StartTime, c.EndTime, c.FreezeTime, c.Password, c.Description,
+		c.Title, c.Type, c.Format, formatConfigJSON, c.StartTime, c.EndTime, c.FreezeTime, c.PasswordHash, c.Description,
 		c.PDFEnabled, c.StatementHidden, c.ID, slug, c.UpsolvingEnabled, c.VirtualContestEnabled,
 		c.Status, c.IsRated, c.RatedForMin, c.RatedForMax)
 	if err != nil {
@@ -268,7 +277,7 @@ func (s *ContestStore) ListByStatus(ctx context.Context, status string, offset, 
 	s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM contests WHERE status=$1`, status).Scan(&total)
 
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id,display_id,COALESCE(slug,''),title,type,format,format_config,start_time,end_time,freeze_time,password,visible,description,
+		`SELECT id,display_id,COALESCE(slug,''),title,type,format,format_config,start_time,end_time,freeze_time,password_hash,visible,description,
 		        registration_required,registration_deadline,max_participants,division,educational_config,
 		        upsolving_enabled,virtual_contest_enabled,pdf_enabled,statement_hidden,created_by,created_at,
 		        COALESCE(status,'draft'), COALESCE(review_note,''),
@@ -284,7 +293,7 @@ func (s *ContestStore) ListByStatus(ctx context.Context, status string, offset, 
 		var c model.Contest
 		var configJSON, formatConfigJSON []byte
 		rows.Scan(&c.ID, &c.DisplayID, &c.Slug, &c.Title, &c.Type, &c.Format, &formatConfigJSON,
-			&c.StartTime, &c.EndTime, &c.FreezeTime, &c.Password, &c.Visible, &c.Description,
+			&c.StartTime, &c.EndTime, &c.FreezeTime, &c.PasswordHash, &c.Visible, &c.Description,
 			&c.RegistrationRequired, &c.RegistrationDeadline, &c.MaxParticipants, &c.Division, &configJSON,
 			&c.UpsolvingEnabled, &c.VirtualContestEnabled, &c.PDFEnabled, &c.StatementHidden,
 			&c.CreatedBy, &c.CreatedAt, &c.Status, &c.ReviewNote,
@@ -787,7 +796,7 @@ func (s *ContestStore) ListByCreatedBy(ctx context.Context, userID string, offse
 		 WHERE c.created_by = $1 OR perm.user_id = $1`, userID).Scan(&total)
 
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT DISTINCT c.id, c.display_id, c.slug, c.title, c.type, c.format, c.format_config, c.start_time, c.end_time, c.freeze_time, c.password, c.visible, c.description,
+		`SELECT DISTINCT c.id, c.display_id, c.slug, c.title, c.type, c.format, c.format_config, c.start_time, c.end_time, c.freeze_time, c.password_hash, c.visible, c.description,
 		                 c.registration_required, c.registration_deadline, c.max_participants, c.division, c.educational_config,
 		                 c.created_at
 		 FROM contests c
@@ -804,7 +813,7 @@ func (s *ContestStore) ListByCreatedBy(ctx context.Context, userID string, offse
 		var configJSON []byte
 		var formatConfigJSON []byte
 		var slug sql.NullString
-		rows.Scan(&c.ID, &c.DisplayID, &slug, &c.Title, &c.Type, &c.Format, &formatConfigJSON, &c.StartTime, &c.EndTime, &c.FreezeTime, &c.Password, &c.Visible, &c.Description,
+		rows.Scan(&c.ID, &c.DisplayID, &slug, &c.Title, &c.Type, &c.Format, &formatConfigJSON, &c.StartTime, &c.EndTime, &c.FreezeTime, &c.PasswordHash, &c.Visible, &c.Description,
 			&c.RegistrationRequired, &c.RegistrationDeadline, &c.MaxParticipants, &c.Division, &configJSON, &c.CreatedAt)
 		if slug.Valid {
 			c.Slug = slug.String
@@ -818,7 +827,7 @@ func (s *ContestStore) ListByCreatedBy(ctx context.Context, userID string, offse
 		if len(formatConfigJSON) > 0 {
 			c.FormatConfig = formatConfigJSON
 		}
-		if c.Password != "" {
+		if c.PasswordHash != "" {
 			c.HasPassword = true
 		}
 		items = append(items, c)

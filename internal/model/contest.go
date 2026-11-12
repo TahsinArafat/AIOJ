@@ -6,17 +6,24 @@ import (
 )
 
 type Contest struct {
-	ID                    string                  `json:"id"`
-	DisplayID             int                     `json:"display_id"`
-	Slug                  string                  `json:"slug,omitempty"`
-	Title                 string                  `json:"title"`
-	Type                  string                  `json:"type"`
-	Format                string                  `json:"format"`
-	FormatConfig          json.RawMessage         `json:"format_config,omitempty"`
-	StartTime             time.Time               `json:"start_time"`
-	EndTime               time.Time               `json:"end_time"`
-	FreezeTime            *time.Time              `json:"freeze_time,omitempty"`
-	Password              string                  `json:"-"`
+	ID           string          `json:"id"`
+	DisplayID    int             `json:"display_id"`
+	Slug         string          `json:"slug,omitempty"`
+	Title        string          `json:"title"`
+	Type         string          `json:"type"`
+	Format       string          `json:"format"`
+	FormatConfig json.RawMessage `json:"format_config,omitempty"`
+	StartTime    time.Time       `json:"start_time"`
+	EndTime      time.Time       `json:"end_time"`
+	FreezeTime   *time.Time      `json:"freeze_time,omitempty"`
+	// PasswordHash is the bcrypt hash of the round's access password. It never
+	// leaves the process: JSON redacts it and no handler ever assigns it onto a
+	// response. The column used to be a plaintext `password` that nothing
+	// compared against, which is why "password protected" contests were public.
+	PasswordHash string `json:"-"`
+	// HasPassword is the only signal the client gets, and it needs it: the
+	// contest page renders an unlock prompt when this is set and the caller has
+	// no grant yet.
 	HasPassword           bool                    `json:"has_password"`
 	Visible               bool                    `json:"visible"`
 	Description           string                  `json:"description,omitempty"`

@@ -61,7 +61,8 @@ func TestContestStore_UpdateSettings(t *testing.T) {
 	c.Title = "Test Round 1"
 	c.StartTime = start.Add(2 * time.Hour)
 	c.EndTime = c.StartTime.Add(5 * time.Minute)
-	c.Password = "aiojtest"
+	// Store-level: the handler hashes before it reaches here, so this is a hash.
+	c.PasswordHash = "$2a$12$abcdefghijklmnopqrstuv"
 	c.PDFEnabled = true
 	c.StatementHidden = false
 	c.UpsolvingEnabled = true
@@ -79,8 +80,11 @@ func TestContestStore_UpdateSettings(t *testing.T) {
 	if got.Title != "Test Round 1" {
 		t.Fatalf("title = %q, want %q", got.Title, "Test Round 1")
 	}
-	if got.Password != "aiojtest" {
-		t.Fatalf("password = %q, want %q", got.Password, "aiojtest")
+	if got.PasswordHash != c.PasswordHash {
+		t.Fatalf("password_hash = %q, want %q", got.PasswordHash, c.PasswordHash)
+	}
+	if !got.HasPassword {
+		t.Fatal("has_password must be derived from a non-empty password_hash")
 	}
 	if !got.PDFEnabled {
 		t.Fatal("pdf_enabled was not persisted")
