@@ -68,6 +68,16 @@ type AuthResponse struct {
 	User         *User  `json:"user,omitempty"`
 	Requires2FA  bool   `json:"requires_2fa,omitempty"`
 	ChallengeID  string `json:"challenge_id,omitempty"`
+	// RedirectTo is where this session belongs, when the server knows better
+	// than the client. It is set for a generated onsite account, which exists for
+	// exactly one round and has no business landing anywhere else: a team member
+	// typing their credentials should arrive at their own contest, not the home
+	// page. Empty for every ordinary sign-in, which keeps the client's own `?next=`
+	// destination authoritative for people who chose where they were going.
+	//
+	// A same-origin path, already validated server-side; the SPA treats it as a
+	// route to navigate to, never as a URL to follow.
+	RedirectTo string `json:"redirect_to,omitempty"`
 }
 
 // OAuthSignupChallenge is the answer to a first-time OAuth callback: no

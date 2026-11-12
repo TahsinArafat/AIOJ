@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { api, getAccessToken, currentUser } from '../lib/api'
+import { errorMessage } from '../lib/errors'
 import { useDocumentTitle } from '../lib/documentTitle'
 import DivisionBadge from '../components/DivisionBadge'
 import { ContestStatusBadge, ContestFormatBadge, ContestTypeBadge } from '../components/contest/ContestBadges'
@@ -155,6 +156,12 @@ export default function ContestDetail() {
     const isAdmin = role === 'admin' || role === 'owner'
 
     const [contest, setContest] = useState<ContestInfo | null>(null)
+    // Why the contest failed to load, when it did, tagged with the id it belongs
+    // to. Kept separate from `contest` because "we could not ask" and "it is not
+    // there" are different messages and used to be the same one; tagged because
+    // this component is reused when the route id changes, and an untagged message
+    // would follow the viewer from one contest to the next.
+    const [loadError, setLoadError] = useState<{ id: string; message: string } | null>(null)
     // The route map only knows it is a contest; the real title arrives with
     // the fetch and replaces "Contest" in the tab.
     useDocumentTitle(contest?.title)
@@ -238,12 +245,20 @@ export default function ContestDetail() {
 
     useEffect(() => {
         if (!id) return
+        // The rejection is captured rather than swallowed. This fetch used to have
+        // no .catch at all, so a 403 (a private round), a 500 and a genuinely
+        // missing contest all rendered the same "Contest not found" — which is how
+        // an upcoming contest, refused by the server, came to look nonexistent.
         api.contests.get(id).then(res => {
             const c = res.contest
             setContest(c)
             setProblems(res.problems || [])
             setRegistered(c.is_registered ?? false)
             setRegistrationCount(c.registration_count ?? 0)
+        }).catch((e: unknown) => {
+            // setState from a promise callback, not the effect body: this is the
+            // async result of an external request, which is what an effect is for.
+            setLoadError({ id, message: errorMessage(e) })
         }).finally(() => setLoading(false))
     }, [id])
 
@@ -369,7 +384,20 @@ export default function ContestDetail() {
     }
 
     if (loading) return <div className="text-center py-20 text-muted">Loading...</div>
-    if (!contest) return <div className="text-center py-20 text-muted">Contest not found</div>
+    // A failure now carries its own reason, so a locked, private or briefly
+    // unreachable round no longer reads as "this contest does not exist".
+    if (!contest) {
+        // Only this contest's own failure explains its absence; a message left
+        // over from a previously viewed round would be about a different contest.
+        const reason = loadError && loadError.id === id ? loadError.message : ''
+        return (
+            <EmptyState
+                icon={<AlertTriangle className="w-12 h-12 text-ink-soft" />}
+                text="Contest not found"
+                description={reason || 'This contest does not exist, or you do not have access to it.'}
+            />
+        )
+    }
 
     const status = getStatus(contest.start_time, contest.end_time, contest.freeze_time ?? undefined)
     const isUpcoming = status === 'upcoming'
@@ -453,7 +481,18 @@ export default function ContestDetail() {
                         <div>
                             <h2 className="text-xl font-bold text-ink mb-4">Problems</h2>
                             {problems.length === 0 ? (
-                                <EmptyState icon={<FileText className="w-12 h-12 text-ink-soft" />} text="No problems added yet" description="Contest organizers haven't published problems for this contest yet." />
+                                // Before the start the list is deliberately empty,
+                                // not unpopulated. Saying "no problems yet" there
+                                // would be a lie the round then contradicts.
+                                isUpcoming ? (
+                                    <EmptyState
+                                        icon={<Clock className="w-12 h-12 text-ink-soft" />}
+                                        text="Problems are revealed when the round starts"
+                                        description={`The problem set opens at ${formatDateTime(contest.start_time)}.`}
+                                    />
+                                ) : (
+                                    <EmptyState icon={<FileText className="w-12 h-12 text-ink-soft" />} text="No problems added yet" description="Contest organizers haven't published problems for this contest yet." />
+                                )
                             ) : (
                                 <div className="bg-surface border border-hairline rounded-xl shadow-sm overflow-hidden">
                                     <table className="w-full text-sm">

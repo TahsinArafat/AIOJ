@@ -52,3 +52,25 @@ export function nextParam(params: URLSearchParams): string | null {
 export function nextPath(params: URLSearchParams): string {
     return nextParam(params) ?? '/'
 }
+
+/**
+ * The destination after signing in, preferring a server-supplied one.
+ *
+ * `redirect_to` comes from the login response and names where the account
+ * belongs — for a generated onsite team account that is its own contest. It
+ * outranks `?next=` because that account has exactly one reasonable
+ * destination and never chose one, whereas a person who followed a login link
+ * mid-navigation did.
+ *
+ * The server vouches for the value, but it still goes through the same
+ * same-origin validation as `?next=`: a redirect target is the one thing that
+ * must never be trusted to be a URL rather than a path, whoever sent it. An
+ * unusable value falls back to `next`, then to "/".
+ */
+export function postLoginPath(params: URLSearchParams, redirectTo?: string | null): string {
+    if (redirectTo) {
+        const safe = nextParam(new URLSearchParams({ next: redirectTo }))
+        if (safe) return safe
+    }
+    return nextPath(params)
+}

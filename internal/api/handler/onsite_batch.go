@@ -15,7 +15,10 @@ import (
 )
 
 type OnsiteBatchHandler struct {
-	contestStore store.ContestStore
+	// contestLookup, not the full store.ContestStore: this handler asks only
+	// "which round is this, and may this caller manage it". Narrowing it is what
+	// lets a redirect-target test stub two methods instead of twenty.
+	contestStore contestLookup
 	onsiteStore  store.OnsiteUserStore
 	userStore    store.UserStore
 	refreshToks  store.RefreshTokenStore
@@ -23,7 +26,7 @@ type OnsiteBatchHandler struct {
 	jwtManager   *auth.JWTManager
 }
 
-func NewOnsiteBatchHandler(cs store.ContestStore, os store.OnsiteUserStore, us store.UserStore, rt store.RefreshTokenStore, twoFA store.TOTPSecretStore, jwtManager *auth.JWTManager) *OnsiteBatchHandler {
+func NewOnsiteBatchHandler(cs contestLookup, os store.OnsiteUserStore, us store.UserStore, rt store.RefreshTokenStore, twoFA store.TOTPSecretStore, jwtManager *auth.JWTManager) *OnsiteBatchHandler {
 	return &OnsiteBatchHandler{
 		contestStore: cs,
 		onsiteStore:  os,
@@ -186,7 +189,7 @@ func (h *OnsiteBatchHandler) LoginAsTeam(w http.ResponseWriter, r *http.Request)
 
 	// This is a login: a linked account may have TOTP enabled, and skipping the
 	// second factor here would hand out a session for the password alone.
-	if writeTwoFAChallenge(r.Context(), w, h.jwtManager, h.twoFA, dbUser.ID) {
+	if writeTwoFAChallenge(r.Context(), w, h.jwtManager, h.twoFA, dbUser.ID, arenaPath(r.Context(), h.contestStore, user.ContestID)) {
 		return
 	}
 
@@ -205,6 +208,9 @@ func (h *OnsiteBatchHandler) LoginAsTeam(w http.ResponseWriter, r *http.Request)
 		"access_token":  accessToken,
 		"refresh_token": rawRefresh,
 		"user":          dbUser,
+		// A team signing in here has exactly one destination: the round these
+		// credentials were generated for.
+		"redirect_to": arenaPath(r.Context(), h.contestStore, user.ContestID),
 	})
 }
 

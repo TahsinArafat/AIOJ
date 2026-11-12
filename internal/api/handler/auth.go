@@ -177,7 +177,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		if err := h.users.TouchLastLogin(r.Context(), user.ID); err != nil {
 			slog.Warn("touch last login failed", "error", err, "user_id", user.ID)
 		}
-		if h.maybe2FAChallenge(w, r, user) {
+		if h.maybe2FAChallenge(w, r, user, "") {
 			return
 		}
 		respondJSON(w, http.StatusOK, h.tokenResp(r.Context(), user))
@@ -229,7 +229,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		_ = h.onsiteStore.AutoRegister(r.Context(), onsiteUser.ContestID, dbUser.ID)
 	}
 
-	if h.maybe2FAChallenge(w, r, dbUser) {
+	if h.maybe2FAChallenge(w, r, dbUser, arenaPath(r.Context(), h.contestStore, onsiteUser.ContestID)) {
 		return
 	}
 
@@ -248,7 +248,38 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		"access_token":  accessToken,
 		"refresh_token": rawRefresh,
 		"user":          dbUser,
+		// A generated onsite account belongs to one round. Tell the client where
+		// it goes, so signing in lands in that contest rather than the home page.
+		"redirect_to": arenaPath(r.Context(), h.contestStore, onsiteUser.ContestID),
 	})
+}
+
+// contestRefResolver is the one read arenaPath needs. Narrow on purpose: the
+// full store.ContestStore is a large interface, and a test that wants to pin a
+// redirect target should not have to stub twenty unrelated methods.
+type contestRefResolver interface {
+	GetByID(context.Context, string) (*model.Contest, error)
+}
+
+// arenaPath is the in-app destination for an onsite team account: the contest it
+// was generated for.
+//
+// It returns the round's public slug when there is one, because that is the URL
+// the rest of the site links to, and falls back to the id. An unresolvable round
+// returns "" so the client keeps its own default rather than navigating to a
+// broken path.
+func arenaPath(ctx context.Context, contests contestRefResolver, contestID string) string {
+	if contests == nil || contestID == "" {
+		return ""
+	}
+	c, err := contests.GetByID(ctx, contestID)
+	if err != nil || c == nil {
+		return ""
+	}
+	if slug := c.Slug; slug != "" {
+		return "/contests/" + slug
+	}
+	return "/contests/" + c.ID
 }
 
 func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
@@ -455,11 +486,11 @@ func (h *AuthHandler) ResendVerification(w http.ResponseWriter, r *http.Request)
 
 // maybe2FAChallenge returns true and writes a challenge response when the
 // user has TOTP 2FA enabled. Returns false when tokens should be issued.
-func (h *AuthHandler) maybe2FAChallenge(w http.ResponseWriter, r *http.Request, user *model.User) bool {
+func (h *AuthHandler) maybe2FAChallenge(w http.ResponseWriter, r *http.Request, user *model.User, redirect string) bool {
 	if user == nil {
 		return false
 	}
-	return writeTwoFAChallenge(r.Context(), w, h.jwt, h.twoFA, user.ID)
+	return writeTwoFAChallenge(r.Context(), w, h.jwt, h.twoFA, user.ID, redirect)
 }
 
 func (h *AuthHandler) tokenResp(ctx context.Context, user *model.User) *model.AuthResponse {

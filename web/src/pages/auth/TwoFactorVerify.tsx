@@ -2,14 +2,17 @@ import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { api, setTokens } from '../../lib/api'
-import { nextPath } from '../../lib/authRedirect'
+import { postLoginPath } from '../../lib/authRedirect'
 
 /** Standalone 2FA challenge page when login redirects here with ?challenge_id=. */
 export default function TwoFactorVerify() {
     const { t } = useTranslation()
     const [params] = useSearchParams()
     const challengeId = params.get('challenge_id') || ''
-    const dest = nextPath(params)
+    // Nothing in the app links here — Login handles the second factor inline —
+    // but a client that does can name a destination, and it is validated the
+    // same way. Absent, this falls back to ?next= and then to "/".
+    const dest = postLoginPath(params, params.get('redirect_to'))
     const [code, setCode] = useState('')
     const [error, setError] = useState<string | null>(null)
     const [busy, setBusy] = useState(false)

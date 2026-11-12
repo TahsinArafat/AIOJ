@@ -20,7 +20,12 @@ const twoFAChallengeTTL = 5 * time.Minute
 // Every login entry point has to run this. The onsite contest login used to
 // mint access and refresh tokens directly, so an account with TOTP enabled
 // could be signed into with the password alone through that route.
-func writeTwoFAChallenge(ctx context.Context, w http.ResponseWriter, jwt *auth.JWTManager, secrets store.TOTPSecretStore, userID string) bool {
+//
+// redirect is carried alongside the challenge rather than inside the challenge
+// token. The second step only proves the factor; it must not also decide where
+// the session goes, and a field on the response keeps that separation without
+// widening the token's contract.
+func writeTwoFAChallenge(ctx context.Context, w http.ResponseWriter, jwt *auth.JWTManager, secrets store.TOTPSecretStore, userID, redirect string) bool {
 	if jwt == nil || secrets == nil || userID == "" {
 		return false
 	}
@@ -36,6 +41,7 @@ func writeTwoFAChallenge(ctx context.Context, w http.ResponseWriter, jwt *auth.J
 	respondJSON(w, http.StatusOK, model.AuthResponse{
 		Requires2FA: true,
 		ChallengeID: challenge,
+		RedirectTo:  redirect,
 	})
 	return true
 }

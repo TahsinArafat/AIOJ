@@ -153,3 +153,88 @@ func TestOnsiteLogin_RejectsBadPassword(t *testing.T) {
 		t.Fatalf("status = %d, want 401", rec.Code)
 	}
 }
+
+// contestResolverStub answers the single read arenaPath performs. It also answers
+// HasAccess, because OnsiteBatchHandler's store interface includes it.
+type contestResolverStub struct{ contest *model.Contest }
+
+func (s contestResolverStub) GetByID(context.Context, string) (*model.Contest, error) {
+	return s.contest, nil
+}
+
+func (contestResolverStub) HasAccess(context.Context, string, string, ...string) bool { return true }
+
+/**
+ * A generated team account lands in its own contest.
+ *
+ * These credentials are minted by a setter for people sitting in a room: they
+ * exist for one round and have no reason to be anywhere else. Signing in used to
+ * drop them on the home page, so every team had to be told the URL — or was left
+ * to find the contest themselves.
+ */
+func TestOnsiteLogin_RedirectsToItsOwnArena(t *testing.T) {
+	hash, _ := auth.HashPassword("TeamPass!2026")
+	linked := "u1"
+
+	onsite := &onsiteLoginStub{user: &model.OnsiteBatchUser{
+		ID: "o1", ContestID: "c1", Username: "team-04",
+		PasswordHash: hash, IsUsed: true, UsedBy: &linked,
+	}}
+	users := &stubUserForEV{users: map[string]*model.User{
+		"u1": {ID: "u1", Username: "team-04", Role: "contestant"},
+	}}
+	contests := contestResolverStub{contest: &model.Contest{ID: "c1", Slug: "icpc-2026"}}
+
+	h := NewOnsiteBatchHandler(contests, onsite, users, &countingRefreshStore{}, nil,
+		auth.NewJWTManager("test-secret", time.Minute, time.Hour))
+
+	rec := httptest.NewRecorder()
+	h.LoginAsTeam(rec, onsiteLoginRequest(t, "team-04", "TeamPass!2026"))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d: %s", rec.Code, rec.Body.String())
+	}
+	var resp struct {
+		RedirectTo string `json:"redirect_to"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.RedirectTo != "/contests/icpc-2026" {
+		t.Fatalf("redirect_to = %q, want the round's slug path", resp.RedirectTo)
+	}
+}
+
+// With no resolvable contest the field is omitted, so the client keeps its own
+// default instead of navigating to a path that cannot exist.
+func TestOnsiteLogin_OmitsRedirectWhenTheRoundIsUnknown(t *testing.T) {
+	hash, _ := auth.HashPassword("TeamPass!2026")
+	linked := "u1"
+
+	onsite := &onsiteLoginStub{user: &model.OnsiteBatchUser{
+		ID: "o1", ContestID: "gone", Username: "team-05",
+		PasswordHash: hash, IsUsed: true, UsedBy: &linked,
+	}}
+	users := &stubUserForEV{users: map[string]*model.User{
+		"u1": {ID: "u1", Username: "team-05", Role: "contestant"},
+	}}
+
+	h := NewOnsiteBatchHandler(contestResolverStub{}, onsite, users, &countingRefreshStore{}, nil,
+		auth.NewJWTManager("test-secret", time.Minute, time.Hour))
+
+	rec := httptest.NewRecorder()
+	h.LoginAsTeam(rec, onsiteLoginRequest(t, "team-05", "TeamPass!2026"))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d: %s", rec.Code, rec.Body.String())
+	}
+	var resp struct {
+		RedirectTo string `json:"redirect_to"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if resp.RedirectTo != "" {
+		t.Fatalf("redirect_to = %q, want empty for an unresolvable round", resp.RedirectTo)
+	}
+}

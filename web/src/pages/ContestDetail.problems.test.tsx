@@ -132,3 +132,43 @@ test('keeps the solve count visible when signed out', async () => {
     expect(screen.getByText('7')).toBeInTheDocument()
     await waitFor(() => expect(screen.queryByLabelText('Solved')).not.toBeInTheDocument())
 })
+
+/**
+ * An upcoming round used to be indistinguishable from a nonexistent one.
+ *
+ * The server refused the read, the page had no .catch, so `contest` stayed null
+ * and the early return printed "Contest not found" — for a contest that existed
+ * and had simply not begun. The page already had a countdown for the `upcoming`
+ * status; nothing ever reached it.
+ */
+test('an unstarted round shows its countdown instead of "not found"', async () => {
+    mocks.get.mockResolvedValue({
+        contest: {
+            id: 'c1',
+            title: 'Test Round 1',
+            start_time: '2030-01-01T00:00:00Z',
+            end_time: '2030-01-01T03:00:00Z',
+            format: 'acm',
+            type: 'acm',
+        },
+        // The server withholds the problem list until the start.
+        problems: [],
+    })
+
+    renderAt('#problems')
+
+    expect(await screen.findByText('Test Round 1')).toBeInTheDocument()
+    expect(screen.queryByText('Contest not found')).not.toBeInTheDocument()
+    expect(screen.getByText('Starts in')).toBeInTheDocument()
+    expect(screen.getByText('Problems are revealed when the round starts')).toBeInTheDocument()
+})
+
+test('a failed load reports the reason rather than claiming the contest is missing', async () => {
+    mocks.get.mockRejectedValue(new Error('forbidden'))
+
+    renderAt('#problems')
+
+    expect(await screen.findByText('Contest not found')).toBeInTheDocument()
+    // The server's own message is surfaced, so a 403 is not reported as absence.
+    expect(screen.getByText('forbidden')).toBeInTheDocument()
+})

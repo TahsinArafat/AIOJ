@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { api, setTokens } from '../lib/api'
-import { nextPath } from '../lib/authRedirect'
+import { postLoginPath } from '../lib/authRedirect'
 import { AuthAlert, AuthDivider, AuthLayout } from '../components/AuthLayout'
 import { Button } from '../components/ui/Button'
 import { Field, Input } from '../components/ui/Field'
@@ -13,13 +13,14 @@ export default function Login() {
     const [err, setErr] = useState('')
     const [loading, setLoading] = useState(false)
     const [challenge, setChallenge] = useState('')
+    // Where the server said this session belongs. Held across the 2FA step
+    // because the challenge response carries it, and the second request only
+    // proves the factor — it does not know about the contest.
+    const [redirectTo, setRedirectTo] = useState('')
     const [code, setCode] = useState('')
     const [verifying, setVerifying] = useState(false)
     const nav = useNavigate()
     const [params] = useSearchParams()
-    // Where to go once the session is established. Read from the URL rather
-    // than component state so a reload of /login?next=… keeps the destination.
-    const dest = nextPath(params)
     const { methods, loading: methodsLoading } = useAuthMethods()
 
     const handle = async (e: React.FormEvent) => {
@@ -30,6 +31,7 @@ export default function Login() {
             const d = await api.auth.login(form)
             if (d.requires_2fa && d.challenge_id) {
                 setChallenge(d.challenge_id)
+                setRedirectTo(d.redirect_to ?? '')
                 return
             }
             if (!d.access_token || !d.refresh_token) {
@@ -40,7 +42,7 @@ export default function Login() {
             // The seeded admin (and any admin-issued password) is locked to the
             // profile endpoints until it is changed; sending it to the
             // destination would only produce 403s.
-            nav(d.user?.must_change_password ? '/profile' : dest, { replace: true })
+            nav(d.user?.must_change_password ? '/profile' : postLoginPath(params, d.redirect_to), { replace: true })
         } catch (e: unknown) {
             setErr(e instanceof Error ? e.message : 'Login failed')
         } finally {
@@ -55,7 +57,7 @@ export default function Login() {
         try {
             const d = await api.auth.verify2FA(challenge, code)
             setTokens(d.access_token, d.refresh_token)
-            nav(d.user?.must_change_password ? '/profile' : dest, { replace: true })
+            nav(d.user?.must_change_password ? '/profile' : postLoginPath(params, redirectTo), { replace: true })
         } catch (e: unknown) {
             setErr(e instanceof Error ? e.message : 'Invalid code')
         } finally {

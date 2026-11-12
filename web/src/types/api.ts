@@ -92,6 +92,14 @@ export interface AuthResponse {
     user?: User | null
     requires_2fa?: boolean
     challenge_id?: string
+    /**
+     * Where this session belongs, when the server knows better than the client.
+     *
+     * Set for a generated onsite team account, which exists for one round and
+     * should land in it rather than the home page. Absent for every ordinary
+     * sign-in, so a person who navigated to /login?next=… keeps their choice.
+     */
+    redirect_to?: string
 }
 
 export interface BalloonRequest {
