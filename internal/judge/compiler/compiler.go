@@ -12,6 +12,13 @@ const (
 	compileCPULimit    = 30_000_000_000 // 30 s
 	compileMemoryLimit = 536_870_912    // 512 MB
 	compileProcLimit   = 64
+
+	// SandboxWorkDir is the absolute path of the sandbox working directory.
+	// go-judge starts every command in /w (env/env_linux.go's defaultWorkDir)
+	// and mounts a tmpfs there; nothing exists at /box, which is isolate's
+	// convention. Commands that address files by absolute path — a mounted SPJ
+	// binary, an interactor, a Java class directory — must use this.
+	SandboxWorkDir = "/w"
 )
 
 // CompileResult is returned by all Compile* methods.
@@ -129,10 +136,15 @@ func cachedArtifact(cr executor.CmdResult, name, label string) (executor.CmdFile
 
 // buildCompileCmd substitutes {{exe}}, {{src}}, and {{dir}} in a compile
 // command template.
+//
+// {{dir}} is the sandbox working directory. go-judge enters /w (its
+// `defaultWorkDir`, and the only tmpfs it makes writable); /box belongs to
+// isolate and does not exist here, so pointing javac's output at it made every
+// Java compile fail.
 func buildCompileCmd(template, exe, src string) string {
 	s := strings.ReplaceAll(template, "{{exe}}", exe)
 	s = strings.ReplaceAll(s, "{{src}}", src)
-	s = strings.ReplaceAll(s, "{{dir}}", "/box")
+	s = strings.ReplaceAll(s, "{{dir}}", SandboxWorkDir)
 	return s
 }
 

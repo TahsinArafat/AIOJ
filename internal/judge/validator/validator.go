@@ -122,7 +122,8 @@ func (r *Runner) Validate(ctx context.Context, p *model.Problem, langs map[strin
 		req := &executor.ExecRequest{
 			Cmd: []executor.Cmd{{
 				Args: []string{"/bin/sh", "-c",
-					"/box/validator < /box/input.txt 2> error.txt; echo $? > rc.txt"},
+					compiler.SandboxWorkDir + "/validator < " +
+						compiler.SandboxWorkDir + "/input.txt 2> error.txt; echo $? > rc.txt"},
 				Env:         []string{"PATH=/usr/bin:/bin"},
 				CPULimit:    10_000,
 				MemoryLimit: 512 * 1024 * 1024,

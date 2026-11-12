@@ -8,8 +8,18 @@
 #
 # Bump this tag deliberately, with a sandbox smoke test (see docs/DEPLOYMENT.md).
 FROM criyle/go-judge:v1.11.4
+# g++-multilib / gcc-multilib are what make the *-32 languages work. Without
+# them `gcc -m32` cannot find the 32-bit crt objects or libgcc and every 32-bit
+# compile fails, while 64-bit compiles keep succeeding — which is how this
+# shipped broken. The admin panel's tool list mirrors this image, so keep the
+# two in step when adding a compiler.
+#
+# clang matters for the same reason: `lang/cpp-clang.yaml` ships and the UI
+# offers "C++ (Clang)", but the image never installed it, so that language was
+# unselectable-in-practice from the day it was added.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    g++ gcc make \
+    g++ gcc g++-multilib gcc-multilib libc6-dev-i386 make \
+    clang \
     python3 pypy3 \
     openjdk-21-jdk-headless \
     rustc cargo \

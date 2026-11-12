@@ -369,7 +369,7 @@ func main() {
 	// saved through the panel invalidates the cache the gates read.
 	featureResolver := feature.NewResolver(settingsStore, userStore)
 	featuresH := handler.NewFeaturesHandler(featureResolver, settingsStore)
-	langAdminH := handler.NewAdminLanguageHandler(cfg.LangDir)
+	langAdminH := handler.NewAdminLanguageHandler(cfg.LangDir, execClient)
 
 	remoteLangH := handler.NewRemoteLanguageHandler(remoteLangStore, vjService)
 	adminSubH := handler.NewAdminSubmissionHandler(submissionStore, problemStore, vjService).

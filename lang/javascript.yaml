@@ -6,4 +6,9 @@ time_limit_multiplier: 2.0
 memory_limit_multiplier: 1.5
 seccomp_rule: "general"
 extensions: [".js"]
-runtime: "/usr/bin/js"
+# JavaScript runs on the same Node runtime as nodejs.yaml.
+#
+# This used to point at /usr/bin/js, which no Debian package ships — the nodejs
+# package provides only /usr/bin/node and /usr/bin/nodejs. Every JavaScript
+# submission therefore failed with "not found" while Node.js worked.
+runtime: "/usr/bin/nodejs"

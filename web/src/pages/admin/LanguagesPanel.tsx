@@ -54,6 +54,7 @@ export default function LanguagesPanel() {
     const [detected, setDetected] = useState<{ compilers: DetectedTool[]; interpreters: DetectedTool[] } | null>(null)
     const [templates, setTemplates] = useState<LanguageConfig[]>([])
     const [showDetect, setShowDetect] = useState(false)
+    const [detecting, setDetecting] = useState(false)
     const [showTemplates, setShowTemplates] = useState(false)
 
     const loadLangs = () => {
@@ -141,11 +142,21 @@ export default function LanguagesPanel() {
     const handleDetect = async () => {
         setShowDetect(true)
         setShowTemplates(false)
+        setDetecting(true)
         try {
             const result = await api.admin.languages.detect()
-            setDetected(result)
+            // Normalise before rendering: the panel calls .map() over both lists,
+            // so a response missing a key (or carrying JSON null) blanked the
+            // whole admin page. An absent list here means "none found".
+            setDetected({
+                compilers: Array.isArray(result?.compilers) ? result.compilers : [],
+                interpreters: Array.isArray(result?.interpreters) ? result.interpreters : [],
+            })
         } catch (e) {
+            setShowDetect(false)
             toast.error('Detection failed: ' + (e instanceof Error ? e.message : String(e)))
+        } finally {
+            setDetecting(false)
         }
     }
 
@@ -329,50 +340,56 @@ export default function LanguagesPanel() {
             )}
 
             {/* Detected Tools Panel */}
-            {showDetect && detected && (
+            {showDetect && (
                 <div className="rounded-lg border border-ok/30 bg-ok/8 p-6 space-y-4">
                     <div className="flex items-center justify-between">
                         <h3 className="font-semibold text-ink flex items-center gap-2"><Cpu size={16} /> Detected Compilers & Interpreters</h3>
                         <button onClick={() => setShowDetect(false)} className="text-muted-soft hover:text-ink cursor-pointer"><X size={16} /></button>
                     </div>
-                    <p className="text-sm text-muted">Tools found on the server. Click "Use" to auto-fill the compile/runtime field in the form.</p>
+                    {detecting ? (
+                        <p className="text-sm text-muted">Probing the judge sandbox for toolchains...</p>
+                    ) : detected && (
+                        <>
+                            <p className="text-sm text-muted">Tools found on the judge server. Click "Use" to auto-fill the compile/runtime field in the form.</p>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <h4 className="font-medium text-sm text-ink-soft mb-2">Compilers</h4>
-                            <div className="space-y-2 max-h-48 overflow-y-auto">
-                                {detected.compilers.map((c, i) => (
-                                    <div key={i} className="flex items-center justify-between bg-surface border border-hairline rounded px-3 py-2">
-                                        <div>
-                                            <div className="text-sm font-medium">{c.name}</div>
-                                            <div className="text-xs text-muted font-mono">{c.path}</div>
-                                            {c.version && <div className="text-xs text-muted-soft mt-0.5">{c.version}</div>}
-                                        </div>
-                                        <button onClick={() => applyDetectedCompiler(c)}
-                                            className="text-xs px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-brand rounded hover:bg-blue-200 cursor-pointer">Use</button>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <h4 className="font-medium text-sm text-ink-soft mb-2">Compilers</h4>
+                                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                                        {detected.compilers.map((c, i) => (
+                                            <div key={i} className="flex items-center justify-between bg-surface border border-hairline rounded px-3 py-2">
+                                                <div>
+                                                    <div className="text-sm font-medium">{c.name}</div>
+                                                    <div className="text-xs text-muted font-mono">{c.path}</div>
+                                                    {c.version && <div className="text-xs text-muted-soft mt-0.5">{c.version}</div>}
+                                                </div>
+                                                <button onClick={() => applyDetectedCompiler(c)}
+                                                    className="text-xs px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-brand rounded hover:bg-blue-200 cursor-pointer">Use</button>
+                                            </div>
+                                        ))}
+                                        {detected.compilers.length === 0 && <p className="text-xs text-muted-soft">No compilers detected</p>}
                                     </div>
-                                ))}
-                                {detected.compilers.length === 0 && <p className="text-xs text-muted-soft">No compilers detected</p>}
-                            </div>
-                        </div>
-                        <div>
-                            <h4 className="font-medium text-sm text-ink-soft mb-2">Interpreters</h4>
-                            <div className="space-y-2 max-h-48 overflow-y-auto">
-                                {detected.interpreters.map((i, idx) => (
-                                    <div key={idx} className="flex items-center justify-between bg-surface border border-hairline rounded px-3 py-2">
-                                        <div>
-                                            <div className="text-sm font-medium">{i.name}</div>
-                                            <div className="text-xs text-muted font-mono">{i.path}</div>
-                                            {i.version && <div className="text-xs text-muted-soft mt-0.5">{i.version}</div>}
-                                        </div>
-                                        <button onClick={() => applyDetectedInterpreter(i)}
-                                            className="text-xs px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-brand rounded hover:bg-blue-200 cursor-pointer">Use</button>
+                                </div>
+                                <div>
+                                    <h4 className="font-medium text-sm text-ink-soft mb-2">Interpreters</h4>
+                                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                                        {detected.interpreters.map((i, idx) => (
+                                            <div key={idx} className="flex items-center justify-between bg-surface border border-hairline rounded px-3 py-2">
+                                                <div>
+                                                    <div className="text-sm font-medium">{i.name}</div>
+                                                    <div className="text-xs text-muted font-mono">{i.path}</div>
+                                                    {i.version && <div className="text-xs text-muted-soft mt-0.5">{i.version}</div>}
+                                                </div>
+                                                <button onClick={() => applyDetectedInterpreter(i)}
+                                                    className="text-xs px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-brand rounded hover:bg-blue-200 cursor-pointer">Use</button>
+                                            </div>
+                                        ))}
+                                        {detected.interpreters.length === 0 && <p className="text-xs text-muted-soft">No interpreters detected</p>}
                                     </div>
-                                ))}
-                                {detected.interpreters.length === 0 && <p className="text-xs text-muted-soft">No interpreters detected</p>}
+                                </div>
                             </div>
-                        </div>
-                    </div>
+                        </>
+                    )}
                 </div>
             )}
 

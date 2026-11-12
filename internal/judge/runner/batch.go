@@ -163,7 +163,11 @@ func (b *BatchRunner) applyChecker(
 		}
 		spjResp, err := b.exec.Run(ctx, &executor.ExecRequest{
 			Cmd: []executor.Cmd{{
-				Args:        []string{"/bin/sh", "-c", "/box/spj /box/input.txt /box/user.txt /box/answer.txt > output.txt 2> error.txt"},
+				Args: []string{"/bin/sh", "-c",
+					compiler.SandboxWorkDir + "/spj " +
+						compiler.SandboxWorkDir + "/input.txt " +
+						compiler.SandboxWorkDir + "/user.txt " +
+						compiler.SandboxWorkDir + "/answer.txt > output.txt 2> error.txt"},
 				Env:         []string{"PATH=/usr/bin:/bin"},
 				CPULimit:    5_000_000_000,
 				MemoryLimit: 268_435_456,

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/tahsinarafat/aioj/internal/judge/checker"
+	"github.com/tahsinarafat/aioj/internal/judge/compiler"
 	"github.com/tahsinarafat/aioj/internal/judge/executor"
 	"github.com/tahsinarafat/aioj/internal/model"
 )
@@ -65,16 +66,16 @@ func (ir *InteractiveRunner) Run(ctx context.Context, in RunInput) (RunOutput, e
 		var contestantArgs []string
 		if cfg.Runtime != "" {
 			rtParts := strings.Fields(cfg.Runtime)
-			contestantArgs = append(rtParts, "/box/"+srcName)
+			contestantArgs = append(rtParts, compiler.SandboxWorkDir+"/"+srcName)
 			contestantRunCopyIn[srcName] = executor.CmdFile{Content: in.SourceCode}
 		} else {
-			contestantArgs = []string{"/box/Main"}
+			contestantArgs = []string{compiler.SandboxWorkDir + "/Main"}
 			contestantRunCopyIn["Main"] = compiledBin
 		}
 
-		interArgs := []string{"/box/interactor"}
+		interArgs := []string{compiler.SandboxWorkDir + "/interactor"}
 		if inputContent != "" {
-			interArgs = append(interArgs, "/box/input.txt")
+			interArgs = append(interArgs, compiler.SandboxWorkDir+"/input.txt")
 		}
 
 		iResult, err := runInteractivePair(ctx, ir.exec,

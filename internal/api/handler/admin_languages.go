@@ -6,24 +6,30 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
 	"github.com/tahsinarafat/aioj/internal/judge/compiler"
+	"github.com/tahsinarafat/aioj/internal/judge/executor"
 	"gopkg.in/yaml.v3"
 )
 
 type AdminLanguageHandler struct {
 	langDir string
+	// exec probes for toolchains through the judge sandbox rather than the
+	// backend's own filesystem. The backend image (Dockerfile.api) deliberately
+	// ships no compilers, so a host-side os.Stat/exec found nothing and reported
+	// an empty tool list on a healthy install.
+	exec *executor.Client
 }
 
-func NewAdminLanguageHandler(langDir string) *AdminLanguageHandler {
-	return &AdminLanguageHandler{langDir: langDir}
+func NewAdminLanguageHandler(langDir string, exec *executor.Client) *AdminLanguageHandler {
+	return &AdminLanguageHandler{langDir: langDir, exec: exec}
 }
 
 type LanguageConfigResponse struct {
@@ -46,49 +52,78 @@ type DetectedTool struct {
 	Version string `json:"version"`
 }
 
-var knownCompilers = []struct {
-	Name        string
-	Binary      string
-	VersionArgs []string
-}{
-	{"GCC (C)", "/usr/bin/gcc", []string{"--version"}},
-	{"G++ (C++)", "/usr/bin/g++", []string{"--version"}},
-	{"Clang", "/usr/bin/clang", []string{"--version"}},
-	{"Clang++", "/usr/bin/clang++", []string{"--version"}},
-	{"GCC 32-bit", "/usr/bin/gcc", []string{"-m32", "--version"}},
-	{"G++ 32-bit", "/usr/bin/g++", []string{"-m32", "--version"}},
-	{"Rustc", "/usr/bin/rustc", []string{"--version"}},
-	{"Javac", "/usr/bin/javac", []string{"-version"}},
-	{"Mono MCS", "/usr/bin/mcs", []string{"--version"}},
-	{"GDC (D)", "/usr/bin/gdc", []string{"--version"}},
-	{"Go", "/usr/local/go/bin/go", []string{"version"}},
-	{"Kotlin", "/usr/bin/kotlinc", []string{"-version"}},
-	{"Scala", "/usr/bin/scalac", []string{"-version"}},
-	{"Swift", "/usr/bin/swift", []string{"--version"}},
-	{"Zig", "/usr/bin/zig", []string{"version"}},
+const (
+	// A probe is a version print or a tiny compile. Both finish in well under a
+	// second on a warm sandbox; the cap only stops a wedged interpreter from
+	// holding the request open.
+	detectionTimeout     = 10 * time.Second
+	detectionCPULimit    = 5_000_000_000 // 5 s
+	detectionMemoryLimit = 268_435_456   // 256 MB
+)
+
+// toolProbe describes one toolchain to look for. Probe is a shell command run
+// inside the judge sandbox; Version is appended to it to capture the banner.
+//
+// Compiles marks the probes that are real compile tests. It matters: printing
+// `gcc -m32 --version` succeeds on a toolchain with no 32-bit multilib, which is
+// how the panel came to advertise "GCC 32-bit" while every 32-bit submission
+// failed. A compile probe only reports the tool when the compile links, which is
+// the same path a submission takes.
+type toolProbe struct {
+	Name     string
+	Binary   string
+	Probe    string
+	Version  string
+	Compiles bool
 }
 
-var knownInterpreters = []struct {
-	Name        string
-	Binary      string
-	VersionArgs []string
-}{
-	{"Python 3", "/usr/bin/python3", []string{"--version"}},
-	{"Python 2", "/usr/bin/python2", []string{"--version"}},
-	{"PyPy 3", "/usr/bin/pypy3", []string{"--version"}},
-	{"Node.js", "/usr/bin/node", []string{"--version"}},
-	{"Ruby", "/usr/bin/ruby", []string{"--version"}},
-	{"Perl", "/usr/bin/perl", []string{"--version"}},
-	{"PHP", "/usr/bin/php", []string{"--version"}},
-	{"Lua", "/usr/bin/lua", []string{"-v"}},
-	{"R (script)", "/usr/bin/Rscript", []string{"--version"}},
-	{"Julia", "/usr/bin/julia", []string{"--version"}},
-	{"Haskell (GHC)", "/usr/bin/ghc", []string{"--version"}},
-	{"Erlang", "/usr/bin/erl", []string{"-version"}},
-	{"Elixir", "/usr/bin/elixir", []string{"--version"}},
-	{"Java (runtime)", "/usr/bin/java", []string{"-version"}},
-	{"Mono (runtime)", "/usr/bin/mono", []string{"--version"}},
-	{"Tclsh", "/usr/bin/tclsh", []string{""}},
+var knownCompilers = []toolProbe{
+	{Name: "GCC (C)", Binary: "/usr/bin/gcc", Probe: "gcc --version", Version: "--version"},
+	{Name: "G++ (C++)", Binary: "/usr/bin/g++", Probe: "g++ --version", Version: "--version"},
+	{Name: "Clang", Binary: "/usr/bin/clang", Probe: "clang --version", Version: "--version"},
+	{Name: "Clang++", Binary: "/usr/bin/clang++", Probe: "clang++ --version", Version: "--version"},
+	{
+		Name:     "GCC 32-bit",
+		Binary:   "/usr/bin/gcc",
+		Probe:    `printf 'int main(void){return 0;}' > t.c && gcc -m32 -o t32 t.c`,
+		Version:  "--version",
+		Compiles: true,
+	},
+	{
+		Name:     "G++ 32-bit",
+		Binary:   "/usr/bin/g++",
+		Probe:    `printf 'int main(){return 0;}' > t.cpp && g++ -m32 -o t32cpp t.cpp`,
+		Version:  "--version",
+		Compiles: true,
+	},
+	{Name: "Rustc", Binary: "/usr/bin/rustc", Probe: "rustc --version", Version: "--version"},
+	{Name: "Javac", Binary: "/usr/bin/javac", Probe: "javac -version", Version: "-version"},
+	{Name: "Mono MCS", Binary: "/usr/bin/mcs", Probe: "mcs --version", Version: "--version"},
+	{Name: "GDC (D)", Binary: "/usr/bin/gdc", Probe: "gdc --version", Version: "--version"},
+	{Name: "Go", Binary: "/usr/local/go/bin/go", Probe: "go version", Version: "version"},
+	{Name: "Kotlin", Binary: "/usr/bin/kotlinc", Probe: "kotlinc -version", Version: "-version"},
+	{Name: "Scala", Binary: "/usr/bin/scalac", Probe: "scalac -version", Version: "-version"},
+	{Name: "Swift", Binary: "/usr/bin/swift", Probe: "swift --version", Version: "--version"},
+	{Name: "Zig", Binary: "/usr/bin/zig", Probe: "zig version", Version: "version"},
+}
+
+var knownInterpreters = []toolProbe{
+	{Name: "Python 3", Binary: "/usr/bin/python3", Probe: "python3 --version", Version: "--version"},
+	{Name: "Python 2", Binary: "/usr/bin/python2", Probe: "python2 --version", Version: "--version"},
+	{Name: "PyPy 3", Binary: "/usr/bin/pypy3", Probe: "pypy3 --version", Version: "--version"},
+	{Name: "Node.js", Binary: "/usr/bin/node", Probe: "node --version", Version: "--version"},
+	{Name: "Ruby", Binary: "/usr/bin/ruby", Probe: "ruby --version", Version: "--version"},
+	{Name: "Perl", Binary: "/usr/bin/perl", Probe: "perl --version", Version: "--version"},
+	{Name: "PHP", Binary: "/usr/bin/php", Probe: "php --version", Version: "--version"},
+	{Name: "Lua", Binary: "/usr/bin/lua", Probe: "lua -v", Version: "-v"},
+	{Name: "R (script)", Binary: "/usr/bin/Rscript", Probe: "Rscript --version", Version: "--version"},
+	{Name: "Julia", Binary: "/usr/bin/julia", Probe: "julia --version", Version: "--version"},
+	{Name: "Haskell (GHC)", Binary: "/usr/bin/ghc", Probe: "ghc --version", Version: "--version"},
+	{Name: "Erlang", Binary: "/usr/bin/erl", Probe: "erl -version", Version: "-version"},
+	{Name: "Elixir", Binary: "/usr/bin/elixir", Probe: "elixir --version", Version: "--version"},
+	{Name: "Java (runtime)", Binary: "/usr/bin/java", Probe: "java -version", Version: "-version"},
+	{Name: "Mono (runtime)", Binary: "/usr/bin/mono", Probe: "mono --version", Version: "--version"},
+	{Name: "Tclsh", Binary: "/usr/bin/tclsh", Probe: "echo 'exit 0' | tclsh", Version: ""},
 }
 
 func (h *AdminLanguageHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -395,60 +430,125 @@ func (h *AdminLanguageHandler) Detect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	type detected struct {
+	// Non-nil slices on purpose. A nil slice marshals to `null`, and the admin
+	// panel called `.map()` on it, so the whole page blanked whenever nothing
+	// was found — which is exactly what happened on the lean backend image that
+	// ships no compilers. An empty array renders "No compilers detected".
+	result := struct {
 		Compilers    []DetectedTool `json:"compilers"`
 		Interpreters []DetectedTool `json:"interpreters"`
+	}{
+		Compilers:    []DetectedTool{},
+		Interpreters: []DetectedTool{},
 	}
 
-	result := detected{}
+	// Concurrency is bounded well below the tool count. Every probe is a sandbox
+	// process, and the judge container has a fixed memory budget shared with live
+	// submissions — firing ~30 at once to answer one admin click could pressure
+	// the host into holding real judgments.
+	const maxConcurrentProbes = 4
+	sem := make(chan struct{}, maxConcurrentProbes)
 
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+
+	probe := func(tool toolProbe, into *[]DetectedTool) {
+		defer wg.Done()
+		sem <- struct{}{}
+		defer func() { <-sem }()
+
+		found := h.detectTool(r.Context(), tool)
+		if found == nil {
+			return
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		*into = append(*into, *found)
+	}
+
+	wg.Add(len(knownCompilers) + len(knownInterpreters))
 	for _, c := range knownCompilers {
-		tool := detectTool(c.Name, c.Binary, c.VersionArgs)
-		if tool != nil {
-			result.Compilers = append(result.Compilers, *tool)
-		}
+		go probe(c, &result.Compilers)
 	}
-
 	for _, i := range knownInterpreters {
-		tool := detectTool(i.Name, i.Binary, i.VersionArgs)
-		if tool != nil {
-			result.Interpreters = append(result.Interpreters, *tool)
-		}
+		go probe(i, &result.Interpreters)
 	}
+	wg.Wait()
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(result)
+	respondJSON(w, http.StatusOK, result)
 }
 
-func detectTool(name, binary string, versionArgs []string) *DetectedTool {
-	info, err := os.Stat(binary)
-	if err != nil || info.IsDir() {
+// detectTool runs one tool's check inside the judge sandbox. The compilers live
+// in the judge image, not the backend image, so probing locally only ever
+// reported "nothing found".
+//
+// Availability and version come from a single sandbox call: the probe decides
+// whether the tool is usable, and the same run captures the version banner.
+func (h *AdminLanguageHandler) detectTool(ctx context.Context, tool toolProbe) *DetectedTool {
+	if h.exec == nil {
 		return nil
 	}
 
-	version := ""
-	if len(versionArgs) > 0 && versionArgs[0] != "" {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-		cmd := exec.CommandContext(ctx, binary, versionArgs...)
-		out, err := cmd.CombinedOutput()
-		if err == nil {
-			version = strings.TrimSpace(string(out))
-			lines := strings.Split(version, "\n")
-			if len(lines) > 0 {
-				version = lines[0]
-			}
-			if len(version) > 100 {
-				version = version[:100] + "..."
-			}
+	ctx, cancel := context.WithTimeout(ctx, detectionTimeout)
+	defer cancel()
+
+	// Each branch keeps a meaningful exit status, so one run both decides
+	// availability and captures the banner.
+	//
+	//  - compile probes: the version command runs only if the compile linked,
+	//    so a failure to link leaves the probe failing.
+	//  - version probes: the command's own output is the banner, so it is
+	//    redirected; the exit status is what separates a missing binary from a
+	//    tool that prints then exits non-zero (javac, java, erl).
+	var script string
+	if tool.Compiles {
+		script = tool.Probe
+		if tool.Version != "" {
+			script += " && " + tool.Binary + " " + tool.Version + " > version.txt 2>&1"
 		}
+	} else {
+		script = tool.Probe + " > version.txt 2>&1"
 	}
 
-	return &DetectedTool{
-		Name:    name,
-		Path:    binary,
-		Version: version,
+	resp, err := h.exec.Run(ctx, &executor.ExecRequest{Cmd: []executor.Cmd{{
+		Args:        []string{"/bin/sh", "-c", script},
+		Env:         []string{"PATH=/usr/bin:/bin:/usr/local/go/bin", "HOME=/tmp"},
+		CPULimit:    detectionCPULimit,
+		MemoryLimit: detectionMemoryLimit,
+		ProcLimit:   64,
+		CopyOut:     []string{"version.txt"},
+	}}})
+	if err != nil || len(resp) == 0 {
+		return nil
 	}
+
+	cr := resp[0]
+	if tool.Compiles {
+		// The compile only counts when it actually linked; a missing 32-bit
+		// libgcc surfaces here as a rejected or non-zero run.
+		if cr.Status != "Accepted" || cr.ExitStatus != 0 {
+			return nil
+		}
+	} else if cr.ExitStatus == 127 {
+		// 127 is the shell's "command not found", the one status that means the
+		// tool is genuinely absent.
+		return nil
+	}
+
+	return &DetectedTool{Name: tool.Name, Path: tool.Binary, Version: firstLine(cr.Files["version.txt"])}
+}
+
+// firstLine trims a captured version banner to the one line worth showing.
+func firstLine(out string) string {
+	trimmed := strings.TrimSpace(out)
+	if trimmed == "" {
+		return ""
+	}
+	line := strings.Split(trimmed, "\n")[0]
+	if len(line) > 100 {
+		line = line[:100] + "..."
+	}
+	return line
 }
 
 var languageTemplates = map[string]LanguageConfigResponse{
