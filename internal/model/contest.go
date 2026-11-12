@@ -41,12 +41,23 @@ type Contest struct {
 	VirtualContestEnabled bool                    `json:"virtual_contest_enabled"`
 	PDFEnabled            bool                    `json:"pdf_enabled"`
 	StatementHidden       bool                    `json:"statement_hidden"`
-	GroupID               string                  `json:"group_id,omitempty"`
-	RatingCalculated      bool                    `json:"rating_calculated"`
-	CreatedBy             string                  `json:"created_by"`
-	CreatedAt             time.Time               `json:"created_at"`
-	Status                string                  `json:"status"` // draft|pending|published|rejected
-	ReviewNote            string                  `json:"review_note,omitempty"`
+	// ScoreboardVisibility is the separate answer to "may this caller watch the
+	// board", as opposed to "may this caller read this round". Access controls
+	// content — statements, booklet, editorial, submit — and its password and
+	// group rules are deliberately not applied here, because a watchable board is
+	// the whole point of an onsite or hiring round: the competitors are in a room
+	// and the result is on a projector.
+	//
+	// Only the board and the per-problem solve counts consult it. Listing does
+	// not: an invite-only round with a public board stays out of the catalog and
+	// out of search, reachable by its direct link alone.
+	ScoreboardVisibility string    `json:"scoreboard_visibility"`
+	GroupID              string    `json:"group_id,omitempty"`
+	RatingCalculated     bool      `json:"rating_calculated"`
+	CreatedBy            string    `json:"created_by"`
+	CreatedAt            time.Time `json:"created_at"`
+	Status               string    `json:"status"` // draft|pending|published|rejected
+	ReviewNote           string    `json:"review_note,omitempty"`
 	// IsRated was in the schema since migration 000003 and no Go code ever read
 	// or wrote it, so every contest was implicitly rated and an unrated round
 	// could not exist. It is now part of the model and of the create/update path.
@@ -70,6 +81,43 @@ const (
 	ContestPermissionJudge   = "judge"
 	ContestPermissionTester  = "tester"
 )
+
+// Scoreboard visibility. The zero value of the column cannot be "" (it has a
+// NOT NULL DEFAULT), so these two constants are the whole allowed set, mirrored
+// by the CHECK constraint in migration 000088.
+const (
+	// ScoreboardParticipants: watching the board is part of reading the round.
+	// The password and group rules apply, exactly as they do to the statements.
+	// This is the default because it is what every existing round already did.
+	ScoreboardParticipants = "participants"
+	// ScoreboardPublic: anyone may watch, including a signed-out visitor who never
+	// held the password. Content stays behind access; only the board is open.
+	ScoreboardPublic = "public"
+)
+
+// IsScoreboardPublic is the one place the value is interpreted, so a caller
+// cannot invent a third reading of it.
+func (c *Contest) IsScoreboardPublic() bool {
+	return c.ScoreboardVisibility == ScoreboardPublic
+}
+
+// NormalizeScoreboardVisibility turns an unset value into the participant-only
+// default. Used at the write boundary so a caller that predates the column (or a
+// test fixture that omits it) writes a valid value rather than tripping the
+// CHECK constraint.
+func NormalizeScoreboardVisibility(v string) string {
+	if v == "" {
+		return ScoreboardParticipants
+	}
+	return v
+}
+
+// ValidScoreboardVisibility rejects anything outside the allowed set. Validated
+// in the handler rather than left to the CHECK constraint, so a bad choice is a
+// 400 with a reason instead of a 500 from Postgres.
+func ValidScoreboardVisibility(v string) bool {
+	return v == ScoreboardParticipants || v == ScoreboardPublic
+}
 
 // MaxContestProblems bounds a round at the 26 single-letter indices the schema
 // stores (contest_problems.index is CHAR(1)).
@@ -166,24 +214,30 @@ type ContestDisplayName struct {
 // RegistrationRequired false is "registration off", and IsRated false is an
 // unrated round.
 type CreateContestRequest struct {
-	Title                 string          `json:"title"`
-	Slug                  string          `json:"slug,omitempty"`
-	Type                  string          `json:"type"`
-	Format                string          `json:"format"`
-	FormatConfig          json.RawMessage `json:"format_config,omitempty"`
-	Division              *int            `json:"division,omitempty"`
-	StartTime             time.Time       `json:"start_time"`
-	EndTime               time.Time       `json:"end_time"`
-	FreezeTime            *time.Time      `json:"freeze_time,omitempty"`
-	Password              *string         `json:"password"`
-	Description           string          `json:"description,omitempty"`
-	Visible               *bool           `json:"visible,omitempty"`
-	ProblemIDs            []string        `json:"problem_ids"`
-	PDFEnabled            *bool           `json:"pdf_enabled,omitempty"`
-	StatementHidden       *bool           `json:"statement_hidden,omitempty"`
-	UpsolvingEnabled      *bool           `json:"upsolving_enabled,omitempty"`
-	VirtualContestEnabled *bool           `json:"virtual_contest_enabled,omitempty"`
-	GroupID               string          `json:"group_id,omitempty"`
+	Title           string          `json:"title"`
+	Slug            string          `json:"slug,omitempty"`
+	Type            string          `json:"type"`
+	Format          string          `json:"format"`
+	FormatConfig    json.RawMessage `json:"format_config,omitempty"`
+	Division        *int            `json:"division,omitempty"`
+	StartTime       time.Time       `json:"start_time"`
+	EndTime         time.Time       `json:"end_time"`
+	FreezeTime      *time.Time      `json:"freeze_time,omitempty"`
+	Password        *string         `json:"password"`
+	Description     string          `json:"description,omitempty"`
+	Visible         *bool           `json:"visible,omitempty"`
+	ProblemIDs      []string        `json:"problem_ids"`
+	PDFEnabled      *bool           `json:"pdf_enabled,omitempty"`
+	StatementHidden *bool           `json:"statement_hidden,omitempty"`
+	// ScoreboardVisibility is a string rather than a bool for the reason in the
+	// migration: the third state (public after the round ends) is a plausible next
+	// ask, and a bool would need a migration that rewrites every row's meaning.
+	// Pointer because this DTO backs create and update alike — omitted means "leave
+	// it alone", and "" is not a meaningful choice to express.
+	ScoreboardVisibility  *string `json:"scoreboard_visibility,omitempty"`
+	UpsolvingEnabled      *bool   `json:"upsolving_enabled,omitempty"`
+	VirtualContestEnabled *bool   `json:"virtual_contest_enabled,omitempty"`
+	GroupID               string  `json:"group_id,omitempty"`
 	// Registration controls. Without these on the create request there was no
 	// way to make a registration-required contest, so the registration
 	// endpoints always answered 400 "registration not required for this

@@ -227,9 +227,25 @@ export default function ContestScoreboard() {
   }
 
   if (error || !data) {
+    // A board that is not published to spectators answers 403, and a bare
+    // "forbidden" is the wrong thing to show someone who followed a link to watch
+    // a round. Say what is actually true: this board is for the people in the
+    // round. The scoreboard has its own visibility setting, so a private round
+    // whose setter kept the default lands here rather than looking broken.
+    const locked = /forbidden|403/i.test(error);
     return (
       <div className="max-w-2xl mx-auto mt-16 text-center">
-        <div className="text-bad text-lg mb-4">{error || 'Scoreboard not found'}</div>
+        {locked ? (
+          <>
+            <h1 className="text-xl font-bold text-ink mb-2">This scoreboard is not public</h1>
+            <p className="text-sm text-muted-soft mb-4">
+              The setter has kept standings visible to participants only. If you have the contest
+              password, open the contest page to unlock it.
+            </p>
+          </>
+        ) : (
+          <div className="text-bad text-lg mb-4">{error || 'Scoreboard not found'}</div>
+        )}
         <Link to={`/contests/${id}`} className="text-brand hover:underline">
           &larr; Back to contest
         </Link>

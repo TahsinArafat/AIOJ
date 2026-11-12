@@ -69,6 +69,15 @@ type contestAccessDecision struct {
 	// rights to testers — most visibly by letting a tester see standings past the
 	// freeze, which is exactly the leak the freeze exists to prevent.
 	isJudge bool
+	// contentAllowed records what the CONTENT pipeline answered, which for a
+	// spectate decision is not the same as whether the caller may watch. A public
+	// board is watchable by somebody who cannot open a single statement, and the
+	// scoreboard has to tell those two callers apart: a non-participant spectator
+	// gets the board without the problem titles.
+	contentAllowed bool
+	// err carries a fail-closed store error out of the content steps. Not an
+	// access level because it is not an answer — it is the absence of one.
+	err error
 }
 
 func (d contestAccessDecision) Allowed() bool       { return d.level == accessGranted }
@@ -115,7 +124,7 @@ func newContestAccessPolicy(cs contestAccessStore, gs contestGrantChecker) conte
 	return contestAccessPolicy{contests: cs, grants: gs, now: time.Now}
 }
 
-// Decide is the whole policy, as an ordered pipeline. Order matters:
+// Decide is the whole policy, as an ordered pipeline:
 //
 //  1. nil contest            -> none
 //  2. staff                  -> granted (they run the round; they never need to
@@ -134,6 +143,44 @@ func newContestAccessPolicy(cs contestAccessStore, gs contestGrantChecker) conte
 // begun must not leak whether it is invite-only or locked, and there is nothing
 // behind the answer to unlock yet.
 func (p contestAccessPolicy) Decide(ctx context.Context, c *model.Contest, claims *auth.Claims) (contestAccessDecision, error) {
+	return p.decide(ctx, c, claims, false)
+}
+
+// DecideSpectate answers the second question: "may this caller watch this round's
+// scoreboard". It is the same ordered pipeline with steps 5 and 6 — group and
+// password — deliberately skipped when the round publishes its board.
+//
+// Why a second axis exists at all: Decide answers "may this caller read this
+// round", and hiding the board behind it made a whole category of round
+// impossible. An onsite final is private to the people in the room and its board
+// is the point — projected, streamed, pasted into a group chat. With one verdict
+// the only way to publish the board was to publish the statements too.
+//
+// What is deliberately NOT relaxed, each for a concrete reason:
+//
+//   - Staff, draft and !Visible are answered before the split, so a draft's board
+//     is still nobody's business and a rejected round has no board.
+//   - accessNotStarted survives, so a public board cannot become the side channel
+//     that reveals an invite-only round hours before it begins. After the start
+//     the setter has chosen to publish the result and nothing is left to infer.
+//   - When the board is not public the pipeline is identical to Decide, so the
+//     participants-only case cannot drift from the content rules.
+//
+// isStaff/isJudge come out of the same computation, because the board needs the
+// judge privilege for the freeze whichever axis admitted the reader.
+func (p contestAccessPolicy) DecideSpectate(ctx context.Context, c *model.Contest, claims *auth.Claims) (contestAccessDecision, error) {
+	return p.decide(ctx, c, claims, true)
+}
+
+// decide is the one pipeline. spectate only decides what happens after the
+// questions both axes share have been answered: a public board turns what would
+// have been a group refusal or a password prompt into a grant.
+//
+// Putting the flag here rather than in a wrapper is not a style choice. A wrapper
+// that inspected Decide's verdict could not tell a group refusal from a store
+// failure — both are accessNone, and one of them must stay closed — so the split
+// has to happen where the reason is still known.
+func (p contestAccessPolicy) decide(ctx context.Context, c *model.Contest, claims *auth.Claims, spectate bool) (contestAccessDecision, error) {
 	if c == nil {
 		return contestAccessDecision{}, nil
 	}
@@ -157,7 +204,10 @@ func (p contestAccessPolicy) Decide(ctx context.Context, c *model.Contest, claim
 	isJudge := isAdmin || isCreator ||
 		hasAccess(model.ContestPermissionManager, model.ContestPermissionJudge)
 	if isStaff {
-		return contestAccessDecision{level: accessGranted, isStaff: true, isJudge: isJudge}, nil
+		// contentAllowed is set explicitly, not defaulted: staff read the round, so
+		// the board they watch is the full one. Leaving it false would strip the
+		// problem titles off a setter's own scoreboard.
+		return contestAccessDecision{level: accessGranted, isStaff: true, isJudge: isJudge, contentAllowed: true}, nil
 	}
 
 	// 3. Published but not started. Answering accessNone here is what made an
@@ -174,16 +224,49 @@ func (p contestAccessPolicy) Decide(ctx context.Context, c *model.Contest, claim
 		return contestAccessDecision{level: accessNotStarted}, nil
 	}
 
+	// The split. Everything above is a question both axes ask and answer the same
+	// way; everything below belongs to content alone.
+	content := p.contentLevel(ctx, c, userID)
+	if content.err != nil {
+		return contestAccessDecision{}, content.err
+	}
+
+	decision := contestAccessDecision{
+		level:   content.level,
+		isJudge: isJudge,
+		// Recorded here because only the board needs it, and only the board can get
+		// it for free: a public board is watchable by a caller who cannot read the
+		// round, and the scoreboard has to know which of those two it is serving so
+		// it can strip the problem titles a spectator must not receive.
+		contentAllowed: content.level == accessGranted,
+	}
+
+	// A round that publishes its board is watchable before the group and password
+	// rules are consulted. This is the entire feature, and it is why the reason
+	// cannot be recovered from the verdict afterwards: a group refusal and a store
+	// failure are both "not granted", and one of them must stay closed.
+	if spectate && c.IsScoreboardPublic() {
+		decision.level = accessGranted
+	}
+
+	return decision, nil
+}
+
+// contentLevel is steps 4 and 5 of the pipeline — the group restriction and the
+// password. Separated out so the spectate path can read the answer without
+// duplicating the rules, since two copies of an access rule is the exact failure
+// this file was written to end.
+func (p contestAccessPolicy) contentLevel(ctx context.Context, c *model.Contest, userID string) contestAccessDecision {
 	// 4. Group restriction. This used to run on GetByID and Register only, so a
 	// non-member who guessed a contest id could read its statements, its PDF and
 	// its standings, and submit to it.
 	allowed, err := p.contests.CheckGroupRestriction(ctx, c.ID, userID)
 	if err != nil {
 		// Fail closed. A database error must not become an access grant.
-		return contestAccessDecision{}, err
+		return contestAccessDecision{err: err}
 	}
 	if !allowed {
-		return contestAccessDecision{}, nil
+		return contestAccessDecision{}
 	}
 
 	// 5. Password. An anonymous caller cannot hold a grant, so this correctly
@@ -193,15 +276,15 @@ func (p contestAccessPolicy) Decide(ctx context.Context, c *model.Contest, claim
 		if userID != "" && p.grants != nil {
 			granted, err = p.grants.IsGranted(ctx, c.ID, userID)
 			if err != nil {
-				return contestAccessDecision{}, err
+				return contestAccessDecision{err: err}
 			}
 		}
 		if !granted {
-			return contestAccessDecision{level: accessPasswordRequired}, nil
+			return contestAccessDecision{level: accessPasswordRequired}
 		}
 	}
 
-	return contestAccessDecision{level: accessGranted}, nil
+	return contestAccessDecision{level: accessGranted}
 }
 
 // ---------------------------------------------------------------------------
@@ -214,6 +297,43 @@ func (p contestAccessPolicy) Decide(ctx context.Context, c *model.Contest, claim
 type contestViewer struct {
 	decision contestAccessDecision
 	claims   *auth.Claims
+}
+
+// requireContestSpectateAccess is the board's gate. It is requireContestAccess
+// with the spectate question asked instead of the content one, so a round with a
+// public scoreboard is watchable by a caller who cannot read a word of it.
+//
+// A refused password round answers 404 here, not the 403 "password_required" the
+// content gate sends. That prompt is for someone who is supposed to unlock and go
+// on to read the statements; a spectator never will, and telling them the round
+// has a password would confirm a private round exists — the same inference the
+// listing deliberately prevents.
+func (h *contestHandlerAccess) requireContestSpectateAccess(
+	w http.ResponseWriter,
+	r *http.Request,
+	c *model.Contest,
+	notFoundWhenDenied bool,
+) (contestViewer, bool) {
+	claims := middleware.GetUserClaims(r)
+
+	decision, err := h.access.DecideSpectate(r.Context(), c, claims)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return contestViewer{}, false
+	}
+
+	switch {
+	case decision.Allowed():
+		return contestViewer{decision: decision, claims: claims}, true
+	case decision.IsUpcoming() && !notFoundWhenDenied:
+		return contestViewer{decision: decision, claims: claims}, true
+	case notFoundWhenDenied:
+		http.Error(w, "contest not found", http.StatusNotFound)
+		return contestViewer{}, false
+	default:
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return contestViewer{}, false
+	}
 }
 
 // requireContestAccess is the one place a contest handler turns a policy decision
@@ -277,10 +397,22 @@ func (h *contestHandlerAccess) resolveContestAccess(
 	case decision.NeedsPassword():
 		// The body is a machine-readable code, not prose, so the contest page can
 		// render an unlock prompt without parsing an error string.
-		respondJSON(w, http.StatusForbidden, map[string]string{
+		//
+		// The scoreboard flag is added for one concrete reason: a round with a
+		// public board is deliberately unlisted, so a spectator who was handed its
+		// link arrives here and would otherwise be told only that the round is
+		// private. It is safe to say — they already hold the id, and the board is
+		// available to anyone — and without it the published board has no route a
+		// stranger can follow. Not sent for a round whose board is participant-only,
+		// where it would be a hint about nothing.
+		body := map[string]string{
 			"error": "password_required",
 			"code":  "password_required",
-		})
+		}
+		if c.IsScoreboardPublic() {
+			body["scoreboard_public"] = "true"
+		}
+		respondJSON(w, http.StatusForbidden, body)
 		return contestViewer{}, false
 	case notFoundWhenDenied:
 		http.Error(w, "contest not found", http.StatusNotFound)

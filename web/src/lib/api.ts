@@ -305,17 +305,23 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
         // can react to password_change_required.
         let message = text
         let code = ''
+        let scoreboardPublic = false
         try {
             const parsed = JSON.parse(text)
             if (parsed && typeof parsed === 'object') {
                 message = parsed.error || parsed.message || text
                 code = parsed.code || ''
+                // Carried for one case: a password-protected round that publishes
+                // its board. Such a round is unlisted, so the locked-contest screen
+                // is the only place a spectator can be handed the way in.
+                scoreboardPublic = parsed.scoreboard_public === 'true'
             }
         } catch {
             // Plain-text error: keep it as-is.
         }
         const err = new Error(message || `HTTP ${res.status}`)
         if (code) (err as Error & { code?: string }).code = code
+        if (scoreboardPublic) (err as Error & { scoreboardPublic?: boolean }).scoreboardPublic = true
         throw err
     }
     const contentType = res.headers.get('content-type') || ''

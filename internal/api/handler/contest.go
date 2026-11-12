@@ -248,6 +248,19 @@ func (h *ContestHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// The board's visibility is validated at the boundary, like every other enum on
+	// this DTO: a bad value becomes a 400 with a reason rather than a 500 from the
+	// CHECK constraint. An omitted field on create means "the default", which is a
+	// participants-only board — the behaviour every round had before the column.
+	sbVisibility := model.ScoreboardParticipants
+	if req.ScoreboardVisibility != nil {
+		if !model.ValidScoreboardVisibility(*req.ScoreboardVisibility) {
+			http.Error(w, "scoreboard_visibility must be 'participants' or 'public'", http.StatusBadRequest)
+			return
+		}
+		sbVisibility = *req.ScoreboardVisibility
+	}
+
 	c := &model.Contest{
 		ID:                   uuid.New().String(),
 		Slug:                 req.Slug,
@@ -262,6 +275,7 @@ func (h *ContestHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Description:          req.Description,
 		Status:               initialContestStatus(claims.Role),
 		Visible:              claims.Role == "admin",
+		ScoreboardVisibility: sbVisibility,
 		GroupID:              req.GroupID,
 		CreatedBy:            claims.UserID,
 		RegistrationRequired: derefBool(req.RegistrationRequired, false),
@@ -491,6 +505,17 @@ func (h *ContestHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if req.StatementHidden != nil {
 		c.StatementHidden = *req.StatementHidden
 	}
+	// The scoreboard axis. Pointer semantics like every other optional field here:
+	// nil leaves the stored value alone, so an unrelated settings save cannot
+	// silently publish (or unpublish) a round's board. Validated rather than
+	// trusted because the column has a CHECK and a 400 with a reason beats a 500.
+	if req.ScoreboardVisibility != nil {
+		if !model.ValidScoreboardVisibility(*req.ScoreboardVisibility) {
+			http.Error(w, "scoreboard_visibility must be 'participants' or 'public'", http.StatusBadRequest)
+			return
+		}
+		c.ScoreboardVisibility = *req.ScoreboardVisibility
+	}
 	if req.UpsolvingEnabled != nil {
 		c.UpsolvingEnabled = *req.UpsolvingEnabled
 	}
@@ -580,7 +605,11 @@ func (h *ContestHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	now := time.Now()
-	viewer, ok := h.requireContestAccess(w, r, contest, false)
+	// The board's own gate, not the content one. A round may publish its board and
+	// keep its statements private — that is what an onsite final or a hiring round
+	// is — and gating the board on content made publishing the result impossible
+	// without publishing the problems too.
+	viewer, ok := h.requireContestSpectateAccess(w, r, contest, false)
 	if !ok {
 		return
 	}
@@ -589,6 +618,11 @@ func (h *ContestHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 	// (manager|judge) and is preserved here deliberately.
 	isJudge := viewer.decision.IsJudge()
 	canSeeJudge := isJudge // preserve original capability before view override
+	// A spectator admitted by a public board is not necessarily a participant. The
+	// board payload is harmless for them — letters, solves, times — with one
+	// exception: the problem title in the header is one field away from the
+	// statement, so it is stripped below for anyone who cannot read the round.
+	canReadRound := viewer.decision.contentAllowed
 
 	// Allow admins/judges to explicitly request the public (frozen) view via ?view=public
 	viewParam := r.URL.Query().Get("view")
@@ -596,13 +630,18 @@ func (h *ContestHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 		isJudge = false
 	}
 
-	// Check cache (key: contestID:view:page:limit:judge)
+	// Check cache (key: contestID:view:page:limit:judge:titles)
 	pageStr := r.URL.Query().Get("page")
 	limitStr := r.URL.Query().Get("limit")
 	// isJudge belongs in the key: a judge sees past the freeze and gets
 	// is_judge:true, so without it the first judge to load the page seeded the
 	// unfrozen board for every anonymous visitor until the entry expired.
-	cacheKey := contest.ID + ":" + viewParam + ":" + pageStr + ":" + limitStr + ":" + strconv.FormatBool(isJudge)
+	//
+	// canReadRound belongs in the key for the same reason: it decides whether the
+	// problem titles are in the body, so without it the first participant to load
+	// a public board would have published the titles to every spectator with it.
+	cacheKey := contest.ID + ":" + viewParam + ":" + pageStr + ":" + limitStr + ":" +
+		strconv.FormatBool(isJudge) + ":" + strconv.FormatBool(canReadRound)
 	if cached, ok := h.cache.get(cacheKey); ok {
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("X-Cache", "HIT")
@@ -611,6 +650,17 @@ func (h *ContestHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	problems, _ := h.store.GetProblems(r.Context(), contest.ID)
+
+	// A title is one field away from the statement, so a caller who cannot read the
+	// round does not get one. The board keeps everything it actually needs: the
+	// letter, the score, the per-cell solve state. Done here rather than at the
+	// response literal so nothing downstream — a future column, a different
+	// serializer — can reintroduce the field by accident.
+	if !canReadRound {
+		for i := range problems {
+			problems[i].Title = ""
+		}
+	}
 
 	frozen := contest.FreezeTime != nil && now.After(*contest.FreezeTime) && now.Before(contest.EndTime)
 
@@ -1395,9 +1445,12 @@ func (h *ContestHandler) ContestStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Per-problem stats carry the problem title, so the contest's own visibility
-	// has to be checked here too — "public like the scoreboard" is only true once
-	// the round is public.
+	// Per-problem stats carry the problem title, so this stays on the CONTENT gate
+	// and deliberately does not follow the scoreboard onto the spectate one. "Public
+	// like the scoreboard" stopped being true the moment a round could publish its
+	// board and keep its statements private: the board's title is stripped for a
+	// non-participant (see Scoreboard), and a stats endpoint that handed the same
+	// title out would undo that with one request.
 	if _, ok := h.requireContestAccess(w, r, contest, true); !ok {
 		return
 	}

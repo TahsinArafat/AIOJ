@@ -164,7 +164,7 @@ export default function ContestDetail() {
     // code is kept because "password_required" needs a prompt, not an apology: a
     // contestant who simply has not unlocked the round must be able to type the
     // password, and everything else stays a plain error.
-    const [loadError, setLoadError] = useState<{ id: string; message: string; code?: string } | null>(null)
+    const [loadError, setLoadError] = useState<{ id: string; message: string; code?: string; scoreboardPublic?: boolean } | null>(null)
     const [unlockPassword, setUnlockPassword] = useState('')
     const [unlocking, setUnlocking] = useState(false)
     const [unlockError, setUnlockError] = useState('')
@@ -276,7 +276,11 @@ export default function ContestDetail() {
             // setState from a promise callback, not the effect body: this is the
             // async result of an external request, which is what an effect is for.
             const code = (e as { code?: string } | null)?.code
-            setLoadError({ id, message: errorMessage(e), code })
+            // A round may publish its board and keep its problems locked. That
+            // round is unlisted, so this screen — the one a shared link lands on —
+            // is the only place a spectator can be told the board is watchable.
+            const scoreboardPublic = (e as { scoreboardPublic?: boolean } | null)?.scoreboardPublic
+            setLoadError({ id, message: errorMessage(e), code, scoreboardPublic })
         }).finally(() => setLoading(false))
     }, [id, reloadKey])
 
@@ -426,6 +430,7 @@ export default function ContestDetail() {
         // over from a previously viewed round would be about a different contest.
         const reason = loadError && loadError.id === id ? loadError.message : ''
         const locked = Boolean(loadError && loadError.id === id && loadError.code === 'password_required')
+        const scoreboardPublic = Boolean(loadError && loadError.id === id && loadError.scoreboardPublic)
 
         if (locked) {
             return (
@@ -459,6 +464,17 @@ export default function ContestDetail() {
                             {unlocking ? 'Unlocking...' : 'Unlock contest'}
                         </button>
                     </form>
+                    {/* A published board is unlisted, so this is the only route a
+                        spectator has. Only rendered when the server says the round
+                        actually has one, so the link cannot dangle. */}
+                    {scoreboardPublic && (
+                        <p className="text-center text-sm text-muted-soft mt-4">
+                            Can't unlock it?{' '}
+                            <Link to={`/contests/${id}/scoreboard`} className="text-brand hover:underline">
+                                Watch the scoreboard
+                            </Link>
+                        </p>
+                    )}
                 </div>
             )
         }

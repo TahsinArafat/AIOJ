@@ -254,6 +254,13 @@ export interface Contest {
     virtual_contest_enabled: boolean
     pdf_enabled: boolean
     statement_hidden: boolean
+    /**
+     * Whether the scoreboard has its own visibility. 'participants' (the default,
+     * and what every round did before) means watching the board is part of
+     * reading the round; 'public' means anyone may watch, including a signed-out
+     * visitor who never held the password. Content is unaffected either way.
+     */
+    scoreboard_visibility: 'participants' | 'public'
     group_id?: string
     rating_calculated: boolean
     created_by: string

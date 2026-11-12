@@ -48,15 +48,19 @@ func (s *ContestStore) Create(ctx context.Context, c *model.Contest) error {
 		c.Status = model.ContestStatusDraft
 	}
 	c.Visible = c.Status == model.ContestStatusPublished
+	// The column is NOT NULL with a CHECK, so a caller that predates it must not
+	// write "". Normalising at the store rather than in each handler keeps the
+	// default in one place.
+	c.ScoreboardVisibility = model.NormalizeScoreboardVisibility(c.ScoreboardVisibility)
 
 	err = tx.QueryRowContext(ctx,
 		`INSERT INTO contests(id,slug,title,type,format,format_config,start_time,end_time,freeze_time,password_hash,visible,description,
 		                    registration_required,registration_deadline,max_participants,division,educational_config,created_by,
-		                    status,is_rated,rated_for_min,rated_for_max)
-		 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22) RETURNING created_at`,
+		                    status,is_rated,rated_for_min,rated_for_max,scoreboard_visibility)
+		 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23) RETURNING created_at`,
 		c.ID, slug, c.Title, c.Type, c.Format, formatConfigJSON, c.StartTime, c.EndTime, c.FreezeTime, c.PasswordHash, c.Visible, c.Description,
 		c.RegistrationRequired, c.RegistrationDeadline, c.MaxParticipants, c.Division, configJSON, c.CreatedBy,
-		c.Status, c.IsRated, c.RatedForMin, c.RatedForMax,
+		c.Status, c.IsRated, c.RatedForMin, c.RatedForMax, c.ScoreboardVisibility,
 	).Scan(&c.CreatedAt)
 	if err != nil {
 		return err
@@ -107,6 +111,7 @@ func (s *ContestStore) getByWhere(ctx context.Context, where string, args ...int
 		        upsolving_enabled,virtual_contest_enabled,pdf_enabled,statement_hidden,created_by,created_at,
 		        COALESCE(status,'draft'), COALESCE(review_note,''),
 		        COALESCE(is_rated,true), COALESCE(rated_for_min,0), COALESCE(rated_for_max,9999),
+		        scoreboard_visibility,
 		        (SELECT group_id::text FROM group_contests WHERE contest_id = id LIMIT 1) AS group_id
 		 FROM contests WHERE `+where, args...).Scan(
 		&c.ID, &c.DisplayID, &slug, &c.Title, &c.Type, &c.Format, &formatConfigJSON, &c.StartTime, &c.EndTime, &c.FreezeTime,
@@ -115,7 +120,7 @@ func (s *ContestStore) getByWhere(ctx context.Context, where string, args ...int
 		&c.Division, &configJSON,
 		&c.UpsolvingEnabled, &c.VirtualContestEnabled, &c.PDFEnabled, &c.StatementHidden,
 		&c.CreatedBy, &c.CreatedAt, &c.Status, &c.ReviewNote,
-		&c.IsRated, &c.RatedForMin, &c.RatedForMax, &groupID)
+		&c.IsRated, &c.RatedForMin, &c.RatedForMax, &c.ScoreboardVisibility, &groupID)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -171,7 +176,7 @@ func (s *ContestStore) ListForViewer(ctx context.Context, offset, limit int, div
 
 	rowsQuery := `SELECT id,display_id,slug,title,type,format,format_config,start_time,end_time,freeze_time,password_hash,visible,description,
 	              registration_required,registration_deadline,max_participants,division,educational_config,
-	              created_at
+	              created_at,scoreboard_visibility
 	              FROM contests WHERE visible=true AND ` + visibility
 	if division != nil {
 		rowsQuery += fmt.Sprintf(" AND division = $%d", argIdx)
@@ -192,7 +197,7 @@ func (s *ContestStore) ListForViewer(ctx context.Context, offset, limit int, div
 		var formatConfigJSON []byte
 		var slug sql.NullString
 		rows.Scan(&c.ID, &c.DisplayID, &slug, &c.Title, &c.Type, &c.Format, &formatConfigJSON, &c.StartTime, &c.EndTime, &c.FreezeTime, &c.PasswordHash, &c.Visible, &c.Description,
-			&c.RegistrationRequired, &c.RegistrationDeadline, &c.MaxParticipants, &c.Division, &configJSON, &c.CreatedAt)
+			&c.RegistrationRequired, &c.RegistrationDeadline, &c.MaxParticipants, &c.Division, &configJSON, &c.CreatedAt, &c.ScoreboardVisibility)
 		if slug.Valid {
 			c.Slug = slug.String
 		}
@@ -247,12 +252,14 @@ func (s *ContestStore) Update(ctx context.Context, c *model.Contest) error {
 	 freeze_time=$7, password_hash=$8, description=$9, pdf_enabled=$10, statement_hidden=$11,
 	 slug=$13, upsolving_enabled=$14, virtual_contest_enabled=$15,
 	 visible=($16::varchar='published'), status=$16, is_rated=$17, rated_for_min=$18, rated_for_max=$19,
-	 registration_required=$20, registration_deadline=$21, max_participants=$22, division=$23
+	 registration_required=$20, registration_deadline=$21, max_participants=$22, division=$23,
+	 scoreboard_visibility=$24
 	 WHERE id=$12`,
 		c.Title, c.Type, c.Format, formatConfigJSON, c.StartTime, c.EndTime, c.FreezeTime, c.PasswordHash, c.Description,
 		c.PDFEnabled, c.StatementHidden, c.ID, slug, c.UpsolvingEnabled, c.VirtualContestEnabled,
 		c.Status, c.IsRated, c.RatedForMin, c.RatedForMax,
-		c.RegistrationRequired, c.RegistrationDeadline, c.MaxParticipants, c.Division)
+		c.RegistrationRequired, c.RegistrationDeadline, c.MaxParticipants, c.Division,
+		model.NormalizeScoreboardVisibility(c.ScoreboardVisibility))
 	if err != nil {
 		return err
 	}
@@ -287,7 +294,8 @@ func (s *ContestStore) ListByStatus(ctx context.Context, status string, offset, 
 		        registration_required,registration_deadline,max_participants,division,educational_config,
 		        upsolving_enabled,virtual_contest_enabled,pdf_enabled,statement_hidden,created_by,created_at,
 		        COALESCE(status,'draft'), COALESCE(review_note,''),
-		        COALESCE(is_rated,true), COALESCE(rated_for_min,0), COALESCE(rated_for_max,9999)
+		        COALESCE(is_rated,true), COALESCE(rated_for_min,0), COALESCE(rated_for_max,9999),
+		        scoreboard_visibility
 		   FROM contests WHERE status=$1 ORDER BY created_at ASC OFFSET $2 LIMIT $3`, status, offset, limit)
 	if err != nil {
 		return nil, 0, err
@@ -303,7 +311,7 @@ func (s *ContestStore) ListByStatus(ctx context.Context, status string, offset, 
 			&c.RegistrationRequired, &c.RegistrationDeadline, &c.MaxParticipants, &c.Division, &configJSON,
 			&c.UpsolvingEnabled, &c.VirtualContestEnabled, &c.PDFEnabled, &c.StatementHidden,
 			&c.CreatedBy, &c.CreatedAt, &c.Status, &c.ReviewNote,
-			&c.IsRated, &c.RatedForMin, &c.RatedForMax)
+			&c.IsRated, &c.RatedForMin, &c.RatedForMax, &c.ScoreboardVisibility)
 		items = append(items, c)
 	}
 	if items == nil {
@@ -804,7 +812,7 @@ func (s *ContestStore) ListByCreatedBy(ctx context.Context, userID string, offse
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT DISTINCT c.id, c.display_id, c.slug, c.title, c.type, c.format, c.format_config, c.start_time, c.end_time, c.freeze_time, c.password_hash, c.visible, c.description,
 		                 c.registration_required, c.registration_deadline, c.max_participants, c.division, c.educational_config,
-		                 c.created_at
+		                 c.created_at, c.scoreboard_visibility
 		 FROM contests c
 		 LEFT JOIN contest_permissions perm ON c.id = perm.contest_id
 		 WHERE c.created_by = $1 OR perm.user_id = $1
@@ -820,7 +828,7 @@ func (s *ContestStore) ListByCreatedBy(ctx context.Context, userID string, offse
 		var formatConfigJSON []byte
 		var slug sql.NullString
 		rows.Scan(&c.ID, &c.DisplayID, &slug, &c.Title, &c.Type, &c.Format, &formatConfigJSON, &c.StartTime, &c.EndTime, &c.FreezeTime, &c.PasswordHash, &c.Visible, &c.Description,
-			&c.RegistrationRequired, &c.RegistrationDeadline, &c.MaxParticipants, &c.Division, &configJSON, &c.CreatedAt)
+			&c.RegistrationRequired, &c.RegistrationDeadline, &c.MaxParticipants, &c.Division, &configJSON, &c.CreatedAt, &c.ScoreboardVisibility)
 		if slug.Valid {
 			c.Slug = slug.String
 		}

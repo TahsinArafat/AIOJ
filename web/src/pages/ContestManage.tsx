@@ -1082,6 +1082,11 @@ function SettingsTab({ contestId }: { contestId: string }) {
         password: '', has_password: false, pdf_enabled: true, statement_hidden: false,
         upsolving_enabled: true, virtual_contest_enabled: true,
         visibility: 'public',
+        // Separate from `visibility` on purpose. A round can keep its problems
+        // behind a password and still publish its board — that is what an onsite
+        // final or a hiring round is — so this is not a third option in the
+        // visibility select, it is its own control.
+        scoreboard_visibility: 'participants',
         group_id: '',
         division: 0,
         registration_required: false, registration_deadline: '', max_participants: '',
@@ -1116,6 +1121,11 @@ function SettingsTab({ contestId }: { contestId: string }) {
                 upsolving_enabled: c.upsolving_enabled ?? true,
                 virtual_contest_enabled: c.virtual_contest_enabled ?? true,
                 visibility: vis,
+                // Default rather than a cast: an older API response, or a contest
+                // saved before this field existed, means participants-only, and
+                // silently rendering it as "public" would be the wrong way to be
+                // wrong.
+                scoreboard_visibility: c.scoreboard_visibility === 'public' ? 'public' : 'participants',
                 group_id: c.group_id || '',
                 division: c.division ?? 0,
                 registration_required: c.registration_required ?? false,
@@ -1166,6 +1176,7 @@ function SettingsTab({ contestId }: { contestId: string }) {
                 end_time: localInputToIso(form.end_time),
                 freeze_time: localInputToIso(form.freeze_time),
                 ...contestVisibilityPayload(form),
+                scoreboard_visibility: form.scoreboard_visibility,
                 pdf_enabled: form.pdf_enabled,
                 statement_hidden: form.statement_hidden,
                 upsolving_enabled: form.upsolving_enabled,
@@ -1260,6 +1271,26 @@ function SettingsTab({ contestId }: { contestId: string }) {
                         <option value="private">Private (Password/Invite required)</option>
                         <option value="group">Specific Group</option>
                     </select>
+                </div>
+
+                {/* Scoreboard visibility. A separate axis from the block above,
+                    because a round can be private and still publish its board:
+                    an onsite final is closed to the room and its scoreboard is
+                    on a projector. The two settings do not imply each other, so
+                    they are not options in one select. */}
+                <div>
+                    <label className="block text-sm font-medium text-ink-soft mb-1">Scoreboard Visibility</label>
+                    <select aria-label="Scoreboard Visibility" value={form.scoreboard_visibility}
+                        onChange={e => setForm(p => ({ ...p, scoreboard_visibility: e.target.value }))}
+                        className="w-full border border-hairline-strong rounded-lg px-3 py-2 text-sm focus:ring-2 focus-visible:outline-[var(--ring)] focus:border-brand bg-surface">
+                        <option value="participants">Participants only (whoever can open the round)</option>
+                        <option value="public">Anyone (watchable without the password)</option>
+                    </select>
+                    <p className="text-xs text-muted-soft mt-1">
+                        {form.scoreboard_visibility === 'public'
+                            ? 'Anyone with the link can watch the scoreboard, including people who cannot open the problems. Problem titles are hidden from them. The round stays out of the contest list and search either way.'
+                            : 'Only people who can already open the round can see the scoreboard.'}
+                    </p>
                 </div>
 
                 {form.visibility === 'private' && (
