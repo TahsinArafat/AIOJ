@@ -126,15 +126,35 @@ const problemColumns = `p.id, p.slug, p.title, p.description, COALESCE(p.constra
 	COALESCE(p.problem_type,'standard'),
 	COALESCE(p.validator_language,''), COALESCE(p.validator_source,'')`
 
-// unreleasedContestSQL is true when the problem belongs to a contest that has not
-// finished yet. Such a problem is not part of the archive: it is reachable through
-// its contest and nothing else, the way Codeforces keeps a round's problems out of
-// the problem list until the round is over. Every public archive read excludes it
-// with `NOT unreleasedContestSQL`.
+// unreleasedContestSQL is true when the problem is being used by a contest that
+// is open right now: published, started, and not finished yet. Such a problem is
+// not part of the archive, the way Codeforces keeps a round's problems out of the
+// problem set until the round is over. Every public archive read excludes it with
+// `NOT unreleasedContestSQL`.
+//
+// All three conditions are load-bearing, and each one was learned the hard way:
+//
+//   - `c.start_time <= NOW()` bounds it below. Without it a round scheduled for
+//     next week took its problems out of the archive today, days before anybody
+//     could be spoilt — the problem simply vanished from the catalogue while its
+//     setter was still writing it up.
+//   - `c.end_time > NOW()` bounds it above, so a finished round's problems go
+//     straight back into the catalogue.
+//   - `c.visible` keeps a draft round from concealing anything. visible mirrors
+//     status = 'published' (ContestStore.SetReviewState), and a round nobody can
+//     enter spoils nothing — yet an abandoned half-configured draft pinned a
+//     published problem out of the archive indefinitely, with nothing on screen
+//     to explain why.
+//
+// So a problem is withheld exactly while some reader who is not supposed to see
+// it could actually reach it.
 const unreleasedContestSQL = `EXISTS (
 	SELECT 1 FROM contest_problems cp
 	JOIN contests c ON c.id = cp.contest_id
-	WHERE cp.problem_id = p.id AND c.end_time > NOW()
+	WHERE cp.problem_id = p.id
+	  AND c.visible
+	  AND c.start_time <= NOW()
+	  AND c.end_time > NOW()
 )`
 
 // archivedProblemSQL is the condition a problem must satisfy to appear in the
@@ -160,13 +180,21 @@ const selectableProblemSQL = `((` + archivedProblemSQL + `)
 	OR p.created_by = $1
 	OR EXISTS (SELECT 1 FROM problem_permissions perm WHERE perm.problem_id = p.id AND perm.user_id = $1))`
 
-// InUnreleasedContest reports whether the problem is part of a contest that has
-// not finished yet.
+// InUnreleasedContest reports whether the problem is being used by a contest
+// that is open right now. This is the predicate behind the archive exclusion and
+// behind withholding a problem's difficulty, so an upcoming or unpublished round
+// reports false here and leaves the problem alone. See unreleasedContestSQL.
 func (s *ProblemStore) InUnreleasedContest(ctx context.Context, problemID string) (bool, error) {
 	var locked bool
 	err := s.db.QueryRowContext(ctx,
-		"SELECT EXISTS (SELECT 1 FROM contest_problems cp JOIN contests c ON c.id = cp.contest_id WHERE cp.problem_id = $1 AND c.end_time > NOW())",
-		problemID).Scan(&locked)
+		`SELECT EXISTS (
+		    SELECT 1 FROM contest_problems cp
+		    JOIN contests c ON c.id = cp.contest_id
+		    WHERE cp.problem_id = $1
+		      AND c.visible
+		      AND c.start_time <= NOW()
+		      AND c.end_time > NOW()
+		 )`, problemID).Scan(&locked)
 	return locked, err
 }
 

@@ -77,8 +77,9 @@ type ProblemStore interface {
 	// problems this user may attach (created by them, or shared with them).
 	ListSelectable(ctx context.Context, userID string, offset, limit int, search string) ([]model.ProblemListItem, int, error)
 	GetAllTags(ctx context.Context) ([]string, error)
-	// InUnreleasedContest reports whether the problem is in a contest that has
-	// not finished yet, so public reads can withhold its difficulty metadata.
+	// InUnreleasedContest reports whether the problem is being used by a contest
+	// that is open right now, so public reads can withhold its difficulty metadata
+	// and keep it out of the archive. An upcoming or unpublished round is false.
 	InUnreleasedContest(ctx context.Context, problemID string) (bool, error)
 	UpdateCounts(ctx context.Context, id string, addSubmission, addAccepted int) error
 	Update(ctx context.Context, id string, p *model.Problem) error
