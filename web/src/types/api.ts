@@ -1501,6 +1501,12 @@ export interface ActivityItem {
 export interface ContestDetailResponse {
     contest: Contest & { is_registered?: boolean; registration_count?: number }
     problems: ContestProblem[]
+    /** True when the viewer runs this round: admin, creator, manager, judge or
+     * tester. A judge of one contest is an ordinary user elsewhere, so this
+     * cannot be derived from the session role. */
+    is_staff?: boolean
+    /** The narrower privilege: admin, creator, manager or judge — not tester. */
+    is_judge?: boolean
 }
 
 /** GET /api/contests/{id}/scoreboard (view=…&page=…) and /standings. */

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -263,9 +264,10 @@ func (h *ContestHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Visible:              claims.Role == "admin",
 		GroupID:              req.GroupID,
 		CreatedBy:            claims.UserID,
-		RegistrationRequired: req.RegistrationRequired,
+		RegistrationRequired: derefBool(req.RegistrationRequired, false),
 		RegistrationDeadline: req.RegistrationDeadline,
 		MaxParticipants:      req.MaxParticipants,
+		Division:             derefInt(req.Division, model.DivisionNone),
 		// A new round is rated by default: that is what the schema default
 		// (is_rated=true) and every competitive round mean. An omitted field on
 		// create therefore must not silently produce an unrated contest.
@@ -381,7 +383,18 @@ func (h *ContestHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	if upcoming && !isManager {
 		c.HasPassword = false
 	}
-	respondJSON(w, http.StatusOK, map[string]interface{}{"contest": c, "problems": problems})
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"contest":  c,
+		"problems": problems,
+		// The page has to know whether to offer the management entry point, and
+		// the only fact it had was the JWT role. That left a contest's own judges,
+		// managers and testers — who run the round without being admins or setters
+		// — with no way to reach the panel, so the "Manage Contest" button appeared
+		// for admins only. These are the same two verdicts the access policy
+		// already computed, so the page and the server cannot disagree.
+		"is_staff": isManager,
+		"is_judge": viewer.decision.IsJudge(),
+	})
 }
 
 func (h *ContestHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -499,6 +512,23 @@ func (h *ContestHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Visible != nil {
 		c.Visible = *req.Visible
+	}
+	// Registration controls and division. The Settings tab had no control for any
+	// of these, and the store's UPDATE did not write them either, so a round's
+	// registration policy was frozen at whatever it was created with. Pointers
+	// throughout: an omitted field means "leave it alone" — a plain bool would
+	// switch registration off on every unrelated save.
+	if req.RegistrationRequired != nil {
+		c.RegistrationRequired = *req.RegistrationRequired
+	}
+	if req.RegistrationDeadline != nil {
+		c.RegistrationDeadline = req.RegistrationDeadline
+	}
+	if req.MaxParticipants != nil {
+		c.MaxParticipants = req.MaxParticipants
+	}
+	if req.Division != nil {
+		c.Division = *req.Division
 	}
 	c.GroupID = req.GroupID
 	if req.Slug != "" {
@@ -854,11 +884,85 @@ func (h *ContestHandler) AddPermission(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid body", http.StatusBadRequest)
 		return
 	}
-	if err := h.store.AddPermission(r.Context(), c.ID, req.UserID, req.Level); err != nil {
+	// The level reaches a CHECK constraint, so an unknown one is a client mistake
+	// and must answer 400. Letting it through produced a 500 that said nothing.
+	switch req.Level {
+	case model.ContestPermissionManager, model.ContestPermissionJudge, model.ContestPermissionTester:
+	default:
+		http.Error(w, "access_level must be manager, judge or tester", http.StatusBadRequest)
+		return
+	}
+
+	// Resolve the identifier to a real user id before it reaches a uuid column.
+	// This is what produced the reported 500: the field was labelled "User ID" but
+	// the form never enforced it, so a typed username went straight into
+	// `WHERE user_id = $1` and Postgres answered "invalid input syntax for type
+	// uuid". An id that parses but belongs to nobody failed the foreign key the
+	// same way. Both are "no such user", which is a 404 and not a server fault.
+	userID, err := h.resolveUserRef(r.Context(), req.UserID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if userID == "" {
+		http.Error(w, "user not found", http.StatusNotFound)
+		return
+	}
+	if err := h.store.AddPermission(r.Context(), c.ID, userID, req.Level); err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
+}
+
+// resolveUserRef is the handler's view of the free function below.
+func (h *ContestHandler) resolveUserRef(ctx context.Context, ref string) (string, error) {
+	return resolveUserRef(ctx, h.userStore, ref)
+}
+
+// userRefLookup is the slice of the user store this resolution needs, declared on
+// the consumer side so a test can satisfy it with two methods.
+type userRefLookup interface {
+	GetByID(ctx context.Context, id string) (*model.User, error)
+	GetByUsername(ctx context.Context, username string) (*model.User, error)
+}
+
+// resolveUserRef turns what an operator typed in the moderators box into a user
+// id. A UUID is checked for existence; anything else is looked up as a username,
+// so "alice" and alice's id are equally valid input. Returns "" when the user does
+// not exist, and an error only when the lookup itself failed — the caller answers
+// 404 and 500 respectively.
+func resolveUserRef(ctx context.Context, users userRefLookup, ref string) (string, error) {
+	ref = strings.TrimSpace(ref)
+	if ref == "" {
+		return "", nil
+	}
+	if users == nil {
+		// No user store to check against: accept the raw value only if it can be
+		// a UUID, so this path cannot reintroduce the invalid-uuid 500.
+		if _, err := uuid.Parse(ref); err != nil {
+			return "", nil
+		}
+		return ref, nil
+	}
+	if _, err := uuid.Parse(ref); err == nil {
+		u, err := users.GetByID(ctx, ref)
+		if err != nil {
+			return "", err
+		}
+		if u == nil {
+			return "", nil
+		}
+		return u.ID, nil
+	}
+	u, err := users.GetByUsername(ctx, ref)
+	if err != nil {
+		return "", err
+	}
+	if u == nil {
+		return "", nil
+	}
+	return u.ID, nil
 }
 
 func (h *ContestHandler) RemovePermission(w http.ResponseWriter, r *http.Request) {
@@ -881,6 +985,13 @@ func (h *ContestHandler) RemovePermission(w http.ResponseWriter, r *http.Request
 		return
 	}
 	targetUserID := chi.URLParam(r, "userId")
+	// A delete is idempotent, so a value that cannot name a row is already the
+	// desired end state. Passing it through reached a uuid column and answered
+	// 500 for what is a no-op.
+	if _, err := uuid.Parse(targetUserID); err != nil {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 	if err := h.store.RemovePermission(r.Context(), c.ID, targetUserID); err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return

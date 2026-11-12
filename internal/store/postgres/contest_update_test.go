@@ -155,3 +155,105 @@ func TestContestStore_UpdatePublishesWithStatus(t *testing.T) {
 		t.Fatal("a published contest must be visible")
 	}
 }
+
+// TestContestStore_UpdatePersistsRegistrationAndDivision is the regression test
+// for settings that could be chosen once and never changed.
+//
+// registration_required, registration_deadline, max_participants and division were
+// all accepted by the create request and then absent from the UPDATE statement.
+// The effect was invisible rather than loud: an operator turned registration on,
+// the handler assigned the field onto the struct, the save answered 200, and the
+// next page load showed the old value. Nothing in the response said the write had
+// been dropped.
+func TestContestStore_UpdatePersistsRegistrationAndDivision(t *testing.T) {
+	db := openTestDB(t)
+	defer db.Close()
+
+	ctx := context.Background()
+	userStore := NewUserStore(db)
+	contestStore := NewContestStore(db)
+
+	owner := &model.User{
+		ID:           uuid.New().String(),
+		Username:     "reg_" + uuid.New().String()[:8],
+		Email:        "reg_" + uuid.New().String()[:8] + "@example.com",
+		PasswordHash: "hashed",
+		Role:         "setter",
+	}
+	if err := userStore.Create(ctx, owner); err != nil {
+		t.Fatalf("create owner: %v", err)
+	}
+	defer db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", owner.ID)
+
+	start := time.Now().UTC().Add(time.Hour).Truncate(time.Second)
+	c := &model.Contest{
+		ID:          uuid.New().String(),
+		Title:       "Registration round",
+		Type:        "acm",
+		Format:      "acm",
+		StartTime:   start,
+		EndTime:     start.Add(3 * time.Hour),
+		CreatedBy:   owner.ID,
+		Status:      model.ContestStatusDraft,
+		Division:    model.DivisionNone,
+		IsRated:     true,
+		RatedForMin: 0,
+		RatedForMax: 9999,
+	}
+	if err := contestStore.Create(ctx, c); err != nil {
+		t.Fatalf("create contest: %v", err)
+	}
+	defer db.ExecContext(ctx, "DELETE FROM contests WHERE id = $1", c.ID)
+
+	deadline := start.Add(-30 * time.Minute).Truncate(time.Second)
+	limit := 150
+	c.RegistrationRequired = true
+	c.RegistrationDeadline = &deadline
+	c.MaxParticipants = &limit
+	c.Division = model.Division2
+	c.Slug = "registered-round"
+
+	if err := contestStore.Update(ctx, c); err != nil {
+		t.Fatalf("update contest: %v", err)
+	}
+
+	got, err := contestStore.GetByID(ctx, c.ID)
+	if err != nil {
+		t.Fatalf("reload: %v", err)
+	}
+	if !got.RegistrationRequired {
+		t.Fatal("registration_required was not persisted")
+	}
+	if got.RegistrationDeadline == nil || !got.RegistrationDeadline.Equal(deadline) {
+		t.Fatalf("registration_deadline = %v, want %v", got.RegistrationDeadline, deadline)
+	}
+	if got.MaxParticipants == nil || *got.MaxParticipants != limit {
+		t.Fatalf("max_participants = %v, want %d", got.MaxParticipants, limit)
+	}
+	if got.Division != model.Division2 {
+		t.Fatalf("division = %d, want %d", got.Division, model.Division2)
+	}
+	if got.Slug != "registered-round" {
+		t.Fatalf("slug = %q, want %q", got.Slug, "registered-round")
+	}
+
+	// Walking it back has to work too: turning registration off and clearing the
+	// cap must reach the column, or a round could only ever gain restrictions.
+	c.RegistrationRequired = false
+	c.RegistrationDeadline = nil
+	c.MaxParticipants = nil
+	if err := contestStore.Update(ctx, c); err != nil {
+		t.Fatalf("update to clear registration: %v", err)
+	}
+
+	got, err = contestStore.GetByID(ctx, c.ID)
+	if err != nil {
+		t.Fatalf("reload after clearing: %v", err)
+	}
+	if got.RegistrationRequired {
+		t.Fatal("registration_required must be clearable")
+	}
+	if got.MaxParticipants != nil {
+		t.Fatalf("max_participants = %v, want nil", got.MaxParticipants)
+	}
+}

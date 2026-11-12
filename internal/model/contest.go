@@ -160,13 +160,18 @@ type ContestDisplayName struct {
 	Institution string `json:"institution,omitempty"`
 }
 
+// CreateContestRequest backs both create and update. Fields that are a real
+// choice at their zero value are pointers, so an omitted field on update means
+// "leave it alone" rather than silently resetting it: Division 0 is "Open",
+// RegistrationRequired false is "registration off", and IsRated false is an
+// unrated round.
 type CreateContestRequest struct {
 	Title                 string          `json:"title"`
 	Slug                  string          `json:"slug,omitempty"`
 	Type                  string          `json:"type"`
 	Format                string          `json:"format"`
 	FormatConfig          json.RawMessage `json:"format_config,omitempty"`
-	Division              int             `json:"division"`
+	Division              *int            `json:"division,omitempty"`
 	StartTime             time.Time       `json:"start_time"`
 	EndTime               time.Time       `json:"end_time"`
 	FreezeTime            *time.Time      `json:"freeze_time,omitempty"`
@@ -184,7 +189,7 @@ type CreateContestRequest struct {
 	// endpoints always answered 400 "registration not required for this
 	// contest". model.Contest has always carried the fields; only the request
 	// DTO was missing them.
-	RegistrationRequired bool       `json:"registration_required"`
+	RegistrationRequired *bool      `json:"registration_required,omitempty"`
 	RegistrationDeadline *time.Time `json:"registration_deadline,omitempty"`
 	MaxParticipants      *int       `json:"max_participants,omitempty"`
 	// Rating controls. is_rated has existed in the schema since migration 000003

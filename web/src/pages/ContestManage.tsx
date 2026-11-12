@@ -15,6 +15,7 @@ import { useConfirm } from '../components/ConfirmDialog'
 import { useToast } from '../components/Toast'
 import { EmptyState } from '../components/EmptyState'
 import { isoToLocalInput, localInputToIso } from '../lib/datetime'
+import { DIVISIONS } from '../lib/divisions'
 import { useClarifications } from '../hooks/useClarifications'
 import { ClarificationsPanel } from '../components/ClarificationsPanel'
 import { ContestAdjustmentsPanel } from './admin/ContestAdjustmentsPanel'
@@ -872,6 +873,8 @@ function ModeratorsTab({ contestId }: { contestId: string }) {
     const [loading, setLoading] = useState(true)
     const [userId, setUserId] = useState('')
     const [level, setLevel] = useState('judge')
+    const [adding, setAdding] = useState(false)
+    const [error, setError] = useState('')
 
     const load = useCallback(() => {
         api.permissions.list(contestId).then(d => setItems(d.data || [])).finally(() => setLoading(false))
@@ -880,14 +883,30 @@ function ModeratorsTab({ contestId }: { contestId: string }) {
 
     const add = async () => {
         if (!userId.trim()) return
-        await api.permissions.add(contestId, { user_id: userId, access_level: level })
-        setUserId('')
-        load()
+        // This used to be a bare await: a rejected request left the box filled in
+        // and the list unchanged, with nothing on screen to say why. A wrong user
+        // is the expected mistake here, so it has to be reported.
+        setError('')
+        setAdding(true)
+        try {
+            await api.permissions.add(contestId, { user_id: userId.trim(), access_level: level })
+            setUserId('')
+            load()
+        } catch (err) {
+            setError(errorMessage(err) || 'Could not add that user')
+        } finally {
+            setAdding(false)
+        }
     }
 
     const remove = async (uid: string) => {
-        await api.permissions.remove(contestId, uid)
-        load()
+        setError('')
+        try {
+            await api.permissions.remove(contestId, uid)
+            load()
+        } catch (err) {
+            setError(errorMessage(err) || 'Could not remove that user')
+        }
     }
 
     if (loading) return <TabLoading />
@@ -900,19 +919,22 @@ function ModeratorsTab({ contestId }: { contestId: string }) {
 
     return (
         <TabShell title="Moderators">
+            {error && <div className="bg-bad/10 border border-bad/30 text-bad px-4 py-2 rounded mb-4 text-sm">{error}</div>}
             <div className="flex gap-2 mb-4">
-                <input value={userId} onChange={e => setUserId(e.target.value)} placeholder="User ID..." className="flex-1 border rounded-lg px-3 py-2 text-sm" />
+                <input value={userId} onChange={e => setUserId(e.target.value)} placeholder="Username or user ID..." className="flex-1 border rounded-lg px-3 py-2 text-sm" />
                 <select value={level} onChange={e => setLevel(e.target.value)} className="border rounded-lg px-3 py-2 text-sm">
                     <option value="judge">Judge</option>
                     <option value="manager">Manager</option>
                     <option value="tester">Tester</option>
                 </select>
-                <button onClick={add} className="px-4 py-2 bg-brand text-on-brand text-sm rounded-lg hover:bg-brand-hover">Add</button>
+                <button onClick={add} disabled={adding} className="px-4 py-2 bg-brand text-on-brand text-sm rounded-lg hover:bg-brand-hover disabled:opacity-50">
+                    {adding ? 'Adding...' : 'Add'}
+                </button>
             </div>
             {items.length === 0 ? <EmptyState
                 icon={<Shield className="w-5 h-5 text-muted-soft" />}
                 text="No moderators added"
-                description="Use the User ID and access-level controls above to add one."
+                description="Use the username and access-level controls above to add one."
             /> : (
                 <div className="space-y-2">
                     {items.map((p) => (
@@ -1056,11 +1078,13 @@ function OnsiteTeamsTab({ contestId }: { contestId: string }) {
 // ═══════════════════════════════════════════════
 function SettingsTab({ contestId }: { contestId: string }) {
     const [form, setForm] = useState({
-        title: '', description: '', start_time: '', end_time: '', freeze_time: '',
+        title: '', slug: '', description: '', start_time: '', end_time: '', freeze_time: '',
         password: '', has_password: false, pdf_enabled: true, statement_hidden: false,
         upsolving_enabled: true, virtual_contest_enabled: true,
         visibility: 'public',
         group_id: '',
+        division: 0,
+        registration_required: false, registration_deadline: '', max_participants: '',
         is_rated: true, rated_for_min: 0, rated_for_max: 9999,
     })
     const [groups, setGroups] = useState<GroupOption[]>([])
@@ -1079,6 +1103,7 @@ function SettingsTab({ contestId }: { contestId: string }) {
             }
             setForm({
                 title: c.title || '',
+                slug: c.slug || '',
                 description: c.description || '',
                 // Local wall-clock for the input, not a sliced UTC instant.
                 start_time: isoToLocalInput(c.start_time),
@@ -1092,6 +1117,11 @@ function SettingsTab({ contestId }: { contestId: string }) {
                 virtual_contest_enabled: c.virtual_contest_enabled ?? true,
                 visibility: vis,
                 group_id: c.group_id || '',
+                division: c.division ?? 0,
+                registration_required: c.registration_required ?? false,
+                registration_deadline: isoToLocalInput(c.registration_deadline),
+                // '' not 0: the column is nullable and an empty box means "no cap".
+                max_participants: c.max_participants == null ? '' : String(c.max_participants),
                 is_rated: c.is_rated ?? true,
                 rated_for_min: c.rated_for_min ?? 0,
                 rated_for_max: c.rated_for_max ?? 9999,
@@ -1109,11 +1139,26 @@ function SettingsTab({ contestId }: { contestId: string }) {
         if (new Date(form.end_time) <= new Date(form.start_time)) { setError('End must be after start'); return }
         if (form.visibility === 'private' && !form.has_password && !form.password.trim()) { setError('Password is required for Private contests'); return }
         if (form.visibility === 'group' && !form.group_id) { setError('Please select a group'); return }
+        // The slug is part of the public URL, so a stray space or slash is worth
+        // catching here rather than turning into a 500 on a UNIQUE violation.
+        const slug = form.slug.trim()
+        if (slug && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/i.test(slug)) {
+            setError('Slug may contain only letters, numbers and hyphens')
+            return
+        }
+        const maxParticipants = form.max_participants.trim() === '' ? undefined : Number(form.max_participants)
+        if (maxParticipants !== undefined && (!Number.isFinite(maxParticipants) || maxParticipants < 0)) {
+            setError('Max participants must be a positive number')
+            return
+        }
         setError('')
         setSaving(true)
         try {
             await api.contests.update(contestId, {
                 title: form.title,
+                // undefined = leave the stored slug alone; the field is optional
+                // and a contest may legitimately have none.
+                slug: slug || undefined,
                 description: form.description || undefined,
                 // The input holds a local wall clock; this is the one place it
                 // becomes the UTC instant the API expects.
@@ -1125,6 +1170,12 @@ function SettingsTab({ contestId }: { contestId: string }) {
                 statement_hidden: form.statement_hidden,
                 upsolving_enabled: form.upsolving_enabled,
                 virtual_contest_enabled: form.virtual_contest_enabled,
+                division: form.division,
+                registration_required: form.registration_required,
+                // null clears the deadline; undefined would mean "leave it alone",
+                // and the API distinguishes the two.
+                registration_deadline: form.registration_deadline ? localInputToIso(form.registration_deadline) : null,
+                max_participants: maxParticipants,
                 is_rated: form.is_rated,
                 rated_for_min: form.rated_for_min,
                 rated_for_max: form.rated_for_max,
@@ -1144,10 +1195,34 @@ function SettingsTab({ contestId }: { contestId: string }) {
 
             <div className="space-y-5">
                 {/* Title */}
+                {/* Title + Slug. The slug is the contest's public URL
+                    (/contests/<slug>); without this field a round created with an
+                    auto-generated slug had no way to get a readable one. The server
+                    has always accepted it on update — the panel just never asked. */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-sm font-medium text-ink-soft mb-1">Title</label>
+                        <input aria-label="Title" value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))}
+                            className="w-full border border-hairline-strong rounded-lg px-3 py-2 text-sm focus:ring-2 focus-visible:outline-[var(--ring)] focus:border-brand" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-ink-soft mb-1">URL Slug <span className="text-muted-soft">(optional)</span></label>
+                        <input aria-label="URL Slug" value={form.slug} onChange={e => setForm(p => ({ ...p, slug: e.target.value }))}
+                            placeholder="aioj-round-1"
+                            className="w-full border border-hairline-strong rounded-lg px-3 py-2 text-sm focus:ring-2 focus-visible:outline-[var(--ring)] focus:border-brand" />
+                        <p className="text-xs text-muted mt-1">Letters, numbers and hyphens. Changing it breaks existing links.</p>
+                    </div>
+                </div>
+
+                {/* Division */}
                 <div>
-                    <label className="block text-sm font-medium text-ink-soft mb-1">Title</label>
-                    <input aria-label="Title" value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))}
-                        className="w-full border border-hairline-strong rounded-lg px-3 py-2 text-sm focus:ring-2 focus-visible:outline-[var(--ring)] focus:border-brand" />
+                    <label className="block text-sm font-medium text-ink-soft mb-1">Division</label>
+                    <select aria-label="Division" value={form.division} onChange={e => setForm(p => ({ ...p, division: Number(e.target.value) }))}
+                        className="w-full border border-hairline-strong rounded-lg px-3 py-2 text-sm focus:ring-2 focus-visible:outline-[var(--ring)] focus:border-brand bg-surface">
+                        {Object.entries(DIVISIONS).map(([value, d]) => (
+                            <option key={value} value={value}>{d.name}</option>
+                        ))}
+                    </select>
                 </div>
 
                 {/* Description */}
@@ -1208,6 +1283,44 @@ function SettingsTab({ contestId }: { contestId: string }) {
                         </select>
                     </div>
                 )}
+
+                {/* Registration. The server has enforced registration_required
+                    since the field existed — submit answers "you must register"
+                    — but no screen ever offered it, so a round could not be made
+                    registration-only after it was created. */}
+                <div>
+                    <label className="block text-sm font-medium text-ink-soft mb-2">Registration</label>
+                    <label className="flex items-start gap-2 cursor-pointer p-2 rounded-lg hover:bg-surface-2 border border-hairline">
+                        <input type="checkbox" checked={form.registration_required}
+                            onChange={e => setForm(p => ({ ...p, registration_required: e.target.checked }))}
+                            className="mt-0.5 rounded border-hairline-strong text-brand focus-visible:outline-[var(--ring)]" />
+                        <span className="text-sm">
+                            Require registration before submitting
+                            <span className="block text-xs text-muted mt-0.5">
+                                {form.registration_required
+                                    ? 'Contestants must register during the window below before they can submit.'
+                                    : 'Anyone who may open the round may submit without registering.'}
+                            </span>
+                        </span>
+                    </label>
+                    {form.registration_required && (
+                        <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-xs font-medium text-muted mb-1">Registration deadline <span className="text-muted-soft">(optional)</span></label>
+                                <input aria-label="Registration deadline" type="datetime-local" value={form.registration_deadline}
+                                    onChange={e => setForm(p => ({ ...p, registration_deadline: e.target.value }))}
+                                    className="w-full border border-hairline-strong rounded-lg px-3 py-2 text-sm focus:ring-2 focus-visible:outline-[var(--ring)] focus:border-brand" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-muted mb-1">Max participants <span className="text-muted-soft">(optional)</span></label>
+                                <input aria-label="Max participants" type="number" min={0} value={form.max_participants}
+                                    onChange={e => setForm(p => ({ ...p, max_participants: e.target.value }))}
+                                    placeholder="Unlimited"
+                                    className="w-full border border-hairline-strong rounded-lg px-3 py-2 text-sm focus:ring-2 focus-visible:outline-[var(--ring)] focus:border-brand" />
+                            </div>
+                        </div>
+                    )}
+                </div>
 
                 {/* Options */}
                 <div>

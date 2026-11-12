@@ -238,15 +238,21 @@ func (s *ContestStore) Update(ctx context.Context, c *model.Contest) error {
 	// once carried visible=$10 while also deriving visible from status, which
 	// left $10 dangling: Postgres cannot infer the type of a parameter that
 	// appears nowhere, so every settings save failed with 500 "update failed".
+	//
+	// Registration controls and division are written here for the first time.
+	// They were accepted on create and then never updated, so a round's entry
+	// policy could not be changed after it existed.
 	_, err := s.db.ExecContext(ctx,
 		`UPDATE contests SET title=$1, type=$2, format=$3, format_config=$4, start_time=$5, end_time=$6,
 	 freeze_time=$7, password_hash=$8, description=$9, pdf_enabled=$10, statement_hidden=$11,
 	 slug=$13, upsolving_enabled=$14, virtual_contest_enabled=$15,
-	 visible=($16::varchar='published'), status=$16, is_rated=$17, rated_for_min=$18, rated_for_max=$19
+	 visible=($16::varchar='published'), status=$16, is_rated=$17, rated_for_min=$18, rated_for_max=$19,
+	 registration_required=$20, registration_deadline=$21, max_participants=$22, division=$23
 	 WHERE id=$12`,
 		c.Title, c.Type, c.Format, formatConfigJSON, c.StartTime, c.EndTime, c.FreezeTime, c.PasswordHash, c.Description,
 		c.PDFEnabled, c.StatementHidden, c.ID, slug, c.UpsolvingEnabled, c.VirtualContestEnabled,
-		c.Status, c.IsRated, c.RatedForMin, c.RatedForMax)
+		c.Status, c.IsRated, c.RatedForMin, c.RatedForMax,
+		c.RegistrationRequired, c.RegistrationDeadline, c.MaxParticipants, c.Division)
 	if err != nil {
 		return err
 	}

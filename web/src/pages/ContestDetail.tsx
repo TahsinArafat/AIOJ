@@ -251,6 +251,13 @@ export default function ContestDetail() {
     const [subFilterStatus, setSubFilterStatus] = useState('')
     const [subFilterId, setSubFilterId] = useState('')
     const [isJudge, setIsJudge] = useState(false)
+    // Whether this contest considers the viewer its staff (admin, creator,
+    // manager, judge or tester). The page cannot derive this from the JWT: a
+    // judge of one round is an ordinary user everywhere else, so the answer has
+    // to come from the contest itself. Without it the management entry point was
+    // gated on the admin role alone and did not appear for the people running
+    // the round.
+    const [isStaff, setIsStaff] = useState(false)
 
     useEffect(() => {
         if (!id) return
@@ -264,6 +271,7 @@ export default function ContestDetail() {
             setProblems(res.problems || [])
             setRegistered(c.is_registered ?? false)
             setRegistrationCount(c.registration_count ?? 0)
+            setIsStaff(res.is_staff ?? false)
         }).catch((e: unknown) => {
             // setState from a promise callback, not the effect body: this is the
             // async result of an external request, which is what an effect is for.
@@ -1220,8 +1228,11 @@ export default function ContestDetail() {
                             </SidebarBox>
                         )}
 
-                        {/* Judge Panel */}
-                        {isAdmin && (
+                        {/* Judge Panel. Gated on staff, not on the admin role: a
+                            manager, judge or tester of this round runs it and needs
+                            the entry point even though their session role says
+                            "user". */}
+                        {isStaff && (
                             <SidebarBox title="Judge Panel" icon="settings" accent="purple">
                                 <div className="space-y-2">
                                     <Link
@@ -1260,6 +1271,22 @@ export default function ContestDetail() {
                     </div>
                 )}
             </div>
+
+            {/* Staff shortcut, fixed to the bottom-right corner.
+                The sidebar above is `hidden lg:block`, and it is also dropped
+                entirely on the standings and submissions tabs — so on a phone, or
+                while reading those two tables, a judge had no visible way into the
+                panel. This stays reachable from every tab and every viewport. */}
+            {isStaff && (
+                <Link
+                    to={`/setter/contest/${id}/manage`}
+                    aria-label="Manage contest"
+                    className="fixed bottom-5 right-5 z-40 flex items-center gap-2 px-4 py-3 bg-purple-600 text-white text-sm font-semibold rounded-full shadow-lg hover:bg-purple-700 transition-colors"
+                >
+                    <Settings className="w-4 h-4" />
+                    <span className="hidden sm:inline">Manage Contest</span>
+                </Link>
+            )}
 
             {/* A judge's announcement is the one message that has to be seen the
                 moment it is posted, whichever tab the competitor is on. */}
