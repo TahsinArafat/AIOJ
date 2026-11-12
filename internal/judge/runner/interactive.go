@@ -41,9 +41,12 @@ func (ir *InteractiveRunner) Run(ctx context.Context, in RunInput) (RunOutput, e
 
 	results := make([]model.TestCaseResult, 0, len(prob.TestCaseScore))
 	finalStatus := model.StatusAC
-	maxTime, maxMem, totalScore := 0, 0, 0
+	maxTime, maxMem, totalScore, maxScore := 0, 0, 0, 0
 
 	for _, tc := range prob.TestCaseScore {
+		// Every case this runner attempts counts toward the denominator, whether
+		// or not it passes: a case the judge failed to run is not credit.
+		maxScore += tc.Score
 		inputContent, loadErr := loadFile(filepath.Join(prob.TestdataPath, tc.InputName))
 		if loadErr != nil {
 			results = append(results, model.TestCaseResult{
@@ -131,10 +134,7 @@ func (ir *InteractiveRunner) Run(ctx context.Context, in RunInput) (RunOutput, e
 		}
 	}
 
-	avgScore := 0
-	if len(prob.TestCaseScore) > 0 {
-		avgScore = totalScore / len(prob.TestCaseScore)
-	}
+	avgScore := percentage(totalScore, maxScore)
 
 	return RunOutput{
 		Results:     results,

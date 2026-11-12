@@ -25,6 +25,9 @@ const baseState: ProblemFormState = {
   interactive: false,
   interactorLanguage: 'cpp-gpp-64',
   interactorSourceCode: '',
+  problemType: 'standard',
+  scoringMode: 'complete',
+  subtaskAggregation: 'min',
 }
 
 test('renders all statement form fields', () => {

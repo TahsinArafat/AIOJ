@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"image"
 	"image/color"
@@ -13,6 +14,11 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/tahsinarafat/aioj/internal/api/middleware"
+	"github.com/tahsinarafat/aioj/internal/auth"
+	"github.com/tahsinarafat/aioj/internal/model"
 )
 
 // pngBytes returns a real 1x1 PNG, so content sniffing sees image/png.
@@ -44,17 +50,35 @@ func multipartBody(t *testing.T, field, filename string, content []byte) (*bytes
 	return &body, w.FormDataContentType()
 }
 
+// newMediaTestHandler builds a handler wired to a problem the given user owns,
+// which is what the route now requires before it will accept bytes.
+func newMediaTestHandler(t *testing.T, dir string) *MediaHandler {
+	t.Helper()
+	p := &model.Problem{ID: "p1", Slug: "x", Title: "X", CreatedBy: "author1"}
+	return NewMediaHandler(dir).WithProblems(&mockProblemStore{
+		getBySlug: p,
+		access:    map[string]string{"author1/p1": "owner"},
+	})
+}
+
 func uploadRequest(t *testing.T, field, filename string, content []byte) *http.Request {
 	t.Helper()
 	body, contentType := multipartBody(t, field, filename, content)
 	req := httptest.NewRequest(http.MethodPost, "/api/problems/x/media", body)
 	req.Header.Set("Content-Type", contentType)
+	// The handler resolves {slug} and the caller's identity before reading the
+	// body.
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, &chi.Context{
+		URLParams: chi.RouteParams{Keys: []string{"slug"}, Values: []string{"x"}},
+	}))
+	req = req.WithContext(context.WithValue(req.Context(), middleware.UserContextKey,
+		&auth.Claims{UserID: "author1", Role: "setter"}))
 	return req
 }
 
 func TestMediaUpload_AcceptsRealImage(t *testing.T) {
 	dir := t.TempDir()
-	h := NewMediaHandler(dir)
+	h := newMediaTestHandler(t, dir)
 
 	rec := httptest.NewRecorder()
 	h.Upload(rec, uploadRequest(t, "image", "avatar.png", pngBytes(t)))
@@ -83,7 +107,7 @@ func TestMediaUpload_AcceptsRealImage(t *testing.T) {
 // checked the extension, so any bytes could be stored as .png.
 func TestMediaUpload_RejectsRenamedNonImage(t *testing.T) {
 	dir := t.TempDir()
-	h := NewMediaHandler(dir)
+	h := newMediaTestHandler(t, dir)
 
 	payload := []byte("<!DOCTYPE html><script>alert(document.cookie)</script>")
 	rec := httptest.NewRecorder()
@@ -100,7 +124,7 @@ func TestMediaUpload_RejectsRenamedNonImage(t *testing.T) {
 
 func TestMediaUpload_RejectsOversizedBody(t *testing.T) {
 	dir := t.TempDir()
-	h := NewMediaHandler(dir)
+	h := newMediaTestHandler(t, dir)
 
 	// A valid PNG header followed by filler past the limit.
 	huge := append(pngBytes(t), bytes.Repeat([]byte{0}, maxMediaUploadBytes+1024)...)
@@ -117,7 +141,7 @@ func TestMediaUpload_RejectsOversizedBody(t *testing.T) {
 }
 
 func TestMediaUpload_RequiresImageField(t *testing.T) {
-	h := NewMediaHandler(t.TempDir())
+	h := newMediaTestHandler(t, t.TempDir())
 	rec := httptest.NewRecorder()
 	h.Upload(rec, uploadRequest(t, "avatar", "a.png", pngBytes(t)))
 
@@ -128,7 +152,7 @@ func TestMediaUpload_RequiresImageField(t *testing.T) {
 
 func TestMediaServe_ServesUploadedFile(t *testing.T) {
 	dir := t.TempDir()
-	h := NewMediaHandler(dir)
+	h := newMediaTestHandler(t, dir)
 
 	rec := httptest.NewRecorder()
 	h.Upload(rec, uploadRequest(t, "image", "a.png", pngBytes(t)))
@@ -170,5 +194,76 @@ func TestMediaServe_NoDirectoryListing(t *testing.T) {
 		if strings.Contains(rec.Body.String(), "secret") {
 			t.Errorf("%s: leaked file content", target)
 		}
+	}
+}
+
+// The upload route sat inside the setter-workspace group, but the handler never
+// read the {slug} it was mounted under and never checked access, so any signed-in
+// user could write into the global media directory. Nothing ever removes those
+// files, so they accumulated forever.
+func TestMediaUpload_RequiresAuthoringRights(t *testing.T) {
+	dir := t.TempDir()
+	p := &model.Problem{ID: "p1", Slug: "x", Title: "X", CreatedBy: "author1"}
+	// Someone else's problem: no access entry for the caller.
+	h := NewMediaHandler(dir).WithProblems(&mockProblemStore{
+		getBySlug: p,
+		access:    map[string]string{"someone-else/p1": "owner"},
+	})
+
+	rec := httptest.NewRecorder()
+	h.Upload(rec, uploadRequest(t, "image", "a.png", pngBytes(t)))
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403 for a non-author", rec.Code)
+	}
+	if entries, _ := os.ReadDir(dir); len(entries) != 0 {
+		t.Fatalf("a refused upload wrote files: %v", entries)
+	}
+}
+
+func TestMediaUpload_RejectsUnknownProblem(t *testing.T) {
+	dir := t.TempDir()
+	// mockProblemStore returns a nil problem when getBySlug is unset.
+	h := NewMediaHandler(dir).WithProblems(&mockProblemStore{})
+
+	rec := httptest.NewRecorder()
+	h.Upload(rec, uploadRequest(t, "image", "a.png", pngBytes(t)))
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404", rec.Code)
+	}
+}
+
+// A handler without a store cannot authorize, so it must refuse rather than
+// silently accepting every upload the way the old handler did.
+func TestMediaUpload_RefusesWithoutProblemStore(t *testing.T) {
+	dir := t.TempDir()
+	h := NewMediaHandler(dir)
+
+	rec := httptest.NewRecorder()
+	h.Upload(rec, uploadRequest(t, "image", "a.png", pngBytes(t)))
+
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want 503", rec.Code)
+	}
+	if entries, _ := os.ReadDir(dir); len(entries) != 0 {
+		t.Fatalf("an unauthorized handler wrote files: %v", entries)
+	}
+}
+
+// An admin may upload to any problem.
+func TestMediaUpload_AdminBypassesOwnership(t *testing.T) {
+	dir := t.TempDir()
+	p := &model.Problem{ID: "p1", Slug: "x", Title: "X", CreatedBy: "author1"}
+	h := NewMediaHandler(dir).WithProblems(&mockProblemStore{getBySlug: p, access: map[string]string{}})
+
+	req := uploadRequest(t, "image", "a.png", pngBytes(t))
+	req = req.WithContext(context.WithValue(req.Context(), middleware.UserContextKey,
+		&auth.Claims{UserID: "admin1", Role: "admin"}))
+	rec := httptest.NewRecorder()
+	h.Upload(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want 201: %s", rec.Code, rec.Body.String())
 	}
 }

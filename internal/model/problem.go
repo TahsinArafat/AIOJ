@@ -93,6 +93,70 @@ func StatusAllowsVisible(status string) bool {
 	return status == ProblemStatusPublished
 }
 
+// ValidProblemType reports whether s is one of the three problem types. The
+// database enforces this too (migration 000082), but rejecting it here turns a
+// CHECK violation into a 400 instead of a 500.
+func ValidProblemType(s string) bool {
+	switch s {
+	case ProblemTypeStandard, ProblemTypeInteractive, ProblemTypeOutputOnly:
+		return true
+	}
+	return false
+}
+
+// ValidScoringMode reports whether s is a scoring mode the judge implements.
+func ValidScoringMode(s string) bool {
+	return s == "complete" || s == "partial"
+}
+
+// ValidSubtaskAggregation reports whether s is a subtask aggregation the scorer
+// implements.
+func ValidSubtaskAggregation(s string) bool {
+	return s == "min" || s == "sum"
+}
+
+// ResolveProblemType decides the problem type to store, given the two fields
+// that can imply it. An empty result means "no opinion" — the caller keeps the
+// type already on the row.
+//
+// `interactive` is the older boolean and `problem_type` the newer enum. The
+// judge keys off Interactive (worker.go), while the submission path
+// (submission.go) and the public badge key off ProblemType, so letting them
+// disagree makes the same problem interactive for one reader and standard for
+// another. Migration 000082 backfilled one from the other exactly once; this
+// keeps that true afterwards.
+//
+// Both arguments are pointers because an absent field is not a false one. The
+// statement form sends neither, and reading that as "standard, not interactive"
+// would silently demote every interactive and output-only problem the moment
+// its author saved a typo fix.
+func ResolveProblemType(explicit *string, interactive *bool) string {
+	// Ticking Interactive is unambiguous: it always means interactive.
+	if interactive != nil && *interactive {
+		return ProblemTypeInteractive
+	}
+
+	if explicit != nil && ValidProblemType(*explicit) {
+		// An explicit type that is not interactive, with the box unticked or
+		// unmentioned, stands. This is how output_only is declared.
+		if *explicit != ProblemTypeInteractive {
+			return *explicit
+		}
+		// explicit says interactive but the box is explicitly off: the two
+		// cannot both hold, and the box is what the judge acts on, so demote.
+		if interactive != nil {
+			return ProblemTypeStandard
+		}
+		return ProblemTypeInteractive
+	}
+
+	// Unticking the box demotes a problem whose old type was interactive.
+	if interactive != nil {
+		return ProblemTypeStandard
+	}
+	return ""
+}
+
 type ProblemListItem struct {
 	ID              string   `json:"id"`
 	Slug            string   `json:"slug"`
@@ -118,6 +182,11 @@ type ProblemPermission struct {
 	AccessLevel string `json:"access_level"`
 }
 
+// CreateProblemRequest is the body both Create and Update decode.
+//
+// Update treats an absent field as "leave it alone" for the fields where that
+// matters — see Visible and ProblemType, which are pointers precisely so a
+// client that predates them cannot silently clear them.
 type CreateProblemRequest struct {
 	Slug                 string          `json:"slug"`
 	Title                string          `json:"title"`
@@ -138,12 +207,16 @@ type CreateProblemRequest struct {
 	SPJSourceCode        string          `json:"spj_source_code,omitempty"`
 	CheckerType          string          `json:"checker_type,omitempty"`
 	FloatEpsilon         float64         `json:"float_epsilon,omitempty"`
-	Visible              bool            `json:"visible"`
-	Interactive          bool            `json:"interactive"`
+	Visible              *bool           `json:"visible,omitempty"`
+	Interactive          *bool           `json:"interactive,omitempty"`
 	InteractorLanguage   string          `json:"interactor_language,omitempty"`
 	InteractorSourceCode string          `json:"interactor_source_code,omitempty"`
-	ScoringMode          string          `json:"scoring_mode,omitempty"`
-	SubtaskAggregation   string          `json:"subtask_aggregation,omitempty"`
+	// "standard" | "interactive" | "output_only". Omitted means "derive it from
+	// Interactive", which is how a client that has no concept of a problem type
+	// still ends up with the right one.
+	ProblemType        *string `json:"problem_type,omitempty"`
+	ScoringMode        string  `json:"scoring_mode,omitempty"`
+	SubtaskAggregation string  `json:"subtask_aggregation,omitempty"`
 }
 
 type ProblemStats struct {

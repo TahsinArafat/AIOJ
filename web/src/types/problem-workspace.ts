@@ -43,6 +43,18 @@ export interface ProblemFormState {
   interactorLanguage: string
   interactorSourceCode: string
 
+  /** "standard" | "interactive" | "output_only".
+   *
+   * The server keeps this in step with `interactive`, but the workspace has to
+   * load and send it back: an output-only problem is not interactive, so a save
+   * that omitted the field would leave the two disagreeing. */
+  problemType: string
+  /** "complete" | "partial". Partial is what enables subtask scoring; the judge
+   * silently treats everything as complete until this is set. */
+  scoringMode: string
+  /** "min" | "sum" — how the cases inside a subtask combine. */
+  subtaskAggregation: string
+
   // Settings. There is deliberately no `visible` field: publishing is an admin
   // decision derived from the review status, so the author has no visibility
   // switch to send.
@@ -71,5 +83,8 @@ export function createDefaultFormState(): ProblemFormState {
     interactive: false,
     interactorLanguage: 'cpp-gpp-64',
     interactorSourceCode: '',
+    problemType: 'standard',
+    scoringMode: 'complete',
+    subtaskAggregation: 'min',
   }
 }

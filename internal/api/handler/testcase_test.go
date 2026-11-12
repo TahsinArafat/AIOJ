@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -235,5 +236,69 @@ func TestTestcaseHandlersRequireAuthor(t *testing.T) {
 	h.List(rec, req)
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("status = %d, want 403 for a non-author", rec.Code)
+	}
+}
+
+// Auto-discovered cases used to carry a flat 10 points each, so a package's
+// total depended on how many cases it had: twelve cases meant a 120-point
+// problem, and the judge's 0-100 percentage then divided wrong against every
+// consumer downstream. The distribution has to be exactly 100 regardless of
+// case count, with the remainder on the earliest cases so it is deterministic.
+func TestAutoDiscoverSpreads100Points(t *testing.T) {
+	for _, count := range []int{1, 3, 7, 12, 100} {
+		dir := t.TempDir()
+		for i := 0; i < count; i++ {
+			stem := fmt.Sprintf("%02d", i)
+			if err := os.WriteFile(filepath.Join(dir, stem+".in"), []byte("1"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(dir, stem+".out"), []byte("2"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		cases := autoDiscoverTestCases(dir)
+		if len(cases) != count {
+			t.Fatalf("count=%d: discovered %d cases", count, len(cases))
+		}
+
+		total := 0
+		for i, tc := range cases {
+			total += tc.Score
+			// Deterministic: the remainder belongs to the earliest names.
+			want := 100 / count
+			if i < 100%count {
+				want++
+			}
+			if tc.Score != want {
+				t.Errorf("count=%d case %d: score = %d, want %d", count, i, tc.Score, want)
+			}
+		}
+		if total != 100 {
+			t.Errorf("count=%d: total = %d, want exactly 100", count, total)
+		}
+	}
+}
+
+// Points follow a stable order even though the file map is iterated randomly.
+func TestAutoDiscoverIsDeterministic(t *testing.T) {
+	dir := t.TempDir()
+	for _, stem := range []string{"a", "b", "c"} {
+		if err := os.WriteFile(filepath.Join(dir, stem+".in"), []byte("1"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, stem+".out"), []byte("2"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	first := autoDiscoverTestCases(dir)
+	for i := 0; i < 20; i++ {
+		next := autoDiscoverTestCases(dir)
+		for j := range first {
+			if next[j].InputName != first[j].InputName || next[j].Score != first[j].Score {
+				t.Fatalf("run %d differs at %d: %+v vs %+v", i, j, next[j], first[j])
+			}
+		}
 	}
 }

@@ -466,8 +466,13 @@ func (h *TestcaseHandler) saveFile(dir string, fileHeader *multipart.FileHeader)
 }
 
 // autoDiscoverTestCases scans targetDir for paired input/output test case files
-// and returns TestCaseScore entries with a default score of 10 per pair.
+// and spreads 100 points across them.
 // Matching is by filename stem (prefix before extension).
+//
+// A flat 10 points per pair made the total depend on the case count — a 12-case
+// package was scored out of 120 — which then divided wrong against every
+// consumer expecting a percentage. The remainder goes to the earliest cases so
+// the total is exactly 100.
 func autoDiscoverTestCases(targetDir string) []model.TestCaseScore {
 	entries, err := os.ReadDir(targetDir)
 	if err != nil {
@@ -501,7 +506,6 @@ func autoDiscoverTestCases(targetDir string) []model.TestCaseScore {
 		scores = append(scores, model.TestCaseScore{
 			InputName:  inName,
 			OutputName: outName,
-			Score:      10,
 		})
 	}
 
@@ -509,9 +513,19 @@ func autoDiscoverTestCases(targetDir string) []model.TestCaseScore {
 		return nil
 	}
 
+	// Sort before assigning points: map iteration order is random, so spreading
+	// points first would give the remainder to an arbitrary case on every upload.
 	sort.Slice(scores, func(i, j int) bool {
 		return scores[i].InputName < scores[j].InputName
 	})
+
+	base, remainder := 100/len(scores), 100%len(scores)
+	for i := range scores {
+		scores[i].Score = base
+		if i < remainder {
+			scores[i].Score++
+		}
+	}
 
 	return scores
 }

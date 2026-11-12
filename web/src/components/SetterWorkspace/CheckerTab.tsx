@@ -237,6 +237,78 @@ int main(int argc, char* argv[]) {
         )}
       </div>
 
+      <hr className="border-hairline" />
+
+      <div className="space-y-4">
+        <h3 className="text-sm font-bold text-ink-soft uppercase tracking-wider">Problem Type &amp; Scoring</h3>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label htmlFor="problem-type" className="block text-xs font-medium text-muted mb-1">
+              Problem Type
+            </label>
+            <select
+              id="problem-type"
+              aria-label="Problem Type"
+              value={formState.problemType}
+              onChange={e => {
+                // Picking "interactive" here is the same declaration as ticking
+                // the box above, so move both: a row where the type says
+                // interactive and the boolean does not is rejected by the API.
+                const next = e.target.value
+                onUpdate('problemType', next)
+                onUpdate('interactive', next === 'interactive')
+              }}
+              className="w-full border border-hairline-strong rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)] bg-surface text-ink"
+            >
+              <option value="standard">Standard (code against test files)</option>
+              <option value="interactive">Interactive (judge talks to the program)</option>
+              <option value="output_only">Output-only (submit the answer file)</option>
+            </select>
+            <p className="mt-1 text-xs text-muted-soft">
+              Output-only problems accept a submitted answer instead of source code.
+            </p>
+          </div>
+
+          <div>
+            <label htmlFor="scoring-mode" className="block text-xs font-medium text-muted mb-1">
+              Scoring Mode
+            </label>
+            <select
+              id="scoring-mode"
+              aria-label="Scoring Mode"
+              value={formState.scoringMode}
+              onChange={e => onUpdate('scoringMode', e.target.value)}
+              className="w-full border border-hairline-strong rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)] bg-surface text-ink"
+            >
+              <option value="complete">Complete (all-or-nothing verdict)</option>
+              <option value="partial">Partial (score by subtask)</option>
+            </select>
+            <p className="mt-1 text-xs text-muted-soft">
+              Partial scoring only has an effect once cases are assigned to subtasks.
+            </p>
+          </div>
+        </div>
+
+        {formState.scoringMode === 'partial' && (
+          <div className="max-w-xs">
+            <label htmlFor="subtask-aggregation" className="block text-xs font-medium text-muted mb-1">
+              Within a Subtask
+            </label>
+            <select
+              id="subtask-aggregation"
+              aria-label="Subtask Aggregation"
+              value={formState.subtaskAggregation}
+              onChange={e => onUpdate('subtaskAggregation', e.target.value)}
+              className="w-full border border-hairline-strong rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)] bg-surface text-ink"
+            >
+              <option value="min">All cases must pass (min)</option>
+              <option value="sum">Cases add up (sum)</option>
+            </select>
+          </div>
+        )}
+      </div>
+
       <button
         onClick={onSave}
         disabled={saving}

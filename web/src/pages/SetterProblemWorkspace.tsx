@@ -99,6 +99,9 @@ useDocumentTitle(problem ? `${problem.title} — setter` : null)
     interactive: false,
     interactorLanguage: 'cpp-gpp-64',
     interactorSourceCode: '',
+    problemType: 'standard',
+    scoringMode: 'complete',
+    subtaskAggregation: 'min',
   })
 
   // Test Cases supplementary state
@@ -114,7 +117,18 @@ useDocumentTitle(problem ? `${problem.title} — setter` : null)
   const [newAccessLevel, setNewAccessLevel] = useState('co_author')
 
   const updateField = <K extends keyof ProblemFormState>(key: K, value: ProblemFormState[K]) => {
-    setFormState(prev => ({ ...prev, [key]: value }))
+    setFormState(prev => {
+      const next = { ...prev, [key]: value }
+      // Ticking Interactive has to move problem_type with it. The two describe
+      // the same thing, and the server rejects a row where they disagree — a
+      // form that sent interactive:true with problem_type:'standard' would 400
+      // on every save. An output-only problem is never interactive, so the box
+      // turning on wins outright.
+      if (key === 'interactive') {
+        next.problemType = value ? 'interactive' : 'standard'
+      }
+      return next
+    })
   }
 
   const buildPayload = (overrides: Partial<ProblemFormState> = {}): Record<string, unknown> => {
@@ -139,6 +153,11 @@ useDocumentTitle(problem ? `${problem.title} — setter` : null)
       checker_type: merged.checkerType,
       float_epsilon: merged.floatEpsilon,
       interactive: merged.interactive,
+      // Sent alongside `interactive` so the server does not have to guess. The
+      // toggling of the checkbox drives this; see the CheckerTab handler.
+      problem_type: merged.problemType,
+      scoring_mode: merged.scoringMode,
+      subtask_aggregation: merged.subtaskAggregation,
       interactor_language: merged.interactorLanguage,
       interactor_source_code: merged.interactorSourceCode,
       // `visible` is deliberately NOT sent: the API derives it from the review
@@ -174,6 +193,12 @@ useDocumentTitle(problem ? `${problem.title} — setter` : null)
         interactive: data.interactive || false,
         interactorLanguage: data.interactor_language || 'cpp-gpp-64',
         interactorSourceCode: data.interactor_source_code || '',
+        // Round-tripped so a save cannot clear them. `problem_type` falls back
+        // to what `interactive` implies, which is how a problem created before
+        // the enum existed still reports a sensible type.
+        problemType: data.problem_type || (data.interactive ? 'interactive' : 'standard'),
+        scoringMode: data.scoring_mode || 'complete',
+        subtaskAggregation: data.subtask_aggregation || 'min',
       })
 
       const permData = await api.problems.getPermissions(data.slug)

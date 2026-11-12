@@ -9,10 +9,16 @@ import (
 // Scorer aggregates a flat slice of per-test-case results into a final
 // verdict, score, and resource-usage summary.
 //
-// It supports three scoring modes:
-//   - standard:  first-failure wins; average per-test score.
-//   - partial:   subtask aggregation (min or sum).
+// Scoring modes:
+//   - standard:  first-failure wins; ratio of points earned to points available.
+//   - partial:   subtask aggregation (min or sum); same ratio.
 //   - (default): treated as standard.
+//
+// Score is always a 0-100 percentage. Every consumer of this number expects that
+// scale: the contest formats multiply it back up (ioi.go:132, oi.go:65), and the
+// problem page renders it as a percentage. It used to be a per-case mean, which
+// only coincidentally looked like a percentage when a problem's cases summed to
+// exactly 100 — every other layout silently scaled wrong.
 type Scorer struct{}
 
 // NewScorer returns a Scorer.
@@ -24,19 +30,38 @@ func (s *Scorer) Aggregate(prob *model.Problem, results []model.TestCaseResult) 
 	if prob.HasSubtasks() && prob.ScoringMode == "partial" {
 		return s.aggregateSubtasks(prob, results)
 	}
-	return s.aggregateStandard(results)
+	// The runner executes cases in TestCaseScore order, so the weights line up
+	// index-for-index with the results it produced.
+	weights := make([]int, len(prob.TestCaseScore))
+	for i, tc := range prob.TestCaseScore {
+		weights[i] = tc.Score
+	}
+	return s.aggregateStandard(weights, results)
 }
 
-// aggregateStandard: first non-AC status wins; score = avg per-test score.
-func (s *Scorer) aggregateStandard(results []model.TestCaseResult) RunOutput {
+// aggregateStandard: first non-AC status wins; score = points earned as a
+// percentage of points available.
+//
+// Each case carries its own weight in TestCaseScore, so the denominator is the
+// sum of those weights, not a flat per-case count. Every result the runner
+// produced counts toward that denominator, so a case that reported SE still
+// contributes its weight — a submission is not credited for a case the judge
+// failed to run.
+//
+// An unweighted test set (every case worth 0) falls back to counting cases, one
+// point each. That is the only sensible reading of "how much of this problem did
+// you solve", and it keeps a problem created before scores were assigned from
+// reporting 0% on a full solve.
+func (s *Scorer) aggregateStandard(weights []int, results []model.TestCaseResult) RunOutput {
 	finalStatus := model.StatusAC
-	totalScore, maxTime, maxMem := 0, 0, 0
+	totalScore, available, maxTime, maxMem := 0, 0, 0, 0
 
-	for _, r := range results {
+	for i, r := range results {
 		if r.Status != model.StatusAC && finalStatus == model.StatusAC {
 			finalStatus = r.Status
 		}
 		totalScore += r.Score
+		available += weightAt(weights, i)
 		if r.Time > maxTime {
 			maxTime = r.Time
 		}
@@ -45,18 +70,45 @@ func (s *Scorer) aggregateStandard(results []model.TestCaseResult) RunOutput {
 		}
 	}
 
-	score := 0
-	if len(results) > 0 {
-		score = totalScore / len(results)
+	if available <= 0 {
+		// Unweighted: one point per case, and credit only for AC.
+		totalScore = 0
+		for _, r := range results {
+			if r.Status == model.StatusAC {
+				totalScore += 1
+			}
+		}
+		available = len(results)
 	}
 
 	return RunOutput{
 		Results:     results,
 		FinalStatus: finalStatus,
-		Score:       score,
+		Score:       percentage(totalScore, available),
 		MaxTime:     maxTime,
 		MaxMem:      maxMem,
 	}
+}
+
+// weightAt reads a case weight without panicking on a short slice, so a caller
+// that hands over fewer weights than results degrades to the unweighted fallback
+// instead of mis-indexing.
+func weightAt(weights []int, i int) int {
+	if i < 0 || i >= len(weights) {
+		return 0
+	}
+	return weights[i]
+}
+
+// percentage turns earned/available points into a 0-100 score, rounded to
+// nearest. Rounding is the reason a submission that earned a single point out of
+// a thousand still reports 0 rather than being inflated; that is correct for a
+// percentage display, and the raw case breakdown shows the detail.
+func percentage(earned, available int) int {
+	if available <= 0 {
+		return 0
+	}
+	return (earned*100 + available/2) / available
 }
 
 // aggregateSubtasks: groups results back into subtasks and applies
@@ -121,10 +173,7 @@ func (s *Scorer) aggregateSubtasks(prob *model.Problem, results []model.TestCase
 		totalScore += subtaskScore
 	}
 
-	percentageScore := 0
-	if maxScore > 0 {
-		percentageScore = (totalScore * 100) / maxScore
-	}
+	percentageScore := percentage(totalScore, maxScore)
 
 	return RunOutput{
 		Results:     results,

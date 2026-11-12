@@ -11,7 +11,11 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/tahsinarafat/aioj/internal/api/middleware"
+	"github.com/tahsinarafat/aioj/internal/model"
+	"github.com/tahsinarafat/aioj/internal/store"
 )
 
 // Upload limits. The previous handler validated only the filename extension,
@@ -41,6 +45,10 @@ var storedMediaName = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[
 
 type MediaHandler struct {
 	dir string
+	// problems resolves the {slug} the upload route carries, so the write can be
+	// authorized against the problem it is for. Optional: the static serve path
+	// and the handler tests do not need it.
+	problems store.ProblemStore
 }
 
 func NewMediaHandler(dir string) *MediaHandler {
@@ -48,7 +56,60 @@ func NewMediaHandler(dir string) *MediaHandler {
 	return &MediaHandler{dir: dir}
 }
 
+// WithProblems attaches the problem store used to authorize an upload against
+// its problem. Returns the handler for call-site chaining.
+func (h *MediaHandler) WithProblems(p store.ProblemStore) *MediaHandler {
+	h.problems = p
+	return h
+}
+
+// authorizedForProblem resolves {slug} and requires the caller to hold authoring
+// rights on it, the same rule every other write in this route group uses.
+//
+// Without this the upload route was authenticated but not authorized: it sat
+// inside the setter-workspace group but its handler never read the slug, so any
+// signed-in user could write into the global media directory — and nothing ever
+// removes those files. Returns the problem, or nil after writing the error.
+func (h *MediaHandler) authorizedForProblem(w http.ResponseWriter, r *http.Request) *model.Problem {
+	claims := middleware.GetUserClaims(r)
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return nil
+	}
+	// A handler built without a store cannot authorize anything, so it refuses
+	// rather than falling open.
+	if h.problems == nil {
+		http.Error(w, "media upload is not configured", http.StatusServiceUnavailable)
+		return nil
+	}
+	slug := chi.URLParam(r, "slug")
+	if slug == "" {
+		http.Error(w, "problem slug is required", http.StatusBadRequest)
+		return nil
+	}
+	p, err := h.problems.GetBySlug(r.Context(), slug)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return nil
+	}
+	if p == nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return nil
+	}
+	if claims.Role != "admin" && !h.problems.HasAccess(r.Context(), p.ID, claims.UserID, "owner", "co_author") {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return nil
+	}
+	return p
+}
+
 func (h *MediaHandler) Upload(w http.ResponseWriter, r *http.Request) {
+	// Authorize before touching the body: parsing a 5 MB multipart form for a
+	// caller who may not upload here is work an anonymous request should not be
+	// able to ask for.
+	if h.authorizedForProblem(w, r) == nil {
+		return
+	}
 	// Bound the body before parsing: ParseMultipartForm's argument is only a
 	// memory hint, not a limit, so the request itself was unbounded.
 	r.Body = http.MaxBytesReader(w, r.Body, maxMediaUploadBytes+maxMediaFormMemory)

@@ -15,12 +15,17 @@ const baseState: ProblemFormState = {
   interactive: false,
   interactorLanguage: 'cpp-gpp-64',
   interactorSourceCode: '',
+  problemType: 'standard',
+  scoringMode: 'complete',
+  subtaskAggregation: 'min',
 }
 
 test('renders checker type selector with all options', () => {
   render(<CheckerTab formState={baseState} onUpdate={vi.fn()} onSave={vi.fn()} saving={false} />)
   expect(screen.getByText('Checker & Special Judge Configuration')).toBeInTheDocument()
-  expect(screen.getByRole('combobox')).toHaveValue('exact')
+  // The tab now also carries the problem-type and scoring selects, so address
+  // the checker selector by its label rather than by "the one combobox".
+  expect(screen.getByLabelText('Checker Method')).toHaveValue('exact')
 })
 
 test('shows epsilon input for float checker types', () => {
@@ -55,4 +60,32 @@ test('calls onSave when save button clicked', () => {
   render(<CheckerTab formState={baseState} onUpdate={vi.fn()} onSave={onSave} saving={false} />)
   fireEvent.click(screen.getByText('Save Checker Configuration'))
   expect(onSave).toHaveBeenCalledTimes(1)
+})
+
+// The backend has always supported output_only and subtask scoring, but nothing
+// in the UI could set them, so those paths were unreachable.
+test('exposes problem type and scoring mode', () => {
+  render(<CheckerTab formState={baseState} onUpdate={vi.fn()} onSave={vi.fn()} saving={false} />)
+
+  expect(screen.getByLabelText('Problem Type')).toHaveValue('standard')
+  expect(screen.getByLabelText('Scoring Mode')).toHaveValue('complete')
+  // Aggregation is only meaningful for partial scoring.
+  expect(screen.queryByLabelText('Subtask Aggregation')).not.toBeInTheDocument()
+})
+
+test('shows aggregation only for partial scoring', () => {
+  render(<CheckerTab formState={{ ...baseState, scoringMode: 'partial' }} onUpdate={vi.fn()} onSave={vi.fn()} saving={false} />)
+  expect(screen.getByLabelText('Subtask Aggregation')).toHaveValue('min')
+})
+
+// Picking "interactive" is the same declaration as ticking the box, and the API
+// rejects a row where the enum and the boolean disagree.
+test('choosing the interactive type also ticks the boolean', () => {
+  const onUpdate = vi.fn()
+  render(<CheckerTab formState={baseState} onUpdate={onUpdate} onSave={vi.fn()} saving={false} />)
+
+  fireEvent.change(screen.getByLabelText('Problem Type'), { target: { value: 'interactive' } })
+
+  expect(onUpdate).toHaveBeenCalledWith('problemType', 'interactive')
+  expect(onUpdate).toHaveBeenCalledWith('interactive', true)
 })

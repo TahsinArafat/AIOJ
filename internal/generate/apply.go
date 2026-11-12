@@ -128,23 +128,15 @@ func (s *ApplyService) Apply(ctx context.Context, job *model.AIGenerationJob, ac
 			return nil, fmt.Errorf("promote staged testdata: %w", err)
 		}
 		problem.TestdataPath = versionPath
-		problem.TestCaseScore = nil
-		entries, err := os.ReadDir(versionPath)
-		if err != nil {
-			return nil, err
-		}
-		for _, entry := range entries {
-			if strings.HasSuffix(entry.Name(), ".in") {
-				stem := strings.TrimSuffix(entry.Name(), ".in")
-				if _, err := os.Stat(filepath.Join(versionPath, stem+".out")); err == nil {
-					problem.TestCaseScore = append(problem.TestCaseScore, model.TestCaseScore{InputName: entry.Name(), OutputName: stem + ".out"})
-				}
-			}
-		}
-		// Spread 100 points across the cases. A flat 10 per case meant a
-		// 12-case problem was scored out of 120, which breaks every percentage
-		// and partial-score display downstream.
-		assignScores(problem.TestCaseScore)
+		problem.TestCaseScore = discoverCaseScores(versionPath)
+		// Carry the validator onto the problem itself, not just onto the asset.
+		// Migration 000083 added problems.validator_language/source so a
+		// generated validator would survive the job, but nothing copied it
+		// across: the setter's "validate cases" endpoint reads the problem row,
+		// so every AI-created problem answered "this problem has no validator"
+		// while its validator sat in problem_generation_assets.
+		problem.ValidatorLanguage = p.ValidatorLanguage
+		problem.ValidatorSource = p.ValidatorCode
 		if err = s.Problems.Update(ctx, problem.ID, problem); err != nil {
 			return nil, err
 		}
@@ -163,6 +155,36 @@ func (s *ApplyService) Apply(ctx context.Context, job *model.AIGenerationJob, ac
 		_ = s.Audit.Insert(ctx, &model.AuditEntry{ActorID: actorID, Action: "AI APPLY", TargetType: "problem", TargetID: problem.ID, Detail: detail})
 	}
 	return &ApplyResult{ProblemID: problem.ID, ProblemSlug: problem.Slug}, nil
+}
+
+// discoverCaseScores pairs every `<stem>.in` with its `<stem>.out` in dir and
+// spreads 100 points across the pairs.
+//
+// Pairs are sorted by name first: os.ReadDir already returns entries sorted, but
+// the remainder from the 100/n split has to land on a stable case or the same
+// test data would score differently on every apply.
+func discoverCaseScores(dir string) []model.TestCaseScore {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil
+	}
+
+	var cases []model.TestCaseScore
+	for _, entry := range entries {
+		name := entry.Name()
+		if !strings.HasSuffix(name, ".in") {
+			continue
+		}
+		stem := strings.TrimSuffix(name, ".in")
+		if _, err := os.Stat(filepath.Join(dir, stem+".out")); err == nil {
+			cases = append(cases, model.TestCaseScore{InputName: name, OutputName: stem + ".out"})
+		}
+	}
+	// Spread 100 points across the cases. A flat 10 per case meant a 12-case
+	// problem was scored out of 120, which breaks every percentage and
+	// partial-score display downstream.
+	assignScores(cases)
+	return cases
 }
 
 // defaultInt returns v when positive, otherwise fallback.

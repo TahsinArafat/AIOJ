@@ -196,6 +196,19 @@ func (h *ProblemHandler) GetBySlug(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, p)
 }
 
+// defaultLimit returns v when it is a usable limit, otherwise fallback.
+//
+// The limits are the sandbox's CPU and memory ceilings, so a zero or negative
+// value is not a valid setting: it makes every submission on the problem exceed
+// its limit instantly. The forms render these as plain number inputs, and an
+// input cleared mid-edit serializes as 0.
+func defaultLimit(v, fallback int) int {
+	if v > 0 {
+		return v
+	}
+	return fallback
+}
+
 func (h *ProblemHandler) Update(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetUserClaims(r)
 	if claims == nil {
@@ -221,10 +234,30 @@ func (h *ProblemHandler) Update(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid body", http.StatusBadRequest)
 		return
 	}
+	// Reject the enum fields before touching the row: a CHECK violation would
+	// otherwise surface as an opaque 500 from the store.
+	if req.ProblemType != nil && !model.ValidProblemType(*req.ProblemType) {
+		http.Error(w, "invalid problem_type", http.StatusBadRequest)
+		return
+	}
+	if req.ScoringMode != "" && !model.ValidScoringMode(req.ScoringMode) {
+		http.Error(w, "invalid scoring_mode", http.StatusBadRequest)
+		return
+	}
+	if req.SubtaskAggregation != "" && !model.ValidSubtaskAggregation(req.SubtaskAggregation) {
+		http.Error(w, "invalid subtask_aggregation", http.StatusBadRequest)
+		return
+	}
+
 	p.Title = req.Title
 	p.Description = req.Description
-	p.TimeLimit = req.TimeLimit
-	p.MemoryLimit = req.MemoryLimit
+	// Limits are clamped, not taken verbatim. The form renders them as empty
+	// inputs while a setter retypes a value, and Number('') is 0; storing that
+	// handed the sandbox a zero CPU limit and every submission on the problem
+	// TLE'd with no visible cause. Create has always defaulted these, so Update
+	// defaulting them too keeps the two paths from disagreeing.
+	p.TimeLimit = defaultLimit(req.TimeLimit, 1000)
+	p.MemoryLimit = defaultLimit(req.MemoryLimit, 262144)
 	p.Difficulty = req.Difficulty
 	p.Rating = max(req.Rating, 0)
 	p.InputFormat = req.InputFormat
@@ -245,14 +278,33 @@ func (h *ProblemHandler) Update(w http.ResponseWriter, r *http.Request) {
 	// publishing is still an explicit admin action (SetReviewState), so a
 	// non-admin's visible flag is ignored outright. p.Status carries the
 	// existing value for everybody else, and the store derives visible from it.
-	if claims.Role == "admin" {
-		if req.Visible {
+	//
+	// `visible` is a *bool because most saves never mention it: the statement
+	// form does not carry a visibility control, so omitting it read as false and
+	// every admin's typo fix silently unpublished a published problem.
+	if claims.Role == "admin" && req.Visible != nil {
+		if *req.Visible {
 			p.Status = model.ProblemStatusPublished
 		} else if p.Status == model.ProblemStatusPublished {
 			p.Status = model.ProblemStatusDraft
 		}
 	}
-	p.Interactive = req.Interactive
+	// interactive and problem_type have to agree or the same problem is
+	// interactive for the judge and standard for everyone reading the enum. An
+	// empty resolution means the request said nothing about the type, so the
+	// stored value stands.
+	if req.Interactive != nil {
+		p.Interactive = *req.Interactive
+	}
+	if resolved := model.ResolveProblemType(req.ProblemType, req.Interactive); resolved != "" {
+		p.ProblemType = resolved
+	}
+	if req.ScoringMode != "" {
+		p.ScoringMode = req.ScoringMode
+	}
+	if req.SubtaskAggregation != "" {
+		p.SubtaskAggregation = req.SubtaskAggregation
+	}
 	p.InteractorLanguage = req.InteractorLanguage
 	p.InteractorSourceCode = req.InteractorSourceCode
 	if err := h.store.Update(r.Context(), p.ID, p); err != nil {
@@ -395,6 +447,18 @@ func (h *ProblemHandler) Create(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid body", http.StatusBadRequest)
 		return
 	}
+	if req.ProblemType != nil && !model.ValidProblemType(*req.ProblemType) {
+		http.Error(w, "invalid problem_type", http.StatusBadRequest)
+		return
+	}
+	if req.ScoringMode != "" && !model.ValidScoringMode(req.ScoringMode) {
+		http.Error(w, "invalid scoring_mode", http.StatusBadRequest)
+		return
+	}
+	if req.SubtaskAggregation != "" && !model.ValidSubtaskAggregation(req.SubtaskAggregation) {
+		http.Error(w, "invalid subtask_aggregation", http.StatusBadRequest)
+		return
+	}
 	var slugDerived bool
 	if req.Title == "" {
 		http.Error(w, "title required", http.StatusBadRequest)
@@ -409,12 +473,8 @@ func (h *ProblemHandler) Create(w http.ResponseWriter, r *http.Request) {
 		req.Slug = slugFromTitle(req.Title)
 		slugDerived = true
 	}
-	if req.TimeLimit <= 0 {
-		req.TimeLimit = 1000
-	}
-	if req.MemoryLimit <= 0 {
-		req.MemoryLimit = 262144
-	}
+	req.TimeLimit = defaultLimit(req.TimeLimit, 1000)
+	req.MemoryLimit = defaultLimit(req.MemoryLimit, 262144)
 	if req.Difficulty == "" {
 		req.Difficulty = "easy"
 	}
@@ -423,6 +483,16 @@ func (h *ProblemHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.FloatEpsilon == 0 {
 		req.FloatEpsilon = 1e-6
+	}
+	// A creation request may legitimately omit these; nil means "not published",
+	// which is what initialStatus already falls back to.
+	wantVisible := req.Visible != nil && *req.Visible
+	wantInteractive := req.Interactive != nil && *req.Interactive
+	// A new problem has no stored type to preserve, so an empty resolution means
+	// the caller said nothing: fall back to the column default.
+	problemType := model.ResolveProblemType(req.ProblemType, req.Interactive)
+	if problemType == "" {
+		problemType = model.ProblemTypeStandard
 	}
 	prob := &model.Problem{
 		ID:                   uuid.New().String(),
@@ -445,14 +515,19 @@ func (h *ProblemHandler) Create(w http.ResponseWriter, r *http.Request) {
 		SPJSourceCode:        req.SPJSourceCode,
 		CheckerType:          req.CheckerType,
 		FloatEpsilon:         req.FloatEpsilon,
-		Interactive:          req.Interactive,
+		Interactive:          wantInteractive,
+		ProblemType:          problemType,
 		InteractorLanguage:   req.InteractorLanguage,
 		InteractorSourceCode: req.InteractorSourceCode,
 		Source:               "local",
-		Status:               initialStatus(req.Visible, claims.Role),
-		Visible:              req.Visible && claims.Role == "admin",
+		Status:               initialStatus(wantVisible, claims.Role),
+		Visible:              wantVisible && claims.Role == "admin",
 		CreatedBy:            claims.UserID,
 	}
+	// Empty means "let the store apply its default" rather than being written
+	// over it, so an omitted field keeps the column's documented value.
+	prob.ScoringMode = req.ScoringMode
+	prob.SubtaskAggregation = req.SubtaskAggregation
 	// A derived slug can collide: nothing stops two setters naming a problem
 	// "Two Sum", and the reporter above turns that into a 409 the user cannot
 	// act on from a name-only form. Suffix a counter instead, but only for

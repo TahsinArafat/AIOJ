@@ -42,3 +42,24 @@ test('renders stored latex as math', async () => {
   await waitFor(() => expect(document.querySelectorAll('.katex')).toHaveLength(2))
   expect(document.querySelector('.tiptap')?.textContent).not.toContain('$')
 })
+
+// Inserting an image appended `![Image](url)` to the markdown, which re-seeds
+// the editor. With no Image extension, ProseMirror dropped the node on parse and
+// the next keystroke saved a statement with no image in it — the file was
+// uploaded and then orphaned. These pin the node existing at all.
+test('renders an image node instead of dropping it', async () => {
+  render(<VisualEditor content={'![Figure 1](/media/abc.png)'} onChange={vi.fn()} />)
+
+  await waitFor(() => expect(document.querySelector('.tiptap img')).toBeTruthy())
+  expect(document.querySelector('.tiptap img')?.getAttribute('src')).toBe('/media/abc.png')
+})
+
+// The same defect for tables: Turndown has no table rule and ProseMirror had no
+// table node, so a table in a statement collapsed into one paragraph per cell.
+test('renders a table node instead of flattening it', async () => {
+  render(<VisualEditor content={'| a | b |\n| --- | --- |\n| 1 | 2 |'} onChange={vi.fn()} />)
+
+  await waitFor(() => expect(document.querySelector('.tiptap table')).toBeTruthy())
+  expect(document.querySelectorAll('.tiptap table th')).toHaveLength(2)
+  expect(document.querySelectorAll('.tiptap table td')).toHaveLength(2)
+})

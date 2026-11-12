@@ -1,6 +1,10 @@
 package generate
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/tahsinarafat/aioj/internal/model"
@@ -63,5 +67,52 @@ func TestProblemMemoryLimitIsStoredAsKilobytes(t *testing.T) {
 				t.Fatalf("problemMemoryLimitKB(%d) = %d, want %d KB", tc.in, got, tc.want)
 			}
 		})
+	}
+}
+
+// discoverCaseScores is what the AI apply path runs over a promoted testdata
+// directory. It has to total exactly 100 points however many pairs there are,
+// because the judge's score is a percentage of the points available.
+func TestDiscoverCaseScoresSpreads100Points(t *testing.T) {
+	for _, n := range []int{1, 3, 12} {
+		dir := t.TempDir()
+		for i := 0; i < n; i++ {
+			stem := fmt.Sprintf("case%02d", i)
+			if err := os.WriteFile(filepath.Join(dir, stem+".in"), []byte("1"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(dir, stem+".out"), []byte("2"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		cases := discoverCaseScores(dir)
+		if len(cases) != n {
+			t.Fatalf("%d pairs: discovered %d", n, len(cases))
+		}
+		total := 0
+		for _, c := range cases {
+			total += c.Score
+			if c.OutputName != strings.TrimSuffix(c.InputName, ".in")+".out" {
+				t.Errorf("case %s paired with %s", c.InputName, c.OutputName)
+			}
+		}
+		if total != 100 {
+			t.Errorf("%d pairs total %d points, want 100", n, total)
+		}
+	}
+}
+
+// An input without a matching output is not a test case and must be skipped
+// rather than scored.
+func TestDiscoverCaseScoresSkipsUnpairedInputs(t *testing.T) {
+	dir := t.TempDir()
+	_ = os.WriteFile(filepath.Join(dir, "a.in"), []byte("1"), 0o644)
+	_ = os.WriteFile(filepath.Join(dir, "a.out"), []byte("2"), 0o644)
+	_ = os.WriteFile(filepath.Join(dir, "orphan.in"), []byte("1"), 0o644)
+
+	cases := discoverCaseScores(dir)
+	if len(cases) != 1 || cases[0].InputName != "a.in" {
+		t.Fatalf("cases = %+v, want just a.in", cases)
 	}
 }

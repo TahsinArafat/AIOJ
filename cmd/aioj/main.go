@@ -361,7 +361,7 @@ func main() {
 	plagiarismService := plagiarism.NewServiceWithEngine(plagiarismStore, contestStore, submissionStore, plagiarismEngine)
 	plagiarismH := handler.NewPlagiarismHandler(plagiarismService, plagiarismStore, contestStore)
 
-	mediaH := handler.NewMediaHandler("./media")
+	mediaH := handler.NewMediaHandler("./media").WithProblems(problemStore)
 	onsiteH := handler.NewOnsiteHandler(balloonStore, printStore, contestStore)
 	onsiteBatchH := handler.NewOnsiteBatchHandler(contestStore, onsiteUserStore, userStore, refreshTokenStore, totpStore, jwtManager)
 
