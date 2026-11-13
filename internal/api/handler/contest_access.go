@@ -303,11 +303,13 @@ type contestViewer struct {
 // with the spectate question asked instead of the content one, so a round with a
 // public scoreboard is watchable by a caller who cannot read a word of it.
 //
-// A refused password round answers 404 here, not the 403 "password_required" the
-// content gate sends. That prompt is for someone who is supposed to unlock and go
-// on to read the statements; a spectator never will, and telling them the round
-// has a password would confirm a private round exists — the same inference the
-// listing deliberately prevents.
+// An unstarted round is refused here, for the same reason the content gate
+// refuses it: a board that is readable hours before the start is a side channel
+// telling the world an invite-only round exists, which is exactly what
+// accessNotStarted exists to prevent. Note that this is the *handler's* decision
+// and has to match the policy's — the policy answering accessNotStarted is not by
+// itself enough, because an earlier version of this function treated "upcoming" as
+// "let them through" and would have served the board before the start.
 func (h *contestHandlerAccess) requireContestSpectateAccess(
 	w http.ResponseWriter,
 	r *http.Request,
@@ -324,8 +326,6 @@ func (h *contestHandlerAccess) requireContestSpectateAccess(
 
 	switch {
 	case decision.Allowed():
-		return contestViewer{decision: decision, claims: claims}, true
-	case decision.IsUpcoming() && !notFoundWhenDenied:
 		return contestViewer{decision: decision, claims: claims}, true
 	case notFoundWhenDenied:
 		http.Error(w, "contest not found", http.StatusNotFound)

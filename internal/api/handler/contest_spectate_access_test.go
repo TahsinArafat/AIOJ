@@ -3,6 +3,8 @@ package handler
 import (
 	"context"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/tahsinarafat/aioj/internal/auth"
@@ -256,5 +258,65 @@ func TestPublicBoardKeepsJudgePrivilegeNarrow(t *testing.T) {
 	}
 	if got.IsJudge() {
 		t.Fatal("a tester must not hold judge privilege: that would expose frozen standings")
+	}
+}
+
+/**
+ * The handler gate must refuse what the policy refuses.
+ *
+ * This test exists because the policy-only tests above did not catch a real bug:
+ * requireContestSpectateAccess treated "upcoming" as "let them through", so a
+ * published-but-unstarted round served its board to anyone. The policy was
+ * correct the whole time — the handler simply did not enforce its answer.
+ *
+ * So the assertions below go through the handler, not the policy. A rule that
+ * only exists in the policy is not a rule a request actually sees.
+ */
+func TestSpectateHandlerEnforcesPolicy(t *testing.T) {
+	cases := []struct {
+		name        string
+		contest     *model.Contest
+		wantOK      bool
+		description string
+	}{
+		{
+			// The bug. An unstarted round must not leak its board.
+			name: "an upcoming public board is refused", contest: withPublicBoard(unstartedContest()),
+			wantOK:      false,
+			description: "a public board must not become a side channel before the start",
+		},
+		{
+			// The feature, for contrast: once started, the board opens.
+			name: "a started public board is served", contest: withPublicBoard(passwordContest()),
+			wantOK: true,
+		},
+		{
+			name: "a draft's public board is refused", contest: withPublicBoard(draftContest()),
+			wantOK:      false,
+			description: "publishing a board must not publish an unproposed round",
+		},
+		{
+			// The backwards-compatible case: no board flag, password round, no grant.
+			name: "a participants-only password round is refused", contest: passwordContest(),
+			wantOK:      false,
+			description: "the default must keep the board behind the password",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			h := &contestHandlerAccess{}
+			h.rebuildWithGrants(&accessStub{groupOK: true}, grantStub{granted: false})
+
+			rec := httptest.NewRecorder()
+			_, ok := h.requireContestSpectateAccess(rec, requestFor("c1"), tc.contest, false)
+			if ok != tc.wantOK {
+				t.Fatalf("gate admitted=%v, want %v (code=%d body=%q) — %s",
+					ok, tc.wantOK, rec.Code, rec.Body.String(), tc.description)
+			}
+			if !tc.wantOK && rec.Code != http.StatusForbidden {
+				t.Fatalf("refusal code = %d, want %d", rec.Code, http.StatusForbidden)
+			}
+		})
 	}
 }
