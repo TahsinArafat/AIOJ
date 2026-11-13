@@ -52,10 +52,17 @@ func (f *AtCoderFormat) ScoreProblem(ctx format.ScoringContext) (format.ProblemR
 		return result, nil
 	}
 
-	result.Attempts = len(ctx.Submissions)
+	// AtCoder counts attempts and nothing else, so a voided submission has to
+	// leave the list here or it would be counted as an attempt.
+	subs := format.ScoringSubmissions(ctx.Submissions)
+	if len(subs) == 0 {
+		return result, nil
+	}
 
-	for _, sub := range ctx.Submissions {
-		result.Attempts = len(ctx.Submissions)
+	result.Attempts = len(subs)
+
+	for _, sub := range subs {
+		result.Attempts = len(subs)
 		if sub.Status == "AC" {
 			result.Solved = true
 			result.Score = 1

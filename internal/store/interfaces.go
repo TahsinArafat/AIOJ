@@ -172,6 +172,11 @@ type SubmissionStore interface {
 	// ResetForRejudge atomically resets a batch of submissions to 'pending'
 	// and clears their judge result, preparing them for re-execution.
 	ResetForRejudge(ctx context.Context, ids []string) error
+	// SetSkipped voids a submission so it stops counting as an attempt and stops
+	// contributing points, leaving the verdict it earned on the row. It refuses a
+	// submission that is pending, judging or already skipped, and reports whether
+	// a row was changed so the caller can answer 404/409.
+	SetSkipped(ctx context.Context, id string) (bool, error)
 	GetProblemStats(ctx context.Context, problemID string) (*model.ProblemStats, error)
 	GetUserStats(ctx context.Context, userID string) (*model.UserProblemStats, error)
 	GetPlatformStats(ctx context.Context) (*model.PlatformStats, error)

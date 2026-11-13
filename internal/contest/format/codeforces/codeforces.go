@@ -63,12 +63,19 @@ func (f *CodeforcesFormat) ScoreProblem(ctx format.ScoringContext) (format.Probl
 		return result, nil
 	}
 
-	result.Attempts = len(ctx.Submissions)
+	// A voided submission costs nothing: it is neither an attempt nor one of the
+	// wrong submissions that decay the score.
+	subs := format.ScoringSubmissions(ctx.Submissions)
+	if len(subs) == 0 {
+		return result, nil
+	}
+
+	result.Attempts = len(subs)
 
 	initialScore := f.getInitialScore(ctx.Problem)
 
 	var wrongBeforeAC int
-	for _, sub := range ctx.Submissions {
+	for _, sub := range subs {
 		if sub.Status == "AC" {
 			result.Solved = true
 			firstACTime := sub.CreatedAt

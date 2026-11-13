@@ -64,7 +64,16 @@ func (f *IOIFormat) ScoreProblem(ctx format.ScoringContext) (format.ProblemResul
 		return result, nil
 	}
 
-	result.Attempts = len(ctx.Submissions)
+	// IOI is a best-of across submissions — both the no-subtask path (highest
+	// score) and the subtask path (best per subtask) — so a voided row has to be
+	// gone before either maximum is taken. A skipped submission would otherwise
+	// keep paying out its points while no longer counting as an attempt.
+	subs := format.ScoringSubmissions(ctx.Submissions)
+	if len(subs) == 0 {
+		return result, nil
+	}
+
+	result.Attempts = len(subs)
 
 	var problemCfg ProblemConfig
 	if len(ctx.Problem.Config) > 0 {
@@ -75,7 +84,7 @@ func (f *IOIFormat) ScoreProblem(ctx format.ScoringContext) (format.ProblemResul
 
 	if len(problemCfg.Subtasks) == 0 {
 		maxScore := 0.0
-		for _, sub := range ctx.Submissions {
+		for _, sub := range subs {
 			if sub.Score > maxScore {
 				maxScore = sub.Score
 			}
@@ -90,7 +99,7 @@ func (f *IOIFormat) ScoreProblem(ctx format.ScoringContext) (format.ProblemResul
 		subtaskBest[st.ID] = 0
 	}
 
-	for _, sub := range ctx.Submissions {
+	for _, sub := range subs {
 		subtaskScores := f.parseSubtaskScores(sub, problemCfg)
 		for stID, score := range subtaskScores {
 			if score > subtaskBest[stID] {

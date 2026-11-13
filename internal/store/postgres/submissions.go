@@ -325,7 +325,12 @@ func (s *SubmissionStore) updateResult(ctx context.Context, id, claimToken strin
 	query := `UPDATE submissions
 	             SET status=$1,score=$2,time_used=$3,memory_used=$4,compile_output=$5,judge_result=$6,judged_at=$7,
 	                 judge_error=$9, judging_started_at=NULL,judging_claim_token=NULL
-	           WHERE id=$8`
+	           WHERE id=$8
+	             -- A skipped submission is voided on purpose: a verdict written
+	             -- over it would resurrect an attempt an organizer removed. The
+	             -- judge never queues a skipped row, so a write that reaches here
+	             -- is a stale one, and dropping it is the point.
+	             AND status <> 'skipped'`
 	args := []interface{}{status, score, timeUsed, memoryUsed, compileOutput, jr, time.Now(), id, judgeError}
 	if claimToken != "" {
 		// $9 is judge_error; the claim token takes the next slot.
@@ -661,6 +666,41 @@ func (s *SubmissionStore) ListForBulkRejudge(ctx context.Context, contestID, pro
 	return ids, rows.Err()
 }
 
+// SetSkipped voids a submission: an organizer rules that it should not count
+// (a resubmit-rule breach, a copied solution) and the round is then scored as if
+// it had never been made.
+//
+// Only status moves. The score, the case results and the rest of the earned
+// verdict are deliberately left on the row: the void is a human decision layered
+// over the judge's answer, and what the submission actually did has to survive
+// for the appeal. The scoreboard never reads a skipped row, so the stale columns
+// cannot reach a standing.
+//
+// A row that is pending or judging is refused: the judge holds a claim on it and
+// is about to write a verdict, so voiding it now would race that write. It is
+// also refused when already skipped, which makes the operation idempotent from
+// the caller's point of view — the second click reports "nothing changed"
+// instead of silently refreshing created_at-style metadata.
+//
+// Returns false when no row matched, so the handler can answer 404/409.
+func (s *SubmissionStore) SetSkipped(ctx context.Context, id string) (bool, error) {
+	res, err := s.db.ExecContext(ctx, `
+		UPDATE submissions
+		   SET status = 'skipped',
+		       judging_started_at = NULL,
+		       judging_claim_token = NULL
+		 WHERE id = $1
+		   AND status NOT IN ('pending', 'judging', 'skipped')`, id)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	return n == 1, nil
+}
+
 // ResetForRejudge atomically resets a batch of submission IDs to 'pending',
 // clears prior verdicts, and clears any stale claim token.
 func (s *SubmissionStore) ResetForRejudge(ctx context.Context, ids []string) error {
@@ -862,7 +902,7 @@ func (s *SubmissionStore) ListIDsForProblemRejudge(ctx context.Context, problemI
 		  FROM submissions s
 		  JOIN problems p ON p.id = s.problem_id
 		 WHERE s.problem_id = $1
-		   AND s.status NOT IN ('pending', 'judging')
+		   AND s.status NOT IN ('pending', 'judging', 'skipped')
 		   AND COALESCE(s.remote_id, '') = ''
 		   AND COALESCE(p.source,'') NOT IN ` + remoteSourceList + ``
 	args := []interface{}{problemID}

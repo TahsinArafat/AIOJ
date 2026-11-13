@@ -62,11 +62,21 @@ type SubmissionHandler struct {
 	langs     map[string]*compiler.LangConfig
 	// audit records setter-initiated rejudges; optional.
 	audit *AuditLogHandler
+	// scoreboardCache is invalidated when a submission is voided, so a standing
+	// that just changed is not served from cache for the rest of its TTL.
+	scoreboardCache *scoreboardCache
 }
 
 // WithAudit attaches the audit recorder. Call it after NewSubmissionHandler.
 func (h *SubmissionHandler) WithAudit(a *AuditLogHandler) *SubmissionHandler {
 	h.audit = a
+	return h
+}
+
+// WithScoreboardCache attaches the standings cache so voiding a submission
+// drops the stale entry. Optional: without it the board catches up on TTL.
+func (h *SubmissionHandler) WithScoreboardCache(c *scoreboardCache) *SubmissionHandler {
+	h.scoreboardCache = c
 	return h
 }
 

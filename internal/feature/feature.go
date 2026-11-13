@@ -432,6 +432,21 @@ var registry = []Feature{
 		Description: "Importing problems from Codeforces, CSES, AtCoder, Toph and QOJ.",
 		Default:     Policy{Enabled: true, Roles: []string{model.RoleSetter}}, RequiresLogin: true, APIEnforced: true,
 	},
+	{
+		// Voiding a submission is an accusation: it says a submission should not
+		// count, and it moves a public leaderboard. So it is an admin decision
+		// who may do it, not a side effect of holding the setter role. Defaults
+		// to setters; an admin can narrow it to only themselves, or open it to
+		// everyone, from the feature panel. Admins always pass, per feature.Decide.
+		//
+		// The role list is the whole gate. Being permitted is still not
+		// sufficient: the caller must also be able to manage the submission's
+		// problem (its owner or co-author) or the round it was made in (manager
+		// or judge). See SubmissionHandler.canSkip.
+		Key: "skip_submission", Label: "Void a submission", Category: CategoryCompete,
+		Description: "Marking a submission as skipped so it stops counting as an attempt: a resubmit-rule breach or a copied solution.",
+		Default:     Policy{Enabled: true, Roles: []string{model.RoleSetter}}, RequiresLogin: true, APIEnforced: true,
+	},
 }
 
 // All returns every declared feature, in registry order.
@@ -489,4 +504,5 @@ const (
 	KeySetterWorkspace = "setter_workspace"
 	KeyAIGeneration    = "ai_generation"
 	KeyProblemImport   = "problem_import"
+	KeySkipSubmission  = "skip_submission"
 )

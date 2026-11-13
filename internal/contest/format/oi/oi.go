@@ -53,10 +53,20 @@ func (f *OIFormat) ScoreProblem(ctx format.ScoringContext) (format.ProblemResult
 		return result, nil
 	}
 
-	result.Attempts = len(ctx.Submissions)
+	// OI scores the highest submission, so a voided row has to be filtered out
+	// BEFORE the maximum is taken — a skipped submission that scored 100 would
+	// otherwise keep paying out its points while no longer counting as an
+	// attempt. That is the case where a void would silently fail to change the
+	// standing at all.
+	subs := format.ScoringSubmissions(ctx.Submissions)
+	if len(subs) == 0 {
+		return result, nil
+	}
+
+	result.Attempts = len(subs)
 
 	maxScore := 0.0
-	for _, sub := range ctx.Submissions {
+	for _, sub := range subs {
 		if sub.Score > maxScore {
 			maxScore = sub.Score
 		}

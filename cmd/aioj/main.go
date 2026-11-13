@@ -423,6 +423,10 @@ Restore from the pre-deploy dump if the schema is unrecoverable.`, err)
 	contestH.WithAdjustments(adjustmentStore)
 	contestAdjH := handler.NewContestAdjustmentHandler(
 		adjustmentStore, contestStore, submissionStore, contestH.ScoreboardCache())
+	// Voiding a submission changes a standing, so the submission handler needs
+	// the same cache to drop it. Attached here because contestH owns the cache
+	// and is built above; without it the board would catch up only on TTL.
+	submissionH.WithScoreboardCache(contestH.ScoreboardCache())
 
 	botAccountH := handler.NewAdminBotAccountHandler(botAccountStore, vjService)
 	settingsStore := postgres.NewSystemSettingsStore(db)

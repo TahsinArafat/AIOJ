@@ -1,0 +1,17 @@
+-- 'skipped' is a verdict the judge never produces: an organizer voids a
+-- submission (a resubmit-rule breach, a copied solution) and it must stop
+-- counting as an attempt and stop contributing points, without the verdict the
+-- contestant actually earned being destroyed.
+--
+-- It goes in the enum rather than into a side table because the whole scoring
+-- path already reduces to "read submissions for this user+problem", and a
+-- submission the scoreboard must not see is most safely expressed as a status
+-- the formats already filter on. Adding a parallel "ignored submissions" list
+-- would mean every one of those queries had to learn about it.
+--
+-- PostgreSQL refuses to *reference* a freshly added enum value in the same
+-- transaction that added it, and golang-migrate wraps each migration in one
+-- transaction — so this migration only adds the value. Nothing that references
+-- 'skipped' as a literal lives here; the Go layer compares against the
+-- constant (model.StatusSkipped).
+ALTER TYPE verdict ADD VALUE IF NOT EXISTS 'skipped';

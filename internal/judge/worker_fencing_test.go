@@ -79,6 +79,11 @@ func (f *fencingStore) ListForBulkRejudge(context.Context, string, string) ([]st
 	return nil, nil
 }
 func (f *fencingStore) ResetForRejudge(context.Context, []string) error { return nil }
+
+// SetSkipped is part of store.SubmissionStore but is not a judge concern: a
+// skipped submission is never queued, so the worker never sees one. It exists
+// here only to satisfy the interface.
+func (f *fencingStore) SetSkipped(context.Context, string) (bool, error) { return false, nil }
 func (f *fencingStore) ListByProblemManage(context.Context, string, int, int, model.SubmissionFilter) ([]model.Submission, int, error) {
 	return nil, 0, nil
 }

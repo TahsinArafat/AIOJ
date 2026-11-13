@@ -55,8 +55,16 @@ func (f *ACMFormat) ScoreProblem(ctx format.ScoringContext) (format.ProblemResul
 		return result, nil
 	}
 
+	// A skipped submission is not an attempt at all, so it is removed before
+	// anything is counted. Dropping it anywhere later would still leave it in
+	// Attempts and in the wrong-attempt penalty.
+	subs := format.ScoringSubmissions(ctx.Submissions)
+	if len(subs) == 0 {
+		return result, nil
+	}
+
 	wrongAttempts := 0
-	for _, sub := range ctx.Submissions {
+	for _, sub := range subs {
 		result.Attempts++
 		if sub.Status == "AC" {
 			result.Solved = true

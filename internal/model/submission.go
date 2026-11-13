@@ -15,6 +15,11 @@ const (
 	StatusRE        SubmissionStatus = "re"
 	StatusCE        SubmissionStatus = "ce"
 	StatusSE        SubmissionStatus = "se"
+	// StatusSkipped is a human verdict, not a judge one: an organizer voids the
+	// submission (a resubmit-rule breach, a copied solution). It scores nothing
+	// and is not counted as an attempt, so the round is scored exactly as if the
+	// submission had not been made. Nothing in the judge ever writes it.
+	StatusSkipped SubmissionStatus = "skipped"
 )
 
 // Submission types

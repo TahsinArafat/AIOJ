@@ -2,8 +2,46 @@ package format
 
 import (
 	"encoding/json"
+	"strings"
 	"time"
 )
+
+// StatusSkipped is a submission an organizer voided. The formats receive
+// UPPER-CASE statuses (the handler upper-cases the stored enum before scoring),
+// so this is the spelling they compare against.
+//
+// A skipped submission is not an attempt: Codeforces drops it from the
+// wrong-attempt count and the penalty that follows from it, so a round is
+// scored as if it had never been made. Every format must therefore filter it
+// out BEFORE counting, not merely refuse to accept on it.
+const StatusSkipped = "SKIPPED"
+
+// IsSkipped reports whether a submission was voided by an organizer.
+func IsSkipped(status string) bool {
+	return strings.EqualFold(status, StatusSkipped)
+}
+
+// ScoringSubmissions returns the submissions a format may score: the ones an
+// organizer has not voided.
+//
+// Every algorithm must start from this list, and that is the whole point of it
+// living here. "A skipped submission does not exist as far as the round is
+// concerned" is one rule, but a per-algorithm loop restating it is a rule that
+// gets forgotten — the score-threshold formats (ioi, oi) are the trap, because
+// they read a submission's stored score directly and a voided row would keep
+// paying out its points even though it no longer counts as an attempt.
+//
+// The result is always a fresh slice: the caller's slice is shared with the
+// scoreboard handler's per-problem map and must not be mutated in place.
+func ScoringSubmissions(subs []Submission) []Submission {
+	out := make([]Submission, 0, len(subs))
+	for _, s := range subs {
+		if !IsSkipped(s.Status) {
+			out = append(out, s)
+		}
+	}
+	return out
+}
 
 type Submission struct {
 	ID        string    `json:"id"`

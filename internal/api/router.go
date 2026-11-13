@@ -300,6 +300,15 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 				r.Use(gate(feature.KeySetterWorkspace))
 				r.Get("/manage", submissionH.ListByProblemManage)
 				r.Post("/rejudge", submissionH.RejudgeProblemSubmissions)
+				// Voiding a submission is an accusation that moves a public
+				// leaderboard, so which roles may do it is an admin decision
+				// (Admin → Feature Gates: "Void a submission") rather than a
+				// side effect of holding the setter role. gate() rejects a
+				// disallowed role before the handler runs; the handler then
+				// checks the caller is accountable for THIS submission. The
+				// route is problem-scoped so the permission is always checked
+				// against the problem that was actually answered.
+				r.With(gate(feature.KeySkipSubmission)).Post("/{id}/skip", submissionH.SkipProblemSubmission)
 			})
 		})
 		r.Get("/{slug}/language-limits", langLimitH.List)
@@ -424,6 +433,11 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 			r.Put("/{id}/problems/{problemId}", contestH.UpdateProblem)
 			r.Delete("/{id}/problems/{problemId}", contestH.RemoveProblem)
 			r.Get("/{id}/submissions", submissionH.ListByContest)
+			// Voiding from the round's own submissions tab. Scoped by contest so
+			// the accountability check runs against the round the submission was
+			// made in — see submission_skip.go. The role policy is the same gate
+			// the problem-scoped route uses.
+			r.With(gate(feature.KeySkipSubmission)).Post("/{id}/submissions/{submissionId}/skip", submissionH.SkipContestSubmission)
 			r.Post("/{id}/calculate-ratings", contestH.CalculateRatings)
 		})
 		r.With(middleware.AuthMiddleware(jwtManager)).Post("/{id}/register-team", contestH.RegisterTeam)
