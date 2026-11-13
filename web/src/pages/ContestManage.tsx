@@ -28,6 +28,9 @@ import {
     setSurface, clearSurface, publicSurfaces, sanitizeAccessConfig,
 } from '../lib/contestAccess'
 import type { AccessAudience, AccessConfig } from '../lib/contestAccess'
+import {
+    formatSpec, defaultFormatConfig, formFromFormatConfig, configFromForm,
+} from '../lib/contestFormatConfig'
 
 function indexLabel(i: number): string {
     let s = ''
@@ -1288,6 +1291,10 @@ function SettingsTab({ contestId }: { contestId: string }) {
         // empty string as "not sent", and the select always has a value, so there is
         // no state in which omitting it is the right answer.
         format: 'acm',
+        // The format's own numbers (penalty, decay, ...). Strings because the inputs
+        // are text — a number input bound to a number cannot represent an empty box,
+        // and an empty box is how a setter clears a field to retype it.
+        format_config: {} as Record<string, string>,
         registration_required: false, registration_deadline: '', max_participants: '',
         is_rated: true, rated_for_min: 0, rated_for_max: 9999,
     })
@@ -1352,6 +1359,11 @@ function SettingsTab({ contestId }: { contestId: string }) {
                 // format column omits it, and an empty select would offer a blank
                 // option that saves as "not sent" and silently keeps the old value.
                 format: c.format || 'acm',
+                // The stored config, rendered as form strings for the format the round
+                // is actually on. Keyed by c.format rather than form.format: a round
+                // carries one config, and showing acm's keys while the select says ioi
+                // would be a form that saves a config for the wrong engine.
+                format_config: formFromFormatConfig(c.format || 'acm', c.format_config),
                 registration_required: c.registration_required ?? false,
                 registration_deadline: isoToLocalInput(c.registration_deadline),
                 // '' not 0: the column is nullable and an empty box means "no cap".
@@ -1462,6 +1474,14 @@ function SettingsTab({ contestId }: { contestId: string }) {
                 // partial-credit key, so carrying it across would score the round with
                 // the new engine's zero values. The hint under the select says so.
                 format: form.format,
+                // Sent only when the round's format is one this build knows the shape
+                // of. An unrecognised format (an older build's, or a hand-edited row)
+                // has no fields to render, so sending {} would overwrite a config this
+                // form cannot see — the settings would be destroyed by a save that
+                // never mentioned them.
+                ...(formatSpec(form.format)
+                    ? { format_config: configFromForm(form.format, form.format_config) }
+                    : {}),
                 registration_required: form.registration_required,
                 // null clears the deadline/cap; omitting the key would mean "leave
                 // it alone". The field is always sent, so emptying the input is the
@@ -1564,7 +1584,22 @@ function SettingsTab({ contestId }: { contestId: string }) {
                     recreate the round and lose its submissions. */}
                 <div>
                     <label className="block text-sm font-medium text-ink-soft mb-1">Scoring format</label>
-                    <select aria-label="Scoring format" value={form.format} onChange={e => setForm(p => ({ ...p, format: e.target.value }))}
+                    <select
+                        aria-label="Scoring format"
+                        value={form.format}
+                        onChange={e => {
+                            // The config is re-seeded from the NEW format's defaults, not
+                            // carried across. This mirrors what the server does with an
+                            // omitted config on a format change — and it has to match,
+                            // because a form showing acm's penalty beside an ioi select
+                            // would save a config for the wrong engine.
+                            const next = e.target.value
+                            setForm(p => ({
+                                ...p,
+                                format: next,
+                                format_config: formFromFormatConfig(next, defaultFormatConfig(next)),
+                            }))
+                        }}
                         className="w-full border border-hairline-strong rounded-lg px-3 py-2 text-sm focus:ring-2 focus-visible:outline-[var(--ring)] focus:border-brand bg-surface">
                         {/* The stored format is always offered, even when the registry
                             no longer lists it. A round can carry a format from an older
@@ -1574,16 +1609,90 @@ function SettingsTab({ contestId }: { contestId: string }) {
                         {!formats.includes(form.format) && (
                             <option value={form.format}>{form.format} (unrecognised)</option>
                         )}
-                        {formats.map(f => (
-                            <option key={f} value={f}>{f.toUpperCase()}</option>
-                        ))}
+                        {formats.map(f => {
+                            const spec = formatSpec(f)
+                            return (
+                                <option key={f} value={f}>
+                                    {spec ? `${spec.label} — ${spec.description}` : f.toUpperCase()}
+                                </option>
+                            )
+                        })}
                     </select>
                     <p className="text-xs text-muted-soft mt-1">
                         Decides how the standings are computed. Changing it resets the format's
-                        own settings to their defaults, because the formats' settings are not
-                        interchangeable — a penalty-per-wrong under an IOI round has nothing to
-                        apply to.
+                        own settings below to their defaults, because the formats' settings are
+                        not interchangeable — a penalty-per-wrong under an IOI round has nothing
+                        to apply to.
                     </p>
+
+                    {/* The format's own settings. This block is why the create page's copy
+                        could be deleted: it was the only UI that could reach them, so
+                        without it a round could change format and never tune it. */}
+                    {(() => {
+                        const spec = formatSpec(form.format)
+                        if (!spec) {
+                            return (
+                                <p className="mt-2 text-xs text-warn">
+                                    This round uses a format this build has no settings for
+                                    ({form.format}). Its stored settings are left untouched.
+                                </p>
+                            )
+                        }
+                        return (
+                            <fieldset className="mt-3 rounded-lg border border-hairline p-3">
+                                <legend className="px-1 text-xs font-semibold text-ink-soft">
+                                    {spec.label} settings
+                                </legend>
+                                <div className="mt-2 space-y-3">
+                                    {spec.fields.map(f => (
+                                        <div key={f.key}>
+                                            {f.type === 'checkbox' ? (
+                                                <label className="flex items-center gap-2 cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        aria-label={f.label}
+                                                        checked={form.format_config[f.key] === 'true'}
+                                                        onChange={e => setForm(p => ({
+                                                            ...p,
+                                                            format_config: {
+                                                                ...p.format_config,
+                                                                [f.key]: e.target.checked ? 'true' : 'false',
+                                                            },
+                                                        }))}
+                                                        className="rounded border-hairline-strong text-brand focus-visible:outline-[var(--ring)]"
+                                                    />
+                                                    <span className="text-sm text-ink-soft">{f.label}</span>
+                                                </label>
+                                            ) : (
+                                                <>
+                                                    <label className="block text-sm font-medium text-ink-soft mb-1">
+                                                        {f.label}
+                                                    </label>
+                                                    <input
+                                                        type="number"
+                                                        aria-label={f.label}
+                                                        min={f.min}
+                                                        max={f.max}
+                                                        step={f.step}
+                                                        value={form.format_config[f.key] ?? ''}
+                                                        onChange={e => setForm(p => ({
+                                                            ...p,
+                                                            format_config: {
+                                                                ...p.format_config,
+                                                                [f.key]: e.target.value,
+                                                            },
+                                                        }))}
+                                                        className="w-full max-w-xs border border-hairline-strong rounded-lg px-3 py-2 text-sm focus:ring-2 focus-visible:outline-[var(--ring)] focus:border-brand bg-surface"
+                                                    />
+                                                </>
+                                            )}
+                                            {f.hint && <p className="mt-1 text-xs text-muted-soft">{f.hint}</p>}
+                                        </div>
+                                    ))}
+                                </div>
+                            </fieldset>
+                        )
+                    })()}
                 </div>
 
                 {/* Description */}

@@ -1,35 +1,29 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, Link, useLocation } from 'react-router-dom'
 import { api, getAccessToken, contestSlug } from '../lib/api'
 import { loginHref } from '../lib/authRedirect'
-import { DIVISIONS } from '../lib/divisions'
 import { PageHeader } from '../components/ui/PageHeader'
 
-const FORMAT_OPTIONS = [
-    { value: 'acm', label: 'ACM/ICPC', desc: 'Standard penalty-based scoring with time penalty.' },
-    { value: 'oi', label: 'OI', desc: 'Max score per problem. No time penalty.' },
-    { value: 'ioi', label: 'IOI', desc: 'Subtask-based scoring with partial credit.' },
-    { value: 'atcoder', label: 'AtCoder', desc: 'First AC time as penalty. No wrong submission penalty.' },
-    { value: 'codeforces', label: 'Codeforces', desc: 'Dynamic score that decays over time.' },
-]
-
-const TYPE_OPTIONS = [
-    { value: 'acm', label: 'ACM' },
-    { value: 'oi', label: 'OI' },
-    { value: 'ioi', label: 'IOI' },
-    { value: 'practice', label: 'Practice' },
-    { value: 'educational', label: 'Educational' },
-]
-
-const PROBLEM_LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
-
-interface SelectedProblem {
-    id: string
-    title: string
-    slug: string
-    difficulty: string
-}
-
+/**
+ * Create a round from its name, then hand it to the workspace.
+ *
+ * This page used to collect six sections — basic info, schedule, format and its
+ * per-format tuning, a problem picker, and options — before it would submit. Every
+ * one of those is also a field on the workspace Settings tab, and the problem
+ * picker duplicated the Challenges tab. Two screens for one job, with the create
+ * page's copies already drifting: it offered `educational` as a contest type the
+ * settings form did not, and its format list was a hand-written constant while the
+ * settings form asks the server.
+ *
+ * So it asks for the one thing the workspace cannot invent — what the round is
+ * called — and creates it. The rest is configured where it can be seen in the
+ * context of the round it applies to.
+ *
+ * The server defaults the schedule (one hour from now, one hour long), so a
+ * name-only round is valid and reads as UPCOMING rather than ended. That matters:
+ * start_time is NOT NULL, and Go's zero time is year 1, which every status
+ * derivation would report as long finished.
+ */
 function slugify(text: string): string {
     return text
         .toLowerCase()
@@ -40,215 +34,42 @@ function slugify(text: string): string {
         .slice(0, 80)
 }
 
-function formatDuration(minutes: number): string {
-    const h = Math.floor(minutes / 60)
-    const m = minutes % 60
-    if (h === 0) return `${m}m`
-    if (m === 0) return `${h}h`
-    return `${h}h ${m}m`
-}
-
-function generateCFScores(count: number): number[] {
-    const scores: number[] = []
-    for (let i = 0; i < count; i++) {
-        scores.push(500 * (i + 1))
-    }
-    return scores
-}
-
-interface ProblemSearchHit { id: string; title: string; slug: string; difficulty?: string }
-
 export default function ContestCreate() {
     const nav = useNavigate()
     const location = useLocation()
 
-    // Basic info
     const [title, setTitle] = useState('')
     const [slug, setSlug] = useState('')
     const [slugEdited, setSlugEdited] = useState(false)
-    // derived instead of an effect: mirrors slugify(title) until edited by hand
-    const effectiveSlug = slugEdited ? slug : slugify(title)
-    const [description, setDescription] = useState('')
-
-    // Schedule
-    const [startTime, setStartTime] = useState('')
-    const [endTime, setEndTime] = useState('')
-    const [freezeTime, setFreezeTime] = useState('')
-
-    // Format & division
-    const [format, setFormat] = useState('acm')
-    const [division, setDivision] = useState('0')
-    const [type, setType] = useState('acm')
-
-    // Format-specific
-    const [penaltyPerWrong, setPenaltyPerWrong] = useState('20')
-    const [maxScorePerProblem, setMaxScorePerProblem] = useState('100')
-    const [decayFactor, setDecayFactor] = useState('250')
-    const [minRatio, setMinRatio] = useState('0.3')
-    const [cfPenalty, setCfPenalty] = useState('50')
-
-    // Problems
-    const [selectedProblems, setSelectedProblems] = useState<SelectedProblem[]>([])
-    const [searchQuery, setSearchQuery] = useState('')
-    const [searchResults, setSearchResults] = useState<SelectedProblem[]>([])
-    const [searchLoading, setSearchLoading] = useState(false)
-    const [showDropdown, setShowDropdown] = useState(false)
-    const searchRef = useRef<HTMLDivElement>(null)
-    const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined)
-
-    // Options
-    const [pdfEnabled, setPdfEnabled] = useState(true)
-    const [statementHidden, setStatementHidden] = useState(false)
-    const [password, setPassword] = useState('')
-    // Rated by default, matching the schema default and what a competitive
-    // round means. An onsite or practice round turns it off.
-    const [isRated, setIsRated] = useState(true)
-    const [ratedForMin, setRatedForMin] = useState(0)
-    const [ratedForMax, setRatedForMax] = useState(9999)
-
-    // UI state
     const [error, setError] = useState('')
     const [submitting, setSubmitting] = useState(false)
 
-    // Auto-generate slug from title
+    // Derived rather than an effect: mirrors slugify(title) until edited by hand.
+    const effectiveSlug = slugEdited ? slug : slugify(title)
 
-    // Auth guard
     const login = loginHref(location)
     useEffect(() => {
         if (!getAccessToken()) nav(login)
     }, [nav, login])
 
-    // Click outside to close search dropdown
-    useEffect(() => {
-        const handler = (e: MouseEvent) => {
-            if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
-                setShowDropdown(false)
-            }
-        }
-        document.addEventListener('mousedown', handler)
-        return () => document.removeEventListener('mousedown', handler)
-    }, [])
-
-    // Duration calculation
-    const durationMinutes = (() => {
-        if (!startTime || !endTime) return null
-        const diff = new Date(endTime).getTime() - new Date(startTime).getTime()
-        return diff > 0 ? Math.round(diff / 60000) : null
-    })()
-
-    // Debounced problem search
-    const handleSearchChange = useCallback((value: string) => {
-        setSearchQuery(value)
-        if (debounceRef.current) clearTimeout(debounceRef.current)
-
-        if (!value.trim()) {
-            setSearchResults([])
-            setShowDropdown(false)
-            return
-        }
-
-        debounceRef.current = setTimeout(async () => {
-            setSearchLoading(true)
-            try {
-                const res = await api.problems.listSelectable(value.trim(), 0, 10)
-                const items = (res.data || []).map((p: ProblemSearchHit) => ({
-                    id: p.id,
-                    title: p.title,
-                    slug: p.slug,
-                    difficulty: p.difficulty || '',
-                }))
-                setSearchResults(items)
-                setShowDropdown(true)
-            } catch {
-                setSearchResults([])
-            } finally {
-                setSearchLoading(false)
-            }
-        }, 300)
-    }, [])
-
-    const addProblem = (problem: SelectedProblem) => {
-        if (selectedProblems.some(p => p.id === problem.id)) return
-        setSelectedProblems(prev => [...prev, problem])
-        setSearchQuery('')
-        setSearchResults([])
-        setShowDropdown(false)
-    }
-
-    const removeProblem = (index: number) => {
-        setSelectedProblems(prev => prev.filter((_, i) => i !== index))
-    }
-
-    const moveProblem = (index: number, direction: -1 | 1) => {
-        const newIndex = index + direction
-        if (newIndex < 0 || newIndex >= selectedProblems.length) return
-        setSelectedProblems(prev => {
-            const copy = [...prev]
-            ;[copy[index], copy[newIndex]] = [copy[newIndex], copy[index]]
-            return copy
-        })
-    }
-
-    // Validation
-    const validate = (): string | null => {
-        if (!title.trim()) return 'Contest title is required.'
-        if (!startTime) return 'Start time is required.'
-        if (!endTime) return 'End time is required.'
-        if (new Date(endTime) <= new Date(startTime)) return 'End time must be after start time.'
-        if (freezeTime) {
-            if (new Date(freezeTime) <= new Date(startTime)) return 'Freeze time must be after start time.'
-            if (new Date(freezeTime) >= new Date(endTime)) return 'Freeze time must be before end time.'
-        }
-        return null
-    }
-
-    // Submit
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        const err = validate()
-        if (err) { setError(err); return }
+        if (!title.trim()) {
+            setError('Give the round a name.')
+            return
+        }
         setError('')
         setSubmitting(true)
-
         try {
-            let formatConfig: Record<string, unknown> = {}
-            if (format === 'acm') {
-                formatConfig = { penalty_per_wrong: Number(penaltyPerWrong), time_penalty: true }
-            } else if (format === 'oi') {
-                formatConfig = { max_score_per_problem: Number(maxScorePerProblem) }
-            } else if (format === 'ioi') {
-                formatConfig = { partial_credit: true, subtask_scoring: true }
-            } else if (format === 'atcoder') {
-                formatConfig = { penalty_is_time_of_ac: true, no_wrong_attempt_penalty: true }
-            } else if (format === 'codeforces') {
-                formatConfig = {
-                    initial_scores: generateCFScores(selectedProblems.length),
-                    decay_factor: Number(decayFactor),
-                    min_score_ratio: Number(minRatio),
-                    wrong_submission_penalty: Number(cfPenalty),
-                }
-            }
-
             const contest = await api.contests.create({
                 title: title.trim(),
                 slug: effectiveSlug || undefined,
-                type,
-                format,
-                format_config: formatConfig,
-                start_time: new Date(startTime).toISOString(),
-                end_time: new Date(endTime).toISOString(),
-                freeze_time: freezeTime ? new Date(freezeTime).toISOString() : undefined,
-                password: password || undefined,
-                description: description || undefined,
-                problem_ids: selectedProblems.length > 0 ? selectedProblems.map(p => p.id) : undefined,
-                division: Number(division),
-                pdf_enabled: pdfEnabled,
-                statement_hidden: statementHidden,
-                is_rated: isRated,
-                rated_for_min: ratedForMin,
-                rated_for_max: ratedForMax,
             })
-            nav(`/contests/${contestSlug(contest)}`)
+            // Straight to the workspace, not the public page. The round is a draft at
+            // this point, so the public page has nothing to show — and the next thing
+            // a setter needs is the Settings tab, where the schedule and the problems
+            // live.
+            nav(`/setter/contest/${contestSlug(contest)}/manage#settings`)
         } catch (err) {
             setError((err instanceof Error ? err.message : String(err)) || 'Failed to create contest.')
         } finally {
@@ -256,433 +77,69 @@ export default function ContestCreate() {
         }
     }
 
-    const difficultyColor = (d: string) => {
-        const map: Record<string, string> = {
-            easy: 'text-ok bg-ok/10',
-            medium: 'text-warn bg-warn/10',
-            hard: 'text-bad bg-bad/10',
-            'very easy': 'text-ok bg-ok/10',
-            'very hard': 'text-bad bg-bad/12',
-        }
-        return map[(d || '').toLowerCase()] || 'text-muted bg-surface-2/20'
-    }
-
-    const sectionLabel = (text: string) => (
-        <h3 className="text-sm font-semibold text-ink uppercase tracking-wide mb-3">{text}</h3>
-    )
-
-    const inputCls = "w-full border border-hairline-strong rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)] focus:border-brand transition"
-    const labelCls = "block text-sm font-medium text-ink-soft mb-1"
+    const inputCls = 'w-full border border-hairline-strong rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)] focus:border-brand transition'
+    const labelCls = 'block text-sm font-medium text-ink-soft mb-1'
 
     return (
-        <div className="max-w-3xl mx-auto pb-12">
+        <div className="max-w-xl mx-auto pb-12">
             <PageHeader
                 eyebrow={<Link to="/setter" className="hover:text-ink">← Setter workspace</Link>}
                 title="Create contest"
-                description="Set up a new competitive programming contest."
+                description="Name the round, then set up its schedule, problems and access in the workspace."
             />
 
             {error && (
-                <div role="alert" className="mb-6 flex items-start gap-2 rounded-lg border border-bad/30 bg-bad/10 px-4 py-3 text-sm text-bad">
-                    <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                    </svg>
-                    <span>{error}</span>
+                <div role="alert" className="mb-6 rounded-lg border border-bad/30 bg-bad/10 px-4 py-3 text-sm text-bad">
+                    {error}
                 </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-8">
-
-                {/* ── Basic Info ── */}
-                <section className="bg-surface border border-hairline rounded-lg p-6">
-                    {sectionLabel('Basic Information')}
-                    <div className="space-y-4">
-                        <div>
-                            <label className={labelCls}>
-                                Title <span className="text-bad">*</span>
-                            </label>
-                            <input aria-label="Title"
-                                required
-                                value={title}
-                                onChange={e => setTitle(e.target.value)}
-                                placeholder="e.g. AIOJ Round 1 - Division 2"
-                                className={inputCls}
-                            />
-                        </div>
-                        <div>
-                            <label className={labelCls}>URL Slug</label>
-                            <div className="flex items-center gap-0">
-                                <span className="inline-flex items-center px-3 py-2 rounded-l-md border border-r-0 border-hairline-strong bg-surface-2/20 text-muted text-sm">
-                                    /contests/
-                                </span>
-                                <input
-                                    value={effectiveSlug}
-                                    onChange={e => { setSlug(e.target.value); setSlugEdited(true) }}
-                                    placeholder="auto-generated-from-title"
-                                    pattern="[a-z0-9\-]*"
-                                    className="flex-1 border border-hairline-strong rounded-r-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)] focus:border-brand transition"
-                                />
-                            </div>
-                        </div>
-                        <div>
-                            <label className={labelCls}>Description</label>
-                            <textarea aria-label="Description"
-                                rows={3}
-                                value={description}
-                                onChange={e => setDescription(e.target.value)}
-                                placeholder="Optional description shown on the contest page..."
-                                className={inputCls + " resize-none"}
-                            />
-                        </div>
+            <form onSubmit={handleSubmit} className="space-y-5">
+                <section className="bg-surface border border-hairline rounded-lg p-6 space-y-4">
+                    <div>
+                        <label className={labelCls}>
+                            Name <span className="text-bad">*</span>
+                        </label>
+                        <input
+                            aria-label="Title"
+                            required
+                            autoFocus
+                            value={title}
+                            onChange={e => setTitle(e.target.value)}
+                            placeholder="e.g. AIOJ Round 1 - Division 2"
+                            className={inputCls}
+                        />
                     </div>
-                </section>
-
-                {/* ── Schedule ── */}
-                <section className="bg-surface border border-hairline rounded-lg p-6">
-                    {sectionLabel('Schedule')}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <div>
-                            <label className={labelCls}>
-                                Start Time <span className="text-bad">*</span>
-                            </label>
-                            <input aria-label="Start Time"
-                                type="datetime-local"
-                                required
-                                value={startTime}
-                                onChange={e => setStartTime(e.target.value)}
-                                className={inputCls}
-                            />
-                        </div>
-                        <div>
-                            <label className={labelCls}>
-                                End Time <span className="text-bad">*</span>
-                            </label>
-                            <input aria-label="End Time"
-                                type="datetime-local"
-                                required
-                                value={endTime}
-                                onChange={e => setEndTime(e.target.value)}
-                                className={inputCls}
-                            />
-                        </div>
-                        <div>
-                            <label className={labelCls}>Freeze Time</label>
-                            <input aria-label="Freeze Time"
-                                type="datetime-local"
-                                value={freezeTime}
-                                onChange={e => setFreezeTime(e.target.value)}
-                                className={inputCls}
-                            />
-                        </div>
-                    </div>
-                    {durationMinutes !== null && (
-                        <p className="mt-2 text-xs text-muted">
-                            Duration: <span className="font-medium text-ink-soft">{formatDuration(durationMinutes)}</span>
-                        </p>
-                    )}
-                </section>
-
-                {/* ── Format ── */}
-                <section className="bg-surface border border-hairline rounded-lg p-6">
-                    {sectionLabel('Format & Division')}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <div>
-                            <label className={labelCls}>Scoring Format</label>
-                            <select aria-label="Scoring Format" value={format} onChange={e => setFormat(e.target.value)} className={inputCls}>
-                                {FORMAT_OPTIONS.map(o => (
-                                    <option key={o.value} value={o.value}>{o.label}</option>
-                                ))}
-                            </select>
-                            <p className="mt-1 text-xs text-muted-soft">
-                                {FORMAT_OPTIONS.find(o => o.value === format)?.desc}
-                            </p>
-                        </div>
-                        <div>
-                            <label className={labelCls}>Division</label>
-                            <select aria-label="Division" value={division} onChange={e => setDivision(e.target.value)} className={inputCls}>
-                                {(Object.entries(DIVISIONS) as [string, { name: string }][]).map(([k, v]) => (
-                                    <option key={k} value={k}>{v.name}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div>
-                            <label className={labelCls}>Contest Type</label>
-                            <select aria-label="Contest Type" value={type} onChange={e => setType(e.target.value)} className={inputCls}>
-                                {TYPE_OPTIONS.map(o => (
-                                    <option key={o.value} value={o.value}>{o.label}</option>
-                                ))}
-                            </select>
-                        </div>
-                    </div>
-
-                    {/* Format-specific settings */}
-                    {format === 'acm' && (
-                        <div className="mt-4 max-w-xs">
-                            <label className={labelCls}>Penalty Per Wrong Answer (minutes)</label>
-                            <input aria-label="Penalty Per Wrong Answer (minutes)"
-                                type="number"
-                                min="0"
-                                value={penaltyPerWrong}
-                                onChange={e => setPenaltyPerWrong(e.target.value)}
-                                className={inputCls}
-                            />
-                        </div>
-                    )}
-
-                    {format === 'oi' && (
-                        <div className="mt-4 max-w-xs">
-                            <label className={labelCls}>Max Score Per Problem</label>
-                            <input aria-label="Max Score Per Problem"
-                                type="number"
-                                min="1"
-                                value={maxScorePerProblem}
-                                onChange={e => setMaxScorePerProblem(e.target.value)}
-                                className={inputCls}
-                            />
-                        </div>
-                    )}
-
-                    {format === 'codeforces' && (
-                        <div className="mt-4 space-y-3">
-                            <div className="grid grid-cols-3 gap-3 max-w-lg">
-                                <div>
-                                    <label className={labelCls}>Decay Factor</label>
-                                    <input aria-label="Decay Factor"
-                                        type="number"
-                                        min="1"
-                                        value={decayFactor}
-                                        onChange={e => setDecayFactor(e.target.value)}
-                                        className={inputCls}
-                                    />
-                                </div>
-                                <div>
-                                    <label className={labelCls}>Min Score Ratio</label>
-                                    <input aria-label="Min Score Ratio"
-                                        type="number"
-                                        min="0"
-                                        max="1"
-                                        step="0.05"
-                                        value={minRatio}
-                                        onChange={e => setMinRatio(e.target.value)}
-                                        className={inputCls}
-                                    />
-                                </div>
-                                <div>
-                                    <label className={labelCls}>Wrong Sub. Penalty</label>
-                                    <input aria-label="Wrong Sub. Penalty"
-                                        type="number"
-                                        min="0"
-                                        value={cfPenalty}
-                                        onChange={e => setCfPenalty(e.target.value)}
-                                        className={inputCls}
-                                    />
-                                </div>
-                            </div>
-                            {selectedProblems.length > 0 && (
-                                <p className="text-xs text-muted">
-                                    Initial scores (auto):{' '}
-                                    <span className="font-mono text-ink-soft">
-                                        [{generateCFScores(selectedProblems.length).join(', ')}]
-                                    </span>
-                                </p>
-                            )}
-                        </div>
-                    )}
-                </section>
-
-                {/* ── Problem Selection ── */}
-                <section className="bg-surface border border-hairline rounded-lg p-6">
-                    {sectionLabel('Problems')}
-                    <div className="relative" ref={searchRef}>
-                        <label className={labelCls}>Search &amp; Add Problems</label>
-                        <div className="relative">
+                    <div>
+                        <label className={labelCls}>URL Slug <span className="text-muted-soft">(optional)</span></label>
+                        <div className="flex items-center gap-0">
+                            <span className="inline-flex items-center px-3 py-2 rounded-l-md border border-r-0 border-hairline-strong bg-surface-2/20 text-muted text-sm">
+                                /contests/
+                            </span>
                             <input
-                                type="text"
-                                value={searchQuery}
-                                onChange={e => handleSearchChange(e.target.value)}
-                                onFocus={() => { if (searchResults.length > 0) setShowDropdown(true) }}
-                                placeholder="Type a problem title or slug..."
-                                className={inputCls + " pr-8"}
-                            />
-                            {searchLoading && (
-                                <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                                    <div className="w-4 h-4 border-2 border-brand/40 border-t-blue-600 rounded-full animate-spin" />
-                                </div>
-                            )}
-                        </div>
-
-                        {showDropdown && searchResults.length > 0 && (
-                            <div className="absolute z-20 w-full mt-1 bg-surface border border-hairline rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                                {searchResults.map(p => (
-                                    <button
-                                        key={p.id}
-                                        type="button"
-                                        onClick={() => addProblem(p)}
-                                        className="w-full text-left px-4 py-2.5 hover:bg-brand-soft flex items-center justify-between gap-2 border-b border-hairline last:border-0 transition"
-                                    >
-                                        <div className="min-w-0">
-                                            <span className="text-sm font-medium text-ink truncate block">{p.title}</span>
-                                            <span className="text-xs text-muted-soft">{p.slug}</span>
-                                        </div>
-                                        {p.difficulty && (
-                                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${difficultyColor(p.difficulty)}`}>
-                                                {p.difficulty}
-                                            </span>
-                                        )}
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-                        {showDropdown && searchQuery.trim() && searchResults.length === 0 && !searchLoading && (
-                            <div className="absolute z-20 w-full mt-1 bg-surface border border-hairline rounded-lg shadow-lg px-4 py-3 text-sm text-muted-soft">
-                                No problems found.
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Selected problems list */}
-                    {selectedProblems.length > 0 && (
-                        <div className="mt-4 border border-hairline rounded-lg overflow-hidden">
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="bg-surface-2/20 text-left">
-                                        <th className="px-4 py-2 font-medium text-muted w-12">#</th>
-                                        <th className="px-4 py-2 font-medium text-muted">Problem</th>
-                                        <th className="px-4 py-2 font-medium text-muted w-24">Difficulty</th>
-                                        <th className="px-4 py-2 font-medium text-muted w-24 text-right">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {selectedProblems.map((p, i) => (
-                                        <tr key={p.id} className="border-t border-hairline hover:bg-surface-2">
-                                            <td className="px-4 py-2.5">
-                                                <span className="inline-flex items-center justify-center w-6 h-6 rounded bg-brand-soft text-brand font-bold text-xs">
-                                                    {PROBLEM_LETTERS[i] || (i + 1)}
-                                                </span>
-                                            </td>
-                                            <td className="px-4 py-2.5">
-                                                <span className="font-medium text-ink">{p.title}</span>
-                                                <span className="text-muted-soft ml-2 text-xs">{p.slug}</span>
-                                            </td>
-                                            <td className="px-4 py-2.5">
-                                                {p.difficulty && (
-                                                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${difficultyColor(p.difficulty)}`}>
-                                                        {p.difficulty}
-                                                    </span>
-                                                )}
-                                            </td>
-                                            <td className="px-4 py-2.5">
-                                                <div className="flex items-center justify-end gap-1">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => moveProblem(i, -1)}
-                                                        disabled={i === 0}
-                                                        className="p-1 text-muted-soft hover:text-ink disabled:opacity-30 disabled:cursor-not-allowed"
-                                                        title="Move up"
-                                                    >
-                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => moveProblem(i, 1)}
-                                                        disabled={i === selectedProblems.length - 1}
-                                                        className="p-1 text-muted-soft hover:text-ink disabled:opacity-30 disabled:cursor-not-allowed"
-                                                        title="Move down"
-                                                    >
-                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => removeProblem(i)}
-                                                        className="p-1 text-muted-soft hover:text-bad"
-                                                        title="Remove"
-                                                    >
-                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                                                    </button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                    {selectedProblems.length === 0 && (
-                        <p className="mt-3 text-sm text-muted-soft text-center py-4">
-                            No problems added yet. Search above to add problems.
-                        </p>
-                    )}
-                </section>
-
-                {/* ── Options ── */}
-                <section className="bg-surface border border-hairline rounded-lg p-6">
-                    {sectionLabel('Options')}
-                    <div className="space-y-4">
-                        <div className="flex items-center gap-6">
-                            <label className="flex items-center gap-2 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={pdfEnabled}
-                                    onChange={e => setPdfEnabled(e.target.checked)}
-                                    className="rounded border-hairline-strong text-brand focus-visible:outline-[var(--ring)]"
-                                />
-                                <span className="text-sm text-ink-soft">Enable PDF statements</span>
-                            </label>
-                            <label className="flex items-center gap-2 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={statementHidden}
-                                    onChange={e => setStatementHidden(e.target.checked)}
-                                    className="rounded border-hairline-strong text-brand focus-visible:outline-[var(--ring)]"
-                                />
-                                <span className="text-sm text-ink-soft">Hide statements (onsite mode)</span>
-                            </label>
-                        </div>
-                        <div className="max-w-sm">
-                            <label className={labelCls}>Password</label>
-                            <input aria-label="Password"
-                                type="text"
-                                value={password}
-                                onChange={e => setPassword(e.target.value)}
-                                placeholder="Leave empty for public contest"
-                                className={inputCls}
+                                aria-label="URL Slug"
+                                value={effectiveSlug}
+                                onChange={e => { setSlug(e.target.value); setSlugEdited(true) }}
+                                placeholder="auto-generated-from-name"
+                                pattern="[a-z0-9\-]*"
+                                className="flex-1 border border-hairline-strong rounded-r-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)] focus:border-brand transition"
                             />
                         </div>
-                        <div className="border-t border-hairline pt-4 space-y-3">
-                            <label className="flex items-center gap-2 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={isRated}
-                                    onChange={e => setIsRated(e.target.checked)}
-                                    className="rounded border-hairline-strong text-brand focus-visible:outline-[var(--ring)]"
-                                />
-                                <span className="text-sm text-ink-soft">Rated contest</span>
-                            </label>
-                            {isRated && (
-                                <div className="grid grid-cols-2 gap-3 max-w-sm">
-                                    <div>
-                                        <label className={labelCls}>Rated for rating ≥</label>
-                                        <input aria-label="Rated from rating" type="number" min={0}
-                                            value={ratedForMin}
-                                            onChange={e => setRatedForMin(Number(e.target.value) || 0)}
-                                            className={inputCls}
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className={labelCls}>Rated for rating ≤</label>
-                                        <input aria-label="Rated to rating" type="number" min={0}
-                                            value={ratedForMax}
-                                            onChange={e => setRatedForMax(Number(e.target.value) || 0)}
-                                            className={inputCls}
-                                        />
-                                    </div>
-                                </div>
-                            )}
-                        </div>
+                        <p className="mt-1 text-xs text-muted-soft">Letters, numbers and hyphens. Changing it later breaks existing links.</p>
                     </div>
                 </section>
 
-                {/* ── Submit ── */}
+                {/* What the workspace will ask for next. Not decoration: the create
+                    page used to collect all of this, and a setter who does not know the
+                    rest moved rather than vanished will go looking for it. */}
+                <p className="text-xs text-muted-soft">
+                    Next, in the workspace: <span className="text-ink-soft">schedule</span> ·{' '}
+                    <span className="text-ink-soft">scoring format</span> ·{' '}
+                    <span className="text-ink-soft">problems</span> ·{' '}
+                    <span className="text-ink-soft">access</span>. The round starts as a draft and
+                    is scheduled an hour from now until you set a real time.
+                </p>
+
                 <div className="flex items-center justify-end gap-3">
                     <button
                         type="button"
@@ -697,7 +154,7 @@ export default function ContestCreate() {
                         className="px-6 py-2.5 text-sm font-medium text-on-brand bg-brand rounded-lg hover:bg-brand-hover disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-2"
                     >
                         {submitting && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
-                        {submitting ? 'Creating...' : 'Create Contest'}
+                        {submitting ? 'Creating...' : 'Create contest and continue to workspace'}
                     </button>
                 </div>
             </form>

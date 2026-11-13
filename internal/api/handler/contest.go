@@ -219,6 +219,41 @@ func (h *ContestHandler) Create(w http.ResponseWriter, r *http.Request) {
 		req.Type = "acm"
 	}
 
+	// Schedule defaults. A round can now be created from its name alone, so the
+	// times arrive as Go's zero value — and start_time/end_time are NOT NULL with
+	// no default of their own. Sending the zero time stores year 1, which is not a
+	// harmless placeholder: every status derivation compares against it, so the
+	// round would read as "ended" everywhere, and the client would render a
+	// 2000-year countdown. A round that has not been scheduled has to look
+	// UNSTARTED, which is what accessNotStarted and the "Upcoming" badge mean.
+	//
+	// The window is one hour from now: long enough that the round is unambiguously
+	// upcoming rather than racing the clock, and short enough that a setter who
+	// forgets to set a real time is not looking at a round that silently never
+	// begins. Both are ordinary settings fields with a full editor in the
+	// workspace, so this is a starting point rather than a decision.
+	if req.StartTime.IsZero() {
+		req.StartTime = time.Now().UTC().Add(time.Hour).Truncate(time.Second)
+	}
+	if req.EndTime.IsZero() {
+		req.EndTime = req.StartTime.Add(time.Hour)
+	}
+	// An end before the start would make the round instantly over, which is the one
+	// combination that cannot be a deliberate choice.
+	if !req.EndTime.After(req.StartTime) {
+		http.Error(w, "end time must be after start time", http.StatusBadRequest)
+		return
+	}
+	// Same for a freeze outside the round. The freeze is what the scoreboard cuts
+	// at, so one outside the window either never applies or hides the whole board;
+	// both are silent, and the settings form is the only place the rule was
+	// expressed (in client-side validation a direct API call never sees).
+	if req.FreezeTime != nil && !req.FreezeTime.IsZero() &&
+		(req.FreezeTime.Before(req.StartTime) || req.FreezeTime.After(req.EndTime)) {
+		http.Error(w, "freeze time must be between start and end time", http.StatusBadRequest)
+		return
+	}
+
 	fmtName := req.Format
 	if fmtName == "" {
 		fmtName = "acm"
