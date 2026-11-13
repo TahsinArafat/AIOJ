@@ -173,6 +173,17 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "this account has been suspended", http.StatusForbidden)
 			return
 		}
+		// An onsite team lands HERE from its second sign-in onward, not in the
+		// onsite branch below. The users row is created with the same password
+		// hash the credential carries, so from then on this ordinary lookup
+		// matches and the function returns before the onsite code is reached.
+		//
+		// That shadowing is what made the earlier enrollment fix look broken: the
+		// grant was only ever written on the first login, so a team that had
+		// signed in once was never enrolled, and every later sign-in took this
+		// branch and skipped it again — permanently locked out of its own round
+		// while the login itself kept succeeding.
+		h.enrollOnsiteTeam(r.Context(), user)
 		// Best effort: a failed bookkeeping write must not fail the login.
 		if err := h.users.TouchLastLogin(r.Context(), user.ID); err != nil {
 			slog.Warn("touch last login failed", "error", err, "user_id", user.ID)
@@ -287,6 +298,39 @@ func arenaPath(ctx context.Context, contests contestRefResolver, contestID strin
 		return "/contests/" + slug
 	}
 	return "/contests/" + c.ID
+}
+
+// enrollOnsiteTeam links a signed-in account back to the onsite credential it
+// belongs to, when it has one, and enrolls it in that round.
+//
+// The lookup is by username against onsite_batch_users, which is the only table
+// that records "this round generated a credential for this handle". A normal
+// account simply has no row there and this is a single indexed miss, so the
+// ordinary login path pays almost nothing for the check.
+//
+// Deliberately not inferred from the email domain. Onsite accounts get a
+// synthetic …@onsite.aioj address, but the credential row is the authoritative
+// link, and keying access off a string an admin could edit would make the email
+// field a way into a round.
+//
+// Failures are swallowed on purpose: a login must not fail because enrollment
+// bookkeeping did. The next sign-in retries, and every write is idempotent.
+func (h *AuthHandler) enrollOnsiteTeam(ctx context.Context, user *model.User) {
+	if h.onsiteStore == nil || user == nil {
+		return
+	}
+	cred, err := h.onsiteStore.GetByUsername(ctx, user.Username)
+	if err != nil || cred == nil {
+		return
+	}
+	// A credential that belongs to a DIFFERENT account must not grant this one
+	// anything. The username match is normally enough — it is UNIQUE — but the
+	// check costs nothing and keeps a reused handle from inheriting an old
+	// credential's round.
+	if cred.UsedBy != nil && *cred.UsedBy != user.ID {
+		return
+	}
+	_ = h.onsiteStore.AutoRegister(ctx, cred.ContestID, user.ID)
 }
 
 func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {

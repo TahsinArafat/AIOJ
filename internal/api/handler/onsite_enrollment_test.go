@@ -114,3 +114,109 @@ func TestOnsiteLogin_EnrollsOnEveryLogin(t *testing.T) {
 		t.Fatalf("enrolled (%q, %q), want (%q, %q)", got[0], got[1], contestID, userID)
 	}
 }
+
+/**
+ * The path a returning team ACTUALLY takes.
+ *
+ * This is the case the previous test missed, and the reason the earlier fix
+ * appeared to do nothing on the live site.
+ *
+ * The first sign-in creates a users row carrying the SAME password hash as the
+ * onsite credential. From the second sign-in onward, the ordinary
+ * users.GetByUsername lookup therefore matches and verifies, and Login returns
+ * from that branch — the onsite branch below it is never reached. So enrollment
+ * that lives only in the onsite branch runs exactly once, ever, and every later
+ * login takes the early return.
+ *
+ * Here the user row has a real password hash, so login legitimately takes the
+ * ordinary branch. Enrollment must still happen.
+ */
+func TestOnsiteLogin_EnrollsWhenUserRowShadowsCredential(t *testing.T) {
+	contestID := uuid.New().String()
+	userID := uuid.New().String()
+	const password = "team-password"
+
+	hash, err := auth.HashPassword(password)
+	if err != nil {
+		t.Fatalf("hash: %v", err)
+	}
+
+	usedBy := userID
+	onsite := &enrollingOnsiteStub{
+		user: &model.OnsiteBatchUser{
+			ID: uuid.New().String(), ContestID: contestID,
+			Username: "team_shadow1", PasswordHash: hash,
+			IsUsed: true, UsedBy: &usedBy,
+		},
+	}
+	// The shadowing row: same username, same password hash. This is what the
+	// onsite branch itself created on first sign-in.
+	users := &stubUserForEV{users: map[string]*model.User{
+		userID: {
+			ID: userID, Username: "team_shadow1", Role: "contestant",
+			PasswordHash: hash,
+		},
+	}}
+
+	h := NewAuthHandler(users, &countingRefreshStore{}, nil, onsite, nil,
+		auth.NewJWTManager("test-secret-at-least-32-bytes-long!!", time.Minute, time.Hour),
+		nil, nil, nil, nil, "", "")
+
+	body, _ := json.Marshal(map[string]string{"username": "team_shadow1", "password": password})
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+
+	h.Login(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("login status = %d, want 200 (body=%q)", rec.Code, rec.Body.String())
+	}
+	if len(onsite.autoRegister) == 0 {
+		t.Fatal("login took the ordinary user branch and never enrolled the team — " +
+			"this is why a team that had signed in once stayed locked out of its round " +
+			"while login kept succeeding")
+	}
+	if got := onsite.autoRegister[0]; got[0] != contestID || got[1] != userID {
+		t.Fatalf("enrolled (%q, %q), want (%q, %q)", got[0], got[1], contestID, userID)
+	}
+}
+
+/**
+ * A credential belonging to a different account must not grant anything.
+ *
+ * The username is UNIQUE so this should not arise, but the guard costs nothing
+ * and stops a reused handle from inheriting another team's round.
+ */
+func TestOnsiteLogin_DoesNotEnrollIntoAnotherTeamsCredential(t *testing.T) {
+	const password = "team-password"
+	hash, err := auth.HashPassword(password)
+	if err != nil {
+		t.Fatalf("hash: %v", err)
+	}
+
+	otherUser := uuid.New().String()
+	onsite := &enrollingOnsiteStub{
+		user: &model.OnsiteBatchUser{
+			ID: uuid.New().String(), ContestID: uuid.New().String(),
+			Username: "team_reused", PasswordHash: hash,
+			IsUsed: true, UsedBy: &otherUser, // belongs to somebody else
+		},
+	}
+	me := uuid.New().String()
+	users := &stubUserForEV{users: map[string]*model.User{
+		me: {ID: me, Username: "team_reused", Role: "contestant", PasswordHash: hash},
+	}}
+
+	h := NewAuthHandler(users, &countingRefreshStore{}, nil, onsite, nil,
+		auth.NewJWTManager("test-secret-at-least-32-bytes-long!!", time.Minute, time.Hour),
+		nil, nil, nil, nil, "", "")
+
+	body, _ := json.Marshal(map[string]string{"username": "team_reused", "password": password})
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+	h.Login(rec, req)
+
+	if len(onsite.autoRegister) != 0 {
+		t.Fatalf("enrolled %v into a credential owned by another account", onsite.autoRegister)
+	}
+}
