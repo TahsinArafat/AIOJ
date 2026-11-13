@@ -17,6 +17,11 @@ FROM criyle/go-judge:v1.11.4
 # clang matters for the same reason: `lang/cpp-clang.yaml` ships and the UI
 # offers "C++ (Clang)", but the image never installed it, so that language was
 # unselectable-in-practice from the day it was added.
+#
+# curl is here for one reason: the container healthcheck has to ask the running
+# server for /version over HTTP. A `go-judge --version` probe would fork a new
+# process and print the build string even if the server were wedged, which is
+# precisely the failure the healthcheck exists to catch. It must be an HTTP call.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     g++ gcc g++-multilib gcc-multilib libc6-dev-i386 make \
     clang \
@@ -24,6 +29,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     openjdk-21-jdk-headless \
     rustc cargo \
     nodejs npm \
+    curl \
     mono-mcs mono-runtime \
     && rm -rf /var/lib/apt/lists/*
 

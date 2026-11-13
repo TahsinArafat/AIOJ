@@ -171,6 +171,15 @@ Restore from the pre-deploy dump if the schema is unrecoverable.`, err)
 		)
 	}
 
+	// Bound one submission so a wedged sandbox cannot hold a judge slot forever.
+	// Unset means the package default. The health probe below keys off the same
+	// value, so the two can never disagree about what "too long" means.
+	if cfg.Judge.JudgmentTimeoutSeconds > 0 {
+		d := time.Duration(cfg.Judge.JudgmentTimeoutSeconds) * time.Second
+		workerPool.WithJudgmentTimeout(d)
+		slog.Info("judge judgment timeout configured", "timeout", d.String())
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -180,6 +189,14 @@ Restore from the pre-deploy dump if the schema is unrecoverable.`, err)
 		reclaimer := judge.NewReclaimer(submissionStore, judgeQueue, judge.DefaultStaleClaimAfter, judge.DefaultReclaimInterval)
 		go reclaimer.Start(ctx)
 		go workerPool.Start(ctx)
+
+		// The probe Docker's healthcheck calls. This process serves no HTTP
+		// otherwise, so before this a wedged worker was undetectable from
+		// outside: the container stayed "running" and `restart: unless-stopped`
+		// never fired, which is why a human had to restart it by hand.
+		if cfg.Judge.HealthAddr != "" {
+			go workerPool.ServeHealth(ctx, cfg.Judge.HealthAddr)
+		}
 
 		slog.Info("running in judge-worker mode, waiting for submissions")
 		quit := make(chan os.Signal, 1)

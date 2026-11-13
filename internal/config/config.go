@@ -184,6 +184,15 @@ type JudgeConfig struct {
 	// ratio. 1.5 means "allow 50% over-subscription before pausing".
 	// Set via JUDGE_MAX_LOAD_PER_CPU.
 	MaxLoadPerCPU float64 `yaml:"max_load_per_cpu"`
+	// JudgmentTimeoutSeconds bounds one submission end to end, across every test
+	// case. It is the backstop that stops a wedged sandbox from holding a judge
+	// slot indefinitely. 0 means the package default (10 minutes). Set via
+	// JUDGE_JUDGMENT_TIMEOUT_SECONDS.
+	JudgmentTimeoutSeconds int `yaml:"judgment_timeout_seconds"`
+	// HealthAddr is where the judge-worker serves its progress probe. Empty
+	// disables the listener. Set via JUDGE_HEALTH_ADDR; compose points it at
+	// :8081 so the container healthcheck has something to call.
+	HealthAddr string `yaml:"health_addr"`
 }
 
 type RedisConfig struct {
@@ -296,6 +305,12 @@ func Load(path string) (*Config, error) {
 	if v := os.Getenv("JUDGE_MAX_LOAD_PER_CPU"); v != "" {
 		f, _ := strconv.ParseFloat(v, 64)
 		cfg.Judge.MaxLoadPerCPU = f
+	}
+	if v := os.Getenv("JUDGE_JUDGMENT_TIMEOUT_SECONDS"); v != "" {
+		cfg.Judge.JudgmentTimeoutSeconds = atoi(v)
+	}
+	if v := os.Getenv("JUDGE_HEALTH_ADDR"); v != "" {
+		cfg.Judge.HealthAddr = v
 	}
 	if v := os.Getenv("REDIS_URL"); v != "" {
 		cfg.Redis.URL = v

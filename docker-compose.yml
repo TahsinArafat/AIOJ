@@ -56,6 +56,17 @@ services:
     # from the backend/worker services on the compose network.
     expose:
       - "5050"
+    # /version is served before the optional auth-token middleware and executes
+    # nothing, so it answers "is this server responsive" without consuming a
+    # sandbox slot. A `go-judge --version` probe would fork a fresh process and
+    # print the build string even if the server were wedged, which is the exact
+    # failure this exists to catch — it must be an HTTP call.
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-m", "5", "http://127.0.0.1:5050/version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     restart: unless-stopped
 
   redis:
@@ -216,6 +227,10 @@ services:
       # another slot is released. Set to 0 to disable each check individually.
       JUDGE_MIN_FREE_MEM_MB: ${JUDGE_MIN_FREE_MEM_MB:-512}
       JUDGE_MAX_LOAD_PER_CPU: ${JUDGE_MAX_LOAD_PER_CPU:-1.5}
+      # Bound one submission so a wedged sandbox cannot hold a judge slot
+      # indefinitely, and serve the probe the healthcheck below calls.
+      JUDGE_JUDGMENT_TIMEOUT_SECONDS: ${JUDGE_JUDGMENT_TIMEOUT_SECONDS:-600}
+      JUDGE_HEALTH_ADDR: ${JUDGE_HEALTH_ADDR:-:8081}
     volumes:
       - testdata:/app/testdata
       - ./lang:/app/lang
@@ -227,6 +242,18 @@ services:
         condition: service_healthy
     deploy:
       replicas: 1
+    # A probe is what makes `restart: unless-stopped` mean anything for this
+    # container. Docker restarts only an *exited* process; a worker blocked on a
+    # stuck judgment is still running, so without this the restart policy could
+    # never fire and the judge needed a manual restart whenever it stopped
+    # compiling. The endpoint answers 503 once a judgment outlives the deadline
+    # that should have failed it.
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8081/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     # Judge-worker compiles and runs code. Memory budget per worker:
     #   - C/C++: ~50–100 MB per concurrent slot
     #   - Python/Node: ~50–80 MB

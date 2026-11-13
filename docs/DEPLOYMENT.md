@@ -532,6 +532,51 @@ When deployed behind Caddy, Nginx, or NPM, only these ports should be open to th
 | `cf-submit error: crash: ... ImportError: geoip2 is required` | `cloakbrowser[geoip]` not installed | Reinstall: `pip install "cloakbrowser[geoip]" --break-system-packages` |
 | 32-bit C/C++ submits fail with `/usr/bin/ld: cannot find /lib32/libc.so.6` | The go-judge sandbox mount table does not expose `/lib32` | Rebuild the judge image: `docker compose build judge && docker compose up -d judge`. See [Sandbox Smoke Test](#sandbox-smoke-test). |
 | A language saved in admin#languages shows an empty compile command | A `LangConfig` that decodes the JSON body without matching field tags | Fixed in-tree; see `internal/judge/compiler/lang.go`. Use "Reset to Default" to restore the shipped config. |
+| Judge stops compiling, test cases stop running, the IDE hangs — restarting `judge` + `judge-worker` fixes it | A judgment held its slot indefinitely: nothing bounded a submission end to end, so a slow sandbox multiplied one 60s call per test case inside a single slot. With concurrency 2 × 1 worker, a few wedged jobs stalled the whole judge while both containers still looked healthy | Fixed in-tree (judgment deadline + health probes). Verify with [Judge Health](#judge-health) below. If it recurs the probe did not fire, which is a bug worth reporting rather than another restart. |
+| `judge-worker` restarts in a loop | The health probe trips faster than judgments finish | `docker compose logs judge-worker` will say "stalled judge worker". A judgment legitimately longer than `JUDGE_JUDGMENT_TIMEOUT_SECONDS` trips it — raise the timeout rather than disabling the probe. |
+
+---
+
+### Judge Health
+
+Two containers do the judging, and both now report their own health so Docker can
+restart them. Neither had a healthcheck before, so `restart: unless-stopped` could
+never fire: Docker only restarts a container that has *exited*, and a wedged judge
+is still running. That is why the judge needed a manual restart whenever it went
+silent.
+
+```bash
+# The sandbox. /version is served before auth and executes nothing, so it answers
+# "is this server responsive" without consuming a sandbox slot.
+docker compose exec judge curl -fsS http://127.0.0.1:5050/version
+
+# The worker. Reports how long its oldest in-flight judgment has run, and returns
+# 503 once that passes the deadline that should have failed it.
+docker compose exec judge-worker wget -qO- http://127.0.0.1:8081/healthz
+```
+
+```json
+{"in_flight":2,"judgment_timeout":"10m0s","oldest_job_sec":41.2,
+ "stall_after_sec":900,"status":"ok","uptime_sec":6312.4}
+```
+
+| Field | Meaning |
+|-------|---------|
+| `status` | `ok`, or `stalled` with HTTP 503. |
+| `in_flight` | Judgments running now. Persistently at `JUDGE_CONCURRENCY` means the judge is saturated, not broken — raise concurrency or the instance size. |
+| `oldest_job_sec` | Age of the longest-running judgment. The number to watch. |
+| `stall_after_sec` | The threshold: `JUDGE_JUDGMENT_TIMEOUT_SECONDS` + 5 minutes. |
+
+Two optional knobs:
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `JUDGE_JUDGMENT_TIMEOUT_SECONDS` | `600` | Time budget for one submission across all its test cases. Exceeding it fails the submission as System Error and releases the slot, instead of holding it until the reclaimer's 15-minute sweep. Raise it if a legitimate judgment (a cold Rust or Java compile under load) is cut short. |
+| `JUDGE_HEALTH_ADDR` | `:8081` | Where the worker serves `/healthz`. Empty disables the listener. |
+
+A stalled judgment is **failed, not retried**. During a live contest that is
+deliberate: silently re-running a submission can double-judge it, and a setter can
+rejudge from the admin panel. Nothing auto-retries.
 
 ---
 

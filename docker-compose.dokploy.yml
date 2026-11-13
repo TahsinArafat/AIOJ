@@ -100,6 +100,26 @@ services:
       - sandbox
     expose:
       - "5050"
+    # Without a healthcheck `restart: unless-stopped` can never fire: Docker only
+    # restarts a container that has *exited*, and a wedged sandbox has not — it is
+    # still running, just not answering. That is why a judge that stopped
+    # compiling needed a human to restart it.
+    #
+    # /version is the right probe rather than /run: it is served unconditionally
+    # and mounted before the optional auth-token middleware, so it tests "is this
+    # server alive" without executing anything. A /run probe would need a real
+    # command, a sandbox slot, and would fail for reasons that are not liveness —
+    # which would restart the judge whenever the host was merely busy.
+    #
+    # go-judge is a Go binary that serves HTTP with no TLS, so /version must be
+    # fetched inside the container: the image has no wget/curl, and installing one
+    # only for a probe adds a package to a privileged image.
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-m", "5", "http://127.0.0.1:5050/version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     restart: unless-stopped
     logging:
       driver: json-file
@@ -206,6 +226,9 @@ services:
       JUDGE_CONCURRENCY: ${JUDGE_CONCURRENCY:-2}
       JUDGE_MIN_FREE_MEM_MB: ${JUDGE_MIN_FREE_MEM_MB:-512}
       JUDGE_MAX_LOAD_PER_CPU: ${JUDGE_MAX_LOAD_PER_CPU:-1.5}
+      # Bound one submission, so a wedged sandbox cannot hold a slot forever.
+      JUDGE_JUDGMENT_TIMEOUT_SECONDS: ${JUDGE_JUDGMENT_TIMEOUT_SECONDS:-600}
+      JUDGE_HEALTH_ADDR: ${JUDGE_HEALTH_ADDR:-:8081}
       CF_SUBMIT_URL: ${CF_SUBMIT_URL:-http://host.docker.internal:8003}
     networks:
       - default
@@ -215,6 +238,23 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    # This healthcheck is what turns `restart: unless-stopped` from decoration
+    # into recovery. Docker only restarts an *exited* container; a worker wedged
+    # on a stuck judgment is still running, so without a probe that fails on
+    # stalled work the restart policy can never fire — which is exactly why the
+    # judge needed a manual restart whenever it stopped compiling.
+    #
+    # wget is BusyBox's, already present in this Alpine-based image (the backend
+    # healthcheck above uses the same tool). The endpoint answers 503 once a
+    # judgment outlives the deadline that should have failed it.
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8081/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      # Long enough that start-up migrations and the first sweep are not counted
+      # as a stall.
+      start_period: 60s
     mem_limit: 2g
     restart: unless-stopped
     logging:

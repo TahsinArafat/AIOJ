@@ -2,6 +2,7 @@ package judge
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sync"
@@ -20,6 +21,25 @@ import (
 // drainTimeout bounds how long Stop waits for in-flight judgments to finish.
 // Beyond it the process exits anyway; the reclaimer picks the rows back up.
 const drainTimeout = 30 * time.Second
+
+// DefaultJudgmentTimeout is the overall budget for one submission, across every
+// test case and every sandbox call it needs.
+//
+// Why a whole-job deadline is needed when each sandbox call already has a 60s
+// HTTP timeout: that timeout bounds one call, not the job. A batch runs one call
+// per test case and does not exit early on a failure — correct, because a
+// partial score is the point of subtask scoring — so a slow sandbox multiplies
+// the per-call timeout by the case count. With 20 cases that is up to 20 minutes
+// inside one slot, and the pool has only concurrency × workers slots (4 by
+// default). Four such submissions stall the whole judge while both containers
+// still look healthy, because the process is parked in a legitimate wait rather
+// than crashed. Restarting the containers "fixed" it by releasing the parked
+// slots, which is why the symptom looked like a container fault.
+//
+// The value is deliberately generous: a cold Rust or Java compile on a loaded
+// host takes minutes, not seconds, and a real judgment must not be cut short.
+// This is a backstop for a wedge, not a performance limit.
+const DefaultJudgmentTimeout = 10 * time.Minute
 
 // VerdictNotifier is implemented by the WebSocket manager so a finished
 // verdict reaches the browser without polling. Declared here (rather than
@@ -62,6 +82,15 @@ type WorkerPool struct {
 	langsOnce sync.Once
 	langs     map[string]*compiler.LangConfig
 
+	// judgmentTimeout caps a single submission end to end. Zero means the
+	// package default; see DefaultJudgmentTimeout for why it exists.
+	judgmentTimeout time.Duration
+
+	// health records loop progress for the liveness probe. Never nil in a pool
+	// built by NewWorkerPool, but nil-checked so a hand-built one in a test does
+	// not panic on the judge path.
+	health *HealthState
+
 	// wg tracks in-flight judgments so Stop can drain instead of abandoning
 	// them half-written.
 	wg     sync.WaitGroup
@@ -75,7 +104,18 @@ func NewWorkerPool(q queue.JudgeQueue, exec *executor.Client, langDir string, co
 		batchRunner: runner.NewBatchRunner(exec), interactiveRunner: runner.NewInteractiveRunner(exec), outputOnlyRunner: runner.NewOutputOnlyRunner(),
 		langDir: langDir, sem: make(chan struct{}, concurrency), subStore: subStore, probStore: probStore,
 		langLimitStore: langLimitStore, balloonStore: balloonStore,
+		judgmentTimeout: DefaultJudgmentTimeout,
+		health:          NewHealthState(),
 	}
+}
+
+// WithJudgmentTimeout overrides the per-submission budget. Non-positive values
+// keep the default, so a zero-valued config cannot mean "no limit".
+func (wp *WorkerPool) WithJudgmentTimeout(d time.Duration) *WorkerPool {
+	if d > 0 {
+		wp.judgmentTimeout = d
+	}
+	return wp
 }
 
 // WithPressureGate attaches a resource-pressure gate to the pool.  Call this
@@ -191,16 +231,51 @@ func (wp *WorkerPool) process(ctx context.Context, submissionID string) {
 	if !claimed {
 		return
 	}
+	// Registered before the deadline is armed so the health probe sees the job
+	// even if arming or judging is where the worker wedges. Our own deadline
+	// normally ends this, so a job that outlives it means the enforcement path
+	// never ran — the condition the probe exists to detect and restart.
+	if wp.health != nil {
+		wp.health.BeginJob(submissionID)
+		defer wp.health.EndJob(submissionID)
+	}
 	defer func() {
 		if r := recover(); r != nil {
 			slog.Error("judge panic", "id", submissionID, "panic", r)
 			wp.finish(context.Background(), submissionID, claimToken, model.StatusSE, 0, 0, 0, fmt.Sprintf("panic: %v", r), nil)
 		}
 	}()
-	wp.judge(ctx, submissionID, claimToken)
+	// Bound the whole judgment, not just each sandbox call. The derived context
+	// stays distinguishable from the parent: a shutdown cancels it with
+	// context.Canceled, while this deadline expires it with
+	// context.DeadlineExceeded, and those two need opposite handling — see
+	// runAndFinalize.
+	//
+	// The zero check is not defensive padding: WithTimeout(ctx, 0) is already
+	// expired, so a pool built as a struct literal — as the pool's own tests do —
+	// would fail every submission instantly with a timeout it never intended.
+	timeout := wp.judgmentTimeout
+	if timeout <= 0 {
+		timeout = DefaultJudgmentTimeout
+	}
+	judgeCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	wp.judge(judgeCtx, submissionID, claimToken)
 }
 
+// finish persists a verdict.
+//
+// When the passed context is already done the verdict is still written, using a
+// detached context: by the time this is called the answer has been computed, and
+// an expired judgment deadline must not be the reason it is thrown away. Losing
+// it would leave the row 'judging' until the reclaimer's 15-minute sweep — the
+// stall this whole change exists to remove. Shutdown deliberately does not reach
+// here at all; runAndFinalize returns early so the reclaimer re-runs the job
+// instead of recording a verdict nobody computed.
 func (wp *WorkerPool) finish(ctx context.Context, submissionID, claimToken string, status model.SubmissionStatus, score, timeUsed, memoryUsed int, compileOutput string, results []model.TestCaseResult) bool {
+	if ctx.Err() != nil {
+		ctx = context.Background()
+	}
 	applied, err := wp.subStore.UpdateResultClaimed(ctx, submissionID, claimToken, status, score, timeUsed, memoryUsed, compileOutput, results)
 	if err != nil {
 		slog.Error("persist verdict failed", "id", submissionID, "error", err)
@@ -308,11 +383,32 @@ func (wp *WorkerPool) judgeInteractiveSub(ctx context.Context, sub *model.Submis
 func (wp *WorkerPool) runAndFinalize(ctx context.Context, sub *model.Submission, claimToken string, prob *model.Problem, r runner.Runner, in runner.RunInput, compileOutput string) {
 	out, err := r.Run(ctx, in)
 	if err != nil {
-		// A cancelled context means the process is shutting down, not that the
-		// submission is broken. Leave it claimed and let the reclaimer re-queue
-		// it rather than recording a System Error over a verdict that was never
-		// computed.
-		if ctx.Err() != nil {
+		// Three ways to get here, and they need three different answers.
+		//
+		// 1. The judgment deadline expired. The sandbox is wedged or the problem
+		//    is pathological; either way the verdict is "system error" and the
+		//    slot must be released now. Writing it is the whole point — leaving
+		//    the row claimed would hold the slot until the reclaimer's sweep.
+		// 2. A submission-level error (a failed sandbox call, an unreadable test
+		//    file). A normal System Error verdict.
+		// 3. Shutdown. Nothing was computed, so recording anything would be a
+		//    lie. Leave it claimed and let the reclaimer re-queue it.
+		//
+		// Shutdown is checked first and by Cause: with a deadline armed, a
+		// shutdown cancels the derived context too, and reading only ctx.Err()
+		// cannot tell "we are stopping" from "we ran out of time".
+		if cause := context.Cause(ctx); cause != nil {
+			if errors.Is(cause, context.DeadlineExceeded) {
+				// Report the value actually enforced, not the raw field: a
+				// structurally-built pool leaves the field zero, and "exceeded the
+				// 0s time budget" would be nonsense in a verdict an admin reads.
+				effective := wp.effectiveJudgmentTimeout()
+				slog.Error("judgment exceeded its time budget; failing it to release the slot",
+					"id", sub.ID, "timeout", effective.String(), "error", err)
+				wp.finish(context.Background(), sub.ID, claimToken, model.StatusSE, 0, 0, 0,
+					fmt.Sprintf("judgment exceeded the %s time budget: %v", effective, err), nil)
+				return
+			}
 			slog.Warn("judgment interrupted by shutdown; leaving it for the reclaimer", "id", sub.ID)
 			return
 		}
