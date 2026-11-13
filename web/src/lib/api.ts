@@ -475,6 +475,18 @@ export const api = {
                 method: 'POST',
                 body: JSON.stringify(d),
             }),
+        /**
+         * Void a submission: it stops counting as an attempt and stops scoring.
+         * A reason is required — a void nobody can explain later is worse than
+         * the submission it removed. Which roles may do this is an admin
+         * setting (Admin → Feature Gates), and the caller must also own the
+         * problem or run the round.
+         */
+        skipSubmission: (slug: string, submissionId: string, reason: string) =>
+            request<{ id: string; status: string; was: string }>(`/problems/${slug}/submissions/${submissionId}/skip`, {
+                method: 'POST',
+                body: JSON.stringify({ reason }),
+            }),
         addPermission: (slug: string, username: string, accessLevel: string) =>
             request<{ status: string }>(`/problems/${slug}/permissions`, {
                 method: 'POST',
@@ -990,6 +1002,16 @@ export const api = {
             if (filters?.status) params.set('status', filters.status);
             return request<ContestSubmissionsResponse>(`/contests/${id}/submissions${params.toString() ? '?' + params : ''}`);
         },
+        /**
+         * Void a submission from the round's own submissions tab. Same action
+         * and same admin-configured role policy as the problem-scoped route;
+         * the contest in the path is what the accountability check runs against.
+         */
+        skipSubmission: (id: string, submissionId: string, reason: string) =>
+            request<{ id: string; status: string; was: string }>(`/contests/${id}/submissions/${submissionId}/skip`, {
+                method: 'POST',
+                body: JSON.stringify({ reason }),
+            }),
     },
     /**
      * Manual standings corrections. A delta layered over the computed result, so

@@ -22,7 +22,9 @@ import type { Submission } from '../../types/api'
  */
 
 const PAGE_SIZE = 50
-const VERDICTS = ['ac', 'wa', 'tle', 'mle', 're', 'ce', 'se', 'pending', 'judging']
+// 'skipped' is included: a voided submission is a real stored status, and a
+// setter needs to be able to find the ones they voided.
+const VERDICTS = ['ac', 'wa', 'tle', 'mle', 're', 'ce', 'se', 'skipped', 'pending', 'judging']
 
 interface Filters {
     handle: string

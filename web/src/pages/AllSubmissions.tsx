@@ -20,8 +20,9 @@ import type { Submission } from '../types/api'
 
 const PAGE_SIZE = 50
 
-// Only verdicts the judge actually stores; the API matches them exactly.
-const VERDICTS = ['ac', 'wa', 'tle', 'mle', 're', 'ce', 'se', 'pending', 'judging']
+// Statuses the API matches exactly. 'skipped' is one of them, though no judge
+// produces it: an organizer sets it by voiding a submission.
+const VERDICTS = ['ac', 'wa', 'tle', 'mle', 're', 'ce', 'se', 'skipped', 'pending', 'judging']
 
 interface Filters {
     handle: string

@@ -14,6 +14,12 @@ export interface VerdictMeta {
     label: string
     short: string
     tone: BadgeTone
+    /**
+     * A voided submission is struck through. It is a real verdict and it stays
+     * visible — deleting the row would hide that something was ruled on — but
+     * it must not read as a result the code earned.
+     */
+    struck?: boolean
 }
 
 const VERDICTS: Record<string, VerdictMeta> = {
@@ -29,6 +35,10 @@ const VERDICTS: Record<string, VerdictMeta> = {
     judging: { label: 'Judging', short: 'JUDGING', tone: 'brand' },
     running: { label: 'Running', short: 'RUN', tone: 'brand' },
     error: { label: 'Error', short: 'ERR', tone: 'bad' },
+    // An organizer voided this submission (a resubmit-rule breach, a copied
+    // solution). It is not a judge verdict: it scores nothing and does not
+    // count as an attempt.
+    skipped: { label: 'Skipped', short: 'SKIP', tone: 'neutral', struck: true },
 }
 
 export function verdictMeta(status: string | undefined | null): VerdictMeta {
@@ -40,6 +50,24 @@ export function verdictMeta(status: string | undefined | null): VerdictMeta {
 export function isPendingVerdict(status: string | undefined | null): boolean {
     const key = (status || '').toLowerCase()
     return key === 'pending' || key === 'judging' || key === 'running'
+}
+
+/**
+ * Whether a submission was voided by an organizer.
+ *
+ * Kept next to verdictMeta so a caller that needs to know whether a row counts
+ * (a rejudge button, a "solved" tally) asks one place rather than re-spelling
+ * the status and drifting from the display side.
+ */
+export function isSkippedVerdict(status: string | undefined | null): boolean {
+    return (status || '').toLowerCase() === 'skipped'
+}
+
+/** Every verdict the UI knows, for a filter dropdown. */
+export function verdictOptions(): { value: string; label: string }[] {
+    return Object.keys(VERDICTS)
+        .filter(k => k !== 'success' && k !== 'running' && k !== 'error')
+        .map(k => ({ value: k, label: VERDICTS[k].label }))
 }
 
 /**

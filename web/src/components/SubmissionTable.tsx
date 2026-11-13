@@ -5,7 +5,7 @@ import { useLanguages } from '../lib/useLanguages'
 import { Button } from './ui/Button'
 import { Table, TableShell, Td, Th, THead, Tr } from './ui/Table'
 import { VerdictBadge } from './ui/VerdictBadge'
-import { isPendingVerdict } from './ui/verdict'
+import { isPendingVerdict, isSkippedVerdict } from './ui/verdict'
 import type { Submission } from '../types/api'
 
 /**
@@ -73,6 +73,11 @@ export function SubmissionTable({
                 <tbody>
                     {rows.flatMap(row => {
                         const pending = isPendingVerdict(row.status)
+                        // A voided submission has no verdict to recompute: the
+                        // judge refuses to overwrite it, so offering the action
+                        // would only fail. The store search skips it too, so a
+                        // bulk rejudge would leave it alone either way.
+                        const voided = isSkippedVerdict(row.status)
                         const result = (
                             <Tr key={row.id}>
                                 <Td>
@@ -119,10 +124,10 @@ export function SubmissionTable({
                                     <VerdictBadge status={row.status} />
                                 </Td>
                                 <Td className="tnum hidden text-right text-xs text-muted sm:table-cell">
-                                    {pending || row.status === 'ce' ? '—' : formatTime(row.time_used)}
+                                    {pending || voided || row.status === 'ce' ? '—' : formatTime(row.time_used)}
                                 </Td>
                                 <Td className="tnum hidden text-right text-xs text-muted md:table-cell">
-                                    {pending || row.status === 'ce' ? '—' : formatMemory(row.memory_used)}
+                                    {pending || voided || row.status === 'ce' ? '—' : formatMemory(row.memory_used)}
                                 </Td>
                                 <Td className="hidden text-right text-xs text-muted-soft lg:table-cell">
                                     {formatWhen(row.created_at)}
@@ -132,9 +137,13 @@ export function SubmissionTable({
                                         <Button
                                             variant="ghost"
                                             size="sm"
-                                            disabled={pending || busyIds?.has(row.id)}
+                                            disabled={pending || voided || busyIds?.has(row.id)}
                                             onClick={() => onRejudge(row)}
-                                            title={pending ? 'Already queued for judging' : 'Rejudge this submission'}
+                                            title={
+                                                voided ? 'This submission was voided and will not be rejudged'
+                                                    : pending ? 'Already queued for judging'
+                                                        : 'Rejudge this submission'
+                                            }
                                         >
                                             <RefreshCw className="h-3.5 w-3.5" />
                                             <span className="sr-only">Rejudge {row.id.slice(0, 8)}</span>

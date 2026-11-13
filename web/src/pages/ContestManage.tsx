@@ -19,6 +19,9 @@ import { DIVISIONS } from '../lib/divisions'
 import { useClarifications } from '../hooks/useClarifications'
 import { ClarificationsPanel } from '../components/ClarificationsPanel'
 import { VerdictBadge } from '../components/ui/VerdictBadge'
+import { isPendingVerdict, isSkippedVerdict } from '../components/ui/verdict'
+import { useFeature } from '../context/FeaturesContext'
+import { SkipSubmissionDialog } from '../components/SkipSubmissionDialog'
 import { ContestAdjustmentsPanel } from './admin/ContestAdjustmentsPanel'
 
 function indexLabel(i: number): string {
@@ -505,12 +508,38 @@ function ParticipantsTab({ contestId }: { contestId: string }) {
 // SUBMISSIONS TAB
 // ═══════════════════════════════════════════════
 function SubmissionsTab({ contestId }: { contestId: string }) {
+    const toast = useToast()
     const [items, setItems] = useState<SubmissionRow[]>([])
     const [loading, setLoading] = useState(true)
+    // The row awaiting a reason, and the in-flight state of the void.
+    const [voiding, setVoiding] = useState<SubmissionRow | null>(null)
+    const [busy, setBusy] = useState(false)
+    // Which rows may be voided at all is an admin policy (Admin → Feature
+    // Gates). The API enforces it; this only keeps the button honest.
+    const { allowed: mayVoid } = useFeature('skip_submission')
 
-    useEffect(() => {
-        api.contests.submissions(contestId, 0, 100, { mine: false }).then(d => setItems(d.data || [])).finally(() => setLoading(false))
+    const load = useCallback(() => {
+        api.contests.submissions(contestId, 0, 100, { mine: false })
+            .then(d => setItems(d.data || []))
+            .finally(() => setLoading(false))
     }, [contestId])
+
+    useEffect(() => { load() }, [load])
+
+    const confirmVoid = async (reason: string) => {
+        if (!voiding?.id) return
+        setBusy(true)
+        try {
+            await api.contests.skipSubmission(contestId, voiding.id, reason)
+            toast.success('Submission voided')
+            setVoiding(null)
+            load()
+        } catch (err) {
+            toast.error(errorMessage(err) || 'Could not void the submission')
+        } finally {
+            setBusy(false)
+        }
+    }
 
     if (loading) return <TabLoading />
 
@@ -525,7 +554,8 @@ function SubmissionsTab({ contestId }: { contestId: string }) {
                     <table className="w-full text-sm">
                         <thead><tr className="border-b border-hairline text-left text-xs text-muted uppercase">
                             <th className="py-2 pr-3">ID</th><th className="py-2 pr-3">User</th><th className="py-2 pr-3">Problem</th>
-                            <th className="py-2 pr-3">Lang</th><th className="py-2 pr-3">Verdict</th><th className="py-2 pr-3">Time</th><th className="py-2">When</th>
+                            <th className="py-2 pr-3">Lang</th><th className="py-2 pr-3">Verdict</th><th className="py-2 pr-3">Time</th>
+                            <th className="py-2 pr-3">When</th>{mayVoid && <th className="py-2 text-right">Actions</th>}
                         </tr></thead>
                         <tbody className="divide-y divide-hairline">
                             {items.slice(0, 100).map((s) => (
@@ -539,13 +569,46 @@ function SubmissionsTab({ contestId }: { contestId: string }) {
                                     <td className="py-2 pr-3 text-xs">{s.language}</td>
                                     <td className="py-2 pr-3"><VerdictBadge status={s.status} short /></td>
                                     <td className="py-2 pr-3 text-xs text-muted">{s.time_used ? `${s.time_used}ms` : '—'}</td>
-                                    <td className="py-2 text-xs text-muted-soft">{s.created_at ? new Date(s.created_at).toLocaleString() : '—'}</td>
+                                    <td className="py-2 pr-3 text-xs text-muted-soft">{s.created_at ? new Date(s.created_at).toLocaleString() : '—'}</td>
+                                    {mayVoid && (
+                                        <td className="py-2 text-right">
+                                            {/* A void is only meaningful once the judge has produced a
+                                                verdict; while a row is pending or in flight the API refuses
+                                                it, so the button is disabled instead of failing on click. */}
+                                            {isSkippedVerdict(s.status) ? (
+                                                <span className="text-xs text-muted-soft">Voided</span>
+                                            ) : isPendingVerdict(s.status) ? (
+                                                <span className="text-xs text-muted-soft">Judging…</span>
+                                            ) : (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setVoiding(s)}
+                                                    className="text-xs text-warn hover:underline"
+                                                    title="Void this submission"
+                                                >
+                                                    Void
+                                                </button>
+                                            )}
+                                        </td>
+                                    )}
                                 </tr>
                             ))}
                         </tbody>
                     </table>
                 </div>
             )}
+
+            <SkipSubmissionDialog
+                // Keyed per row so the reason field resets when a different
+                // submission is picked, without an effect.
+                key={voiding?.id ?? 'none'}
+                open={voiding !== null}
+                was={voiding?.status}
+                username={voiding?.username}
+                busy={busy}
+                onCancel={() => setVoiding(null)}
+                onConfirm={confirmVoid}
+            />
         </TabShell>
     )
 }
