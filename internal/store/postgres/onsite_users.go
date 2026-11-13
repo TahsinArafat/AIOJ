@@ -131,25 +131,45 @@ func (s *OnsiteUserStoreImpl) DeleteByID(ctx context.Context, contestID, id stri
 	return err
 }
 
-// AutoRegister enrolls a freshly signed-in onsite team in the round it was
-// generated for, and grants it access to that round.
+// AutoRegister enrolls a signed-in onsite team in the round it was generated
+// for: it registers the team, grants it the round, and joins it to any group the
+// round is restricted to.
 //
-// The grant is the half that was missing. Being registered was not enough: the
-// access policy asks contest_access_grants for the password question and never
-// looks at contest_registrations, so an onsite team signing in to a
-// password-protected round was auto-registered, redirected to the contest, and
-// then refused — "forbidden", which the page renders as "Contest not found".
-// The setter created these accounts, so they are already vetted the way the
-// password is meant to vet people; making a competitor type a contest password
-// they were never given is the bug.
+// All three are needed, because the access policy asks the questions in this
+// order and stops at the first refusal:
+//
+//	group restriction -> password grant -> granted
+//
+// Registration alone was never enough: the policy does not consult
+// contest_registrations at all, so enrolling a team in a password-protected
+// round changed nothing. The grant is the answer to the password question — the
+// setter created these accounts, so they are already vetted the way the password
+// is meant to vet people, and making a competitor type a secret nobody gave them
+// was the first half of the bug.
+//
+// The group membership is the second half, and the one that survives every other
+// fix: a group-restricted round is refused BEFORE the password is ever checked,
+// so a grant cannot rescue a team that is not in the group. A round is restricted
+// to a group precisely to name who may compete, and an onsite team with
+// generated credentials is on that list by construction.
 func (s *OnsiteUserStoreImpl) AutoRegister(ctx context.Context, contestID, userID string) error {
 	if _, err := s.db.ExecContext(ctx,
 		`INSERT INTO contest_registrations (contest_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
 		contestID, userID); err != nil {
 		return err
 	}
-	_, err := s.db.ExecContext(ctx,
+	if _, err := s.db.ExecContext(ctx,
 		`INSERT INTO contest_access_grants (contest_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+		contestID, userID); err != nil {
+		return err
+	}
+	// One statement so a round restricted to several groups cannot leave the team
+	// in only some of them. A round with no groups inserts nothing, which is the
+	// ordinary public case.
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO group_members (group_id, user_id, role)
+		 SELECT gc.group_id, $2, 'member' FROM group_contests gc WHERE gc.contest_id = $1
+		 ON CONFLICT DO NOTHING`,
 		contestID, userID)
 	return err
 }
