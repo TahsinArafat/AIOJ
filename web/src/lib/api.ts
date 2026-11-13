@@ -268,7 +268,19 @@ async function refreshAccessToken(): Promise<RefreshOutcome> {
     return refreshInFlight
 }
 
-async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
+/**
+ * Send one request with the bearer token and CSRF cookie attached, refreshing
+ * once on 401.
+ *
+ * Exported to the module (not the public `api` object) so every caller shares
+ * one auth path. The uploads and remote-import endpoints used to open-code
+ * `fetch` with `if (token) headers['Authorization'] = ...`, which meant an
+ * expired access token got no refresh retry — and because the CSRF middleware
+ * only skips its check for a *present* Authorization header, the request came
+ * back 403 "csrf cookie missing" instead of a 401 the client could recover
+ * from. Every caller must go through here.
+ */
+async function fetchAuthed(path: string, opts: RequestInit = {}): Promise<Response> {
     const method = (opts.method || 'GET').toUpperCase()
     const headers: Record<string, string> = {
         ...(opts.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
@@ -297,33 +309,44 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
             throw new Error('connection lost, please try again')
         }
     }
+    return res
+}
 
-    if (!res.ok) {
-        const text = await res.text()
-        // Error bodies are usually JSON ({"error": "...", "code": "..."}); surface
-        // the message rather than the raw JSON blob, and keep the code so callers
-        // can react to password_change_required.
-        let message = text
-        let code = ''
-        let scoreboardPublic = false
-        try {
-            const parsed = JSON.parse(text)
-            if (parsed && typeof parsed === 'object') {
-                message = parsed.error || parsed.message || text
-                code = parsed.code || ''
-                // Carried for one case: a password-protected round that publishes
-                // its board. Such a round is unlisted, so the locked-contest screen
-                // is the only place a spectator can be handed the way in.
-                scoreboardPublic = parsed.scoreboard_public === 'true'
-            }
-        } catch {
-            // Plain-text error: keep it as-is.
+/**
+ * Turn a failed response into the Error the UI shows.
+ *
+ * Error bodies are usually JSON ({"error": "...", "code": "..."}); surface the
+ * message rather than the raw JSON blob, and keep the code so callers can react
+ * to password_change_required.
+ */
+async function throwForStatus(res: Response): Promise<never> {
+    const text = await res.text()
+    let message = text
+    let code = ''
+    let scoreboardPublic = false
+    try {
+        const parsed = JSON.parse(text)
+        if (parsed && typeof parsed === 'object') {
+            message = parsed.error || parsed.message || text
+            code = parsed.code || ''
+            // Carried for one case: a password-protected round that publishes
+            // its board. Such a round is unlisted, so the locked-contest screen
+            // is the only place a spectator can be handed the way in.
+            scoreboardPublic = parsed.scoreboard_public === 'true'
         }
-        const err = new Error(message || `HTTP ${res.status}`)
-        if (code) (err as Error & { code?: string }).code = code
-        if (scoreboardPublic) (err as Error & { scoreboardPublic?: boolean }).scoreboardPublic = true
-        throw err
+    } catch {
+        // Plain-text error: keep it as-is.
     }
+    const err = new Error(message || `HTTP ${res.status}`)
+    if (code) (err as Error & { code?: string }).code = code
+    if (scoreboardPublic) (err as Error & { scoreboardPublic?: boolean }).scoreboardPublic = true
+    throw err
+}
+
+async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
+    const res = await fetchAuthed(path, opts)
+    if (!res.ok) await throwForStatus(res)
+
     const contentType = res.headers.get('content-type') || ''
     if (res.status === 204 || contentType.includes('text/plain')) {
         return null as unknown as T
@@ -335,6 +358,13 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
     } catch {
         return text as unknown as T
     }
+}
+
+/** Same auth and refresh path as request(), for endpoints that return bytes. */
+async function requestBlob(path: string, opts: RequestInit = {}): Promise<Blob> {
+    const res = await fetchAuthed(path, opts)
+    if (!res.ok) await throwForStatus(res)
+    return res.blob()
 }
 
 import type { AIBrief, ContestAdjustment, AIBriefPreset, AIGenerationJob, AIModel, APIKey, ActivityItem, AdminBulkAction, AdminBulkResponse, AdminFeature, AdminUserDetail, AdminUserQuery, AdminAuthMethods, AdminUserRow, AuthMethods, AuthResponse, AuthSessionResponse, BackupFile, BlogListItem, BlogPost, BotAccount, Clarification, Class, ClassListItem, ClassMember, Comment, Contest, ContestDetailResponse, ContestNotice, ContestPermission, ContestProblem, ContestRegistration, ContestSubmissionsResponse, DetectedTool, Editorial, FeaturePolicy, Group, GroupListItem, GroupMember, GroupPendingInvite, GymContest, GymData, Hack, HackResult, HackSubmission, LanguageConfig, Notification, NotificationPreferences, OAuthUsernameCheck, OnsiteBatchUser, Organization, OrganizationListItem, OrganizationMember, PendingInvite, PendingRemoteSubmission, PlagiarismPairDetail, PlagiarismReport, Problem, ProblemI18n, ProblemListItem, ProblemPermission, ProblemStats, PublicLanguage, PublicProfile, RankingEntry, RatingHistoryEntry, RemoteLanguage, ResolvedFeature, ScoreboardData, SetterApplication, Submission, Team, TeamListItem, TeamMember, TestcaseFile, TestcaseFileContent, TestResult, TrainingPlan, TrainingPlanDetail, TrainingPlanEnrollment, TrainingPlanProblem, TrainingPlanProgress, TrainingPlanSection, User, UserAchievement, UserProblemStats, UserProfile, VirtualContest, VirtualStatusResponse, WeakTagsRecommendations, Webhook } from '../types/api'
@@ -497,28 +527,10 @@ export const api = {
         uploadTestcases: async (slug: string, file: File): Promise<unknown> => {
             const formData = new FormData()
             formData.append('file', file)
-            const headers: Record<string, string> = {}
-            const token = getAccessToken()
-            if (token) headers['Authorization'] = `Bearer ${token}`
-            const res = await fetch(BASE + `/problems/${slug}/testcases`, {
+            return request<unknown>(`/problems/${slug}/testcases`, {
                 method: 'POST',
-                headers,
-                body: formData
+                body: formData,
             })
-            if (!res.ok) {
-                const text = await res.text()
-                throw new Error(text || `HTTP ${res.status}`)
-            }
-            if (res.status === 204 || res.status === 200) {
-                const text = await res.text()
-                if (!text) return null
-                try {
-                    return JSON.parse(text)
-                } catch {
-                    return text
-                }
-            }
-            return res.json()
         },
         /** Every file in the problem's testdata directory, with role and pair. */
         listTestcases: (slug: string) =>
@@ -534,15 +546,9 @@ export const api = {
             request<null>(`/problems/${slug}/testcases/${encodeURIComponent(name)}`, { method: 'DELETE' }),
         /** Fetches with the bearer token, then hands the bytes to the browser. */
         downloadTestcase: async (slug: string, name: string) => {
-            const token = getAccessToken()
-            const res = await fetch(BASE + `/problems/${slug}/testcases/${encodeURIComponent(name)}?download=1`, {
-                headers: token ? { Authorization: `Bearer ${token}` } : {},
-            })
-            if (!res.ok) {
-                const text = await res.text()
-                throw new Error(text || `HTTP ${res.status}`)
-            }
-            const blob = await res.blob()
+            const blob = await requestBlob(
+                `/problems/${slug}/testcases/${encodeURIComponent(name)}?download=1`,
+            )
             const url = URL.createObjectURL(blob)
             const a = document.createElement('a')
             a.href = url
@@ -553,96 +559,37 @@ export const api = {
         importProblem: async (file: File) => {
             const formData = new FormData()
             formData.append('file', file)
-            const headers: Record<string, string> = {}
-            const token = getAccessToken()
-            if (token) headers['Authorization'] = `Bearer ${token}`
-            const res = await fetch(BASE + '/problems/import', {
+            return request<{ status: string; problem_id: string; slug: string }>('/problems/import', {
                 method: 'POST',
-                headers,
-                body: formData
+                body: formData,
             })
-            if (!res.ok) {
-                const text = await res.text()
-                throw new Error(text || `HTTP ${res.status}`)
-            }
-            return res.json() as Promise<{ status: string; problem_id: string; slug: string }>
         },
         exportProblemUrl: (slug: string) => BASE + `/problems/${slug}/export`,
-        importCodeforces: async (contestId: string, problemIndex: string) => {
-            const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-            const token = getAccessToken()
-            if (token) headers['Authorization'] = `Bearer ${token}`
-            const res = await fetch(BASE + '/problems/import/codeforces', {
+        importCodeforces: async (contestId: string, problemIndex: string) =>
+            request<{ status: string; problem_id: string; slug: string }>('/problems/import/codeforces', {
                 method: 'POST',
-                headers,
-                body: JSON.stringify({ contest_id: contestId, problem_index: problemIndex })
-            })
-            if (!res.ok) {
-                const text = await res.text()
-                throw new Error(text || `HTTP ${res.status}`)
-            }
-            return res.json() as Promise<{ status: string; problem_id: string; slug: string }>
-        },
-        importCSES: async (problemId: string) => {
-            const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-            const token = getAccessToken()
-            if (token) headers['Authorization'] = `Bearer ${token}`
-            const res = await fetch(BASE + '/problems/import/cses', {
+                body: JSON.stringify({ contest_id: contestId, problem_index: problemIndex }),
+            }),
+        importCSES: async (problemId: string) =>
+            request<{ status: string; problem_id: string; slug: string }>('/problems/import/cses', {
                 method: 'POST',
-                headers,
-                body: JSON.stringify({ problem_id: problemId })
-            })
-            if (!res.ok) {
-                const text = await res.text()
-                throw new Error(text || `HTTP ${res.status}`)
-            }
-            return res.json() as Promise<{ status: string; problem_id: string; slug: string }>
-        },
-        importAtCoder: async (contestId: string, problemId: string) => {
-            const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-            const token = getAccessToken()
-            if (token) headers['Authorization'] = `Bearer ${token}`
-            const res = await fetch(BASE + '/problems/import/atcoder', {
+                body: JSON.stringify({ problem_id: problemId }),
+            }),
+        importAtCoder: async (contestId: string, problemId: string) =>
+            request<{ status: string; problem_id: string; slug: string }>('/problems/import/atcoder', {
                 method: 'POST',
-                headers,
-                body: JSON.stringify({ contest_id: contestId, problem_id: problemId })
-            })
-            if (!res.ok) {
-                const text = await res.text()
-                throw new Error(text || `HTTP ${res.status}`)
-            }
-            return res.json() as Promise<{ status: string; problem_id: string; slug: string }>
-        },
-        importToph: async (problemId: string) => {
-            const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-            const token = getAccessToken()
-            if (token) headers['Authorization'] = `Bearer ${token}`
-            const res = await fetch(BASE + '/problems/import/toph', {
+                body: JSON.stringify({ contest_id: contestId, problem_id: problemId }),
+            }),
+        importToph: async (problemId: string) =>
+            request<{ status: string; problem_id: string; slug: string }>('/problems/import/toph', {
                 method: 'POST',
-                headers,
-                body: JSON.stringify({ problem_id: problemId })
-            })
-            if (!res.ok) {
-                const text = await res.text()
-                throw new Error(text || `HTTP ${res.status}`)
-            }
-            return res.json() as Promise<{ status: string; problem_id: string; slug: string }>
-        },
-        importQOJ: async (problemId: string) => {
-            const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-            const token = getAccessToken()
-            if (token) headers['Authorization'] = `Bearer ${token}`
-            const res = await fetch(BASE + '/problems/import/qoj', {
+                body: JSON.stringify({ problem_id: problemId }),
+            }),
+        importQOJ: async (problemId: string) =>
+            request<{ status: string; problem_id: string; slug: string }>('/problems/import/qoj', {
                 method: 'POST',
-                headers,
-                body: JSON.stringify({ problem_id: problemId })
-            })
-            if (!res.ok) {
-                const text = await res.text()
-                throw new Error(text || `HTTP ${res.status}`)
-            }
-            return res.json() as Promise<{ status: string; problem_id: string; slug: string }>
-        },
+                body: JSON.stringify({ problem_id: problemId }),
+            }),
     },
     submissions: {
         create: (d: unknown) => request<Submission>('/submissions', { method: 'POST', body: JSON.stringify(d) }),
