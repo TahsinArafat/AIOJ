@@ -18,7 +18,6 @@ import (
 	"github.com/tahsinarafat/aioj/internal/model"
 	"github.com/tahsinarafat/aioj/internal/queue"
 	"github.com/tahsinarafat/aioj/internal/store"
-	"github.com/tahsinarafat/aioj/internal/store/postgres"
 	"github.com/tahsinarafat/aioj/internal/vjudge"
 )
 
@@ -35,13 +34,24 @@ const (
 	PriorityBulk = 3
 )
 
+// submissionServiceStore is the submission surface this handler serves. It
+// spans read, write and remote hand-off because this is the one handler that
+// does all three: a user submits, reads their own verdict, and the row may
+// still be routed to a remote judge. Composed from the role interfaces rather
+// than restated, so a signature change is felt in one place.
+type submissionServiceStore interface {
+	store.SubmissionReader
+	store.SubmissionWriter
+	store.SubmissionRemoteJudge
+}
+
 type SubmissionHandler struct {
 	// contestHandlerAccess carries the shared contest access policy. Submit is the
 	// surface the exploit actually hit: the password and group gates were simply
 	// absent here, so a contestant could post a solution to a round they could not
 	// even read.
 	contestHandlerAccess
-	subStore     store.SubmissionStore
+	subStore     submissionServiceStore
 	probStore    store.ProblemStore
 	contestStore store.ContestStore
 	queue        queue.JudgeQueue
@@ -82,12 +92,12 @@ func (h *SubmissionHandler) WithScoreboardCache(c *scoreboardCache) *SubmissionH
 
 // WithGrants attaches the password-entitlement store and rebuilds the access
 // policy so it can consult it. Returns the handler for call-site chaining.
-func (h *SubmissionHandler) WithGrants(gs *postgres.ContestGrantStore) *SubmissionHandler {
+func (h *SubmissionHandler) WithGrants(gs contestGrantChecker) *SubmissionHandler {
 	h.rebuildWithGrants(h.contestStore, gs)
 	return h
 }
 
-func NewSubmissionHandler(sub store.SubmissionStore, prob store.ProblemStore, contest store.ContestStore,
+func NewSubmissionHandler(sub submissionServiceStore, prob store.ProblemStore, contest store.ContestStore,
 	q queue.JudgeQueue, ws *WSManager, exec *executor.Client, langDir string, vjSvc *vjudge.Service,
 	users store.UserStore) *SubmissionHandler {
 	h := &SubmissionHandler{subStore: sub, probStore: prob, contestStore: contest, queue: q, wsManager: ws, exec: exec, langDir: langDir, vjudgeSvc: vjSvc, users: users,

@@ -9,14 +9,13 @@ import (
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
 	"github.com/tahsinarafat/aioj/internal/model"
 	"github.com/tahsinarafat/aioj/internal/store"
-	"github.com/tahsinarafat/aioj/internal/store/postgres"
 )
 
 type GroupHandler struct {
 	// contestHandlerAccess carries the shared contest access policy, so this
 	// handler asks the same object every other surface asks.
 	contestHandlerAccess
-	store     *postgres.GroupStore
+	store     store.GroupStore
 	userStore store.UserStore
 	// contestStore answers "may this group's manager see the contest they are
 	// attaching" — the group used to be able to adopt any contest id, including
@@ -26,12 +25,12 @@ type GroupHandler struct {
 
 // WithGrants attaches the password-entitlement store and rebuilds the access
 // policy so it can consult it. Returns the handler for call-site chaining.
-func (h *GroupHandler) WithGrants(gs *postgres.ContestGrantStore) *GroupHandler {
+func (h *GroupHandler) WithGrants(gs contestGrantChecker) *GroupHandler {
 	h.rebuildWithGrants(h.contestStore, gs)
 	return h
 }
 
-func NewGroupHandler(s *postgres.GroupStore, us store.UserStore, cs store.ContestStore) *GroupHandler {
+func NewGroupHandler(s store.GroupStore, us store.UserStore, cs store.ContestStore) *GroupHandler {
 	h := &GroupHandler{store: s, userStore: us, contestStore: cs}
 	h.access = newContestAccessPolicy(cs, nil)
 	return h

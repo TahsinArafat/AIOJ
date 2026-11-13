@@ -9,26 +9,25 @@ import (
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
 	"github.com/tahsinarafat/aioj/internal/model"
 	"github.com/tahsinarafat/aioj/internal/store"
-	"github.com/tahsinarafat/aioj/internal/store/postgres"
 )
 
 type EditorialHandler struct {
 	// contestHandlerAccess carries the shared contest access policy, so this
 	// handler asks the same object every other surface asks.
 	contestHandlerAccess
-	store        *postgres.EditorialStore
+	store        store.EditorialStore
 	problemStore store.ProblemStore
 	contestStore store.ContestStore
 }
 
 // WithGrants attaches the password-entitlement store and rebuilds the access
 // policy so it can consult it. Returns the handler for call-site chaining.
-func (h *EditorialHandler) WithGrants(gs *postgres.ContestGrantStore) *EditorialHandler {
+func (h *EditorialHandler) WithGrants(gs contestGrantChecker) *EditorialHandler {
 	h.rebuildWithGrants(h.contestStore, gs)
 	return h
 }
 
-func NewEditorialHandler(s *postgres.EditorialStore, ps store.ProblemStore, cs store.ContestStore) *EditorialHandler {
+func NewEditorialHandler(s store.EditorialStore, ps store.ProblemStore, cs store.ContestStore) *EditorialHandler {
 	h := &EditorialHandler{store: s, problemStore: ps, contestStore: cs}
 	h.access = newContestAccessPolicy(cs, nil)
 	return h

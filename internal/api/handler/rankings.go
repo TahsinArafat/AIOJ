@@ -1,17 +1,25 @@
 package handler
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 
-	"github.com/tahsinarafat/aioj/internal/store/postgres"
+	"github.com/tahsinarafat/aioj/internal/model"
 )
 
-type RankingsHandler struct {
-	userStore *postgres.UserStore
+// ratingRanker is the one query the rankings page runs. Declared on the
+// consumer side so this handler does not depend on the whole user store for a
+// single listing — it never reads, writes or bans a user.
+type ratingRanker interface {
+	ListUsersByRating(ctx context.Context, offset, limit int, country, organization string) ([]model.RankingEntry, int, error)
 }
 
-func NewRankingsHandler(us *postgres.UserStore) *RankingsHandler {
+type RankingsHandler struct {
+	userStore ratingRanker
+}
+
+func NewRankingsHandler(us ratingRanker) *RankingsHandler {
 	return &RankingsHandler{userStore: us}
 }
 

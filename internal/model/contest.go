@@ -567,3 +567,38 @@ func DefaultEducationalConfig() EducationalRoundConfig {
 		RatedForDivisions: []int{2, 3},
 	}
 }
+
+// ScoreboardRow is one judged submission as the standings computation reads it:
+// the minimum a format needs to score a problem for one participant.
+//
+// It lives here rather than in the postgres package because it crosses the
+// store boundary — the contest handler asks the store for these rows and hands
+// them to a format. A row type the interface returns cannot be declared by the
+// package that implements the interface, or the interface is unnameable.
+type ScoreboardRow struct {
+	UserID    string
+	ProblemID string
+	Status    string
+	Score     int
+	CreatedAt time.Time
+}
+
+// ContestProblemStats is one problem's line in the contest statistics view.
+type ContestProblemStats struct {
+	ProblemID string  `json:"problem_id"`
+	Index     string  `json:"index"`
+	Title     string  `json:"title"`
+	TotalSubs int     `json:"total_submissions"`
+	Accepted  int     `json:"accepted"`
+	SolveRate float64 `json:"solve_rate"`
+}
+
+// ContestStats is the aggregate the jury's statistics tab renders.
+type ContestStats struct {
+	TotalParticipants   int                   `json:"total_participants"`
+	TotalSubmissions    int                   `json:"total_submissions"`
+	AcceptedSubmissions int                   `json:"accepted_submissions"`
+	Problems            []ContestProblemStats `json:"problems"`
+	Languages           map[string]int        `json:"languages"`
+	Verdicts            map[string]int        `json:"verdicts"`
+}

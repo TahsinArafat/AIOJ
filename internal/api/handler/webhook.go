@@ -7,14 +7,15 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
 	"github.com/tahsinarafat/aioj/internal/model"
+	"github.com/tahsinarafat/aioj/internal/store"
 	"github.com/tahsinarafat/aioj/internal/store/postgres"
 )
 
 type WebhookHandler struct {
-	store *postgres.WebhookStore
+	store store.WebhookStore
 }
 
-func NewWebhookHandler(s *postgres.WebhookStore) *WebhookHandler {
+func NewWebhookHandler(s store.WebhookStore) *WebhookHandler {
 	return &WebhookHandler{store: s}
 }
 

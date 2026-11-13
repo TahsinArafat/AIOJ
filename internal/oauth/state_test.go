@@ -66,12 +66,12 @@ func TestStateToken_WithoutNext(t *testing.T) {
 
 func TestNormalizeNext(t *testing.T) {
 	cases := map[string]string{
-		"/problems":                 "/problems",
-		"/contests/abc/problem/A?x=1": "/contests/abc/problem/A?x=1",
-		"":                          "",
-		"//evil.com":                "",
-		"https://evil.com":          "",
-		`/\evil.com`:                "",
+		"/problems":                     "/problems",
+		"/contests/abc/problem/A?x=1":   "/contests/abc/problem/A?x=1",
+		"":                              "",
+		"//evil.com":                    "",
+		"https://evil.com":              "",
+		`/\evil.com`:                    "",
 		"/" + strings.Repeat("a", 1025): "",
 	}
 	for in, want := range cases {

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"sort"
@@ -9,14 +10,31 @@ import (
 	"github.com/tahsinarafat/aioj/internal/store/postgres"
 )
 
+// The feed reads one method from each of three stores, so each is declared on
+// the consumer side: this file depends on the three queries it runs rather than
+// on the whole submission, rating and blog stores. postgres.ActivityItem stays
+// as the shared row shape — it is what these queries return, not a dependency
+// on the implementation.
+type (
+	recentACLister interface {
+		RecentAC(ctx context.Context, limit int) ([]postgres.ActivityItem, error)
+	}
+	recentRatingLister interface {
+		RecentRatings(ctx context.Context, limit int) ([]postgres.ActivityItem, error)
+	}
+	recentCommentLister interface {
+		RecentCommentsActivity(ctx context.Context, limit int) ([]postgres.ActivityItem, error)
+	}
+)
+
 // ActivityHandler serves GET /api/activity — unified recent community feed.
 type ActivityHandler struct {
-	Subs     *postgres.SubmissionStore
-	Ratings  *postgres.RatingStore
-	Comments *postgres.FeedStore
+	Subs     recentACLister
+	Ratings  recentRatingLister
+	Comments recentCommentLister
 }
 
-func NewActivityHandler(s *postgres.SubmissionStore, r *postgres.RatingStore, c *postgres.FeedStore) *ActivityHandler {
+func NewActivityHandler(s recentACLister, r recentRatingLister, c recentCommentLister) *ActivityHandler {
 	return &ActivityHandler{Subs: s, Ratings: r, Comments: c}
 }
 

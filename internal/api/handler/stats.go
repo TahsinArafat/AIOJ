@@ -8,12 +8,14 @@ import (
 	"github.com/tahsinarafat/aioj/internal/store"
 )
 
+// store.SubmissionStats is already the narrow seam here: the three aggregate
+// queries are what a stats page is, and all three are used.
 type StatsHandler struct {
-	subStore     store.SubmissionStore
+	subStore     store.SubmissionStats
 	problemStore store.ProblemStore
 }
 
-func NewStatsHandler(ss store.SubmissionStore, ps store.ProblemStore) *StatsHandler {
+func NewStatsHandler(ss store.SubmissionStats, ps store.ProblemStore) *StatsHandler {
 	return &StatsHandler{subStore: ss, problemStore: ps}
 }
 

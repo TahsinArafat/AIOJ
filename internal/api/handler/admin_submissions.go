@@ -19,15 +19,31 @@ import (
 // forget from the caller's point of view, so it needs its own deadline.
 const remotePollTimeout = 2 * time.Minute
 
+// adminSubmissionStore is what the admin submissions console touches: the
+// rejudge and failure-triage operations, plus the remote hand-off fields. It
+// deliberately excludes Create, UpdateResult and the listing methods the
+// ordinary submission handler owns.
+type adminSubmissionStore interface {
+	store.SubmissionRemoteJudge
+	GetByID(ctx context.Context, id string) (*model.Submission, error)
+	ListRecentFailures(ctx context.Context, limit int) ([]model.Submission, error)
+	ListForBulkRejudge(ctx context.Context, contestID, problemID string) ([]string, error)
+	ListIDsForProblemRejudge(ctx context.Context, problemID string, filter model.SubmissionFilter) ([]string, error)
+	ResetForRejudge(ctx context.Context, ids []string) error
+	RecomputeProblemCounts(ctx context.Context, problemID string) error
+	UpdateStatus(ctx context.Context, id string, status model.SubmissionStatus)
+	UpdateResult(ctx context.Context, id string, status model.SubmissionStatus, score, timeUsed, memoryUsed int, compileOutput string, results []model.TestCaseResult) error
+}
+
 type AdminSubmissionHandler struct {
-	subStore     store.SubmissionStore
+	subStore     adminSubmissionStore
 	probStore    store.ProblemStore
 	contestStore store.ContestStore
 	queue        queue.JudgeQueue
 	vjudgeSvc    *vjudge.Service
 }
 
-func NewAdminSubmissionHandler(subStore store.SubmissionStore, probStore store.ProblemStore, vjSvc *vjudge.Service) *AdminSubmissionHandler {
+func NewAdminSubmissionHandler(subStore adminSubmissionStore, probStore store.ProblemStore, vjSvc *vjudge.Service) *AdminSubmissionHandler {
 	return &AdminSubmissionHandler{subStore: subStore, probStore: probStore, vjudgeSvc: vjSvc}
 }
 

@@ -581,13 +581,10 @@ func (s *ContestStore) GetDisplayNames(ctx context.Context, contestID string, us
 	return out, rows.Err()
 }
 
-type ScoreboardRow struct {
-	UserID    string
-	ProblemID string
-	Status    string
-	Score     int
-	CreatedAt time.Time
-}
+// ScoreboardRow is the model row the standings computation consumes. Aliased
+// so the interface can name it without postgres owning a type that crosses the
+// store boundary.
+type ScoreboardRow = model.ScoreboardRow
 
 func (s *ContestStore) AddPermission(ctx context.Context, contestID, userID, accessLevel string) error {
 	_, err := s.db.ExecContext(ctx,
@@ -715,24 +712,10 @@ func (s *ContestStore) IsParticipant(ctx context.Context, contestID, userID stri
 }
 
 // ContestProblemStats holds per-problem statistics for a contest.
-type ContestProblemStats struct {
-	ProblemID string  `json:"problem_id"`
-	Index     string  `json:"index"`
-	Title     string  `json:"title"`
-	TotalSubs int     `json:"total_submissions"`
-	Accepted  int     `json:"accepted"`
-	SolveRate float64 `json:"solve_rate"`
-}
+type ContestProblemStats = model.ContestProblemStats
 
 // ContestStats holds aggregate statistics for a contest.
-type ContestStats struct {
-	TotalParticipants   int                   `json:"total_participants"`
-	TotalSubmissions    int                   `json:"total_submissions"`
-	AcceptedSubmissions int                   `json:"accepted_submissions"`
-	Problems            []ContestProblemStats `json:"problems"`
-	Languages           map[string]int        `json:"languages"`
-	Verdicts            map[string]int        `json:"verdicts"`
-}
+type ContestStats = model.ContestStats
 
 // GetContestStats returns aggregate statistics for a contest.
 func (s *ContestStore) GetContestStats(ctx context.Context, contestID string) (*ContestStats, error) {

@@ -8,7 +8,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
 	"github.com/tahsinarafat/aioj/internal/model"
-	"github.com/tahsinarafat/aioj/internal/store/postgres"
+	"github.com/tahsinarafat/aioj/internal/store"
 	"github.com/tahsinarafat/aioj/internal/virtual"
 )
 
@@ -17,20 +17,20 @@ type VirtualHandler struct {
 	// handler asks the same object every other surface asks.
 	contestHandlerAccess
 	service      *virtual.Service
-	virtualStore *postgres.VirtualStore
+	virtualStore store.VirtualStore
 	// contestStore is needed to refuse starting a virtual contest on a contest
 	// the caller cannot read; the handler used to pass the id straight through.
-	contestStore *postgres.ContestStore
+	contestStore store.ContestStore
 }
 
 // WithGrants attaches the password-entitlement store and rebuilds the access
 // policy so it can consult it. Returns the handler for call-site chaining.
-func (h *VirtualHandler) WithGrants(gs *postgres.ContestGrantStore) *VirtualHandler {
+func (h *VirtualHandler) WithGrants(gs contestGrantChecker) *VirtualHandler {
 	h.rebuildWithGrants(h.contestStore, gs)
 	return h
 }
 
-func NewVirtualHandler(s *virtual.Service, vs *postgres.VirtualStore, cs *postgres.ContestStore) *VirtualHandler {
+func NewVirtualHandler(s *virtual.Service, vs store.VirtualStore, cs store.ContestStore) *VirtualHandler {
 	h := &VirtualHandler{service: s, virtualStore: vs, contestStore: cs}
 	h.access = newContestAccessPolicy(cs, nil)
 	return h

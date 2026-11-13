@@ -8,14 +8,14 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
 	"github.com/tahsinarafat/aioj/internal/model"
-	"github.com/tahsinarafat/aioj/internal/store/postgres"
+	"github.com/tahsinarafat/aioj/internal/store"
 )
 
 type BlogHandler struct {
-	store *postgres.BlogStore
+	store store.BlogStore
 }
 
-func NewBlogHandler(s *postgres.BlogStore) *BlogHandler {
+func NewBlogHandler(s store.BlogStore) *BlogHandler {
 	return &BlogHandler{store: s}
 }
 

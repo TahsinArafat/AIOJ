@@ -43,10 +43,19 @@ type RemoteLanguageItem struct {
 	Name string `json:"text"`
 }
 
+// remoteSubmissionStore is what the remote-judge hand-off touches: rows still
+// needing a remote submit or a poll, and the verdict that comes back. Not the
+// local judge queue — this service never claims or fences a row.
+type remoteSubmissionStore interface {
+	store.SubmissionRemoteJudge
+	UpdateStatus(ctx context.Context, id string, status model.SubmissionStatus)
+	UpdateResult(ctx context.Context, id string, status model.SubmissionStatus, score, timeUsed, memoryUsed int, compileOutput string, results []model.TestCaseResult) error
+}
+
 type Service struct {
 	mu              sync.RWMutex
 	bots            map[string]Bot
-	subStore        store.SubmissionStore
+	subStore        remoteSubmissionStore
 	probStore       store.ProblemStore
 	botAccStore     store.BotAccountStore
 	remoteLangStore store.RemoteLanguageStore
@@ -55,7 +64,7 @@ type Service struct {
 	activeSubmits   sync.Map
 }
 
-func NewService(subStore store.SubmissionStore, probStore store.ProblemStore, botAccStore store.BotAccountStore, remoteLangStore store.RemoteLanguageStore) *Service {
+func NewService(subStore remoteSubmissionStore, probStore store.ProblemStore, botAccStore store.BotAccountStore, remoteLangStore store.RemoteLanguageStore) *Service {
 	return &Service{bots: make(map[string]Bot), subStore: subStore, probStore: probStore, botAccStore: botAccStore, remoteLangStore: remoteLangStore}
 }
 

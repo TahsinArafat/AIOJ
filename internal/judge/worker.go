@@ -61,7 +61,7 @@ type WorkerPool struct {
 	outputOnlyRunner  *runner.OutputOnlyRunner
 	langDir           string
 	sem               chan struct{}
-	subStore          store.SubmissionStore
+	subStore          submissionJudgeStore
 	probStore         store.ProblemStore
 	langLimitStore    store.LanguageLimitStore
 	balloonStore      store.BalloonStore
@@ -98,7 +98,7 @@ type WorkerPool struct {
 	closed bool
 }
 
-func NewWorkerPool(q queue.JudgeQueue, exec *executor.Client, langDir string, concurrency int, subStore store.SubmissionStore, probStore store.ProblemStore, langLimitStore store.LanguageLimitStore, balloonStore store.BalloonStore) *WorkerPool {
+func NewWorkerPool(q queue.JudgeQueue, exec *executor.Client, langDir string, concurrency int, subStore submissionJudgeStore, probStore store.ProblemStore, langLimitStore store.LanguageLimitStore, balloonStore store.BalloonStore) *WorkerPool {
 	return &WorkerPool{
 		queue: q, exec: exec, compiler: compiler.New(exec),
 		batchRunner: runner.NewBatchRunner(exec), interactiveRunner: runner.NewInteractiveRunner(exec), outputOnlyRunner: runner.NewOutputOnlyRunner(),
@@ -454,4 +454,16 @@ func boolToInt(b bool) int {
 		return 1
 	}
 	return 0
+}
+
+// submissionJudgeStore is the claim protocol this pool runs against: read the
+// row, fence it with a claim, write the result back only while the claim holds.
+//
+// Deliberately not store.SubmissionStore: a judge worker must not be able to
+// list, void or rejudge submissions, and a test fake for it is three methods
+// rather than thirty.
+type submissionJudgeStore interface {
+	GetByID(ctx context.Context, id string) (*model.Submission, error)
+	ClaimPending(ctx context.Context, id, claimToken string) (bool, error)
+	UpdateResultClaimed(ctx context.Context, id, claimToken string, status model.SubmissionStatus, score, timeUsed, memoryUsed int, compileOutput string, results []model.TestCaseResult) (bool, error)
 }

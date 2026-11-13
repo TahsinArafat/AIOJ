@@ -9,15 +9,14 @@ import (
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
 	"github.com/tahsinarafat/aioj/internal/model"
 	"github.com/tahsinarafat/aioj/internal/store"
-	"github.com/tahsinarafat/aioj/internal/store/postgres"
 )
 
 type TeamHandler struct {
-	store     *postgres.TeamStore
+	store     store.TeamStore
 	userStore store.UserStore
 }
 
-func NewTeamHandler(s *postgres.TeamStore, us store.UserStore) *TeamHandler {
+func NewTeamHandler(s store.TeamStore, us store.UserStore) *TeamHandler {
 	return &TeamHandler{store: s, userStore: us}
 }
 

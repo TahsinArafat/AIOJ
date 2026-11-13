@@ -9,10 +9,17 @@ import (
 	"github.com/tahsinarafat/aioj/internal/store"
 )
 
+// problemSubmissionLister is the one submission query a plagiarism run makes:
+// every submission to the problem being compared. Narrow on the consumer side
+// so the engine can be tested without a submission store.
+type problemSubmissionLister interface {
+	ListByProblem(ctx context.Context, problemID string, offset, limit int) ([]model.Submission, int, error)
+}
+
 type Service struct {
 	store    store.PlagiarismStore
 	contestS store.ContestStore
-	subS     store.SubmissionStore
+	subS     problemSubmissionLister
 
 	// engine performs the scan. fallback runs instead when engine fails at
 	// runtime (a missing binary, a crashed process, a protocol mismatch), so a
@@ -23,13 +30,13 @@ type Service struct {
 }
 
 // NewService wires a service with the pure-Go engine.
-func NewService(s store.PlagiarismStore, c store.ContestStore, sub store.SubmissionStore) *Service {
+func NewService(s store.PlagiarismStore, c store.ContestStore, sub problemSubmissionLister) *Service {
 	return &Service{store: s, contestS: c, subS: sub, engine: NativeEngine{}}
 }
 
 // NewServiceWithEngine wires a service with a specific engine, keeping the
 // pure-Go engine as a runtime fallback unless that is the engine requested.
-func NewServiceWithEngine(s store.PlagiarismStore, c store.ContestStore, sub store.SubmissionStore, engine Engine) *Service {
+func NewServiceWithEngine(s store.PlagiarismStore, c store.ContestStore, sub problemSubmissionLister, engine Engine) *Service {
 	svc := NewService(s, c, sub)
 	if engine == nil {
 		return svc

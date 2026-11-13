@@ -10,15 +10,15 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
 	"github.com/tahsinarafat/aioj/internal/model"
-	"github.com/tahsinarafat/aioj/internal/store/postgres"
+	"github.com/tahsinarafat/aioj/internal/store"
 )
 
 type ClassHandler struct {
-	classStore *postgres.ClassStore
-	orgStore   *postgres.OrganizationStore
+	classStore store.ClassStore
+	orgStore   store.OrganizationStore
 }
 
-func NewClassHandler(cs *postgres.ClassStore, os *postgres.OrganizationStore) *ClassHandler {
+func NewClassHandler(cs store.ClassStore, os store.OrganizationStore) *ClassHandler {
 	return &ClassHandler{classStore: cs, orgStore: os}
 }
 

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
@@ -27,10 +28,18 @@ import (
  * Who may do it: the round's managers and judges, not testers. A correction
  * moves a public leaderboard, so it needs the people accountable for the round.
  */
+// adjustmentSubmissionReader is what the correction ledger reads: the round's
+// submissions to recompute standings from, and one row for detail. The ledger
+// never writes a submission — a correction is its own row.
+type adjustmentSubmissionReader interface {
+	GetByID(ctx context.Context, id string) (*model.Submission, error)
+	ListByContest(ctx context.Context, contestID string, offset, limit int, filter model.SubmissionFilter) ([]model.Submission, int, error)
+}
+
 type ContestAdjustmentHandler struct {
 	store        store.ContestAdjustmentStore
 	contestStore contestStaffStore
-	subStore     store.SubmissionStore
+	subStore     adjustmentSubmissionReader
 	// cache is the scoreboard cache, so a correction is visible on the next load
 	// rather than after the TTL — a judge who fixes a result and still sees the
 	// old numbers assumes the fix failed.
@@ -40,7 +49,7 @@ type ContestAdjustmentHandler struct {
 func NewContestAdjustmentHandler(
 	as store.ContestAdjustmentStore,
 	cs contestStaffStore,
-	subs store.SubmissionStore,
+	subs adjustmentSubmissionReader,
 	cache *scoreboardCache,
 ) *ContestAdjustmentHandler {
 	return &ContestAdjustmentHandler{store: as, contestStore: cs, subStore: subs, cache: cache}

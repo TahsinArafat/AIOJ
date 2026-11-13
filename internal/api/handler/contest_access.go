@@ -120,6 +120,17 @@ type contestGrantChecker interface {
 	IsGranted(ctx context.Context, contestID, userID string) (bool, error)
 }
 
+// contestGrantRevoker is the grant store *plus* the one write a contest update
+// needs: changing the password drops the entitlements the old one bought.
+//
+// Kept separate from contestGrantChecker because only the password-change path
+// calls this. Every other WithGrants caller wants the read half, and handing it
+// RevokeAll would let it invalidate a round it has no business touching.
+type contestGrantRevoker interface {
+	contestGrantChecker
+	RevokeAll(ctx context.Context, contestID string) error
+}
+
 // contestAccessPolicy is the seam every contest surface goes through.
 type contestAccessPolicy struct {
 	contests contestAccessStore

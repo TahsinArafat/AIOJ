@@ -8,14 +8,14 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
 	"github.com/tahsinarafat/aioj/internal/model"
-	"github.com/tahsinarafat/aioj/internal/store/postgres"
+	"github.com/tahsinarafat/aioj/internal/store"
 )
 
 type NotificationHandler struct {
-	store *postgres.NotificationStore
+	store store.NotificationStore
 }
 
-func NewNotificationHandler(s *postgres.NotificationStore) *NotificationHandler {
+func NewNotificationHandler(s store.NotificationStore) *NotificationHandler {
 	return &NotificationHandler{store: s}
 }
 

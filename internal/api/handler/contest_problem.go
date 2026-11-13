@@ -8,7 +8,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/tahsinarafat/aioj/internal/model"
 	"github.com/tahsinarafat/aioj/internal/store"
-	"github.com/tahsinarafat/aioj/internal/store/postgres"
 )
 
 // contestProblemStore is the slice of the contest store this handler needs.
@@ -30,7 +29,7 @@ type ContestProblemHandler struct {
 
 // WithGrants attaches the password-entitlement store and rebuilds the access
 // policy so it can consult it. Returns the handler for call-site chaining.
-func (h *ContestProblemHandler) WithGrants(gs *postgres.ContestGrantStore) *ContestProblemHandler {
+func (h *ContestProblemHandler) WithGrants(gs contestGrantChecker) *ContestProblemHandler {
 	h.rebuildWithGrants(h.contestStore, gs)
 	return h
 }

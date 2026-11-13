@@ -8,12 +8,19 @@ import (
 )
 
 // userDataAggregator adapts existing stores to UserDataAggregator.
-type userDataAggregator struct {
-	users    store.UserStore
-	subStore store.SubmissionStore
+// submissionAggregateReader is what the user-data aggregator reads: a user's
+// submissions, plus one row when it needs the problem. Two methods, not thirty.
+type submissionAggregateReader interface {
+	GetByID(ctx context.Context, id string) (*model.Submission, error)
+	ListByUser(ctx context.Context, userID string, offset, limit int, problemID, contestID string) ([]model.Submission, int, error)
 }
 
-func NewUserDataAggregator(users store.UserStore, subs store.SubmissionStore) UserDataAggregator {
+type userDataAggregator struct {
+	users    store.UserStore
+	subStore submissionAggregateReader
+}
+
+func NewUserDataAggregator(users store.UserStore, subs submissionAggregateReader) UserDataAggregator {
 	return &userDataAggregator{users: users, subStore: subs}
 }
 

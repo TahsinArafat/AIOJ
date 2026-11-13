@@ -8,14 +8,14 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
 	"github.com/tahsinarafat/aioj/internal/model"
-	"github.com/tahsinarafat/aioj/internal/store/postgres"
+	"github.com/tahsinarafat/aioj/internal/store"
 )
 
 type OrganizationHandler struct {
-	store *postgres.OrganizationStore
+	store store.OrganizationStore
 }
 
-func NewOrganizationHandler(s *postgres.OrganizationStore) *OrganizationHandler {
+func NewOrganizationHandler(s store.OrganizationStore) *OrganizationHandler {
 	return &OrganizationHandler{store: s}
 }
 

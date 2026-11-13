@@ -8,15 +8,15 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
 	"github.com/tahsinarafat/aioj/internal/model"
-	"github.com/tahsinarafat/aioj/internal/store/postgres"
+	"github.com/tahsinarafat/aioj/internal/store"
 )
 
 type TrainingHandler struct {
-	store    *postgres.TrainingPlanStore
-	orgStore *postgres.OrganizationStore
+	store    store.TrainingPlanStore
+	orgStore store.OrganizationStore
 }
 
-func NewTrainingHandler(s *postgres.TrainingPlanStore, os *postgres.OrganizationStore) *TrainingHandler {
+func NewTrainingHandler(s store.TrainingPlanStore, os store.OrganizationStore) *TrainingHandler {
 	return &TrainingHandler{store: s, orgStore: os}
 }
 

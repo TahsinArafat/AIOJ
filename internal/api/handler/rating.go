@@ -5,15 +5,15 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/tahsinarafat/aioj/internal/store/postgres"
+	"github.com/tahsinarafat/aioj/internal/store"
 )
 
 type RatingHandler struct {
-	ratingStore  *postgres.RatingStore
-	contestStore *postgres.ContestStore
+	ratingStore  store.RatingStore
+	contestStore store.ContestStore
 }
 
-func NewRatingHandler(rs *postgres.RatingStore, cs *postgres.ContestStore) *RatingHandler {
+func NewRatingHandler(rs store.RatingStore, cs store.ContestStore) *RatingHandler {
 	return &RatingHandler{ratingStore: rs, contestStore: cs}
 }
 

@@ -26,7 +26,6 @@ import (
 	pdfgen "github.com/tahsinarafat/aioj/internal/pdf"
 	"github.com/tahsinarafat/aioj/internal/rating"
 	"github.com/tahsinarafat/aioj/internal/store"
-	"github.com/tahsinarafat/aioj/internal/store/postgres"
 	"github.com/tahsinarafat/aioj/internal/webhook"
 )
 
@@ -83,8 +82,8 @@ type ContestHandler struct {
 	// satisfies contestAccessStore directly (it holds the contest store), so the
 	// policy is built in NewContestHandler.
 	contestHandlerAccess
-	store        *postgres.ContestStore
-	ratingStore  *postgres.RatingStore
+	store        store.ContestStore
+	ratingStore  store.RatingStore
 	problemStore store.ProblemStore
 	userStore    store.UserStore
 	teamStore    store.TeamStore
@@ -103,7 +102,7 @@ type ContestHandler struct {
 	// grants is the password-entitlement store. Optional so tests can build the
 	// handler without one; a nil store means no round can be unlocked, which
 	// fails closed for password-protected contests.
-	grants *postgres.ContestGrantStore
+	grants contestGrantRevoker
 	// registrations answers the two questions the contest page needs and the
 	// Contest row cannot: how many people entered, and whether this caller is one
 	// of them. Optional like the others: a nil store omits both fields rather than
@@ -152,7 +151,7 @@ func (h *ContestHandler) WithNotifier(n *notify.Notifier) *ContestHandler {
 	return h
 }
 
-func NewContestHandler(s *postgres.ContestStore, rs *postgres.RatingStore, ps store.ProblemStore, us store.UserStore, ts store.TeamStore) *ContestHandler {
+func NewContestHandler(s store.ContestStore, rs store.RatingStore, ps store.ProblemStore, us store.UserStore, ts store.TeamStore) *ContestHandler {
 	h := &ContestHandler{store: s, ratingStore: rs, problemStore: ps, userStore: us, teamStore: ts, cache: newScoreboardCache(30 * time.Second)}
 	h.access = newContestAccessPolicy(s, nil)
 	return h
@@ -161,7 +160,7 @@ func NewContestHandler(s *postgres.ContestStore, rs *postgres.RatingStore, ps st
 // WithGrants attaches the password-entitlement store and rebuilds the access
 // policy so it can consult it. Returns the handler for call-site chaining, matching
 // WithAdjustments/WithFeed/WithNotifier.
-func (h *ContestHandler) WithGrants(gs *postgres.ContestGrantStore) *ContestHandler {
+func (h *ContestHandler) WithGrants(gs contestGrantRevoker) *ContestHandler {
 	h.grants = gs
 	h.access = newContestAccessPolicy(h.store, gs)
 	return h

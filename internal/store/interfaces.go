@@ -119,8 +119,26 @@ type ProblemI18nStore interface {
 	Delete(ctx context.Context, problemID, language string) error
 }
 
+// SubmissionStore is the whole submission surface. Prefer one of the narrower
+// interfaces below when a consumer needs only part of it; this union exists for
+// the one consumer that genuinely spans it (the submission handler).
+//
+// The roles are declared separately because they were measured, not guessed:
+// the judge reclaimer needs two methods, the hack service one, and plagiarism
+// one. Depending on all 30 forced every one of those consumers to be tested
+// through a 30-method fake.
 type SubmissionStore interface {
-	Create(ctx context.Context, s *model.Submission) error
+	SubmissionReader
+	SubmissionWriter
+	SubmissionJudgeQueue
+	SubmissionRemoteJudge
+	SubmissionStats
+}
+
+// SubmissionReader is the read side: the listings and lookups the HTTP layer
+// serves from. A consumer that only renders submissions needs this and nothing
+// else.
+type SubmissionReader interface {
 	GetByID(ctx context.Context, id string) (*model.Submission, error)
 	ListByProblem(ctx context.Context, problemID string, offset, limit int) ([]model.Submission, int, error)
 	ListByUser(ctx context.Context, userID string, offset, limit int, problemID, contestID string) ([]model.Submission, int, error)
@@ -134,37 +152,24 @@ type SubmissionStore interface {
 	// hidden problems, submissions from a contest that is still running — are
 	// filtered in SQL so they never reach the response.
 	ListPublic(ctx context.Context, offset, limit int, filter model.PublicSubmissionFilter) ([]model.Submission, int, error)
-	// ListIDsForProblemRejudge returns judged local submissions of one problem,
-	// optionally narrowed to a contest, for a batch rejudge.
-	ListIDsForProblemRejudge(ctx context.Context, problemID string, filter model.SubmissionFilter) ([]string, error)
 	// ListRecentFailures returns the newest System Error submissions with the
 	// judge's failure text, for admins triaging a broken judge or problem.
 	ListRecentFailures(ctx context.Context, limit int) ([]model.Submission, error)
+}
+
+// SubmissionWriter is the HTTP layer's write side: creating a submission,
+// recording a verdict, and the rejudge/void operations an operator triggers.
+type SubmissionWriter interface {
+	Create(ctx context.Context, s *model.Submission) error
+	UpdateStatus(ctx context.Context, id string, status model.SubmissionStatus)
+	UpdateResult(ctx context.Context, id string, status model.SubmissionStatus, score, timeUsed, memoryUsed int, compileOutput string, results []model.TestCaseResult) error
 	// RecomputeProblemCounts rebuilds problems.submission_count/accepted_count
 	// from the submissions table. Rejudging does not touch those counters, so
 	// they are recomputed once per batch instead of being double-counted.
 	RecomputeProblemCounts(ctx context.Context, problemID string) error
-	UpdateStatus(ctx context.Context, id string, status model.SubmissionStatus)
-	UpdateResult(ctx context.Context, id string, status model.SubmissionStatus, score, timeUsed, memoryUsed int, compileOutput string, results []model.TestCaseResult) error
-	// ClaimPending atomically acquires a pending submission for one judge
-	// worker. The claim token fences late results from an older worker after a
-	// stale claim has been reclaimed and re-judged.
-	ClaimPending(ctx context.Context, id, claimToken string) (bool, error)
-	// UpdateResultClaimed persists a result only while claimToken still owns
-	// the judging row. It returns false when a newer claim has superseded it.
-	UpdateResultClaimed(ctx context.Context, id, claimToken string, status model.SubmissionStatus, score, timeUsed, memoryUsed int, compileOutput string, results []model.TestCaseResult) (bool, error)
-	// RequeueStale atomically moves submissions stuck in "judging" for longer
-	// than olderThan back to "pending", clears their claim, and returns their
-	// IDs. Concurrent reclaimer sweeps cannot return the same row twice.
-	RequeueStale(ctx context.Context, olderThan time.Duration) ([]string, error)
-	UpdateRemoteID(ctx context.Context, id string, remoteID string, remoteURL string) error
-	UpdateBotID(ctx context.Context, id string, botID string, botSlug string) error
-	GetPendingRemoteSubmissions(ctx context.Context) ([]model.PendingRemoteSubmission, error)
-	GetUnsubmittedRemoteSubmissions(ctx context.Context) ([]model.Submission, error)
-	ListPending(ctx context.Context, limit int) ([]string, error)
-	// ListPendingWithContext returns pending local submissions enriched with
-	// their contest time window so the reclaimer can assign correct priority.
-	ListPendingWithContext(ctx context.Context, limit int) ([]PendingSubmissionInfo, error)
+	// ListIDsForProblemRejudge returns judged local submissions of one problem,
+	// optionally narrowed to a contest, for a batch rejudge.
+	ListIDsForProblemRejudge(ctx context.Context, problemID string, filter model.SubmissionFilter) ([]string, error)
 	// ListForBulkRejudge returns IDs of all judged local submissions in a
 	// contest (optionally filtered to one problem) suitable for rejudging.
 	// It excludes submissions still pending/judging to avoid double-dispatch.
@@ -177,6 +182,42 @@ type SubmissionStore interface {
 	// submission that is pending, judging or already skipped, and reports whether
 	// a row was changed so the caller can answer 404/409.
 	SetSkipped(ctx context.Context, id string) (bool, error)
+}
+
+// SubmissionJudgeQueue is the claim protocol between the judge workers and the
+// pending queue. Its whole point is the fencing: a result is only accepted
+// while the writing worker still holds the claim.
+type SubmissionJudgeQueue interface {
+	// ClaimPending atomically acquires a pending submission for one judge
+	// worker. The claim token fences late results from an older worker after a
+	// stale claim has been reclaimed and re-judged.
+	ClaimPending(ctx context.Context, id, claimToken string) (bool, error)
+	// UpdateResultClaimed persists a result only while claimToken still owns
+	// the judging row. It returns false when a newer claim has superseded it.
+	UpdateResultClaimed(ctx context.Context, id, claimToken string, status model.SubmissionStatus, score, timeUsed, memoryUsed int, compileOutput string, results []model.TestCaseResult) (bool, error)
+	// RequeueStale atomically moves submissions stuck in "judging" for longer
+	// than olderThan back to "pending", clears their claim, and returns their
+	// IDs. Concurrent reclaimer sweeps cannot return the same row twice.
+	RequeueStale(ctx context.Context, olderThan time.Duration) ([]string, error)
+	ListPending(ctx context.Context, limit int) ([]string, error)
+	// ListPendingWithContext returns pending local submissions enriched with
+	// their contest time window so the reclaimer can assign correct priority.
+	ListPendingWithContext(ctx context.Context, limit int) ([]PendingSubmissionInfo, error)
+}
+
+// SubmissionRemoteJudge is the hand-off to a remote judge: what still needs
+// submitting, and where its result landed. Separate from the local judge queue
+// because the vjudge service never claims or fences anything.
+type SubmissionRemoteJudge interface {
+	UpdateRemoteID(ctx context.Context, id string, remoteID string, remoteURL string) error
+	UpdateBotID(ctx context.Context, id string, botID string, botSlug string) error
+	GetPendingRemoteSubmissions(ctx context.Context) ([]model.PendingRemoteSubmission, error)
+	GetUnsubmittedRemoteSubmissions(ctx context.Context) ([]model.Submission, error)
+}
+
+// SubmissionStats is the aggregate read side. Its three methods are report
+// queries, not row reads, which is why they sit apart from SubmissionReader.
+type SubmissionStats interface {
 	GetProblemStats(ctx context.Context, problemID string) (*model.ProblemStats, error)
 	GetUserStats(ctx context.Context, userID string) (*model.UserProblemStats, error)
 	GetPlatformStats(ctx context.Context) (*model.PlatformStats, error)
@@ -230,6 +271,11 @@ type ContestStore interface {
 	GetByID(ctx context.Context, id string) (*model.Contest, error)
 	GetBySlug(ctx context.Context, slug string) (*model.Contest, error)
 	List(ctx context.Context, offset, limit int) ([]model.Contest, int, error)
+	// ListForViewer is the public listing: it applies the per-caller visibility
+	// predicate (published, not hidden from this viewer, division match) that
+	// List does not, so the contest archive does not leak a draft or an
+	// unlisted round. division is optional; a nil viewerID means anonymous.
+	ListForViewer(ctx context.Context, offset, limit int, division *int, viewerID string) ([]model.Contest, int, error)
 	ListByCreatedBy(ctx context.Context, userID string, offset, limit int) ([]model.Contest, int, error)
 	Update(ctx context.Context, c *model.Contest) error
 	Delete(ctx context.Context, id string) error
@@ -248,6 +294,17 @@ type ContestStore interface {
 	// GetProblemProgress is the per-viewer solve state and round-wide solve count
 	// for each problem, keyed by problem id. viewerID may be empty.
 	GetProblemProgress(ctx context.Context, contestID, viewerID string, beforeTime *time.Time) (map[string]model.ContestProblemProgress, error)
+	// GetScoreboardRows is the judged rows the standings are computed from.
+	// beforeTime, when set, applies the freeze cutoff.
+	GetScoreboardRows(ctx context.Context, contestID string, beforeTime *time.Time) ([]model.ScoreboardRow, error)
+	// GetContestStats is the jury's statistics tab: participant, submission and
+	// per-problem aggregates in one round trip.
+	GetContestStats(ctx context.Context, contestID string) (*model.ContestStats, error)
+	// RegisterTeam / ListTeamRegistrations back team-mode entry. A round that
+	// registers teams instead of individuals needs both, and the rating
+	// recalculation reads the second.
+	RegisterTeam(ctx context.Context, contestID, teamID string) (*model.TeamRegistration, error)
+	ListTeamRegistrations(ctx context.Context, contestID string) ([]model.TeamRegistration, error)
 	GetContestProblemByIndex(ctx context.Context, contestID, index string) (*model.Problem, error)
 	GetParticipants(ctx context.Context, contestID string) ([]string, error)
 	IsParticipant(ctx context.Context, contestID, userID string) (bool, error)
@@ -309,6 +366,9 @@ type VirtualStore interface {
 type GymStore interface {
 	Create(ctx context.Context, g *model.GymContest) error
 	GetByID(ctx context.Context, id string) (*model.GymContest, error)
+	// GetByIDForViewer applies the per-caller visibility rule (a private gym is
+	// visible to its owner and its members), where GetByID does not.
+	GetByIDForViewer(ctx context.Context, id, viewUserID string) (*model.GymContest, error)
 	List(ctx context.Context, offset, limit int, filter model.GymFilter) ([]model.GymContest, int, error)
 	MarkSolved(ctx context.Context, gymID, userID string) error
 	IsSolved(ctx context.Context, gymID, userID string) (bool, error)

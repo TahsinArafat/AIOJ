@@ -25,15 +25,29 @@ type Runner interface {
 	Run(ctx context.Context, prob *model.Problem, sub *model.Submission, testInput, expectedOutput string) (Verdict, error)
 }
 
+// contestLookup is the one contest query this service makes: it needs the round
+// a hack belongs to, and nothing else. Narrow on the consumer side so a test
+// fake is one method, not the whole ContestStore.
+type contestLookup interface {
+	GetByID(ctx context.Context, id string) (*model.Contest, error)
+}
+
+// submissionLookup is the one submission query a hack needs: the row being
+// hacked, so it can check the owner and the contest. Not the whole submission
+// store — a hack never lists, rejudges or voids anything.
+type submissionLookup interface {
+	GetByID(ctx context.Context, id string) (*model.Submission, error)
+}
+
 type Service struct {
 	hackStore    store.HackStore
-	contestStore store.ContestStore
-	subStore     store.SubmissionStore
+	contestStore contestLookup
+	subStore     submissionLookup
 	probStore    store.ProblemStore
 	judge        Runner
 }
 
-func NewService(hs store.HackStore, cs store.ContestStore, ss store.SubmissionStore) *Service {
+func NewService(hs store.HackStore, cs contestLookup, ss submissionLookup) *Service {
 	return &Service{
 		hackStore:    hs,
 		contestStore: cs,

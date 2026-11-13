@@ -7,15 +7,15 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
 	"github.com/tahsinarafat/aioj/internal/model"
-	"github.com/tahsinarafat/aioj/internal/store/postgres"
+	"github.com/tahsinarafat/aioj/internal/store"
 )
 
 type RegistrationHandler struct {
-	registrationStore *postgres.RegistrationStore
-	contestStore      *postgres.ContestStore
+	registrationStore store.RegistrationStore
+	contestStore      store.ContestStore
 }
 
-func NewRegistrationHandler(rs *postgres.RegistrationStore, cs *postgres.ContestStore) *RegistrationHandler {
+func NewRegistrationHandler(rs store.RegistrationStore, cs store.ContestStore) *RegistrationHandler {
 	return &RegistrationHandler{
 		registrationStore: rs,
 		contestStore:      cs,

@@ -7,14 +7,15 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
 	"github.com/tahsinarafat/aioj/internal/model"
+	"github.com/tahsinarafat/aioj/internal/store"
 	"github.com/tahsinarafat/aioj/internal/store/postgres"
 )
 
 type APIKeyHandler struct {
-	store *postgres.APIKeyStore
+	store store.APIKeyStore
 }
 
-func NewAPIKeyHandler(s *postgres.APIKeyStore) *APIKeyHandler {
+func NewAPIKeyHandler(s store.APIKeyStore) *APIKeyHandler {
 	return &APIKeyHandler{store: s}
 }
 

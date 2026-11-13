@@ -10,18 +10,18 @@ import (
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
 	"github.com/tahsinarafat/aioj/internal/hack"
 	"github.com/tahsinarafat/aioj/internal/model"
-	"github.com/tahsinarafat/aioj/internal/store/postgres"
+	"github.com/tahsinarafat/aioj/internal/store"
 )
 
 type HackHandler struct {
 	service      *hack.Service
-	hackStore    *postgres.HackStore
+	hackStore    store.HackStore
 	contestStore interface {
 		GetByID(context.Context, string) (*model.Contest, error)
 	}
 }
 
-func NewHackHandler(s *hack.Service, hs *postgres.HackStore, resolvers ...interface {
+func NewHackHandler(s *hack.Service, hs store.HackStore, resolvers ...interface {
 	GetByID(context.Context, string) (*model.Contest, error)
 }) *HackHandler {
 	var cs interface {

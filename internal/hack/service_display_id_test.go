@@ -162,6 +162,6 @@ func (canonicalProblemStore) GetByID(_ context.Context, id string) (*model.Probl
 }
 
 var _ store.HackStore = (*canonicalHackStore)(nil)
-var _ store.ContestStore = canonicalHackContestStore{}
+var _ contestLookup = canonicalHackContestStore{}
 var _ Runner = fakeRunner{}
 var _ Runner = (*Judge)(nil)

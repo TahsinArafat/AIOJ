@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -11,20 +12,26 @@ import (
 	"github.com/tahsinarafat/aioj/internal/auth"
 	"github.com/tahsinarafat/aioj/internal/model"
 	"github.com/tahsinarafat/aioj/internal/store"
-	"github.com/tahsinarafat/aioj/internal/store/postgres"
 	"golang.org/x/crypto/bcrypt"
 )
 
+// publicSubmissionLister is the one submission query the public profile makes:
+// the user's accepted submissions. Narrower than store.SubmissionStore so the
+// profile cannot reach a store method that is not about the viewer.
+type publicSubmissionLister interface {
+	ListPublicByUser(ctx context.Context, userID string, offset, limit int) ([]model.Submission, int, error)
+}
+
 type UsersHandler struct {
 	userStore   store.UserStore
-	blogStore   *postgres.BlogStore
-	subStore    store.SubmissionStore
+	blogStore   store.BlogStore
+	subStore    publicSubmissionLister
 	teamStore   store.TeamStore
 	groupStore  store.GroupStore
 	refreshToks store.RefreshTokenStore
 }
 
-func NewUsersHandler(us store.UserStore, bs *postgres.BlogStore, ss store.SubmissionStore, ts store.TeamStore, gs store.GroupStore, rt store.RefreshTokenStore) *UsersHandler {
+func NewUsersHandler(us store.UserStore, bs store.BlogStore, ss publicSubmissionLister, ts store.TeamStore, gs store.GroupStore, rt store.RefreshTokenStore) *UsersHandler {
 	return &UsersHandler{userStore: us, blogStore: bs, subStore: ss, teamStore: ts, groupStore: gs, refreshToks: rt}
 }
 

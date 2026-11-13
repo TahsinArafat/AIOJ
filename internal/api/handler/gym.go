@@ -9,14 +9,13 @@ import (
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
 	"github.com/tahsinarafat/aioj/internal/model"
 	"github.com/tahsinarafat/aioj/internal/store"
-	"github.com/tahsinarafat/aioj/internal/store/postgres"
 )
 
 type GymHandler struct {
 	// contestHandlerAccess carries the shared contest access policy, so this
 	// handler asks the same object every other surface asks.
 	contestHandlerAccess
-	store *postgres.GymStore
+	store store.GymStore
 	// contestStore is needed to answer "may this caller see the contest this gym
 	// points at" — the check the handler shipped without.
 	contestStore store.ContestStore
@@ -24,12 +23,12 @@ type GymHandler struct {
 
 // WithGrants attaches the password-entitlement store and rebuilds the access
 // policy so it can consult it. Returns the handler for call-site chaining.
-func (h *GymHandler) WithGrants(gs *postgres.ContestGrantStore) *GymHandler {
+func (h *GymHandler) WithGrants(gs contestGrantChecker) *GymHandler {
 	h.rebuildWithGrants(h.contestStore, gs)
 	return h
 }
 
-func NewGymHandler(s *postgres.GymStore, cs store.ContestStore) *GymHandler {
+func NewGymHandler(s store.GymStore, cs store.ContestStore) *GymHandler {
 	h := &GymHandler{store: s, contestStore: cs}
 	h.access = newContestAccessPolicy(cs, nil)
 	return h

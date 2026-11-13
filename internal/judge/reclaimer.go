@@ -31,7 +31,7 @@ const (
 // resets a row and ListPending reconciles the database with the queue. The
 // latter is what makes a failed Redis enqueue recoverable on the next sweep.
 type Reclaimer struct {
-	subStore store.SubmissionStore
+	subStore staleReclaimer
 	queue    queue.JudgeQueue
 	// staleAfter is how long a row may sit in 'judging' before it is presumed
 	// abandoned. Interval is the sweep period.
@@ -39,10 +39,19 @@ type Reclaimer struct {
 	interval   time.Duration
 }
 
+// staleReclaimer is the pair of operations this sweep needs. Narrower than
+// store.SubmissionStore, and narrower than store.SubmissionJudgeQueue: the
+// reclaimer never claims a row or writes a result, it only puts abandoned rows
+// back on the queue.
+type staleReclaimer interface {
+	RequeueStale(ctx context.Context, olderThan time.Duration) ([]string, error)
+	ListPendingWithContext(ctx context.Context, limit int) ([]store.PendingSubmissionInfo, error)
+}
+
 // NewReclaimer builds a Reclaimer. Non-positive values fall back to the
 // package defaults so a zero-valued config cannot accidentally steal live
 // judgments (staleAfter=0 would reclaim everything immediately).
-func NewReclaimer(subStore store.SubmissionStore, q queue.JudgeQueue, staleAfter, interval time.Duration) *Reclaimer {
+func NewReclaimer(subStore staleReclaimer, q queue.JudgeQueue, staleAfter, interval time.Duration) *Reclaimer {
 	if staleAfter <= 0 {
 		staleAfter = DefaultStaleClaimAfter
 	}
