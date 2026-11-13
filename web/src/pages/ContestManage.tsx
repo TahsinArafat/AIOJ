@@ -18,6 +18,7 @@ import { isoToLocalInput, localInputToIso } from '../lib/datetime'
 import { DIVISIONS } from '../lib/divisions'
 import { useClarifications } from '../hooks/useClarifications'
 import { ClarificationsPanel } from '../components/ClarificationsPanel'
+import { VerdictBadge } from '../components/ui/VerdictBadge'
 import { ContestAdjustmentsPanel } from './admin/ContestAdjustmentsPanel'
 
 function indexLabel(i: number): string {
@@ -57,7 +58,19 @@ interface ChallengeRow { problem_id: string; index?: string; score?: number; sor
 interface ProblemHit { id: string; title?: string; difficulty?: string }
 interface RegistrationList { data?: ParticipantRow[]; count?: number }
 interface ParticipantRow { user_id?: string; username?: string; registered_at: string }
-interface SubmissionRow { id?: string; username?: string; user_id?: string; problem_index?: string; problem_id?: string; language?: string; status: string; time_ms?: number; created_at?: string }
+interface SubmissionRow {
+    id?: string
+    username?: string
+    user_id?: string
+    problem_index?: string
+    problem_id?: string
+    language?: string
+    status: string
+    score?: number
+    time_used?: number
+    memory_used?: number
+    created_at?: string
+}
 interface PrintRow { id: string; filename?: string; status: string; content?: string; username?: string; created_at?: string }
 interface ContestStats {
     total_participants?: number
@@ -501,12 +514,6 @@ function SubmissionsTab({ contestId }: { contestId: string }) {
 
     if (loading) return <TabLoading />
 
-    const verdictColor = (s: string) => {
-        if (s === 'ACCEPTED') return 'text-ok bg-ok/10'
-        if (s?.includes('PENDING') || s === 'JUDGING') return 'text-warn bg-warn/10'
-        return 'text-bad bg-bad/10'
-    }
-
     return (
         <TabShell title="Submissions" subtitle={`${items.length} total`}>
             {items.length === 0 ? <EmptyState
@@ -525,10 +532,13 @@ function SubmissionsTab({ contestId }: { contestId: string }) {
                                 <tr key={s.id} className="hover:bg-surface-2">
                                     <td className="py-2 pr-3"><Link to={`/submissions/${s.id}`} className="text-brand hover:underline font-mono text-xs">{s.id?.slice(0, 8)}</Link></td>
                                     <td className="py-2 pr-3">{s.username || s.user_id?.slice(0, 8)}</td>
+                                    {/* The round's letter is how a problem is identified inside a contest; a
+                                        uuid here is unreadable at the desk. Fall back to the uuid only when the
+                                        problem is no longer listed in the round. */}
                                     <td className="py-2 pr-3 font-mono text-xs">{s.problem_index || s.problem_id?.slice(0, 8)}</td>
                                     <td className="py-2 pr-3 text-xs">{s.language}</td>
-                                    <td className="py-2 pr-3"><span className={`text-xs px-2 py-0.5 rounded-full font-medium ${verdictColor(s.status)}`}>{s.status}</span></td>
-                                    <td className="py-2 pr-3 text-xs text-muted">{s.time_ms ? `${s.time_ms}ms` : '—'}</td>
+                                    <td className="py-2 pr-3"><VerdictBadge status={s.status} short /></td>
+                                    <td className="py-2 pr-3 text-xs text-muted">{s.time_used ? `${s.time_used}ms` : '—'}</td>
                                     <td className="py-2 text-xs text-muted-soft">{s.created_at ? new Date(s.created_at).toLocaleString() : '—'}</td>
                                 </tr>
                             ))}

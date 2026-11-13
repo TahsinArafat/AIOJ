@@ -484,9 +484,17 @@ func (s *SubmissionStore) ListByContest(ctx context.Context, contestID string, o
 	var total int
 	s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM submissions s WHERE "+where, args...).Scan(&total)
 	args = append(args, offset, limit)
+	// The LEFT JOIN to contest_problems resolves the round's letter for each
+	// row. It is LEFT, not INNER, so a row whose problem has since been removed
+	// from the round (or a submission written with a problem_id the contest
+	// never listed) still appears instead of silently vanishing; the letter
+	// comes back empty and the caller falls back to the problem's identity.
 	rows, err := s.db.QueryContext(ctx,
-		fmt.Sprintf(`SELECT s.id,s.user_id,COALESCE(u.username,''),s.problem_id,s.language,s.status,s.score,s.time_used,s.memory_used,s.created_at,s.submission_type
-		 FROM submissions s LEFT JOIN users u ON s.user_id = u.id WHERE %s ORDER BY s.created_at DESC OFFSET $%d LIMIT $%d`, where, argIdx, argIdx+1), args...)
+		fmt.Sprintf(`SELECT s.id,s.user_id,COALESCE(u.username,''),s.problem_id,COALESCE(cp.index,''),s.language,s.status,s.score,s.time_used,s.memory_used,s.created_at,s.submission_type
+		 FROM submissions s
+		 LEFT JOIN users u ON s.user_id = u.id
+		 LEFT JOIN contest_problems cp ON cp.contest_id = s.contest_id AND cp.problem_id = s.problem_id
+		 WHERE %s ORDER BY s.created_at DESC OFFSET $%d LIMIT $%d`, where, argIdx, argIdx+1), args...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -494,7 +502,7 @@ func (s *SubmissionStore) ListByContest(ctx context.Context, contestID string, o
 	var items []model.Submission
 	for rows.Next() {
 		var sub model.Submission
-		rows.Scan(&sub.ID, &sub.UserID, &sub.Username, &sub.ProblemID, &sub.Language, &sub.Status, &sub.Score, &sub.TimeUsed, &sub.MemoryUsed, &sub.CreatedAt, &sub.SubmissionType)
+		rows.Scan(&sub.ID, &sub.UserID, &sub.Username, &sub.ProblemID, &sub.ProblemIndex, &sub.Language, &sub.Status, &sub.Score, &sub.TimeUsed, &sub.MemoryUsed, &sub.CreatedAt, &sub.SubmissionType)
 		items = append(items, sub)
 	}
 	if items == nil {

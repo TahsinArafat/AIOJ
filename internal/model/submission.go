@@ -72,6 +72,11 @@ type Submission struct {
 	// status table can name the problem without a second lookup per row.
 	ProblemSlug  string `json:"problem_slug,omitempty"`
 	ProblemTitle string `json:"problem_title,omitempty"`
+	// ProblemIndex is the contest letter (A, B, …), which is how a round is read
+	// and the only way to identify a problem inside one. Filled by the
+	// contest-scoped listings; empty everywhere else, since a practice problem
+	// has no letter.
+	ProblemIndex string `json:"problem_index,omitempty"`
 	// CanView / CanRejudge are per-viewer capabilities computed by the handler;
 	// they are never stored.
 	CanView    bool       `json:"can_view,omitempty"`
