@@ -7,7 +7,7 @@
 # change on our side and no way to reproduce yesterday's binary.
 #
 # Bump this tag deliberately, with a sandbox smoke test (see docs/DEPLOYMENT.md).
-FROM criyle/go-judge:v1.11.4
+FROM criyle/go-judge:v1.14.0
 # g++-multilib / gcc-multilib are what make the *-32 languages work. Without
 # them `gcc -m32` cannot find the 32-bit crt objects or libgcc and every 32-bit
 # compile fails, while 64-bit compiles keep succeeding — which is how this
