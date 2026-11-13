@@ -46,7 +46,7 @@ RUN touch src/*.rs && \
 #   openjdk21-jdk          — Java compilation/execution (judge-worker only)
 #   rust cargo             — Rust compilation (judge-worker only)
 #   nodejs npm             — JS execution (judge-worker only)
-FROM alpine:3.19
+FROM alpine:3.24
 RUN apk add --no-cache ca-certificates tzdata bash
 RUN apk add --no-cache --repository=https://dl-cdn.alpinelinux.org/alpine/edge/main postgresql18-client
 RUN addgroup -S aioj && adduser -S aioj -G aioj

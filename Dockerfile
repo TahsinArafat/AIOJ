@@ -41,7 +41,7 @@ RUN touch src/*.rs && \
     printf '{"threshold":0.5,"inputs":[]}' | target/release/aioj-plagiarism | grep -q '"summary"'
 
 # Stage 2: Run
-FROM alpine:3.19
+FROM alpine:3.24
 RUN apk add --no-cache ca-certificates tzdata \
     g++ gcc make musl-dev python3 openjdk21-jdk rust cargo nodejs npm bash tar
 RUN apk add --no-cache --repository=https://dl-cdn.alpinelinux.org/alpine/edge/main postgresql18-client
