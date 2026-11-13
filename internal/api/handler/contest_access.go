@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
@@ -130,7 +131,8 @@ func newContestAccessPolicy(cs contestAccessStore, gs contestGrantChecker) conte
 	return contestAccessPolicy{contests: cs, grants: gs, now: time.Now}
 }
 
-// Decide is the whole policy, as an ordered pipeline:
+// Decide answers "may this caller reach this surface of this round", as one
+// ordered pipeline:
 //
 //  1. nil contest            -> none
 //  2. staff                  -> granted (they run the round; they never need to
@@ -138,9 +140,9 @@ func newContestAccessPolicy(cs contestAccessStore, gs contestGrantChecker) conte
 //     open it while it is still a draft)
 //  3. draft                  -> none (an unpublished round is nobody's business)
 //  4. published, not started -> not started (the shell is public, the content is not)
-//  5. wrong group            -> none
-//  6. password without grant -> password required
-//  7. otherwise              -> granted
+//  5. group/password         -> none / password_required, UNLESS this surface's
+//     audience is public
+//  6. otherwise              -> granted
 //
 // Staff is answered before the visibility rule so a setter is not locked out of
 // their own draft; visibility is answered before the password rule so a draft
@@ -148,45 +150,23 @@ func newContestAccessPolicy(cs contestAccessStore, gs contestGrantChecker) conte
 // before the group and password rules for the same reason: a round that has not
 // begun must not leak whether it is invite-only or locked, and there is nothing
 // behind the answer to unlock yet.
-func (p contestAccessPolicy) Decide(ctx context.Context, c *model.Contest, claims *auth.Claims) (contestAccessDecision, error) {
-	return p.decide(ctx, c, claims, false)
+//
+// The surface is a parameter rather than a second entry point because the reason
+// the split lives inside this pipeline is unchanged from when there was exactly
+// one such surface (the scoreboard): a wrapper that inspected the verdict could
+// not tell a group refusal from a store failure — both are accessNone, and one of
+// them must stay closed — so the override has to happen where the reason is still
+// known. Generalising the entry point from a bool to a surface name is what makes
+// the sixth surface cost one line instead of a sixth copy of this function.
+func (p contestAccessPolicy) Decide(ctx context.Context, c *model.Contest, claims *auth.Claims, surface string) (contestAccessDecision, error) {
+	return p.decide(ctx, c, claims, surface)
 }
 
-// DecideSpectate answers the second question: "may this caller watch this round's
-// scoreboard". It is the same ordered pipeline with steps 5 and 6 — group and
-// password — deliberately skipped when the round publishes its board.
-//
-// Why a second axis exists at all: Decide answers "may this caller read this
-// round", and hiding the board behind it made a whole category of round
-// impossible. An onsite final is private to the people in the room and its board
-// is the point — projected, streamed, pasted into a group chat. With one verdict
-// the only way to publish the board was to publish the statements too.
-//
-// What is deliberately NOT relaxed, each for a concrete reason:
-//
-//   - Staff, draft and !Visible are answered before the split, so a draft's board
-//     is still nobody's business and a rejected round has no board.
-//   - accessNotStarted survives, so a public board cannot become the side channel
-//     that reveals an invite-only round hours before it begins. After the start
-//     the setter has chosen to publish the result and nothing is left to infer.
-//   - When the board is not public the pipeline is identical to Decide, so the
-//     participants-only case cannot drift from the content rules.
-//
-// isStaff/isJudge come out of the same computation, because the board needs the
-// judge privilege for the freeze whichever axis admitted the reader.
-func (p contestAccessPolicy) DecideSpectate(ctx context.Context, c *model.Contest, claims *auth.Claims) (contestAccessDecision, error) {
-	return p.decide(ctx, c, claims, true)
-}
-
-// decide is the one pipeline. spectate only decides what happens after the
-// questions both axes share have been answered: a public board turns what would
-// have been a group refusal or a password prompt into a grant.
-//
-// Putting the flag here rather than in a wrapper is not a style choice. A wrapper
-// that inspected Decide's verdict could not tell a group refusal from a store
-// failure — both are accessNone, and one of them must stay closed — so the split
-// has to happen where the reason is still known.
-func (p contestAccessPolicy) decide(ctx context.Context, c *model.Contest, claims *auth.Claims, spectate bool) (contestAccessDecision, error) {
+// decide is the pipeline itself. The surface only decides the last step — every
+// question above it is asked and answered the same way for every surface, which
+// is what keeps a new surface from having to restate the draft, visibility,
+// group and password rules (and from getting one of them subtly wrong).
+func (p contestAccessPolicy) decide(ctx context.Context, c *model.Contest, claims *auth.Claims, surface string) (contestAccessDecision, error) {
 	if c == nil {
 		return contestAccessDecision{}, nil
 	}
@@ -230,29 +210,40 @@ func (p contestAccessPolicy) decide(ctx context.Context, c *model.Contest, claim
 		return contestAccessDecision{level: accessNotStarted}, nil
 	}
 
-	// The split. Everything above is a question both axes ask and answer the same
-	// way; everything below belongs to content alone.
+	// The split. Everything above is a question every surface asks and answers the
+	// same way; everything below belongs to the surface's own audience.
 	content := p.contentLevel(ctx, c, userID)
 	if content.err != nil {
 		return contestAccessDecision{}, content.err
 	}
 
 	decision := contestAccessDecision{
-		level:   content.level,
-		isJudge: isJudge,
-		// Recorded here because only the board needs it, and only the board can get
-		// it for free: a public board is watchable by a caller who cannot read the
-		// round, and the scoreboard has to know which of those two it is serving so
-		// it can strip the problem titles a spectator must not receive.
+		level:          content.level,
+		isJudge:        isJudge,
 		contentAllowed: content.level == accessGranted,
 	}
 
-	// A round that publishes its board is watchable before the group and password
-	// rules are consulted. This is the entire feature, and it is why the reason
-	// cannot be recovered from the verdict afterwards: a group refusal and a store
-	// failure are both "not granted", and one of them must stay closed.
-	if spectate && c.IsScoreboardPublic() {
+	// This surface's audience, resolved once. An unset surface inherits the round's
+	// base gate, which is what makes an empty access_config mean exactly today's
+	// behaviour: §4 content rules, unchanged.
+	switch c.AccessConfig.Audience(surface) {
+	case model.AccessPublic:
+		// The feature, generalised from the scoreboard. A public surface is
+		// reachable before the group and password rules are consulted, so a
+		// spectator who never held the password can read exactly this one surface
+		// and nothing else.
+		//
+		// Note what this does NOT do: it does not touch any other surface's
+		// audience, and it cannot. Each gate call site passes its own surface, so
+		// "the board is public" can never widen the statements — the bug this
+		// whole axis exists to prevent.
 		decision.level = accessGranted
+	case model.AccessStaff:
+		// Organizers only. Reached only for a caller who is not already staff (the
+		// staff branch returned above), so the answer is a flat refusal, and it is
+		// accessNone rather than a password prompt: there is no credential that
+		// would admit this caller, and offering one would be a lie.
+		decision.level = accessNone
 	}
 
 	return decision, nil
@@ -305,45 +296,14 @@ type contestViewer struct {
 	claims   *auth.Claims
 }
 
-// requireContestSpectateAccess is the board's gate. It is requireContestAccess
-// with the spectate question asked instead of the content one, so a round with a
-// public scoreboard is watchable by a caller who cannot read a word of it.
+// requireContestSurfaceAccess is the one place a contest handler turns a policy
+// decision into an HTTP response. It returns false when the handler must stop.
 //
-// An unstarted round is refused here, for the same reason the content gate
-// refuses it: a board that is readable hours before the start is a side channel
-// telling the world an invite-only round exists, which is exactly what
-// accessNotStarted exists to prevent. Note that this is the *handler's* decision
-// and has to match the policy's — the policy answering accessNotStarted is not by
-// itself enough, because an earlier version of this function treated "upcoming" as
-// "let them through" and would have served the board before the start.
-func (h *contestHandlerAccess) requireContestSpectateAccess(
-	w http.ResponseWriter,
-	r *http.Request,
-	c *model.Contest,
-	notFoundWhenDenied bool,
-) (contestViewer, bool) {
-	claims := middleware.GetUserClaims(r)
-
-	decision, err := h.access.DecideSpectate(r.Context(), c, claims)
-	if err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return contestViewer{}, false
-	}
-
-	switch {
-	case decision.Allowed():
-		return contestViewer{decision: decision, claims: claims}, true
-	case notFoundWhenDenied:
-		http.Error(w, "contest not found", http.StatusNotFound)
-		return contestViewer{}, false
-	default:
-		http.Error(w, "forbidden", http.StatusForbidden)
-		return contestViewer{}, false
-	}
-}
-
-// requireContestAccess is the one place a contest handler turns a policy decision
-// into an HTTP response. It returns false when the handler must stop.
+// Every gated route names its surface. That is deliberate: the surface decides
+// which audience applies, so a route that forgot to name one would silently fall
+// back to the round's base gate — which is safe, but invisibly so, and the whole
+// point of this refactor is that a surface's audience is a visible decision at
+// the call site rather than something inferred.
 //
 // notFoundWhenDenied exists because the surfaces disagree, for good reasons: the
 // problem statement and the booklet answer 404 so a draft's existence is not
@@ -351,45 +311,151 @@ func (h *contestHandlerAccess) requireContestSpectateAccess(
 // and the tests pin it), while the scoreboard answers 403.
 //
 // An unstarted round is refused here, deliberately. Every caller of this function
-// reads *content* — statements, the booklet, standings, submissions — and none of
-// it exists before the start. The contest page itself wants the shell instead and
-// calls requireContestShellAccess.
-func (h *contestHandlerAccess) requireContestAccess(
+// reads a surface whose content does not exist before the start. The contest page
+// itself wants the shell instead and calls requireContestShellAccess.
+func (h *contestHandlerAccess) requireContestSurfaceAccess(
 	w http.ResponseWriter,
 	r *http.Request,
 	c *model.Contest,
+	surface string,
 	notFoundWhenDenied bool,
 ) (contestViewer, bool) {
-	return h.resolveContestAccess(w, r, c, notFoundWhenDenied, false)
+	return h.resolveContestAccess(w, r, c, surface, notFoundWhenDenied, false)
 }
 
-// requireContestShellAccess is requireContestAccess for a surface that renders the
-// round's metadata rather than its content.
+// requireContestShellAccess is requireContestSurfaceAccess for a surface that
+// renders the round's metadata rather than its content.
 //
 // Only the contest page uses it: on an upcoming round it needs the title, the
 // times and the countdown, and refusing there is what produced "Contest not
 // found" on a contest that existed and had merely not begun. Accepting an
 // unstarted round here does not open the round — the problems, statements,
-// standings and submit all go through requireContestAccess, which still refuses.
-func (h *contestHandlerAccess) requireContestShellAccess(
+// standings and submit all go through requireContestSurfaceAccess, which still
+// refuses.
+//
+// contestPageAccess is what the contest page needs to render, which is more than
+// one verdict: it carries the round's shell AND its problem list, and those are
+// two surfaces with two audiences.
+type contestPageAccess struct {
+	access contestViewer
+	// showProblems is the problem-list surface's own answer, already resolved
+	// against staff privilege. The handler renders the list or an empty slice from
+	// this, and never re-derives it from viewer.decision.
+	showProblems bool
+}
+
+// requireContestPageAccess is the contest page's gate. The page is admitted when
+// EITHER surface it serves is reachable, and each surface's content is decided
+// separately.
+//
+// Why this is not just requireContestShellAccess: gating the page on the base gate
+// alone made a published problem list unreachable on the one request that renders
+// it. On a password round, `problem_list: public` was honoured by the per-problem
+// stats endpoint but the page answered 403 before the list was ever consulted —
+// so a setter who made their list public watched nothing change on the page a
+// spectator would actually open. A setting that only works on a side door is
+// worse than no setting, because it looks like it works.
+//
+// The refusal shape is unchanged: a password round that publishes nothing still
+// answers password_required so the page can prompt, and a draft still answers
+// forbidden. Publishing one surface does not turn the round into a public one.
+func (h *contestHandlerAccess) requireContestPageAccess(
 	w http.ResponseWriter,
 	r *http.Request,
 	c *model.Contest,
 	notFoundWhenDenied bool,
-) (contestViewer, bool) {
-	return h.resolveContestAccess(w, r, c, notFoundWhenDenied, true)
+) (contestPageAccess, bool) {
+	claims := middleware.GetUserClaims(r)
+
+	// The base verdict decides the shell and staff/judge privilege.
+	base, err := h.access.Decide(r.Context(), c, claims, model.SurfaceParticipate)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return contestPageAccess{}, false
+	}
+
+	// The list verdict decides one list, and is independent of the base.
+	list, err := h.access.Decide(r.Context(), c, claims, model.SurfaceProblemList)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return contestPageAccess{}, false
+	}
+
+	// Staff and an unstarted round are answered by the base pipeline before any
+	// audience is consulted, so this branch is the shell behaviour that existed
+	// before this gate: a setter opens their own draft, and an unstarted round
+	// opens for its countdown.
+	//
+	// An unstarted round shows no list whatever its audience says. That is the
+	// policy's accessNotStarted rule, and it is re-applied here because this gate
+	// admits the page on the list's answer too: without the guard, publishing a
+	// problem list would serve it hours before the start, which is the side channel
+	// accessNotStarted exists to prevent.
+	upcoming := base.IsUpcoming()
+	if base.Allowed() || upcoming {
+		return contestPageAccess{
+			access:       contestViewer{decision: base, claims: claims},
+			showProblems: list.Allowed() && !upcoming,
+		}, true
+	}
+
+	// The list is published, so the page opens for it even though the round's
+	// content stays closed. Note the decision returned is the BASE's, so
+	// contentAllowed is false and nothing downstream mistakes this caller for a
+	// participant — the only surface they were granted is the one named here.
+	if list.Allowed() {
+		return contestPageAccess{
+			access:       contestViewer{decision: base, claims: claims},
+			showProblems: true,
+		}, true
+	}
+
+	// Neither surface is reachable: report the base's refusal, which describes the
+	// round rather than the list, and keeps every existing refusal shape.
+	switch {
+	case base.NeedsPassword():
+		// The body is a machine-readable code, not prose, so the contest page can
+		// render an unlock prompt without parsing an error string.
+		//
+		// The published-surface list is added for one concrete reason: a round that
+		// publishes a surface is deliberately unlisted, so a spectator who was
+		// handed its link arrives here and would otherwise be told only that the
+		// round is private. It is safe to say — they already hold the id, and those
+		// surfaces are available to anyone — and without it a published surface has
+		// no route a stranger can follow.
+		body := map[string]string{
+			"error": "password_required",
+			"code":  "password_required",
+		}
+		// Kept for the standings page, which reads it. published_surfaces is the
+		// general form; this one names the board so an existing client keeps
+		// working when the board is what was published.
+		if c.AccessConfig.Audience(model.SurfaceStandings) == model.AccessPublic {
+			body["scoreboard_public"] = "true"
+		}
+		if public := c.PublicSurfaces(); len(public) > 0 {
+			body["published_surfaces"] = strings.Join(public, ",")
+		}
+		respondJSON(w, http.StatusForbidden, body)
+	case notFoundWhenDenied:
+		http.Error(w, "contest not found", http.StatusNotFound)
+	default:
+		http.Error(w, "forbidden", http.StatusForbidden)
+	}
+	return contestPageAccess{}, false
 }
 
 func (h *contestHandlerAccess) resolveContestAccess(
 	w http.ResponseWriter,
 	r *http.Request,
 	c *model.Contest,
+	surface string,
 	notFoundWhenDenied bool,
 	allowUpcoming bool,
 ) (contestViewer, bool) {
 	claims := middleware.GetUserClaims(r)
 
-	decision, err := h.access.Decide(r.Context(), c, claims)
+	decision, err := h.access.Decide(r.Context(), c, claims, surface)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return contestViewer{}, false
@@ -404,19 +470,29 @@ func (h *contestHandlerAccess) resolveContestAccess(
 		// The body is a machine-readable code, not prose, so the contest page can
 		// render an unlock prompt without parsing an error string.
 		//
-		// The scoreboard flag is added for one concrete reason: a round with a
-		// public board is deliberately unlisted, so a spectator who was handed its
-		// link arrives here and would otherwise be told only that the round is
-		// private. It is safe to say — they already hold the id, and the board is
-		// available to anyone — and without it the published board has no route a
-		// stranger can follow. Not sent for a round whose board is participant-only,
-		// where it would be a hint about nothing.
+		// The published-surface flag is added for one concrete reason: a round that
+		// publishes a surface is deliberately unlisted, so a spectator who was
+		// handed its link arrives here and would otherwise be told only that the
+		// round is private. It is safe to say — they already hold the id, and that
+		// surface is available to anyone — and without it the published surface has
+		// no route a stranger can follow. Not sent for a round that publishes
+		// nothing, where it would be a hint about nothing.
+		//
+		// Renamed from scoreboard_public to published_surfaces when the board
+		// stopped being the only surface that could be public: the reader wants to
+		// know what it may follow a link to, and naming one surface would have gone
+		// stale (and been wrong) the first time a round published its booklet
+		// instead. scoreboard_public is still sent when the board is one of them, so
+		// the existing standings page keeps working unchanged.
 		body := map[string]string{
 			"error": "password_required",
 			"code":  "password_required",
 		}
-		if c.IsScoreboardPublic() {
+		if c.AccessConfig.Audience(model.SurfaceStandings) == model.AccessPublic {
 			body["scoreboard_public"] = "true"
+		}
+		if public := c.PublicSurfaces(); len(public) > 0 {
+			body["published_surfaces"] = strings.Join(public, ",")
 		}
 		respondJSON(w, http.StatusForbidden, body)
 		return contestViewer{}, false
@@ -431,7 +507,7 @@ func (h *contestHandlerAccess) resolveContestAccess(
 
 // contestHandlerAccess carries the policy for handlers that are not
 // ContestHandler. Embedded so ContestHandler, ContestProblemHandler and the rest
-// pick up requireContestAccess without each declaring the method.
+// pick up requireContestSurfaceAccess without each declaring the method.
 type contestHandlerAccess struct {
 	access contestAccessPolicy
 }

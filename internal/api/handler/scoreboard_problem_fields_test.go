@@ -76,7 +76,7 @@ func TestScoreboardProblemPayloadCarriesNoName(t *testing.T) {
 		IsRated: true, RatedForMin: 0, RatedForMax: 9999,
 		// A public board is the case that matters: it is watchable by someone the
 		// content gate refuses, so it is the only board a stranger can read.
-		ScoreboardVisibility: model.ScoreboardPublic,
+		AccessConfig: model.AccessConfig{model.SurfaceStandings: model.AccessPublic},
 	}
 	if err := contestStore.Create(ctx, contest); err != nil {
 		t.Fatalf("create contest: %v", err)

@@ -23,6 +23,11 @@ import { isPendingVerdict, isSkippedVerdict } from '../components/ui/verdict'
 import { useFeature } from '../context/FeaturesContext'
 import { SkipSubmissionDialog } from '../components/SkipSubmissionDialog'
 import { ContestAdjustmentsPanel } from './admin/ContestAdjustmentsPanel'
+import {
+    SURFACES, AUDIENCE_LABELS, surfaceAudience, isInherited,
+    setSurface, clearSurface, publicSurfaces, sanitizeAccessConfig,
+} from '../lib/contestAccess'
+import type { AccessConfig } from '../lib/contestAccess'
 
 function indexLabel(i: number): string {
     let s = ''
@@ -1155,11 +1160,11 @@ function SettingsTab({ contestId }: { contestId: string }) {
         password: '', has_password: false, pdf_enabled: true, statement_hidden: false,
         upsolving_enabled: true, virtual_contest_enabled: true,
         visibility: 'public',
-        // Separate from `visibility` on purpose. A round can keep its problems
-        // behind a password and still publish its board — that is what an onsite
-        // final or a hiring round is — so this is not a third option in the
-        // visibility select, it is its own control.
-        scoreboard_visibility: 'participants',
+        // Per-surface access. An empty map is the meaningful default: every
+        // surface inherits the round's own gate, which is what every round did
+        // before this setting existed. Not a "scoreboard_visibility" string any
+        // more — the board is one row of this table now.
+        access_config: {} as AccessConfig,
         group_id: '',
         division: 0,
         registration_required: false, registration_deadline: '', max_participants: '',
@@ -1206,11 +1211,10 @@ function SettingsTab({ contestId }: { contestId: string }) {
                 upsolving_enabled: c.upsolving_enabled ?? true,
                 virtual_contest_enabled: c.virtual_contest_enabled ?? true,
                 visibility: vis,
-                // Default rather than a cast: an older API response, or a contest
-                // saved before this field existed, means participants-only, and
-                // silently rendering it as "public" would be the wrong way to be
-                // wrong.
-                scoreboard_visibility: c.scoreboard_visibility === 'public' ? 'public' : 'participants',
+                // Sanitised on the way in as well as out: a response from an older
+                // server, or a hand-edited row, must not put an unknown audience
+                // into the form and then have the save round-trip it back.
+                access_config: sanitizeAccessConfig(c.access_config),
                 group_id: c.group_id || '',
                 division: c.division ?? 0,
                 registration_required: c.registration_required ?? false,
@@ -1293,7 +1297,12 @@ function SettingsTab({ contestId }: { contestId: string }) {
                 end_time: localInputToIso(form.end_time),
                 freeze_time: localInputToIso(form.freeze_time),
                 ...contestVisibilityPayload(form),
-                scoreboard_visibility: form.scoreboard_visibility,
+                // Always sent, whole-map: the server treats a present
+                // access_config as a replace, so an emptied map is how a setter
+                // says "every surface back to inheriting". Omitting the key would
+                // mean "leave the audiences alone" and their reset would be
+                // silently dropped.
+                access_config: sanitizeAccessConfig(form.access_config),
                 pdf_enabled: form.pdf_enabled,
                 statement_hidden: form.statement_hidden,
                 upsolving_enabled: form.upsolving_enabled,
@@ -1432,23 +1441,106 @@ function SettingsTab({ contestId }: { contestId: string }) {
                     </select>
                 </div>
 
-                {/* Scoreboard visibility. A separate axis from the block above,
-                    because a round can be private and still publish its board:
-                    an onsite final is closed to the room and its scoreboard is
-                    on a projector. The two settings do not imply each other, so
-                    they are not options in one select. */}
+                {/* Per-surface access. Replaces the single "Scoreboard
+                    Visibility" select, which was the first surface to need its
+                    own audience and turned out not to be the last: a round's
+                    problem list, statements, booklet, submit path and board are
+                    five independent answers, and one dropdown could only express
+                    the board's.
+
+                    Rows, not a matrix of checkboxes: each surface has a small
+                    closed set of audiences, and a select per row keeps the
+                    vocabulary visible next to the surface it applies to. The
+                    "inherited" marker matters — an inherited audience and one
+                    stored on this round look identical otherwise, and a setter
+                    who cannot tell which rows they changed will not dare clear
+                    one. */}
                 <div>
-                    <label className="block text-sm font-medium text-ink-soft mb-1">Scoreboard Visibility</label>
-                    <select aria-label="Scoreboard Visibility" value={form.scoreboard_visibility}
-                        onChange={e => setForm(p => ({ ...p, scoreboard_visibility: e.target.value }))}
-                        className="w-full border border-hairline-strong rounded-lg px-3 py-2 text-sm focus:ring-2 focus-visible:outline-[var(--ring)] focus:border-brand bg-surface">
-                        <option value="participants">Participants only (whoever can open the round)</option>
-                        <option value="public">Anyone (watchable without the password)</option>
-                    </select>
-                    <p className="text-xs text-muted-soft mt-1">
-                        {form.scoreboard_visibility === 'public'
-                            ? 'Anyone with the link can watch the scoreboard, including people who cannot open the problems. Problem titles are hidden from them. The round stays out of the contest list and search either way.'
-                            : 'Only people who can already open the round can see the scoreboard.'}
+                    <label className="block text-sm font-medium text-ink-soft mb-2">Who can access what</label>
+                    <div className="rounded-lg border border-hairline-strong overflow-hidden">
+                        <table className="w-full text-sm">
+                            <thead className="bg-surface-2">
+                                <tr>
+                                    <th className="text-left px-3 py-2 font-medium text-muted">Part of the round</th>
+                                    <th className="text-left px-3 py-2 font-medium text-muted w-56">Who can access it</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-hairline">
+                                {SURFACES.map((surface) => {
+                                    const inherited = isInherited(form.access_config, surface.key)
+                                    const audience = surfaceAudience(form.access_config, surface.key)
+                                    // Surfacing the resolved value on an inherited
+                                    // row is the point: "inherited" alone does not
+                                    // tell the setter whether the surface is
+                                    // currently open or closed.
+                                    const effective = inherited
+                                        ? `Inherited — ${AUDIENCE_LABELS[audience].toLowerCase()}`
+                                        : AUDIENCE_LABELS[audience]
+                                    return (
+                                        <tr key={surface.key}>
+                                            <td className="px-3 py-2.5 align-top">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-medium text-ink">{surface.label}</span>
+                                                    {inherited && (
+                                                        <span className="text-[11px] px-1.5 py-0.5 rounded bg-surface-2 text-muted-soft">
+                                                            inherited
+                                                        </span>
+                                                    )}
+                                                    {!inherited && surface.key !== 'participate' && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setForm(p => ({ ...p, access_config: clearSurface(p.access_config, surface.key) }))}
+                                                            className="text-[11px] text-muted-soft hover:text-brand underline"
+                                                            aria-label={`Reset ${surface.label} to inherited`}
+                                                        >
+                                                            reset
+                                                        </button>
+                                                    )}
+                                                </div>
+                                                <p className="text-xs text-muted-soft mt-0.5">{surface.hint}</p>
+                                            </td>
+                                            <td className="px-3 py-2.5 align-top">
+                                                <select
+                                                    aria-label={`${surface.label} access`}
+                                                    value={form.access_config[surface.key] ?? ''}
+                                                    onChange={e => {
+                                                        const v = e.target.value
+                                                        setForm(p => ({
+                                                            ...p,
+                                                            access_config: v === ''
+                                                                ? clearSurface(p.access_config, surface.key)
+                                                                : setSurface(p.access_config, surface.key, v as 'participants' | 'public' | 'staff'),
+                                                        }))
+                                                    }}
+                                                    className="w-full border border-hairline-strong rounded-lg px-2.5 py-1.5 text-sm focus:ring-2 focus-visible:outline-[var(--ring)] focus:border-brand bg-surface"
+                                                >
+                                                    <option value="">Same as the round ({AUDIENCE_LABELS[surfaceAudience(form.access_config, 'participate')].toLowerCase()})</option>
+                                                    <option value="participants">Participants only</option>
+                                                    <option value="public">Anyone</option>
+                                                    {surface.allowsStaff && <option value="staff">Organizers only</option>}
+                                                </select>
+                                                <p className="text-[11px] text-muted-soft mt-1">
+                                                    {surface.key === 'participate'
+                                                        ? 'The base rule. Surfaces left on "same as the round" follow this.'
+                                                        : inherited
+                                                            ? `Currently ${AUDIENCE_LABELS[audience].toLowerCase()}, following the round's setting.`
+                                                            : effective + '.'}
+                                                </p>
+                                            </td>
+                                        </tr>
+                                    )
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                    <p className="text-xs text-muted-soft mt-2">
+                        {(() => {
+                            const open = publicSurfaces(form.access_config)
+                            if (open.length === 0) {
+                                return 'Nothing is published beyond the people who can open the round. A round like this stays out of the contest list and search.'
+                            }
+                            return `Anyone with the link can reach: ${open.map(s => s.label.toLowerCase()).join(', ')}. The round stays out of the contest list and search either way, so a published surface is reachable by its direct link and is not discoverable.`
+                        })()}
                     </p>
                 </div>
 

@@ -48,19 +48,23 @@ func (s *ContestStore) Create(ctx context.Context, c *model.Contest) error {
 		c.Status = model.ContestStatusDraft
 	}
 	c.Visible = c.Status == model.ContestStatusPublished
-	// The column is NOT NULL with a CHECK, so a caller that predates it must not
-	// write "". Normalising at the store rather than in each handler keeps the
-	// default in one place.
-	c.ScoreboardVisibility = model.NormalizeScoreboardVisibility(c.ScoreboardVisibility)
+	// The column is NOT NULL, so a caller that predates it must not write SQL NULL.
+	// Normalising at the store rather than in each handler keeps the default in one
+	// place. Only invalid entries are dropped; an empty map is a valid config and
+	// means "every surface inherits the base gate".
+	accessConfigJSON, err := json.Marshal(model.NormalizeAccessConfig(c.AccessConfig))
+	if err != nil {
+		return fmt.Errorf("marshal access_config: %w", err)
+	}
 
 	err = tx.QueryRowContext(ctx,
 		`INSERT INTO contests(id,slug,title,type,format,format_config,start_time,end_time,freeze_time,password_hash,visible,description,
 		                    registration_required,registration_deadline,max_participants,division,educational_config,created_by,
-		                    status,is_rated,rated_for_min,rated_for_max,scoreboard_visibility)
+		                    status,is_rated,rated_for_min,rated_for_max,access_config)
 		 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23) RETURNING created_at`,
 		c.ID, slug, c.Title, c.Type, c.Format, formatConfigJSON, c.StartTime, c.EndTime, c.FreezeTime, c.PasswordHash, c.Visible, c.Description,
 		c.RegistrationRequired, c.RegistrationDeadline, c.MaxParticipants, c.Division, configJSON, c.CreatedBy,
-		c.Status, c.IsRated, c.RatedForMin, c.RatedForMax, c.ScoreboardVisibility,
+		c.Status, c.IsRated, c.RatedForMin, c.RatedForMax, accessConfigJSON,
 	).Scan(&c.CreatedAt)
 	if err != nil {
 		return err
@@ -103,6 +107,7 @@ func (s *ContestStore) getByWhere(ctx context.Context, where string, args ...int
 	var c model.Contest
 	var configJSON []byte
 	var formatConfigJSON []byte
+	var accessConfigJSON []byte
 	var slug sql.NullString
 	var groupID sql.NullString
 	err := s.db.QueryRowContext(ctx,
@@ -111,7 +116,7 @@ func (s *ContestStore) getByWhere(ctx context.Context, where string, args ...int
 		        upsolving_enabled,virtual_contest_enabled,pdf_enabled,statement_hidden,created_by,created_at,
 		        COALESCE(status,'draft'), COALESCE(review_note,''),
 		        COALESCE(is_rated,true), COALESCE(rated_for_min,0), COALESCE(rated_for_max,9999),
-		        scoreboard_visibility,
+		        access_config,
 		        (SELECT group_id::text FROM group_contests WHERE contest_id = id LIMIT 1) AS group_id
 		 FROM contests WHERE `+where, args...).Scan(
 		&c.ID, &c.DisplayID, &slug, &c.Title, &c.Type, &c.Format, &formatConfigJSON, &c.StartTime, &c.EndTime, &c.FreezeTime,
@@ -120,7 +125,7 @@ func (s *ContestStore) getByWhere(ctx context.Context, where string, args ...int
 		&c.Division, &configJSON,
 		&c.UpsolvingEnabled, &c.VirtualContestEnabled, &c.PDFEnabled, &c.StatementHidden,
 		&c.CreatedBy, &c.CreatedAt, &c.Status, &c.ReviewNote,
-		&c.IsRated, &c.RatedForMin, &c.RatedForMax, &c.ScoreboardVisibility, &groupID)
+		&c.IsRated, &c.RatedForMin, &c.RatedForMax, &accessConfigJSON, &groupID)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -142,10 +147,32 @@ func (s *ContestStore) getByWhere(ctx context.Context, where string, args ...int
 	if len(formatConfigJSON) > 0 {
 		c.FormatConfig = formatConfigJSON
 	}
+	c.AccessConfig = decodeAccessConfig(accessConfigJSON)
 	if c.PasswordHash != "" {
 		c.HasPassword = true
 	}
 	return &c, nil
+}
+
+// decodeAccessConfig turns the stored JSONB into a map, always non-nil.
+//
+// A malformed or dangling value cannot fail a read: this is a settings blob on
+// the hot path of every contest page, and a 500 on the contest because somebody
+// hand-edited a row would trade a cosmetic problem for an outage. Invalid
+// entries are dropped and the result is a map, so every caller can index it
+// without a nil check. The single failure mode is a surface falling back to its
+// inherited audience, which is the conservative direction — a surface becoming
+// MORE open is the one that would be dangerous.
+func decodeAccessConfig(raw []byte) model.AccessConfig {
+	out := model.AccessConfig{}
+	if len(raw) == 0 {
+		return out
+	}
+	var stored model.AccessConfig
+	if err := json.Unmarshal(raw, &stored); err != nil {
+		return out
+	}
+	return model.NormalizeAccessConfig(stored)
 }
 
 func (s *ContestStore) List(ctx context.Context, offset, limit int) ([]model.Contest, int, error) {
@@ -176,7 +203,7 @@ func (s *ContestStore) ListForViewer(ctx context.Context, offset, limit int, div
 
 	rowsQuery := `SELECT id,display_id,slug,title,type,format,format_config,start_time,end_time,freeze_time,password_hash,visible,description,
 	              registration_required,registration_deadline,max_participants,division,educational_config,
-	              created_at,scoreboard_visibility
+	              created_at,access_config
 	              FROM contests WHERE visible=true AND ` + visibility
 	if division != nil {
 		rowsQuery += fmt.Sprintf(" AND division = $%d", argIdx)
@@ -195,9 +222,10 @@ func (s *ContestStore) ListForViewer(ctx context.Context, offset, limit int, div
 		var c model.Contest
 		var configJSON []byte
 		var formatConfigJSON []byte
+		var accessConfigJSON []byte
 		var slug sql.NullString
 		rows.Scan(&c.ID, &c.DisplayID, &slug, &c.Title, &c.Type, &c.Format, &formatConfigJSON, &c.StartTime, &c.EndTime, &c.FreezeTime, &c.PasswordHash, &c.Visible, &c.Description,
-			&c.RegistrationRequired, &c.RegistrationDeadline, &c.MaxParticipants, &c.Division, &configJSON, &c.CreatedAt, &c.ScoreboardVisibility)
+			&c.RegistrationRequired, &c.RegistrationDeadline, &c.MaxParticipants, &c.Division, &configJSON, &c.CreatedAt, &accessConfigJSON)
 		if slug.Valid {
 			c.Slug = slug.String
 		}
@@ -210,6 +238,7 @@ func (s *ContestStore) ListForViewer(ctx context.Context, offset, limit int, div
 		if len(formatConfigJSON) > 0 {
 			c.FormatConfig = formatConfigJSON
 		}
+		c.AccessConfig = decodeAccessConfig(accessConfigJSON)
 		if c.PasswordHash != "" {
 			c.HasPassword = true
 		}
@@ -247,19 +276,27 @@ func (s *ContestStore) Update(ctx context.Context, c *model.Contest) error {
 	// Registration controls and division are written here for the first time.
 	// They were accepted on create and then never updated, so a round's entry
 	// policy could not be changed after it existed.
-	_, err := s.db.ExecContext(ctx,
+	//
+	// access_config is a whole-map replace, not a merge: the manage screen renders
+	// every surface at once, so a merge would only give a stale tab a way to
+	// resurrect an audience another tab had just cleared.
+	accessConfigJSON, err := json.Marshal(model.NormalizeAccessConfig(c.AccessConfig))
+	if err != nil {
+		return fmt.Errorf("marshal access_config: %w", err)
+	}
+	_, err = s.db.ExecContext(ctx,
 		`UPDATE contests SET title=$1, type=$2, format=$3, format_config=$4, start_time=$5, end_time=$6,
 	 freeze_time=$7, password_hash=$8, description=$9, pdf_enabled=$10, statement_hidden=$11,
 	 slug=$13, upsolving_enabled=$14, virtual_contest_enabled=$15,
 	 visible=($16::varchar='published'), status=$16, is_rated=$17, rated_for_min=$18, rated_for_max=$19,
 	 registration_required=$20, registration_deadline=$21, max_participants=$22, division=$23,
-	 scoreboard_visibility=$24
+	 access_config=$24
 	 WHERE id=$12`,
 		c.Title, c.Type, c.Format, formatConfigJSON, c.StartTime, c.EndTime, c.FreezeTime, c.PasswordHash, c.Description,
 		c.PDFEnabled, c.StatementHidden, c.ID, slug, c.UpsolvingEnabled, c.VirtualContestEnabled,
 		c.Status, c.IsRated, c.RatedForMin, c.RatedForMax,
 		c.RegistrationRequired, c.RegistrationDeadline, c.MaxParticipants, c.Division,
-		model.NormalizeScoreboardVisibility(c.ScoreboardVisibility))
+		accessConfigJSON)
 	if err != nil {
 		return err
 	}
@@ -295,7 +332,7 @@ func (s *ContestStore) ListByStatus(ctx context.Context, status string, offset, 
 		        upsolving_enabled,virtual_contest_enabled,pdf_enabled,statement_hidden,created_by,created_at,
 		        COALESCE(status,'draft'), COALESCE(review_note,''),
 		        COALESCE(is_rated,true), COALESCE(rated_for_min,0), COALESCE(rated_for_max,9999),
-		        scoreboard_visibility
+		        access_config
 		   FROM contests WHERE status=$1 ORDER BY created_at ASC OFFSET $2 LIMIT $3`, status, offset, limit)
 	if err != nil {
 		return nil, 0, err
@@ -306,12 +343,14 @@ func (s *ContestStore) ListByStatus(ctx context.Context, status string, offset, 
 	for rows.Next() {
 		var c model.Contest
 		var configJSON, formatConfigJSON []byte
+		var accessConfigJSON []byte
 		rows.Scan(&c.ID, &c.DisplayID, &c.Slug, &c.Title, &c.Type, &c.Format, &formatConfigJSON,
 			&c.StartTime, &c.EndTime, &c.FreezeTime, &c.PasswordHash, &c.Visible, &c.Description,
 			&c.RegistrationRequired, &c.RegistrationDeadline, &c.MaxParticipants, &c.Division, &configJSON,
 			&c.UpsolvingEnabled, &c.VirtualContestEnabled, &c.PDFEnabled, &c.StatementHidden,
 			&c.CreatedBy, &c.CreatedAt, &c.Status, &c.ReviewNote,
-			&c.IsRated, &c.RatedForMin, &c.RatedForMax, &c.ScoreboardVisibility)
+			&c.IsRated, &c.RatedForMin, &c.RatedForMax, &accessConfigJSON)
+		c.AccessConfig = decodeAccessConfig(accessConfigJSON)
 		items = append(items, c)
 	}
 	if items == nil {
@@ -812,7 +851,7 @@ func (s *ContestStore) ListByCreatedBy(ctx context.Context, userID string, offse
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT DISTINCT c.id, c.display_id, c.slug, c.title, c.type, c.format, c.format_config, c.start_time, c.end_time, c.freeze_time, c.password_hash, c.visible, c.description,
 		                 c.registration_required, c.registration_deadline, c.max_participants, c.division, c.educational_config,
-		                 c.created_at, c.scoreboard_visibility
+		                 c.created_at, c.access_config
 		 FROM contests c
 		 LEFT JOIN contest_permissions perm ON c.id = perm.contest_id
 		 WHERE c.created_by = $1 OR perm.user_id = $1
@@ -826,9 +865,10 @@ func (s *ContestStore) ListByCreatedBy(ctx context.Context, userID string, offse
 		var c model.Contest
 		var configJSON []byte
 		var formatConfigJSON []byte
+		var accessConfigJSON []byte
 		var slug sql.NullString
 		rows.Scan(&c.ID, &c.DisplayID, &slug, &c.Title, &c.Type, &c.Format, &formatConfigJSON, &c.StartTime, &c.EndTime, &c.FreezeTime, &c.PasswordHash, &c.Visible, &c.Description,
-			&c.RegistrationRequired, &c.RegistrationDeadline, &c.MaxParticipants, &c.Division, &configJSON, &c.CreatedAt, &c.ScoreboardVisibility)
+			&c.RegistrationRequired, &c.RegistrationDeadline, &c.MaxParticipants, &c.Division, &configJSON, &c.CreatedAt, &accessConfigJSON)
 		if slug.Valid {
 			c.Slug = slug.String
 		}
@@ -841,6 +881,7 @@ func (s *ContestStore) ListByCreatedBy(ctx context.Context, userID string, offse
 		if len(formatConfigJSON) > 0 {
 			c.FormatConfig = formatConfigJSON
 		}
+		c.AccessConfig = decodeAccessConfig(accessConfigJSON)
 		if c.PasswordHash != "" {
 			c.HasPassword = true
 		}

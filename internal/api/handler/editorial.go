@@ -77,7 +77,7 @@ func (h *EditorialHandler) Create(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "contest not found", http.StatusNotFound)
 			return
 		}
-		if decision, derr := h.access.Decide(r.Context(), contest, claims); derr != nil || !decision.Allowed() {
+		if decision, derr := h.access.Decide(r.Context(), contest, claims, model.SurfaceParticipate); derr != nil || !decision.Allowed() {
 			http.Error(w, "contest not found", http.StatusNotFound)
 			return
 		}

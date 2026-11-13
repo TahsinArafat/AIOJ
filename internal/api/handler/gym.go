@@ -62,7 +62,7 @@ func (h *GymHandler) Create(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "contest not found", http.StatusNotFound)
 		return
 	}
-	if decision, derr := h.access.Decide(r.Context(), contest, claims); derr != nil || !decision.Allowed() {
+	if decision, derr := h.access.Decide(r.Context(), contest, claims, model.SurfaceParticipate); derr != nil || !decision.Allowed() {
 		// 404 rather than 403 so gym creation is not an oracle for which private
 		// contest ids exist.
 		http.Error(w, "contest not found", http.StatusNotFound)

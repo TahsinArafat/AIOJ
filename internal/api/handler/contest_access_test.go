@@ -168,7 +168,7 @@ func TestContestAccessPolicyDecide(t *testing.T) {
 			}
 			p := newContestAccessPolicy(stub, tc.grant)
 
-			got, err := p.Decide(context.Background(), tc.contest, tc.claims)
+			got, err := p.Decide(context.Background(), tc.contest, tc.claims, model.SurfaceParticipate)
 			if tc.wantErr {
 				if err == nil {
 					t.Fatal("a store failure must surface, not become an access grant")
@@ -193,7 +193,7 @@ func TestDraftNeverRevealsPasswordState(t *testing.T) {
 	c.PasswordHash = testPasswordHash
 	p := newContestAccessPolicy(&accessStub{groupOK: true}, grantStub{})
 
-	got, err := p.Decide(context.Background(), c, &auth.Claims{UserID: "nobody", Role: "user"})
+	got, err := p.Decide(context.Background(), c, &auth.Claims{UserID: "nobody", Role: "user"}, model.SurfaceParticipate)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -210,11 +210,11 @@ func TestDraftNeverRevealsPasswordState(t *testing.T) {
 func TestDecisionIsStaff(t *testing.T) {
 	p := newContestAccessPolicy(&accessStub{groupOK: true}, grantStub{})
 
-	creator, _ := p.Decide(context.Background(), publishedContest(), &auth.Claims{UserID: "creator1", Role: "setter"})
+	creator, _ := p.Decide(context.Background(), publishedContest(), &auth.Claims{UserID: "creator1", Role: "setter"}, model.SurfaceParticipate)
 	if !creator.IsStaff() {
 		t.Fatal("the contest creator is staff")
 	}
-	plain, _ := p.Decide(context.Background(), publishedContest(), &auth.Claims{UserID: "u", Role: "user"})
+	plain, _ := p.Decide(context.Background(), publishedContest(), &auth.Claims{UserID: "u", Role: "user"}, model.SurfaceParticipate)
 	if plain.IsStaff() {
 		t.Fatal("an ordinary contestant is not staff")
 	}
@@ -236,7 +236,7 @@ func TestDecisionIsStaff(t *testing.T) {
 func TestUnstartedRoundIsShellOnly(t *testing.T) {
 	p := newContestAccessPolicy(&accessStub{groupOK: true}, grantStub{})
 
-	got, err := p.Decide(context.Background(), unstartedContest(), &auth.Claims{UserID: "u", Role: "user"})
+	got, err := p.Decide(context.Background(), unstartedContest(), &auth.Claims{UserID: "u", Role: "user"}, model.SurfaceParticipate)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -256,7 +256,7 @@ func TestUnstartedRoundRevealsNoOtherRestriction(t *testing.T) {
 	locked.PasswordHash = testPasswordHash
 
 	p := newContestAccessPolicy(&accessStub{groupOK: false}, grantStub{})
-	got, err := p.Decide(context.Background(), locked, &auth.Claims{UserID: "u", Role: "user"})
+	got, err := p.Decide(context.Background(), locked, &auth.Claims{UserID: "u", Role: "user"}, model.SurfaceParticipate)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -278,7 +278,7 @@ func TestUpcomingRoundYieldsShellOnly(t *testing.T) {
 	p := newContestAccessPolicy(&accessStub{groupOK: true}, grantStub{})
 
 	t.Run("anonymous gets the shell, not access", func(t *testing.T) {
-		got, err := p.Decide(context.Background(), unstartedContest(), nil)
+		got, err := p.Decide(context.Background(), unstartedContest(), nil, model.SurfaceParticipate)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -294,7 +294,7 @@ func TestUpcomingRoundYieldsShellOnly(t *testing.T) {
 		c := unstartedContest()
 		c.PasswordHash = testPasswordHash
 
-		got, err := p.Decide(context.Background(), c, &auth.Claims{UserID: "u", Role: "user"})
+		got, err := p.Decide(context.Background(), c, &auth.Claims{UserID: "u", Role: "user"}, model.SurfaceParticipate)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -307,7 +307,7 @@ func TestUpcomingRoundYieldsShellOnly(t *testing.T) {
 	})
 
 	t.Run("staff see their unstarted round as open", func(t *testing.T) {
-		got, err := p.Decide(context.Background(), unstartedContest(), &auth.Claims{UserID: "creator1", Role: "setter"})
+		got, err := p.Decide(context.Background(), unstartedContest(), &auth.Claims{UserID: "creator1", Role: "setter"}, model.SurfaceParticipate)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -324,7 +324,7 @@ func TestTesterIsStaffButNotJudge(t *testing.T) {
 	// enough to be treated as a judge.
 	p := newContestAccessPolicy(&accessStub{levels: []string{model.ContestPermissionTester}, groupOK: true}, grantStub{})
 
-	got, err := p.Decide(context.Background(), draftContest(), &auth.Claims{UserID: "t", Role: "setter"})
+	got, err := p.Decide(context.Background(), draftContest(), &auth.Claims{UserID: "t", Role: "setter"}, model.SurfaceParticipate)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

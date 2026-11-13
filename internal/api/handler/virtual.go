@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
+	"github.com/tahsinarafat/aioj/internal/model"
 	"github.com/tahsinarafat/aioj/internal/store/postgres"
 	"github.com/tahsinarafat/aioj/internal/virtual"
 )
@@ -59,7 +60,7 @@ func (h *VirtualHandler) Start(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "contest not found", http.StatusNotFound)
 		return
 	}
-	if decision, derr := h.access.Decide(r.Context(), contest, claims); derr != nil || !decision.Allowed() {
+	if decision, derr := h.access.Decide(r.Context(), contest, claims, model.SurfaceParticipate); derr != nil || !decision.Allowed() {
 		http.Error(w, "contest not found", http.StatusNotFound)
 		return
 	}

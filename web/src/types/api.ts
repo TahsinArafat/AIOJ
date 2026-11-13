@@ -3,6 +3,24 @@
  * responses not backed by internal/model structs follow the generated section.
  */
 
+/**
+ * Per-surface access. The vocabulary lives here rather than in lib/contestAccess.ts
+ * because this file has no imports by design (it is generated-shaped), and the
+ * lib re-exports these so there is exactly one definition of each.
+ */
+export type AccessAudience = 'participants' | 'public' | 'staff'
+
+export type AccessSurface =
+    | 'participate'
+    | 'problem_list'
+    | 'statement'
+    | 'pdf'
+    | 'submit'
+    | 'standings'
+
+/** `{surface: audience}`. An absent key means "inherit the base". */
+export type AccessConfig = Partial<Record<AccessSurface, AccessAudience>>
+
 export interface AIModel {
     id: string
     name: string
@@ -255,12 +273,16 @@ export interface Contest {
     pdf_enabled: boolean
     statement_hidden: boolean
     /**
-     * Whether the scoreboard has its own visibility. 'participants' (the default,
-     * and what every round did before) means watching the board is part of
-     * reading the round; 'public' means anyone may watch, including a signed-out
-     * visitor who never held the password. Content is unaffected either way.
+     * Who may reach each part of the round: {surface: audience}.
+     *
+     * An ABSENT key means "inherit", which is not the same as a stored default —
+     * the map only ever records a deliberate override, so an empty object is a
+     * round that behaves exactly as it did before this setting existed. Read it
+     * through the helper in lib/contestAccess.ts rather than indexing directly, or
+     * you will treat "inherit" and "participants" as different things when they
+     * resolve the same way.
      */
-    scoreboard_visibility: 'participants' | 'public'
+    access_config?: AccessConfig
     group_id?: string
     rating_calculated: boolean
     created_by: string

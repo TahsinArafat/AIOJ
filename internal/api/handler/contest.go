@@ -249,17 +249,14 @@ func (h *ContestHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// The board's visibility is validated at the boundary, like every other enum on
-	// this DTO: a bad value becomes a 400 with a reason rather than a 500 from the
-	// CHECK constraint. An omitted field on create means "the default", which is a
-	// participants-only board — the behaviour every round had before the column.
-	sbVisibility := model.ScoreboardParticipants
-	if req.ScoreboardVisibility != nil {
-		if !model.ValidScoreboardVisibility(*req.ScoreboardVisibility) {
-			http.Error(w, "scoreboard_visibility must be 'participants' or 'public'", http.StatusBadRequest)
-			return
-		}
-		sbVisibility = *req.ScoreboardVisibility
+	// Every surface audience is validated at the boundary, like every other enum on
+	// this DTO: a bad key or value becomes a 400 with a reason rather than a
+	// silently-dropped entry. An omitted map on create means "every surface inherits",
+	// which is the behaviour every round had before this setting existed.
+	accessConfig, err := validateAccessConfig(req.AccessConfig)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 
 	c := &model.Contest{
@@ -276,7 +273,7 @@ func (h *ContestHandler) Create(w http.ResponseWriter, r *http.Request) {
 		Description:          req.Description,
 		Status:               initialContestStatus(claims.Role),
 		Visible:              claims.Role == "admin",
-		ScoreboardVisibility: sbVisibility,
+		AccessConfig:         accessConfig,
 		GroupID:              req.GroupID,
 		CreatedBy:            claims.UserID,
 		RegistrationRequired: derefBool(req.RegistrationRequired, false),
@@ -337,17 +334,17 @@ func (h *ContestHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	// This one surface asks for the *shell*: an upcoming round must render its
 	// title, its times and a countdown, and refusing it here is what showed
 	// "Contest not found" on a contest that existed and had merely not begun.
-	viewer, ok := h.requireContestShellAccess(w, r, c, false)
+	viewer, ok := h.requireContestPageAccess(w, r, c, false)
 	if !ok {
 		return
 	}
-	claims := viewer.claims
+	claims := viewer.access.claims
 	userID := ""
 	if claims != nil {
 		userID = claims.UserID
 	}
-	isManager := viewer.decision.IsStaff()
-	upcoming := viewer.decision.IsUpcoming()
+	isManager := viewer.access.decision.IsStaff()
+	upcoming := viewer.access.decision.IsUpcoming()
 	now := time.Now()
 
 	// The problem list is part of the round's content, not its shell, so it waits
@@ -355,8 +352,16 @@ func (h *ContestHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	// before it opens, and it would be incoherent to publish them while every
 	// statement behind them refuses to open. An empty slice, not nil, so the wire
 	// shape stays the same for a client that expects a list.
+	//
+	// Whether to serve it at all is the problem-list surface's own answer, already
+	// resolved by requireContestPageAccess — including the case this page would
+	// otherwise get wrong, where the round publishes its list and nothing else, so
+	// the page opens for the list while the round's content stays closed. Deciding
+	// it there rather than here is what keeps the page's admission rule and its
+	// body in agreement: two computations of one question is how a page ends up
+	// admitting a caller and then rendering them nothing.
 	problems := []model.ContestProblem{}
-	if !upcoming {
+	if viewer.showProblems {
 		problems, _ = h.store.GetProblems(r.Context(), c.ID)
 	}
 
@@ -408,7 +413,7 @@ func (h *ContestHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 		// for admins only. These are the same two verdicts the access policy
 		// already computed, so the page and the server cannot disagree.
 		"is_staff": isManager,
-		"is_judge": viewer.decision.IsJudge(),
+		"is_judge": viewer.access.decision.IsJudge(),
 	})
 }
 
@@ -521,16 +526,25 @@ func (h *ContestHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if req.StatementHidden != nil {
 		c.StatementHidden = *req.StatementHidden
 	}
-	// The scoreboard axis. Pointer semantics like every other optional field here:
-	// nil leaves the stored value alone, so an unrelated settings save cannot
-	// silently publish (or unpublish) a round's board. Validated rather than
-	// trusted because the column has a CHECK and a 400 with a reason beats a 500.
-	if req.ScoreboardVisibility != nil {
-		if !model.ValidScoreboardVisibility(*req.ScoreboardVisibility) {
-			http.Error(w, "scoreboard_visibility must be 'participants' or 'public'", http.StatusBadRequest)
+	// The per-surface audiences. Presence decides, like the nullable fields above:
+	// an absent key leaves the stored map alone so an unrelated settings save (a
+	// rename) cannot silently republish or privatize a surface, while an explicit
+	// `"access_config": {}` means "every surface back to inheriting the base gate".
+	//
+	// Both are real requests and both decode to a nil map from a map-typed field,
+	// which is why this reads the key set rather than the value — the same trap
+	// that made max_participants unclearable.
+	if _, sent := present["access_config"]; sent {
+		next, err := validateAccessConfig(req.AccessConfig)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		c.ScoreboardVisibility = *req.ScoreboardVisibility
+		// No cache invalidation here. Update drops the round's cached board
+		// unconditionally, a few lines below, so a changed audience is already
+		// covered — and computing whether it changed just to maybe-invalidate would
+		// be a second place that has to know what the cache depends on.
+		c.AccessConfig = next
 	}
 	if req.UpsolvingEnabled != nil {
 		c.UpsolvingEnabled = *req.UpsolvingEnabled
@@ -625,6 +639,35 @@ type scoreboardProblem struct {
 	Score     int    `json:"score"`
 }
 
+// validateAccessConfig checks a caller-supplied surface map and returns the
+// normalized form, or an error naming the offending entry.
+//
+// Rejecting rather than dropping is the opposite of what model.NormalizeAccessConfig
+// does at the store boundary, and the difference is who supplied the value. Here it
+// is a user request, so a typo deserves a 400 that names it — silently dropping
+// "standings: publc" would leave the setter looking at a board that is still
+// private with no indication why. At the store the value may have been written by
+// an older build or by hand, there is no response to write to, and falling back is
+// the only option that does not make a surface unreachable.
+//
+// An error names the surface and the audience, not just "invalid access_config":
+// the caller is a setter staring at a six-row table, and "unknown audience for
+// surface 'standings'" is actionable where a bare 400 is not.
+func validateAccessConfig(in model.AccessConfig) (model.AccessConfig, error) {
+	out := model.AccessConfig{}
+	for surface, audience := range in {
+		if !model.ValidAccessSurface(surface) {
+			return nil, fmt.Errorf("unknown access surface %q", surface)
+		}
+		if !model.ValidAccessAudience(audience) {
+			return nil, fmt.Errorf("audience for surface %q must be one of %q, %q, %q",
+				surface, model.AccessParticipants, model.AccessPublic, model.AccessStaff)
+		}
+		out[surface] = audience
+	}
+	return out, nil
+}
+
 func (h *ContestHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	contest, err := h.store.GetByID(r.Context(), id)
@@ -641,7 +684,7 @@ func (h *ContestHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 	// keep its statements private — that is what an onsite final or a hiring round
 	// is — and gating the board on content made publishing the result impossible
 	// without publishing the problems too.
-	viewer, ok := h.requireContestSpectateAccess(w, r, contest, false)
+	viewer, ok := h.requireContestSurfaceAccess(w, r, contest, model.SurfaceStandings, false)
 	if !ok {
 		return
 	}
@@ -1450,7 +1493,12 @@ func (h *ContestHandler) DownloadPDF(w http.ResponseWriter, r *http.Request) {
 	// not-yet-started contest must not hand its statements to an anonymous visitor
 	// just because statement_hidden defaults to false. Answering 404 (not 403) keeps
 	// a draft's existence unconfirmed.
-	viewer, ok := h.requireContestAccess(w, r, contest, true)
+	//
+	// Its own surface, not the statement's. Printing is a different act from
+	// browsing: a round may hand out a booklet at the door while keeping the
+	// statements closed in the browser, which is the case that made this
+	// separable from pdf_enabled below.
+	viewer, ok := h.requireContestSurfaceAccess(w, r, contest, model.SurfacePDF, true)
 	if !ok {
 		return
 	}
@@ -1498,13 +1546,13 @@ func (h *ContestHandler) ContestStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Per-problem stats carry the problem title, so this stays on the CONTENT gate
-	// and deliberately does not follow the scoreboard onto the spectate one. "Public
-	// like the scoreboard" stopped being true the moment a round could publish its
-	// board and keep its statements private: the board's title is stripped for a
-	// non-participant (see Scoreboard), and a stats endpoint that handed the same
-	// title out would undo that with one request.
-	if _, ok := h.requireContestAccess(w, r, contest, true); !ok {
+	// Per-problem stats carry the problem title and the round-wide solve count, so
+	// this asks the problem-list surface — not the statement's, and not the
+	// standalone board's. "Public like the scoreboard" stopped being true the moment
+	// a round could publish its board and keep its problem names private: the board
+	// carries letters only for every caller (see boardProblems), and a stats
+	// endpoint that handed the titles out would undo that with one request.
+	if _, ok := h.requireContestSurfaceAccess(w, r, contest, model.SurfaceProblemList, true); !ok {
 		return
 	}
 

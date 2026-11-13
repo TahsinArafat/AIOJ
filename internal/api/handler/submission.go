@@ -969,12 +969,12 @@ func (h *SubmissionHandler) RecheckRemote(w http.ResponseWriter, r *http.Request
 // problem at all (submit, or /run it). It writes the response and returns an error
 // when access is refused, so callers just `if err != nil { return }`.
 //
-// Kept separate from requireContestAccess because a refused submission has to
+// Kept separate from requireContestSurfaceAccess because a refused submission has to
 // distinguish "unlock it" from "forbidden": a contestant who simply has not typed
 // the password yet needs a 403 password_required so the UI can prompt, whereas a
 // non-member of a restricted group gets a flat refusal they cannot act on.
 func (h *SubmissionHandler) requireContestSubmissionAccess(w http.ResponseWriter, r *http.Request, contest *model.Contest) error {
-	decision, err := h.access.Decide(r.Context(), contest, middleware.GetUserClaims(r))
+	decision, err := h.access.Decide(r.Context(), contest, middleware.GetUserClaims(r), model.SurfaceSubmit)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return err

@@ -14,7 +14,7 @@ import (
 /**
  * Watching a round is not reading it.
  *
- * DecideSpectate is the second axis: a round can keep its statements private
+ * The standings surface is a second axis: a round can keep its statements private
  * (password, group) and still publish its scoreboard. The cases below are the
  * boundary between those two answers, and each one is a way the feature goes
  * wrong if the split is drawn in the wrong place.
@@ -28,18 +28,18 @@ import (
 
 // withPublicBoard marks a contest as publishing its scoreboard.
 func withPublicBoard(c *model.Contest) *model.Contest {
-	c.ScoreboardVisibility = model.ScoreboardPublic
+	c.AccessConfig = model.AccessConfig{model.SurfaceStandings: model.AccessPublic}
 	return c
 }
 
 // withParticipantsBoard is the default a round has before anyone touches the
 // setting, spelled out so a test that means "the old behaviour" says so.
 func withParticipantsBoard(c *model.Contest) *model.Contest {
-	c.ScoreboardVisibility = model.ScoreboardParticipants
+	c.AccessConfig = model.AccessConfig{model.SurfaceStandings: model.AccessParticipants}
 	return c
 }
 
-func TestContestAccessPolicyDecideSpectate(t *testing.T) {
+func TestContestAccessPolicyStandingsSurface(t *testing.T) {
 	user := &auth.Claims{UserID: "u", Role: "user"}
 
 	cases := []struct {
@@ -122,7 +122,7 @@ func TestContestAccessPolicyDecideSpectate(t *testing.T) {
 			// The zero value behaves like participants: a contest built by a caller
 			// that predates the column, or a fixture that omits it, must not publish
 			// its board by accident.
-			name:    "an unset scoreboard_visibility is participant-only",
+			name:    "an unset standings audience is participant-only",
 			contest: passwordContest(),
 			claims:  user, stub: &accessStub{groupOK: true}, grant: grantStub{granted: false},
 			want: accessPasswordRequired, wantContent: false,
@@ -189,7 +189,7 @@ func TestContestAccessPolicyDecideSpectate(t *testing.T) {
 			}
 			p := newContestAccessPolicy(stub, tc.grant)
 
-			got, err := p.DecideSpectate(context.Background(), tc.contest, tc.claims)
+			got, err := p.Decide(context.Background(), tc.contest, tc.claims, model.SurfaceStandings)
 			if tc.wantErr {
 				if err == nil {
 					t.Fatal("a store failure must surface, not become a watchable board")
@@ -214,15 +214,15 @@ func TestContestAccessPolicyDecideSpectate(t *testing.T) {
  * The two axes must be reachable in one direction only.
  *
  * A public board opens the scoreboard; it must not open the statements. This is
- * the regression test for the mistake that would make the feature dangerous — if
- * DecideSpectate were ever wired to a content surface, every private round with a
- * public board would hand out its problems.
+ * the regression test for the mistake that would make the feature dangerous: if
+ * the standings surface were ever wired to a content surface, every private round
+ * with a public board would hand out its problems.
  */
 func TestPublicBoardDoesNotOpenContent(t *testing.T) {
 	c := withPublicBoard(passwordContest())
 	p := newContestAccessPolicy(&accessStub{groupOK: true}, grantStub{granted: false})
 
-	content, err := p.Decide(context.Background(), c, &auth.Claims{UserID: "u", Role: "user"})
+	content, err := p.Decide(context.Background(), c, &auth.Claims{UserID: "u", Role: "user"}, model.SurfaceParticipate)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -233,7 +233,7 @@ func TestPublicBoardDoesNotOpenContent(t *testing.T) {
 		t.Fatal("the content gate must still ask for the password")
 	}
 
-	spectate, err := p.DecideSpectate(context.Background(), c, &auth.Claims{UserID: "u", Role: "user"})
+	spectate, err := p.Decide(context.Background(), c, &auth.Claims{UserID: "u", Role: "user"}, model.SurfaceStandings)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -249,7 +249,7 @@ func TestPublicBoardKeepsJudgePrivilegeNarrow(t *testing.T) {
 	c := withPublicBoard(publishedContest())
 	p := newContestAccessPolicy(&accessStub{levels: []string{model.ContestPermissionTester}}, grantStub{})
 
-	got, err := p.DecideSpectate(context.Background(), c, &auth.Claims{UserID: "t", Role: "user"})
+	got, err := p.Decide(context.Background(), c, &auth.Claims{UserID: "t", Role: "user"}, model.SurfaceStandings)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -265,7 +265,7 @@ func TestPublicBoardKeepsJudgePrivilegeNarrow(t *testing.T) {
  * The handler gate must refuse what the policy refuses.
  *
  * This test exists because the policy-only tests above did not catch a real bug:
- * requireContestSpectateAccess treated "upcoming" as "let them through", so a
+ * the old spectate gate treated "upcoming" as "let them through", so a
  * published-but-unstarted round served its board to anyone. The policy was
  * correct the whole time — the handler simply did not enforce its answer.
  *
@@ -309,7 +309,7 @@ func TestSpectateHandlerEnforcesPolicy(t *testing.T) {
 			h.rebuildWithGrants(&accessStub{groupOK: true}, grantStub{granted: false})
 
 			rec := httptest.NewRecorder()
-			_, ok := h.requireContestSpectateAccess(rec, requestFor("c1"), tc.contest, false)
+			_, ok := h.requireContestSurfaceAccess(rec, requestFor("c1"), tc.contest, model.SurfaceStandings, false)
 			if ok != tc.wantOK {
 				t.Fatalf("gate admitted=%v, want %v (code=%d body=%q) — %s",
 					ok, tc.wantOK, rec.Code, rec.Body.String(), tc.description)
@@ -336,7 +336,7 @@ func TestAnonymousSpectatorWatchesAPrivateRoundsPublicBoard(t *testing.T) {
 	private := withPublicBoard(passwordContest())
 	p := newContestAccessPolicy(&accessStub{groupOK: true}, grantStub{granted: false})
 
-	spectate, err := p.DecideSpectate(context.Background(), private, nil)
+	spectate, err := p.Decide(context.Background(), private, nil, model.SurfaceStandings)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -345,7 +345,7 @@ func TestAnonymousSpectatorWatchesAPrivateRoundsPublicBoard(t *testing.T) {
 	}
 	// The board is watchable, the round is not readable: that pair is the whole
 	// point, and losing the second half would publish the statements.
-	content, err := p.Decide(context.Background(), private, nil)
+	content, err := p.Decide(context.Background(), private, nil, model.SurfaceParticipate)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -355,4 +355,111 @@ func TestAnonymousSpectatorWatchesAPrivateRoundsPublicBoard(t *testing.T) {
 	if !content.NeedsPassword() {
 		t.Fatalf("content answer = %v, want password_required so the page can prompt rather than 404", content.level)
 	}
+}
+
+/**
+ * One public surface leaves the other five exactly where they were.
+ *
+ * This is the invariant the whole refactor rests on, and the one whose absence
+ * would be a security regression rather than a missing feature. Before
+ * access_config there was a single "spectate" axis, so a public board could not
+ * widen anything — there was nothing else to widen. Now that every surface has
+ * its own audience, "the board is public" must not reach the statements, the
+ * submit path or the problem list, and a gate that ignored its surface argument
+ * would leak all three with no visible symptom on the board itself.
+ *
+ * Asserted through the real gate rather than the policy, for the reason the table
+ * above documents: a rule that only exists in the policy is not a rule a request
+ * sees. Every case is a round that publishes exactly one surface, probed on all
+ * six.
+ */
+func TestOnePublicSurfaceDoesNotWidenTheOthers(t *testing.T) {
+	p := newContestAccessPolicy(&accessStub{groupOK: true}, grantStub{granted: false})
+
+	for _, published := range []string{model.SurfaceStandings, model.SurfacePDF, model.SurfaceProblemList} {
+		t.Run("only "+published+" is public", func(t *testing.T) {
+			c := passwordContest()
+			c.AccessConfig = model.AccessConfig{published: model.AccessPublic}
+
+			for _, surface := range model.AccessSurfaceKeys {
+				got, err := p.Decide(context.Background(), c, nil, surface)
+				if err != nil {
+					t.Fatalf("surface %q: unexpected error: %v", surface, err)
+				}
+				wantOpen := surface == published
+				if got.Allowed() != wantOpen {
+					t.Errorf("with %q public, surface %q allowed=%v, want %v — a public "+
+						"surface must not widen any other",
+						published, surface, got.Allowed(), wantOpen)
+				}
+			}
+		})
+	}
+
+	// And the base gate does flow down: publishing SurfaceParticipate opens every
+	// surface that has no override of its own, which is what makes "participate" a
+	// sensible default rather than a sixth thing to set.
+	t.Run("a public base opens the surfaces that inherit", func(t *testing.T) {
+		c := passwordContest()
+		c.AccessConfig = model.AccessConfig{model.SurfaceParticipate: model.AccessPublic}
+
+		for _, surface := range model.AccessSurfaceKeys {
+			got, err := p.Decide(context.Background(), c, nil, surface)
+			if err != nil {
+				t.Fatalf("surface %q: unexpected error: %v", surface, err)
+			}
+			if !got.Allowed() {
+				t.Errorf("surface %q was refused on a round whose base gate is public", surface)
+			}
+		}
+	})
+
+	// An explicit override beats the inherited base in both directions. A surface
+	// set to staff stays closed even when the base is public; a surface set to
+	// public opens even when the base is not.
+	t.Run("an override beats the base in both directions", func(t *testing.T) {
+		closed := passwordContest()
+		closed.AccessConfig = model.AccessConfig{
+			model.SurfaceParticipate: model.AccessPublic,
+			model.SurfaceStatement:   model.AccessStaff,
+		}
+		got, err := p.Decide(context.Background(), closed, nil, model.SurfaceStatement)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got.Allowed() {
+			t.Fatal("a surface set to staff was opened by a public base gate")
+		}
+
+		open := passwordContest()
+		open.AccessConfig = model.AccessConfig{model.SurfaceSubmit: model.AccessPublic}
+		got, err = p.Decide(context.Background(), open, nil, model.SurfaceSubmit)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !got.Allowed() {
+			t.Fatal("a surface set to public was closed by a participants base gate")
+		}
+	})
+
+	// Staff reach every surface whatever the audiences say. A setter checking their
+	// own round must not be locked out of the booklet because they set it to staff.
+	t.Run("staff reach every surface regardless of audience", func(t *testing.T) {
+		c := passwordContest()
+		c.AccessConfig = model.AccessConfig{
+			model.SurfacePDF:       model.AccessStaff,
+			model.SurfaceStatement: model.AccessStaff,
+		}
+		staff := &auth.Claims{UserID: "m", Role: model.RoleSetter}
+		sp := newContestAccessPolicy(&accessStub{staff: true}, grantStub{})
+		for _, surface := range model.AccessSurfaceKeys {
+			got, err := sp.Decide(context.Background(), c, staff, surface)
+			if err != nil {
+				t.Fatalf("surface %q: unexpected error: %v", surface, err)
+			}
+			if !got.Allowed() {
+				t.Errorf("staff were refused surface %q", surface)
+			}
+		}
+	})
 }

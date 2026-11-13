@@ -62,7 +62,7 @@ func TestScoreboardCacheDoesNotSeedJudgeCapabilityToSpectators(t *testing.T) {
 		IsRated: true, RatedForMin: 0, RatedForMax: 9999,
 		// A public board is what makes this reachable by a signed-out spectator,
 		// and it is the setting the round in question used.
-		ScoreboardVisibility: model.ScoreboardPublic,
+		AccessConfig: model.AccessConfig{model.SurfaceStandings: model.AccessPublic},
 	}
 	if err := contestStore.Create(ctx, c); err != nil {
 		t.Fatalf("create contest: %v", err)

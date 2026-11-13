@@ -54,7 +54,7 @@ func TestBookletRequiresAReadableContest(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			p := newContestAccessPolicy(&accessStub{staff: tc.staff, groupOK: true}, grantStub{})
-			decision, err := p.Decide(t.Context(), tc.contest, tc.claims)
+			decision, err := p.Decide(t.Context(), tc.contest, tc.claims, model.SurfacePDF)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}

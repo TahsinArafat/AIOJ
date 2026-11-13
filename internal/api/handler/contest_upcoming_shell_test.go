@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/tahsinarafat/aioj/internal/model"
 )
 
 /**
@@ -44,11 +46,11 @@ func TestShellGateAcceptsAnUpcomingRound(t *testing.T) {
 	h := upcomingAccess()
 	rec := httptest.NewRecorder()
 
-	viewer, ok := h.requireContestShellAccess(rec, requestFor("c1"), unstartedContest(), false)
+	page, ok := h.requireContestPageAccess(rec, requestFor("c1"), unstartedContest(), false)
 	if !ok {
 		t.Fatalf("shell gate refused an upcoming round: %d %s", rec.Code, rec.Body.String())
 	}
-	if !viewer.decision.IsUpcoming() {
+	if !page.access.decision.IsUpcoming() {
 		t.Fatal("the decision must say upcoming, so content is withheld")
 	}
 }
@@ -56,14 +58,14 @@ func TestShellGateAcceptsAnUpcomingRound(t *testing.T) {
 /**
  * The content gate must keep refusing it. This is the assertion that stops the
  * fix from becoming an exploit: every surface that hands out the round itself
- * asks requireContestAccess, so if upcoming ever satisfies it, the statements,
+ * asks requireContestSurfaceAccess, so if upcoming ever satisfies it, the statements,
  * the booklet, the standings and submit all open hours before the start.
  */
 func TestContentGateStillRefusesAnUpcomingRound(t *testing.T) {
 	h := upcomingAccess()
 	rec := httptest.NewRecorder()
 
-	if _, ok := h.requireContestAccess(rec, requestFor("c1"), unstartedContest(), false); ok {
+	if _, ok := h.requireContestSurfaceAccess(rec, requestFor("c1"), unstartedContest(), model.SurfaceStatement, false); ok {
 		t.Fatal("content gate must refuse an upcoming round")
 	}
 	if rec.Code != http.StatusForbidden {
@@ -87,7 +89,7 @@ func TestContentGateAnswersNotFoundForHiddenRounds(t *testing.T) {
 
 	t.Run("a draft is not confirmed to exist", func(t *testing.T) {
 		rec := httptest.NewRecorder()
-		if _, ok := h.requireContestAccess(rec, requestFor("c1"), draftContest(), true); ok {
+		if _, ok := h.requireContestSurfaceAccess(rec, requestFor("c1"), draftContest(), model.SurfaceStatement, true); ok {
 			t.Fatal("content gate must not open a draft")
 		}
 		if rec.Code != http.StatusNotFound {
@@ -97,7 +99,7 @@ func TestContentGateAnswersNotFoundForHiddenRounds(t *testing.T) {
 
 	t.Run("an unstarted round is not confirmed to exist", func(t *testing.T) {
 		rec := httptest.NewRecorder()
-		if _, ok := h.requireContestAccess(rec, requestFor("c1"), unstartedContest(), true); ok {
+		if _, ok := h.requireContestSurfaceAccess(rec, requestFor("c1"), unstartedContest(), model.SurfaceStatement, true); ok {
 			t.Fatal("content gate must not open an upcoming round")
 		}
 		if rec.Code != http.StatusNotFound {
@@ -109,7 +111,7 @@ func TestContentGateAnswersNotFoundForHiddenRounds(t *testing.T) {
 	// round, or the contest page goes back to rendering "Contest not found".
 	t.Run("the shell of an unstarted round is not a 404", func(t *testing.T) {
 		rec := httptest.NewRecorder()
-		if _, ok := h.requireContestShellAccess(rec, requestFor("c1"), unstartedContest(), true); !ok {
+		if _, ok := h.requireContestPageAccess(rec, requestFor("c1"), unstartedContest(), true); !ok {
 			t.Fatalf("shell gate refused an upcoming round: %d %s", rec.Code, rec.Body.String())
 		}
 	})
@@ -123,7 +125,7 @@ func TestBothGatesRefuseADraft(t *testing.T) {
 	h := upcomingAccess()
 
 	rec := httptest.NewRecorder()
-	if _, ok := h.requireContestShellAccess(rec, requestFor("c1"), draft, false); ok {
+	if _, ok := h.requireContestPageAccess(rec, requestFor("c1"), draft, false); ok {
 		t.Fatal("the shell gate must not open a draft")
 	}
 	if rec.Code != http.StatusForbidden {
@@ -131,7 +133,7 @@ func TestBothGatesRefuseADraft(t *testing.T) {
 	}
 
 	rec = httptest.NewRecorder()
-	if _, ok := h.requireContestAccess(rec, requestFor("c1"), draft, false); ok {
+	if _, ok := h.requireContestSurfaceAccess(rec, requestFor("c1"), draft, model.SurfaceStatement, false); ok {
 		t.Fatal("the content gate must not open a draft")
 	}
 }
@@ -143,12 +145,12 @@ func TestStartedRoundPassesBothGates(t *testing.T) {
 	h := upcomingAccess()
 
 	rec := httptest.NewRecorder()
-	if _, ok := h.requireContestAccess(rec, requestFor("c1"), started, false); !ok {
+	if _, ok := h.requireContestSurfaceAccess(rec, requestFor("c1"), started, model.SurfaceStatement, false); !ok {
 		t.Fatalf("content gate refused a started round: %d %s", rec.Code, rec.Body.String())
 	}
 
 	rec = httptest.NewRecorder()
-	if _, ok := h.requireContestShellAccess(rec, requestFor("c1"), started, false); !ok {
+	if _, ok := h.requireContestPageAccess(rec, requestFor("c1"), started, false); !ok {
 		t.Fatalf("shell gate refused a started round: %d %s", rec.Code, rec.Body.String())
 	}
 }

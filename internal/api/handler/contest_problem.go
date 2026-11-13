@@ -63,7 +63,12 @@ func (h *ContestProblemHandler) GetByIndex(w http.ResponseWriter, r *http.Reques
 	// visible/started rule only, so a group-restricted or password-protected round
 	// handed its problems to anyone who knew the id. 404 rather than 403 so a draft
 	// is not confirmed to exist.
-	viewer, ok := h.requireContestAccess(w, r, contest, true)
+	//
+	// Its own surface, which a setter can widen independently of the problem list:
+	// a teaser round publishes which problems exist without publishing what they
+	// ask, and the reverse (statements open, list closed) is not useful but is not
+	// harmful either — the list is a subset of what a statement reveals.
+	viewer, ok := h.requireContestSurfaceAccess(w, r, contest, model.SurfaceStatement, true)
 	if !ok {
 		return
 	}
