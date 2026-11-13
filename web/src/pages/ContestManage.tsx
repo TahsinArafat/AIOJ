@@ -27,7 +27,7 @@ import {
     SURFACES, AUDIENCE_LABELS, surfaceAudience, isInherited,
     setSurface, clearSurface, publicSurfaces, sanitizeAccessConfig,
 } from '../lib/contestAccess'
-import type { AccessConfig } from '../lib/contestAccess'
+import type { AccessAudience, AccessConfig } from '../lib/contestAccess'
 
 function indexLabel(i: number): string {
     let s = ''
@@ -1165,6 +1165,11 @@ function SettingsTab({ contestId }: { contestId: string }) {
         // before this setting existed. Not a "scoreboard_visibility" string any
         // more — the board is one row of this table now.
         access_config: {} as AccessConfig,
+        // Whether the round appears in the catalog and in search. Defaults to
+        // true, matching the server's column default and every round that existed
+        // before this field — an unlisted-by-default would hide the whole site's
+        // back catalogue on the first save.
+        listed: true,
         group_id: '',
         division: 0,
         registration_required: false, registration_deadline: '', max_participants: '',
@@ -1215,6 +1220,10 @@ function SettingsTab({ contestId }: { contestId: string }) {
                 // server, or a hand-edited row, must not put an unknown audience
                 // into the form and then have the save round-trip it back.
                 access_config: sanitizeAccessConfig(c.access_config),
+                // ?? true, not || or a bare read: an older server omits the field
+                // entirely and `undefined` must not render as "unlisted" — that
+                // would show a listing toggle that disagrees with the catalog.
+                listed: c.listed ?? true,
                 group_id: c.group_id || '',
                 division: c.division ?? 0,
                 registration_required: c.registration_required ?? false,
@@ -1303,6 +1312,11 @@ function SettingsTab({ contestId }: { contestId: string }) {
                 // mean "leave the audiences alone" and their reset would be
                 // silently dropped.
                 access_config: sanitizeAccessConfig(form.access_config),
+                // Always sent. Unlike a nullable field there is no "clear" state
+                // here — listing is a yes/no — so there is no presence dance; the
+                // server only needs the pointer to tell a deliberate unlist from an
+                // omitted key in some other client's save.
+                listed: form.listed,
                 pdf_enabled: form.pdf_enabled,
                 statement_hidden: form.statement_hidden,
                 upsolving_enabled: form.upsolving_enabled,
@@ -1441,6 +1455,32 @@ function SettingsTab({ contestId }: { contestId: string }) {
                     </select>
                 </div>
 
+                {/* Listing. Placed here, beside Visibility Mode, because the two are
+                    the pair a setter has to tell apart: "who can open this round"
+                    and "does the world know it exists". Publishing a round used to
+                    answer both at once, so the only way to keep a round out of the
+                    catalog was to unpublish it — which also closed it to the people
+                    it was for. */}
+                <div className="rounded-lg border border-hairline-strong px-4 py-3">
+                    <label className="flex items-start gap-3 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            aria-label="List in the public contests list"
+                            checked={form.listed}
+                            onChange={e => setForm(p => ({ ...p, listed: e.target.checked }))}
+                            className="mt-0.5 rounded border-hairline-strong text-brand focus-visible:outline-[var(--ring)]"
+                        />
+                        <span>
+                            <span className="block text-sm font-medium text-ink">List in the public contests list</span>
+                            <span className="block text-xs text-muted-soft mt-0.5">
+                                {form.listed
+                                    ? 'The round appears in the contest list and in search. Turn this off for an onsite, school or invitation-only round.'
+                                    : 'The round is not in the contest list or search. Anyone holding its link can still open it, under the access rules above.'}
+                            </span>
+                        </span>
+                    </label>
+                </div>
+
                 {/* Per-surface access. Replaces the single "Scoreboard
                     Visibility" select, which was the first surface to need its
                     own audience and turned out not to be the last: a round's
@@ -1509,13 +1549,19 @@ function SettingsTab({ contestId }: { contestId: string }) {
                                                             ...p,
                                                             access_config: v === ''
                                                                 ? clearSurface(p.access_config, surface.key)
-                                                                : setSurface(p.access_config, surface.key, v as 'participants' | 'public' | 'staff'),
+                                                                : setSurface(p.access_config, surface.key, v as AccessAudience),
                                                         }))
                                                     }}
                                                     className="w-full border border-hairline-strong rounded-lg px-2.5 py-1.5 text-sm focus:ring-2 focus-visible:outline-[var(--ring)] focus:border-brand bg-surface"
                                                 >
                                                     <option value="">Same as the round ({AUDIENCE_LABELS[surfaceAudience(form.access_config, 'participate')].toLowerCase()})</option>
-                                                    <option value="participants">Participants only</option>
+                                                    <option value="open">Anyone who can open the round</option>
+                                                    {/* Not offered for submit: requiring an entrant in order to
+                                                        submit deadlocks the first submission of a round, because
+                                                        submitting is one of the two ways to become one. The server
+                                                        answers 400 for it, so showing it would be showing an option
+                                                        that cannot be saved. */}
+                                                    {surface.allowsParticipants && <option value="participants">Participants only</option>}
                                                     <option value="public">Anyone</option>
                                                     {surface.allowsStaff && <option value="staff">Organizers only</option>}
                                                 </select>
@@ -1536,10 +1582,19 @@ function SettingsTab({ contestId }: { contestId: string }) {
                     <p className="text-xs text-muted-soft mt-2">
                         {(() => {
                             const open = publicSurfaces(form.access_config)
-                            if (open.length === 0) {
-                                return 'Nothing is published beyond the people who can open the round. A round like this stays out of the contest list and search.'
-                            }
-                            return `Anyone with the link can reach: ${open.map(s => s.label.toLowerCase()).join(', ')}. The round stays out of the contest list and search either way, so a published surface is reachable by its direct link and is not discoverable.`
+                            // Whether the round is discoverable is a separate setting
+                            // (List in the public contests list), so this line says
+                            // what the audiences do and defers the listing question
+                            // to the control that owns it. Before that control
+                            // existed this text asserted the round stayed out of the
+                            // list, which was true only because publishing and
+                            // listing were the same bit.
+                            const reach = open.length === 0
+                                ? 'Nothing here is public: only the people who can open the round reach any of it.'
+                                : `Anyone with the link can reach: ${open.map(s => s.label.toLowerCase()).join(', ')}.`
+                            return form.listed
+                                ? `${reach} This round is listed, so it also appears in the contest list and in search.`
+                                : `${reach} This round is unlisted: reachable by its direct link, and not in the contest list or search.`
                         })()}
                     </p>
                 </div>

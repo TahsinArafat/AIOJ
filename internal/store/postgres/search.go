@@ -83,9 +83,9 @@ func (s *SearchStore) SearchContests(ctx context.Context, query string, limit in
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, display_id, slug, title, type, start_time, end_time, visible, description,
 		        registration_required, registration_deadline, max_participants, division,
-		        created_by, created_at
+		        created_by, created_at, listed
 		 FROM contests
-		 WHERE visible = true AND title ILIKE '%' || $1 || '%' AND `+visibility+`
+		 WHERE visible = true AND listed = true AND title ILIKE '%' || $1 || '%' AND `+visibility+`
 		 ORDER BY title
 		 LIMIT $2`,
 		query, limit, viewerID)
@@ -100,7 +100,7 @@ func (s *SearchStore) SearchContests(ctx context.Context, query string, limit in
 		var slug sql.NullString
 		if err := rows.Scan(&c.ID, &c.DisplayID, &slug, &c.Title, &c.Type, &c.StartTime, &c.EndTime,
 			&c.Visible, &c.Description, &c.RegistrationRequired, &c.RegistrationDeadline,
-			&c.MaxParticipants, &c.Division, &c.CreatedBy, &c.CreatedAt); err != nil {
+			&c.MaxParticipants, &c.Division, &c.CreatedBy, &c.CreatedAt, &c.Listed); err != nil {
 			return nil, err
 		}
 		if slug.Valid {
