@@ -1541,7 +1541,6 @@ export interface ProblemMeta {
     problem_id: string
     index: string
     score: number
-    title?: string
 }
 export interface ContestInfo {
     id: string

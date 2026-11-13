@@ -609,6 +609,22 @@ func (h *ContestHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// scoreboardProblem is the standings header as it goes over the wire: the letter,
+// the point value, and the id the cells key on. Deliberately NOT
+// model.ContestProblem, which also carries Title and Slug — both of which are the
+// problem's name, and neither of which a standings reader needs.
+//
+// A separate type is the point. The board used to serialize the store row and
+// blank Title for a caller who could not read the round, which left Slug in place
+// and leaked every problem's name to a signed-out visitor. Enumerating the safe
+// fields here means a field added to the model later cannot appear on the board by
+// default; it has to be added to this struct on purpose.
+type scoreboardProblem struct {
+	ProblemID string `json:"problem_id"`
+	Index     string `json:"index"`
+	Score     int    `json:"score"`
+}
+
 func (h *ContestHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	contest, err := h.store.GetByID(r.Context(), id)
@@ -634,42 +650,37 @@ func (h *ContestHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 	// (manager|judge) and is preserved here deliberately.
 	isJudge := viewer.decision.IsJudge()
 	canSeeJudge := isJudge // preserve original capability before view override
-	// A spectator admitted by a public board is not necessarily a participant. The
-	// board payload is harmless for them — letters, solves, times — with one
-	// exception: the problem title in the header is one field away from the
-	// statement, so it is stripped below for anyone who cannot read the round.
-	canReadRound := viewer.decision.contentAllowed
-
 	// Allow admins/judges to explicitly request the public (frozen) view via ?view=public
 	viewParam := r.URL.Query().Get("view")
 	if viewParam == "public" && isJudge {
 		isJudge = false
 	}
 
-	// Check cache (key: contestID:view:page:limit:judge:titles:canSeeJudge)
+	// Check cache (key: contestID:view:page:limit:judge:canSeeJudge)
 	pageStr := r.URL.Query().Get("page")
 	limitStr := r.URL.Query().Get("limit")
 	// isJudge belongs in the key: a judge sees past the freeze and gets
 	// is_judge:true, so without it the first judge to load the page seeded the
 	// unfrozen board for every anonymous visitor until the entry expired.
 	//
-	// canReadRound belongs in the key for the same reason: it decides whether the
-	// problem titles are in the body, so without it the first participant to load
-	// a public board would have published the titles to every spectator with it.
-	//
 	// canSeeJudge belongs in the key and is the one that was missed. It reports
 	// whether the CALLER may switch to the judge view, and it survives the
 	// ?view=public override above: a judge asking for the public board gets
 	// is_judge=false with can_see_judge=true, while an anonymous spectator on a
-	// public round gets the same is_judge=false, the same view=public, and — since
-	// an unrestricted round is readable by anyone — the same canReadRound=true.
-	// Every other component of the key matched, so the judge's entry was served to
-	// anonymous visitors, and the standings page rendered its "Judge View" toggle
-	// to people who had no judge privilege at all. Verified against a live round:
-	// an anonymous request for ?view=public returned can_see_judge=true from a HIT.
+	// public round gets the same is_judge=false, the same view=public, and the
+	// same canReadRound. Every other component of the key matched, so the judge's
+	// entry was served to anonymous visitors, and the standings page rendered its
+	// "Judge View" toggle to people who had no judge privilege at all. Verified
+	// against a live round: an anonymous request for ?view=public returned
+	// can_see_judge=true from a HIT.
+	//
+	// contentAllowed used to be a component too, back when it decided whether the
+	// problem titles were in the body. The board now carries letters only for every
+	// caller (see boardProblems below), so it no longer varies the response and the
+	// slot is gone: keeping it would have stored the same bytes twice under two
+	// keys, for two callers who now get identical boards.
 	cacheKey := contest.ID + ":" + viewParam + ":" + pageStr + ":" + limitStr + ":" +
-		strconv.FormatBool(isJudge) + ":" + strconv.FormatBool(canReadRound) + ":" +
-		strconv.FormatBool(canSeeJudge)
+		strconv.FormatBool(isJudge) + ":" + strconv.FormatBool(canSeeJudge)
 	if cached, ok := h.cache.get(cacheKey); ok {
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("X-Cache", "HIT")
@@ -679,14 +690,28 @@ func (h *ContestHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 
 	problems, _ := h.store.GetProblems(r.Context(), contest.ID)
 
-	// A title is one field away from the statement, so a caller who cannot read the
-	// round does not get one. The board keeps everything it actually needs: the
-	// letter, the score, the per-cell solve state. Done here rather than at the
-	// response literal so nothing downstream — a future column, a different
-	// serializer — can reintroduce the field by accident.
-	if !canReadRound {
-		for i := range problems {
-			problems[i].Title = ""
+	// The board carries letters, never names.
+	//
+	// A title is one field away from the statement — and so is its slug, which is
+	// derived from the title at create time and is therefore the name in URL
+	// clothing. Blanking Title alone was not enough: the response still serialized
+	// slug, so a signed-out visitor could read every problem's name straight off
+	// the standings JSON. Confirmed on the live round, where an anonymous GET
+	// returned {"index":"B","slug":"common-binary-harvest"} and the rest.
+	//
+	// So model.ContestProblem is no longer serialized here at all. The response
+	// carries a narrow projection of the three fields a standings table renders,
+	// which means a field added to the model later cannot reach this payload by
+	// accident. (Slug is populated by GetProblems for the booklet and the
+	// problem-list link; it is this response, not that query, that must not carry
+	// it.) boardProblems is the only projection of these rows that leaves the
+	// process, so the strip is by construction rather than by remembering.
+	boardProblems := make([]scoreboardProblem, len(problems))
+	for i, p := range problems {
+		boardProblems[i] = scoreboardProblem{
+			ProblemID: p.ProblemID,
+			Index:     p.Index,
+			Score:     p.Score,
 		}
 	}
 
@@ -904,7 +929,7 @@ func (h *ContestHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 	contest.RatingCalculated = len(ratingsForSB) > 0
 
 	respondData := map[string]interface{}{
-		"entries": pagedEntries, "problems": problems,
+		"entries": pagedEntries, "problems": boardProblems,
 		"frozen": frozen, "contest": contest,
 		"is_judge": isJudge, "can_see_judge": canSeeJudge,
 		"pagination": map[string]interface{}{

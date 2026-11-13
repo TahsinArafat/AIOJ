@@ -31,11 +31,18 @@ interface ScoreboardEntry {
   problems: Record<string, ProblemCell>;
 }
 
+/**
+ * One column header on the board: the letter and its point value.
+ *
+ * The API deliberately does NOT send the problem's title or slug. Both are the
+ * problem's name — the slug is generated from the title — and the standings are
+ * watchable by people who are not in the round, so the name is the one fact that
+ * would give the statement away. The board identifies problems by letter.
+ */
 interface ProblemMeta {
   problem_id: string;
   index: string;
   score: number;
-  title?: string;
 }
 
 interface ContestInfo {
@@ -257,10 +264,6 @@ export default function ContestScoreboard() {
   const oi = isOI(contest.format);
   const problemIndices = problems.map((p) => p.index).sort();
 
-  // Build a map from index to problem meta
-  const problemMap = new Map<string, ProblemMeta>();
-  problems.forEach((p) => problemMap.set(p.index, p));
-
   return (
     <div>
       {/* Back link */}
@@ -352,15 +355,9 @@ export default function ContestScoreboard() {
                 <th className="px-3 py-2.5 text-center font-bold w-28">Rating</th>
               )}
               {problemIndices.map((idx) => {
-                const pm = problemMap.get(idx);
                 return (
                   <th key={idx} className="px-2 py-2.5 text-center font-bold w-[72px]">
                     <div className="text-sm">{idx}</div>
-                    {/* The header row sits on the dark code surface, so the
-                        light-theme `text-muted` grey would be unreadable here. */}
-                    {pm?.title && (
-                      <div className="text-[11px] font-normal text-code-ink/70 truncate max-w-[68px]" title={pm.title}>{pm.title}</div>
-                    )}
                   </th>
                 );
               })}

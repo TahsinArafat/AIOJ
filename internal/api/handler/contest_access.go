@@ -70,10 +70,16 @@ type contestAccessDecision struct {
 	// freeze, which is exactly the leak the freeze exists to prevent.
 	isJudge bool
 	// contentAllowed records what the CONTENT pipeline answered, which for a
-	// spectate decision is not the same as whether the caller may watch. A public
-	// board is watchable by somebody who cannot open a single statement, and the
-	// scoreboard has to tell those two callers apart: a non-participant spectator
-	// gets the board without the problem titles.
+	// spectate decision is not the same as whether the caller may watch: a public
+	// board is watchable by somebody who cannot open a single statement.
+	//
+	// The scoreboard used to read this to decide whether to strip the problem
+	// titles off the board. It no longer does — the board carries letters only, for
+	// every caller — so nothing in production consumes this field today. It is kept
+	// because it is the content axis's answer on a spectate request, which the
+	// public-board case is precisely what makes non-obvious, and it is what the
+	// spectate tests assert the split on; a caller that needs "may this spectator
+	// also read the round" has one place to ask.
 	contentAllowed bool
 	// err carries a fail-closed store error out of the content steps. Not an
 	// access level because it is not an answer — it is the absence of one.
