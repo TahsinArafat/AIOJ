@@ -226,8 +226,15 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "failed to update credential state", http.StatusInternalServerError)
 			return
 		}
-		_ = h.onsiteStore.AutoRegister(r.Context(), onsiteUser.ContestID, dbUser.ID)
 	}
+
+	// Every login, not only the first. This used to sit in the else branch above,
+	// so a team that had already signed in once was never enrolled — and once the
+	// grant is written here, leaving it in that branch would lock those teams out
+	// permanently, because the code that grants access lives in the branch they no
+	// longer take. Both writes are idempotent (ON CONFLICT DO NOTHING), so a repeat
+	// is two no-ops rather than an error.
+	_ = h.onsiteStore.AutoRegister(r.Context(), onsiteUser.ContestID, dbUser.ID)
 
 	if h.maybe2FAChallenge(w, r, dbUser, arenaPath(r.Context(), h.contestStore, onsiteUser.ContestID)) {
 		return

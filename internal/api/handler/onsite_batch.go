@@ -184,8 +184,13 @@ func (h *OnsiteBatchHandler) LoginAsTeam(w http.ResponseWriter, r *http.Request)
 			http.Error(w, "failed to update credential state", http.StatusInternalServerError)
 			return
 		}
-		_ = h.onsiteStore.AutoRegister(r.Context(), user.ContestID, dbUser.ID)
 	}
+
+	// Every login, not only the first — the same fix as auth.go's onsite path.
+	// While this sat in the else branch, a team that had already signed in once
+	// never reached it, so it was never enrolled and never granted the round its
+	// own credentials were generated for.
+	_ = h.onsiteStore.AutoRegister(r.Context(), user.ContestID, dbUser.ID)
 
 	// This is a login: a linked account may have TOTP enabled, and skipping the
 	// second factor here would hand out a session for the password alone.

@@ -131,9 +131,25 @@ func (s *OnsiteUserStoreImpl) DeleteByID(ctx context.Context, contestID, id stri
 	return err
 }
 
+// AutoRegister enrolls a freshly signed-in onsite team in the round it was
+// generated for, and grants it access to that round.
+//
+// The grant is the half that was missing. Being registered was not enough: the
+// access policy asks contest_access_grants for the password question and never
+// looks at contest_registrations, so an onsite team signing in to a
+// password-protected round was auto-registered, redirected to the contest, and
+// then refused — "forbidden", which the page renders as "Contest not found".
+// The setter created these accounts, so they are already vetted the way the
+// password is meant to vet people; making a competitor type a contest password
+// they were never given is the bug.
 func (s *OnsiteUserStoreImpl) AutoRegister(ctx context.Context, contestID, userID string) error {
-	_, err := s.db.ExecContext(ctx,
+	if _, err := s.db.ExecContext(ctx,
 		`INSERT INTO contest_registrations (contest_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+		contestID, userID); err != nil {
+		return err
+	}
+	_, err := s.db.ExecContext(ctx,
+		`INSERT INTO contest_access_grants (contest_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
 		contestID, userID)
 	return err
 }
