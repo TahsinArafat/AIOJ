@@ -10,12 +10,12 @@ import { EmptyState } from '../components/EmptyState'
 import {
     Trophy, FileText, MessageSquare, Users, Zap, FileDown, Pencil, Gamepad2,
     AlertTriangle, Megaphone, Settings, BookOpen, Info, Clock, Shield, CheckCircle2, X, ExternalLink,
-    ChevronLeft, ChevronRight, Send, Filter, Eye, EyeOff, Lock
+    Send, Filter, Eye, EyeOff, Lock
 } from 'lucide-react'
 import { useConfirm } from '../components/ConfirmDialog'
 import { useToast } from '../components/Toast'
 import { ContestCountdown, ContestRunningClock } from '../components/ContestClock'
-import { formatDuration, formatPenaltyMinutes } from '../lib/contestTime'
+import { formatDuration } from '../lib/contestTime'
 import { problemLetter } from '../lib/contestProblems'
 import { useContestAnnouncements } from '../hooks/useContestAnnouncements'
 import { useClarifications } from '../hooks/useClarifications'
@@ -108,7 +108,10 @@ function SidebarBox({ title, icon, children, accent }: {
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 
-type Tab = 'problems' | 'standings' | 'submissions' | 'clarifications' | 'announcements'
+// The standings tab is gone: the scoreboard has its own page
+// (/contests/{id}/scoreboard), and this page's copy of it was a second, worse
+// rendering of the same table. The button in the tab strip opens that page.
+type Tab = 'problems' | 'submissions' | 'clarifications' | 'announcements'
 
 interface ContestInfo {
     title: string
@@ -133,20 +136,6 @@ interface ProblemRow {
     my_solved?: boolean; my_attempted?: boolean; my_submissions?: number;
 }
 interface SubmissionRow { id?: string; created_at: string; status: string; language?: string; problem_id?: string; user_id?: string; username?: string; time_used?: number; memory_used?: number; score?: number }
-interface StandingsCell { solved?: boolean; attempts?: number; time?: number; pending?: number }
-interface StandingsEntry { user_id?: string; username?: string; team_name?: string; institution?: string; rank?: number; total_solved?: number; total_penalty?: number; problems?: Record<string, StandingsCell> }
-
-/**
- * The name to print for a standings row.
- *
- * A generated onsite account signs in as a throwaway handle ("team_1a2b3c4d")
- * that means nothing to the people in the room, so the team it was minted for
- * wins when the API supplies one. Everyone else is their username.
- */
-function standingsLabel(row: StandingsEntry): string {
-    return row.team_name || row.username || '—'
-}
-
 export default function ContestDetail() {
     const confirm = useConfirm()
     const toast = useToast()
@@ -178,7 +167,10 @@ export default function ContestDetail() {
     const [loading, setLoading] = useState(true)
     const [activeTab, setActiveTab] = useState<Tab>(() => {
         const hash = window.location.hash.replace('#', '') as Tab
-        const validTabs: Tab[] = ['problems', 'standings', 'submissions', 'clarifications', 'announcements']
+        // '#standings' is deliberately absent. The hash used to name a tab
+        // here, so an old bookmark produces an unknown value; it falls through
+        // to Problems, which is the sensible landing place.
+        const validTabs: Tab[] = ['problems', 'submissions', 'clarifications', 'announcements']
         return validTabs.includes(hash) ? hash : 'problems'
     })
 
@@ -204,31 +196,6 @@ export default function ContestDetail() {
         .sort((a, b) => String(a.index).localeCompare(String(b.index)))
         .map(p => ({ problem_id: p.problem_id as string, index: String(p.index), title: p.title || '' })), [problems])
 
-    // Standings
-    const [standings, setStandings] = useState<StandingsEntry[]>([])
-    const [standingsProblems, setStandingsProblems] = useState<ProblemRow[]>([])
-    const [standingsFrozen, setStandingsFrozen] = useState(false)
-    const [standingsPage, setStandingsPage] = useState(1)
-    const [standingsPagination, setStandingsPagination] = useState<{ page: number; total_pages: number; total: number } | null>(null)
-    // First solver per problem (earliest solve time)
-    const firstSolvers = useMemo(() => {
-        const probList = standingsProblems.length > 0 ? standingsProblems : problems
-        const map: Record<string, string> = {} // problem index -> user_id of first solver
-        const bestTime: Record<string, number> = {}
-        for (const row of standings) {
-            for (let pi = 0; pi < probList.length; pi++) {
-                const pidx = problemLetter(probList[pi], pi)
-                const c = row.problems?.[pidx]
-                if (c?.solved && (c.attempts ?? 0) > 0) {
-                    if (!(pidx in bestTime) || (c.time ?? Infinity) < bestTime[pidx]) {
-                        bestTime[pidx] = c.time ?? Infinity
-                        map[pidx] = row.user_id ?? ''
-                    }
-                }
-            }
-        }
-        return map
-    }, [standings, standingsProblems, problems])
     // Announcements. Polling and the new-announcement popup live in one hook so
     // every contest page shares the same behaviour — a contestant on a problem
     // statement used to be the one place an announcement could not reach them.
@@ -300,17 +267,6 @@ export default function ContestDetail() {
             setUnlocking(false)
         }
     }
-
-    useEffect(() => {
-        if (activeTab === 'standings' && id) {
-            api.contests.standings(id, standingsPage).then((res: { entries?: StandingsEntry[]; problems?: ProblemRow[]; frozen?: boolean; pagination?: { page: number; total_pages: number; total: number } }) => {
-                setStandings(res.entries || [])
-                setStandingsProblems(res.problems || [])
-                setStandingsFrozen(res.frozen || false)
-                setStandingsPagination(res.pagination || null)
-            }).catch(() => { })
-        }
-    }, [activeTab, id, standingsPage])
 
     useEffect(() => {
         if (activeTab === 'submissions' && id && getAccessToken()) {
@@ -522,14 +478,13 @@ export default function ContestDetail() {
             )}
 
             {/* ── Tab Navigation ───────────────────────────────────────────── */}
-            {/* overflow-x-auto: five tabs (with unread badges) are 623px of
+            {/* overflow-x-auto: the tabs (with unread badges) are 623px of
                 min-content, so without a scroller they pushed the document to
                 663px on a 390px phone. */}
             <div className="border-b border-hairline mb-6 overflow-x-auto">
                 <nav className="flex gap-6 min-w-max">
                     {([
                         { key: 'problems', label: 'Problems', icon: 'problems' },
-                        { key: 'standings', label: 'Standings', icon: 'standings' },
                         { key: 'submissions', label: 'Submissions', icon: 'submissions' },
                         { key: 'clarifications', label: 'Clarifications', icon: 'clarifications', unread: unreadClarifications },
                         { key: 'announcements', label: 'Announcements', icon: 'announcements', unread: announcementsApi.unreadCount },
@@ -540,7 +495,6 @@ export default function ContestDetail() {
                                 if (tab.key !== activeTab) {
                                     setActiveTab(tab.key)
                                     if (tab.key === 'clarifications') setUnreadClarifications(0)
-                                    if (tab.key !== 'standings') setStandingsPage(1)
                                 }
                             }}
                             className={`pb-3 text-sm font-semibold transition-colors flex items-center gap-1.5 ${activeTab === tab.key
@@ -549,7 +503,6 @@ export default function ContestDetail() {
                                 }`}
                         >
                             {tab.icon === 'problems' && <FileText className="w-4 h-4" />}
-                            {tab.icon === 'standings' && <Trophy className="w-4 h-4" />}
                             {tab.icon === 'submissions' && <Send className="w-4 h-4" />}
                             {tab.icon === 'clarifications' && <MessageSquare className="w-4 h-4" />}
                             {tab.icon === 'announcements' && <Megaphone className="w-4 h-4" />}
@@ -559,13 +512,29 @@ export default function ContestDetail() {
                             ) : null}
                         </button>
                     ))}
+                    {/* Standings used to be a tab here as well as a page of its
+                        own, which meant two renderings of the same table that
+                        could disagree. It is now only the page, opened in a new
+                        tab: a standings table is compared against the problems
+                        while reading them, so opening it alongside this page is
+                        what the link is for. */}
+                    <a
+                        href={`/contests/${id}/scoreboard`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="pb-3 text-sm font-semibold transition-colors flex items-center gap-1.5 text-muted hover:text-ink border-b-2 border-transparent"
+                    >
+                        <Trophy className="w-4 h-4" />
+                        Open Standings
+                        <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
                 </nav>
             </div>
 
             {/* ── Main Layout: Content + Sidebar ───────────────────────────── */}
-            <div className={`items-start ${activeTab === 'standings' || activeTab === 'submissions' ? '' : 'flex gap-6'}`}>
+            <div className={`items-start ${activeTab === 'submissions' ? '' : 'flex gap-6'}`}>
                 {/* Left: Main Content */}
-                <div className={activeTab === 'standings' || activeTab === 'submissions' ? '' : 'flex-1 min-w-0'}>
+                <div className={activeTab === 'submissions' ? '' : 'flex-1 min-w-0'}>
                     {activeTab === 'problems' && (
                         <div>
                             <h2 className="text-xl font-bold text-ink mb-4">Problems</h2>
@@ -660,195 +629,6 @@ export default function ContestDetail() {
                                             })}
                                         </tbody>
                                     </table>
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {activeTab === 'standings' && (
-                        <div>
-                            <div className="flex items-center justify-between mb-4">
-                                <h2 className="text-xl font-bold text-ink flex items-center gap-2">
-                                    <Trophy className="w-5 h-5" /> Standings
-                                </h2>
-                                <div className="flex items-center gap-2">
-                                    {standingsFrozen && (
-                                        <span className="px-3 py-1 bg-brand-soft text-brand text-xs font-semibold rounded-full flex items-center gap-1 border border-brand/30">
-                                            <Clock className="w-3 h-3" /> Frozen
-                                        </span>
-                                    )}
-                                    <a
-                                        href={`/contests/${id}/scoreboard`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-muted hover:text-brand border border-hairline rounded-full hover:border-brand/40 dark:hover:border-brand/40 hover:bg-surface-2 transition-colors"
-                                    >
-                                        <ExternalLink className="w-3 h-3" />
-                                        Full Scoreboard
-                                    </a>
-                                </div>
-                            </div>
-                            {standings.length === 0 ? (
-                                <div className="text-center py-16 bg-surface border border-hairline rounded-xl">
-                                    <EmptyState icon={<Trophy className="w-12 h-12 text-muted" />} text="No submissions yet" description="Standings will appear once participants start solving" />
-                                </div>
-                            ) : (
-                                <div className="bg-surface border border-hairline rounded-xl shadow-md overflow-x-auto">
-                                    <table className="w-full text-sm">
-                                        <thead>
-                                            <tr className="bg-surface-2 text-ink border-b border-hairline">
-                                                <th className="text-center px-3 py-3 font-bold text-xs uppercase tracking-wider w-16">Rank</th>
-                                                <th className="text-left px-4 py-3 font-bold text-xs uppercase tracking-wider min-w-[180px]">Team</th>
-                                                <th className="text-center px-3 py-3 font-bold text-xs uppercase tracking-wider w-20">
-                                                    <span className="text-ok dark:text-ok">=</span>
-                                                </th>
-                                                <th className="text-center px-3 py-3 font-bold text-xs uppercase tracking-wider w-20">Penalty</th>
-                                                {(standingsProblems.length > 0 ? standingsProblems : problems).map((p, i) => (
-                                                    <th key={i} className="text-center px-1 py-3 font-bold text-xs uppercase tracking-wider w-16">
-                                                        <div className="flex flex-col items-center">
-                                                            {/* The stored letter, not this list's position:
-                                                                a removed problem used to leave the header
-                                                                saying "A" while the problems tab said "B". */}
-                                                            <span className="text-base">{problemLetter(p, i)}</span>
-                                                            {p.title && <span className="text-[11px] text-muted font-normal normal-case truncate max-w-[60px]" title={p.title}>{p.title}</span>}
-                                                        </div>
-                                                    </th>
-                                                ))}
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-hairline">
-                                            {(standingsProblems.length > 0 ? standingsProblems : problems).length > 0 && standings.map((row, idx) => {
-                                                const probList = standingsProblems.length > 0 ? standingsProblems : problems
-                                                const isMe = row.user_id === userId
-                                                const rank = row.rank || idx + 1
-                                                const medal = rank === 1 ? 'gold' : rank === 2 ? 'silver' : rank === 3 ? 'bronze' : null
-                                                const penaltyStr = formatPenaltyMinutes(row.total_penalty ?? 0)
-                                                return (
-                                                    <tr key={row.user_id || idx} className={`transition-colors ${isMe ? 'bg-brand-soft hover:bg-brand/15' : idx % 2 === 0 ? 'bg-surface hover:bg-surface-2' : 'bg-surface-2 hover:bg-surface-2'}`}>
-                                                        <td className="text-center px-3 py-2.5">
-                                                            {medal ? (
-                                                                <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-sm font-black border ${medal === 'gold' ? 'bg-warn/12 text-warn dark:text-warn border-warn/40' :
-                                                                    medal === 'silver' ? 'bg-surface-3/50 text-ink-soft border-hairline-strong' :
-                                                                        'bg-warn/12 text-warn border-warn/40'
-                                                                    }`}>{rank}</span>
-                                                            ) : (
-                                                                <span className="text-sm font-bold text-muted">{rank}</span>
-                                                            )}
-                                                        </td>
-                                                        <td className={`px-4 py-2.5 font-semibold ${isMe ? 'text-brand' : 'text-ink'}`}>
-                                                            {standingsLabel(row)}
-                                                            {row.institution && (
-                                                                <span className="ml-2 text-[11px] font-normal text-muted">{row.institution}</span>
-                                                            )}
-                                                            {isMe && <span className="ml-2 text-[11px] bg-brand-soft text-brand px-1.5 py-0.5 rounded font-bold border border-brand/30">YOU</span>}
-                                                        </td>
-                                                        <td className="text-center px-3 py-2.5">
-                                                            <span className="text-lg font-black text-ink">{row.total_solved ?? 0}</span>
-                                                        </td>
-                                                        <td className="text-center px-3 py-2.5 font-mono text-muted text-xs">{penaltyStr}</td>
-                                                        {probList.map((p, i) => {
-                                                            const pidx = problemLetter(p, i)
-                                                            const cell = row.problems?.[pidx] || {}
-                                                            const solved = cell.solved
-                                                            const attempts = cell.attempts || 0
-                                                            const pending = cell.pending || 0
-                                                            const isFirst = solved && firstSolvers[pidx] === row.user_id
-                                                            const timeMin = Math.floor(cell.time || 0)
-                                                            if (solved) {
-                                                                return (
-                                                                    <td key={i} className="text-center px-1 py-2.5">
-                                                                        <div className={`inline-flex flex-col items-center justify-center rounded-md px-2 py-1 min-w-[48px] ${isFirst ? 'bg-ok-fill text-white shadow-sm' : 'bg-ok/12 text-ok dark:text-ok border border-ok/30'}`}>
-                                                                            <span className="text-xs font-black leading-none">{attempts <= 1 ? '+' : `+${attempts - 1}`}</span>
-                                                                            <span className="text-[10px] font-mono leading-none mt-0.5 opacity-70">{timeMin}m</span>
-                                                                        </div>
-                                                                    </td>
-                                                                )
-                                                            }
-                                                            if (pending > 0) {
-                                                                return (
-                                                                    <td key={i} className="text-center px-1 py-2.5">
-                                                                        <div className="inline-flex flex-col items-center justify-center bg-brand-soft text-brand dark:text-brand border border-brand/30 rounded-md px-2 py-1 min-w-[48px]">
-                                                                            <span className="text-xs font-black leading-none">?</span>
-                                                                            <span className="text-[10px] font-mono leading-none mt-0.5">{pending}</span>
-                                                                        </div>
-                                                                    </td>
-                                                                )
-                                                            }
-                                                            if (attempts > 0) {
-                                                                return (
-                                                                    <td key={i} className="text-center px-1 py-2.5">
-                                                                        <div className="inline-flex items-center justify-center bg-bad/12 dark:bg-bad/12 text-bad dark:text-bad border border-bad/30 dark:border-bad/40 rounded-md px-2 py-1 min-w-[48px]">
-                                                                            <span className="text-xs font-black">-{attempts}</span>
-                                                                        </div>
-                                                                    </td>
-                                                                )
-                                                            }
-                                                            return <td key={i} className="text-center px-1 py-2.5"><span className="text-muted font-medium">-</span></td>
-                                                        })}
-                                                    </tr>
-                                                )
-                                            })}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-                            {/* Participant count & Pagination */}
-                            {standingsPagination && standingsPagination.total > 0 && (
-                                <div className="mt-3 flex flex-col items-center gap-3">
-                                    <span className="text-xs text-muted">
-                                        {standingsPagination.total} participant{standingsPagination.total !== 1 ? 's' : ''}
-                                    </span>
-                                    {standingsPagination.total_pages > 1 && (() => {
-                                        const { page, total_pages } = standingsPagination;
-                                        const pages: (number | 'ellipsis')[] = [];
-                                        if (total_pages <= 7) {
-                                            for (let i = 1; i <= total_pages; i++) pages.push(i);
-                                        } else {
-                                            const left = Math.max(2, page - 1);
-                                            const right = Math.min(total_pages - 1, page + 1);
-                                            pages.push(1);
-                                            if (left > 2) pages.push('ellipsis');
-                                            for (let i = left; i <= right; i++) pages.push(i);
-                                            if (right < total_pages - 1) pages.push('ellipsis');
-                                            pages.push(total_pages);
-                                        }
-                                        return (
-                                            <div className="flex items-center justify-center gap-1">
-                                                <button
-                                                    onClick={() => setStandingsPage(p => Math.max(1, p - 1))}
-                                                    disabled={page <= 1}
-                                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 text-sm font-medium rounded-md border border-hairline bg-surface-2 text-ink-soft hover:bg-surface-3 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                                                >
-                                                    <ChevronLeft className="w-4 h-4" />
-                                                    Prev
-                                                </button>
-                                                {pages.map((p, i) =>
-                                                    p === 'ellipsis' ? (
-                                                        <span key={`e${i}`} className="px-2 py-1.5 text-sm text-muted">...</span>
-                                                    ) : (
-                                                        <button
-                                                            key={p}
-                                                            onClick={() => setStandingsPage(p)}
-                                                            className={`min-w-[36px] px-2 py-1.5 text-sm font-medium rounded-md border transition-colors ${p === page
-                                                                ? 'bg-brand text-on-brand border-brand shadow-sm'
-                                                                : 'bg-surface-2 text-ink-soft border-hairline hover:bg-surface-3'
-                                                                }`}
-                                                        >
-                                                            {p}
-                                                        </button>
-                                                    )
-                                                )}
-                                                <button
-                                                    onClick={() => setStandingsPage(p => Math.min(total_pages, p + 1))}
-                                                    disabled={page >= total_pages}
-                                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 text-sm font-medium rounded-md border border-hairline bg-surface-2 text-ink-soft hover:bg-surface-3 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                                                >
-                                                    Next
-                                                    <ChevronRight className="w-4 h-4" />
-                                                </button>
-                                            </div>
-                                        );
-                                    })()}
                                 </div>
                             )}
                         </div>
@@ -1138,7 +918,7 @@ export default function ContestDetail() {
                 </div>
 
                 {/* Right: Sidebar — hidden on standings/submissions tab to maximize table width */}
-                {activeTab !== 'standings' && activeTab !== 'submissions' && (
+                {activeTab !== 'submissions' && (
                     <div className="w-80 flex-shrink-0 space-y-4 hidden lg:block">
                         {/* Contest Info */}
                         <SidebarBox title="Contest Info" icon="info">
