@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
+	"github.com/tahsinarafat/aioj/internal/model"
 	"github.com/tahsinarafat/aioj/internal/store/postgres"
 )
 
@@ -108,9 +109,23 @@ func (h *RegistrationHandler) CheckRegistration(w http.ResponseWriter, r *http.R
 }
 
 func (h *RegistrationHandler) ListRegistrations(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r)
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 	contest, err := h.contestStore.GetByID(r.Context(), chi.URLParam(r, "id"))
 	if err != nil || contest == nil {
 		http.Error(w, "contest not found", http.StatusNotFound)
+		return
+	}
+	// The roster is who signed up, by username — staff information. Refusing is the
+	// default and access is the exception, the same shape every other contest
+	// handler uses. This one shipped with no check at all, so any caller holding a
+	// contest id could enumerate its registrants without even being signed in.
+	if claims.Role != model.RoleAdmin &&
+		!h.contestStore.HasAccess(r.Context(), contest.ID, claims.UserID, model.ContestPermissionManager, model.ContestPermissionJudge) {
+		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
 	registrations, err := h.registrationStore.GetRegistrations(r.Context(), contest.ID)

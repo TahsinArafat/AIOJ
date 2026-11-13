@@ -471,7 +471,13 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 		r.With(middleware.AuthMiddleware(jwtManager)).Delete("/", registrationH.Unregister)
 	})
 
-	r.With(gate(feature.KeyContests)).Get("/api/contests/{id}/registrations", registrationH.ListRegistrations)
+	// The roster is staff-only. It was mounted outside the authenticated group
+	// above, so an anonymous caller could read every registrant's username for any
+	// contest id — on a public round that is the full competitor list, handed out
+	// without even signing in. The handler also re-checks: this route must not be
+	// the only thing standing between a stranger and a roster.
+	r.With(gate(feature.KeyContests), middleware.AuthMiddleware(jwtManager)).
+		Get("/api/contests/{id}/registrations", registrationH.ListRegistrations)
 
 	r.Route("/api/contests/{id}/onsite", func(r chi.Router) {
 		r.Use(gate(feature.KeyContests))

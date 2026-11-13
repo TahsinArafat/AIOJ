@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -458,10 +459,25 @@ func (h *ContestHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req model.CreateContestRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	// Read the body once, decode it twice: the struct is how every ordinary field
+	// is read, and `present` records which keys the caller actually sent. Two
+	// fields are nullable in the database — registration_deadline and
+	// max_participants — and for them "clear it" and "don't touch it" are different
+	// requests that decode to the same nil pointer. Without this a setter could set
+	// a participant cap and never remove it again: the form omits the field to mean
+	// "no cap" and the server read that as "leave the old cap alone". Presence, not
+	// value, is the distinction.
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
 		http.Error(w, "invalid body", http.StatusBadRequest)
 		return
 	}
+	if err := json.Unmarshal(body, &req); err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	var present map[string]json.RawMessage
+	_ = json.Unmarshal(body, &present)
 	if req.Title != "" {
 		c.Title = req.Title
 	}
@@ -546,10 +562,10 @@ func (h *ContestHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if req.RegistrationRequired != nil {
 		c.RegistrationRequired = *req.RegistrationRequired
 	}
-	if req.RegistrationDeadline != nil {
+	if _, sent := present["registration_deadline"]; sent {
 		c.RegistrationDeadline = req.RegistrationDeadline
 	}
-	if req.MaxParticipants != nil {
+	if _, sent := present["max_participants"]; sent {
 		c.MaxParticipants = req.MaxParticipants
 	}
 	if req.Division != nil {

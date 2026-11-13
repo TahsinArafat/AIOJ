@@ -1227,10 +1227,11 @@ function SettingsTab({ contestId }: { contestId: string }) {
                 virtual_contest_enabled: form.virtual_contest_enabled,
                 division: form.division,
                 registration_required: form.registration_required,
-                // null clears the deadline; undefined would mean "leave it alone",
-                // and the API distinguishes the two.
+                // null clears the deadline/cap; omitting the key would mean "leave
+                // it alone". The field is always sent, so emptying the input is the
+                // way to remove a limit that was set earlier.
                 registration_deadline: form.registration_deadline ? localInputToIso(form.registration_deadline) : null,
-                max_participants: maxParticipants,
+                max_participants: maxParticipants ?? null,
                 is_rated: form.is_rated,
                 rated_for_min: form.rated_for_min,
                 rated_for_max: form.rated_for_max,
