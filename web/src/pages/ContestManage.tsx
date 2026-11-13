@@ -1,7 +1,7 @@
 import React from 'react'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { api, getAccessToken } from '../lib/api'
+import { api, getAccessToken, currentUser } from '../lib/api'
 import { errorMessage } from '../lib/errors'
 import { contestVisibilityPayload } from '../lib/contestVisibility'
 import { PageHeader } from '../components/ui/PageHeader'
@@ -1096,10 +1096,22 @@ function SettingsTab({ contestId }: { contestId: string }) {
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
     const [error, setError] = useState('')
+    // Publication state. Kept out of `form` because it is not saved with the
+    // settings PUT: visible is derived from status on the server, so publishing is
+    // a separate review action, not a field on this form.
+    const [status, setStatus] = useState<string>('draft')
+    const [publishing, setPublishing] = useState(false)
+    // Publishing is an admin action; a setter can only propose. The server
+    // enforces this (initialContestStatus and ReviewContest both check the role),
+    // so this only decides which button to show.
+    const isAdmin = currentUser()?.role === 'admin' || currentUser()?.role === 'owner'
 
     useEffect(() => {
         api.contests.get(contestId).then(d => {
             const c = d.contest
+            // A round that has never been through review has no status at all;
+            // the server treats that as a draft, and so does this screen.
+            setStatus(c.status || 'draft')
             let vis = 'public'
             if (c.group_id) {
                 vis = 'group'
@@ -1142,6 +1154,38 @@ function SettingsTab({ contestId }: { contestId: string }) {
             setGroups(res.data || [])
         }).catch(() => { })
     }, [contestId])
+
+    /**
+     * Propose or publish this round.
+     *
+     * Publishing is not a field on this form because `visible` is derived from
+     * `status` on the server: a settings PUT can never un-draft a round. Before
+     * this control existed there was no way to publish from the UI at all —
+     * api.contests.submitForReview was defined but no screen called it — so every
+     * round a setter made stayed a draft and answered "forbidden" to everyone,
+     * including the onsite teams its own credentials were generated for.
+     *
+     * Two different actions behind one button: an admin publishes directly, a
+     * setter submits for review. That matches initialContestStatus on the server,
+     * where only an admin's round starts published.
+     */
+    const handlePublish = async () => {
+        setError('')
+        setPublishing(true)
+        try {
+            if (isAdmin) {
+                await api.admin.contestReview.review(contestId, 'published')
+                setStatus('published')
+            } else {
+                await api.contests.submitForReview(contestId)
+                setStatus('pending')
+            }
+        } catch (err) {
+            setError(errorMessage(err) || 'Failed to change publication state')
+        } finally {
+            setPublishing(false)
+        }
+    }
 
     const handleSave = async () => {
         if (!form.title.trim()) { setError('Title is required'); return }
@@ -1203,6 +1247,47 @@ function SettingsTab({ contestId }: { contestId: string }) {
     return (
         <TabShell title="Settings">
             {error && <div className="bg-bad/10 border border-bad/30 text-bad px-4 py-2 rounded mb-4 text-sm">{error}</div>}
+
+            {/* Publication. Deliberately the first thing on the page, because it
+                gates everything else: a draft is invisible to everyone but staff,
+                so a setter who configured a round perfectly and never published it
+                saw "Contest not found" and had no control to fix it — the API
+                method existed but no screen ever called it. */}
+            <div className={`mb-5 rounded-lg border px-4 py-3 text-sm ${status === 'published'
+                ? 'bg-ok/10 border-ok/30 text-ok'
+                : status === 'pending'
+                    ? 'bg-warn/10 border-warn/30 text-warn'
+                    : status === 'rejected'
+                        ? 'bg-bad/10 border-bad/30 text-bad'
+                        : 'bg-surface-2 border-hairline-strong text-muted'
+                }`}>
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div>
+                        <span className="font-semibold">
+                            {status === 'published' ? 'Published'
+                                : status === 'pending' ? 'Awaiting admin review'
+                                    : status === 'rejected' ? 'Rejected' : 'Draft — not visible to anyone'}
+                        </span>
+                        <p className="text-xs mt-0.5 opacity-90">
+                            {status === 'published'
+                                ? 'Competitors, onsite teams and the public can open this round.'
+                                : status === 'pending'
+                                    ? 'An admin must approve it before competitors can open it.'
+                                    : status === 'rejected'
+                                        ? 'An admin rejected this round. Edit it and submit again.'
+                                        : 'Only you and the round staff can see it. Publish to let competitors in.'}
+                        </p>
+                    </div>
+                    {status !== 'published' && (
+                        <button onClick={handlePublish} disabled={publishing}
+                            className="px-4 py-2 bg-brand text-on-brand rounded-lg hover:bg-brand-hover disabled:opacity-50 font-medium text-sm transition-colors shrink-0">
+                            {publishing
+                                ? (isAdmin ? 'Publishing...' : 'Submitting...')
+                                : (isAdmin ? 'Publish now' : 'Submit for review')}
+                        </button>
+                    )}
+                </div>
+            </div>
 
             <div className="space-y-5">
                 {/* Title */}
@@ -1314,6 +1399,32 @@ function SettingsTab({ contestId }: { contestId: string }) {
                         </select>
                     </div>
                 )}
+
+                {/* Round behaviour. All four are persisted by the store and applied
+                    by Update, but none of them had a control — so the values could
+                    only ever be whatever the create form happened to send, and a
+                    setter could not turn any of them off afterwards. */}
+                <div>
+                    <label className="block text-sm font-medium text-ink-soft mb-2">Round behaviour</label>
+                    <div className="space-y-2">
+                        {([
+                            ['upsolving_enabled', 'Upsolving', 'Let competitors keep submitting after the round ends.'],
+                            ['virtual_contest_enabled', 'Virtual participation', 'Let people run this round as a timed practice attempt.'],
+                            ['pdf_enabled', 'Printable booklet', 'Offer a PDF of the problems for printing.'],
+                            ['statement_hidden', 'Hide statements', 'Keep each problem statement hidden until the round starts.'],
+                        ] as const).map(([key, label, hint]) => (
+                            <label key={key} className="flex items-start gap-2 cursor-pointer p-2 rounded-lg hover:bg-surface-2 border border-hairline">
+                                <input type="checkbox" checked={Boolean(form[key])}
+                                    onChange={e => setForm(p => ({ ...p, [key]: e.target.checked }))}
+                                    className="mt-0.5 rounded border-hairline-strong text-brand focus-visible:outline-[var(--ring)]" />
+                                <span>
+                                    <span className="block text-sm text-ink">{label}</span>
+                                    <span className="block text-xs text-muted-soft">{hint}</span>
+                                </span>
+                            </label>
+                        ))}
+                    </div>
+                </div>
 
                 {/* Registration. The server has enforced registration_required
                     since the field existed — submit answers "you must register"
