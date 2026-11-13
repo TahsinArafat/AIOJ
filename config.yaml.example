@@ -13,6 +13,16 @@ database:
   name: "aioj"
   max_open: 25
   max_idle: 5
+  # Apply pending migrations at startup. Every container boots the same binary,
+  # so all of them migrate; a database advisory lock serializes it. Set false on
+  # instances that should only serve (a rolling restart, or a deployment with a
+  # dedicated migrate job) so a schema change never races a live process.
+  migrate_on_boot: true
+  # Repair a schema version left dirty by a migration that failed and rolled
+  # back. Only the newest-version case is auto-repaired; a dirty version below
+  # the newest is always refused, because the schema's real shape is unknown.
+  # Leave false to inspect failures by hand instead.
+  migrate_auto_recover: false
 auth:
   csrf_secret: ""  # override with CSRF_SECRET
   jwt_secret: "change-me-in-production"  # override with JWT_SECRET env var — set a long random value in production

@@ -133,6 +133,20 @@ type DatabaseConfig struct {
 	// ReplicaDSN is an optional read-replica connection (Phase E).
 	// When empty, all reads stay on the primary.
 	ReplicaDSN string `yaml:"replica_dsn"`
+	// MigrateOnBoot runs pending migrations at startup. Default true.
+	//
+	// Deployments that migrate elsewhere (a release job, or one designated
+	// instance) set this false so a rolling start cannot race the schema.
+	MigrateOnBoot *bool `yaml:"migrate_on_boot"`
+	// MigrateAutoRecover repairs a left-dirty migrations table before failing.
+	// Default false; see internal/db for what it will and will not touch.
+	MigrateAutoRecover bool `yaml:"migrate_auto_recover"`
+}
+
+// ShouldMigrateOnBoot reports whether this process should apply migrations.
+// An unset value means true: existing deployments keep migrating at startup.
+func (c DatabaseConfig) ShouldMigrateOnBoot() bool {
+	return c.MigrateOnBoot == nil || *c.MigrateOnBoot
 }
 
 type AuthConfig struct {

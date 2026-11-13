@@ -22,6 +22,7 @@ import (
 	"github.com/tahsinarafat/aioj/internal/auth"
 	"github.com/tahsinarafat/aioj/internal/authmethod"
 	"github.com/tahsinarafat/aioj/internal/config"
+	schemadb "github.com/tahsinarafat/aioj/internal/db"
 	"github.com/tahsinarafat/aioj/internal/feature"
 	"github.com/tahsinarafat/aioj/internal/generate"
 	"github.com/tahsinarafat/aioj/internal/hack"
@@ -80,16 +81,47 @@ func main() {
 	}
 	defer db.Close()
 
-	slog.Info("running database migrations...")
-	m, err := migrate.New("file://internal/store/migrations", fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
-		cfg.Database.User, cfg.Database.Password, cfg.Database.Host, cfg.Database.Port, cfg.Database.Name))
-	if err != nil {
-		log.Fatalf("failed to initialize migrations: %v", err)
+	// Schema migration. Guarded by config because three containers boot this
+	// same binary (server, judge-worker, ai-harness) and all of them used to run
+	// m.Up() at once; the advisory lock serializes them, but a deploy that wants
+	// one designated migrator can now say so.
+	if cfg.Database.ShouldMigrateOnBoot() {
+		slog.Info("running database migrations...")
+		m, err := migrate.New("file://"+schemadb.MigrationDir, fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
+			cfg.Database.User, cfg.Database.Password, cfg.Database.Host, cfg.Database.Port, cfg.Database.Name))
+		if err != nil {
+			log.Fatalf("failed to initialize migrations: %v", err)
+		}
+		res, err := schemadb.Migrate(m, schemadb.MigrationDir, cfg.Database.MigrateAutoRecover)
+		if err != nil {
+			// A platform that redeploys on every push cannot be reached once the
+			// process exits, so the message has to say what to do rather than
+			// only what broke. Reverting the image does not help: the failure
+			// lives in the schema, not the binary.
+			log.Fatalf(`failed to apply migrations: %v
+
+The service will not start against this schema. To recover:
+
+  1. Inspect:   SELECT version, dirty FROM schema_migrations;
+  2. If dirty:  resolve the named migration by hand, then
+                  DELETE FROM schema_migrations;
+                  INSERT INTO schema_migrations (version, dirty) VALUES (<last good>, false);
+                (golang-migrate has no repair CLI here; this is the equivalent.)
+  3. Or set database.migrate_auto_recover: true to let startup retry a migration
+     that failed at the newest version — it is safe because a failed migration
+     rolls back atomically. A dirty version *below* the newest is always refused.
+
+Restore from the pre-deploy dump if the schema is unrecoverable.`, err)
+		}
+		if res.Applied > 0 || res.Recovered {
+			slog.Info("database migrations applied",
+				"from", res.From, "to", res.To, "applied", res.Applied, "recovered", res.Recovered)
+		} else {
+			slog.Info("database schema already current", "version", res.To)
+		}
+	} else {
+		slog.Info("database migrations skipped (database.migrate_on_boot is false)")
 	}
-	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
-		log.Fatalf("failed to apply migrations: %v", err)
-	}
-	slog.Info("database migrations applied successfully")
 
 	accessTTL, _ := time.ParseDuration(cfg.Auth.AccessTTL)
 	refreshTTL, _ := time.ParseDuration(cfg.Auth.RefreshTTL)
