@@ -334,7 +334,17 @@ export function ChallengesTab({ contestId }: { contestId: string }) {
                                     <span className="text-xs text-muted-soft font-mono">{p.problem_id}</span>
                                 </div>
                             </td>
-                            <td className="py-2.5 pr-4">{p.score ?? 100}</td>
+                            <td className="py-2.5 pr-4">
+                                <ScoreCell
+                                    contestId={contestId}
+                                    problemId={p.problem_id}
+                                    score={p.score ?? 100}
+                                    index={indexLabel(idx)}
+                                    sortOrder={p.sort_order ?? idx}
+                                    onSaved={(next) => setProblems(rows => rows.map(r =>
+                                        r.problem_id === p.problem_id ? { ...r, score: next } : r))}
+                                />
+                            </td>
                             <td className="py-2.5 text-right">
                                 <div className="flex items-center justify-end gap-2">
                                     <div className="flex items-center gap-1" role="group" aria-label={`Reorder ${p.title || p.problem_id}`}>
@@ -381,6 +391,108 @@ export function ChallengesTab({ contestId }: { contestId: string }) {
                 description="Use Add Problem to build the contest challenge list."
             />}
         </TabShell>
+    )
+}
+
+/**
+ * One problem's score, editable in place.
+ *
+ * The score was render-only — `<td>{p.score ?? 100}</td>` — while the server has
+ * accepted a score on PUT /contests/{id}/problems/{problemId} since it was
+ * written. So the value could be set when a problem was added, reordered by the
+ * move buttons (which re-send the score to keep it) and otherwise never changed
+ * from the UI. A round whose problems are worth different points could only get
+ * there by editing the database.
+ *
+ * Kept as a local draft until commit rather than writing on every keystroke: the
+ * column is an integer, so a mid-typing value ("1", then "10", then "100") would
+ * be three writes, and an emptied box has no integer to send. Blur and Enter
+ * commit; Escape reverts.
+ */
+function ScoreCell({ contestId, problemId, score, index, sortOrder, onSaved }: {
+    contestId: string
+    problemId: string
+    score: number
+    index: string
+    sortOrder: number
+    onSaved: (next: number) => void
+}) {
+    const toast = useToast()
+    const [editing, setEditing] = useState(false)
+    const [draft, setDraft] = useState(String(score))
+    const [busy, setBusy] = useState(false)
+
+    // The draft is seeded when editing STARTS, not by an effect on `score`. That is
+    // both the lint-clean shape (react-hooks/set-state-in-effect) and the correct
+    // one: a reorder or a reload changes `score` while the cell is not being edited,
+    // and re-seeding an unmounted draft would be work nobody sees. Seeding here
+    // means the box always opens showing what the server last said.
+    const beginEdit = () => {
+        setDraft(String(score))
+        setEditing(true)
+    }
+
+    const commit = async () => {
+        const parsed = Number(draft)
+        if (!Number.isInteger(parsed) || parsed < 0) {
+            toast.error('Score must be a whole number of 0 or more')
+            setDraft(String(score))
+            setEditing(false)
+            return
+        }
+        if (parsed === score) {
+            setEditing(false)
+            return
+        }
+        setBusy(true)
+        try {
+            // index and sort_order go along even though only the score changes: the
+            // handler derives the letter from sort_order, so sending the row's real
+            // position keeps it where it is. Sending 0 here would re-letter the
+            // whole round and move this problem to the top.
+            await api.contests.updateProblem(contestId, problemId, { index, score: parsed, sort_order: sortOrder })
+            onSaved(parsed)
+            toast.success(`Score set to ${parsed}`)
+            setEditing(false)
+        } catch (e) {
+            toast.error('Failed to update score: ' + (errorMessage(e) || 'Please try again'))
+            setDraft(String(score))
+        } finally {
+            setBusy(false)
+        }
+    }
+
+    if (!editing) {
+        return (
+            <button
+                type="button"
+                onClick={beginEdit}
+                aria-label={`Edit score for problem ${index}`}
+                title="Click to edit"
+                className="tnum rounded px-2 py-1 -mx-1 text-sm font-medium text-ink hover:bg-surface-2 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
+            >
+                {score}
+            </button>
+        )
+    }
+
+    return (
+        <input
+            type="number"
+            min={0}
+            step={1}
+            autoFocus
+            disabled={busy}
+            aria-label={`Score for problem ${index}`}
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
+            onBlur={commit}
+            onKeyDown={e => {
+                if (e.key === 'Enter') { e.preventDefault(); commit() }
+                if (e.key === 'Escape') { e.preventDefault(); setDraft(String(score)); setEditing(false) }
+            }}
+            className="tnum w-20 rounded border border-hairline-strong bg-surface px-2 py-1 text-sm focus-visible:outline-[var(--ring)] disabled:opacity-50"
+        />
     )
 }
 
@@ -1172,10 +1284,20 @@ function SettingsTab({ contestId }: { contestId: string }) {
         listed: true,
         group_id: '',
         division: 0,
+        // The scoring engine. Sent on every save, like `listed`: the server reads an
+        // empty string as "not sent", and the select always has a value, so there is
+        // no state in which omitting it is the right answer.
+        format: 'acm',
         registration_required: false, registration_deadline: '', max_participants: '',
         is_rated: true, rated_for_min: 0, rated_for_max: 9999,
     })
     const [groups, setGroups] = useState<GroupOption[]>([])
+    // The registered scoring formats, from the server. Fetched rather than listed
+    // here: the set is whatever internal/contest/format registers, and a second copy
+    // in the SPA is how a new format ships without appearing in the form that has to
+    // select it. `api.contests.getFormats` existed already and had no callers — this
+    // is the control it was added for.
+    const [formats, setFormats] = useState<string[]>(['acm'])
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
     const [error, setError] = useState('')
@@ -1226,6 +1348,10 @@ function SettingsTab({ contestId }: { contestId: string }) {
                 listed: c.listed ?? true,
                 group_id: c.group_id || '',
                 division: c.division ?? 0,
+                // ?? 'acm' rather than a bare read: an older server predating the
+                // format column omits it, and an empty select would offer a blank
+                // option that saves as "not sent" and silently keeps the old value.
+                format: c.format || 'acm',
                 registration_required: c.registration_required ?? false,
                 registration_deadline: isoToLocalInput(c.registration_deadline),
                 // '' not 0: the column is nullable and an empty box means "no cap".
@@ -1239,6 +1365,14 @@ function SettingsTab({ contestId }: { contestId: string }) {
         api.groups.list(0, 100).then(res => {
             setGroups(res.data || [])
         }).catch(() => { })
+
+        // A failure here must not blank the select: the form still needs to show the
+        // round's current format, and the fallback keeps 'acm' selectable. Caught
+        // rather than left to reject, because this is one of three parallel loads and
+        // an unhandled rejection here would not surface anywhere the setter can see.
+        api.contests.getFormats()
+            .then(res => { if (res.formats?.length) setFormats(res.formats) })
+            .catch(() => { })
     }, [contestId])
 
     /**
@@ -1322,6 +1456,12 @@ function SettingsTab({ contestId }: { contestId: string }) {
                 upsolving_enabled: form.upsolving_enabled,
                 virtual_contest_enabled: form.virtual_contest_enabled,
                 division: form.division,
+                // The scoring engine. Changing it makes the server replace
+                // format_config with the new format's default, because the configs are
+                // not interchangeable — an acm penalty under an ioi engine has no
+                // partial-credit key, so carrying it across would score the round with
+                // the new engine's zero values. The hint under the select says so.
+                format: form.format,
                 registration_required: form.registration_required,
                 // null clears the deadline/cap; omitting the key would mean "leave
                 // it alone". The field is always sent, so emptying the input is the
@@ -1416,6 +1556,34 @@ function SettingsTab({ contestId }: { contestId: string }) {
                             <option key={value} value={value}>{d.name}</option>
                         ))}
                     </select>
+                </div>
+
+                {/* Scoring format. This was absent entirely: the server accepted a
+                    format on create and dropped it on every update, so a round's
+                    scoring was fixed at creation and the only correction was to
+                    recreate the round and lose its submissions. */}
+                <div>
+                    <label className="block text-sm font-medium text-ink-soft mb-1">Scoring format</label>
+                    <select aria-label="Scoring format" value={form.format} onChange={e => setForm(p => ({ ...p, format: e.target.value }))}
+                        className="w-full border border-hairline-strong rounded-lg px-3 py-2 text-sm focus:ring-2 focus-visible:outline-[var(--ring)] focus:border-brand bg-surface">
+                        {/* The stored format is always offered, even when the registry
+                            no longer lists it. A round can carry a format from an older
+                            build or a hand-edited row, and a select whose value is not
+                            among its options renders as blank — which would look like the
+                            round has no format and save it away. */}
+                        {!formats.includes(form.format) && (
+                            <option value={form.format}>{form.format} (unrecognised)</option>
+                        )}
+                        {formats.map(f => (
+                            <option key={f} value={f}>{f.toUpperCase()}</option>
+                        ))}
+                    </select>
+                    <p className="text-xs text-muted-soft mt-1">
+                        Decides how the standings are computed. Changing it resets the format's
+                        own settings to their defaults, because the formats' settings are not
+                        interchangeable — a penalty-per-wrong under an IOI round has nothing to
+                        apply to.
+                    </p>
                 </div>
 
                 {/* Description */}

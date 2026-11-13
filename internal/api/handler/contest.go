@@ -606,6 +606,40 @@ func (h *ContestHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if req.Division != nil {
 		c.Division = *req.Division
 	}
+	// Scoring format. Accepted on create and never on update, so a round's format
+	// could be chosen once and never corrected — the Settings tab had no control
+	// for it because the server would have dropped the value.
+	//
+	// Validated against the registry before the write, the same way Create does it,
+	// so a typo is a 400 naming what exists rather than a stored name that
+	// format.Create will reject on every scoreboard render.
+	//
+	// A format change replaces format_config with that format's default rather
+	// than carrying the old one across. The two are not interchangeable: an acm
+	// config under an ioi engine has no partial-credit or subtask keys, so keeping
+	// it would silently score the round with the new engine's zero values.
+	// Switching back and forth therefore loses custom tuning, which is the honest
+	// trade — the alternative is a config that does not match its format.
+	if req.Format != "" {
+		factory, ok := format.Get(req.Format)
+		if !ok {
+			http.Error(w, "unknown format: "+req.Format, http.StatusBadRequest)
+			return
+		}
+		if len(req.FormatConfig) > 0 {
+			// Validated through Create so a bad config is rejected here rather than
+			// at the first scoreboard render.
+			if _, err := format.Create(req.Format, req.FormatConfig); err != nil {
+				http.Error(w, "invalid format config: "+err.Error(), http.StatusBadRequest)
+				return
+			}
+			c.FormatConfig = req.FormatConfig
+		} else if req.Format != c.Format {
+			f, _ := factory(nil)
+			c.FormatConfig = f.DefaultConfig()
+		}
+		c.Format = req.Format
+	}
 	c.GroupID = req.GroupID
 	if req.Slug != "" {
 		c.Slug = req.Slug

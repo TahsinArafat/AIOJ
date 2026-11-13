@@ -493,6 +493,12 @@ type CreateContestRequest struct {
 	// has no such rule — it is a settable property on a published round, not a
 	// publication action.
 	Listed *bool `json:"listed,omitempty"`
+	// Format and FormatConfig (above) are also the update path's scoring controls.
+	// They were on the DTO from the start but Update never assigned them, so the
+	// Settings tab had no control for the format and a round's scoring could be
+	// chosen once and never corrected. Format is a plain string rather than a
+	// pointer because a format is always one of the registered names, so "" is
+	// unambiguously "not sent".
 }
 
 type ContestRegistration struct {
