@@ -111,7 +111,10 @@ function SidebarBox({ title, icon, children, accent }: {
 // The standings tab is gone: the scoreboard has its own page
 // (/contests/{id}/scoreboard), and this page's copy of it was a second, worse
 // rendering of the same table. The button in the tab strip opens that page.
-type Tab = 'problems' | 'submissions' | 'clarifications' | 'announcements'
+type Tab = 'about' | 'problems' | 'submissions' | 'clarifications' | 'announcements'
+
+/** One entry on the round's About tab: who runs it, by username. */
+interface JudgeRow { user_id?: string; username?: string; access_level?: string }
 
 interface ContestInfo {
     title: string
@@ -127,6 +130,9 @@ interface ContestInfo {
     statement_hidden?: boolean
     upsolving_enabled?: boolean
     virtual_contest_enabled?: boolean
+    description?: string
+    /** Present when the caller may read the round as content; absent otherwise. */
+    judges?: JudgeRow[]
 }
 interface ProblemRow {
     problem_id?: string; index?: string; title?: string; score?: number;
@@ -170,7 +176,7 @@ export default function ContestDetail() {
         // '#standings' is deliberately absent. The hash used to name a tab
         // here, so an old bookmark produces an unknown value; it falls through
         // to Problems, which is the sensible landing place.
-        const validTabs: Tab[] = ['problems', 'submissions', 'clarifications', 'announcements']
+        const validTabs: Tab[] = ['about', 'problems', 'submissions', 'clarifications', 'announcements']
         return validTabs.includes(hash) ? hash : 'problems'
     })
 
@@ -484,6 +490,7 @@ export default function ContestDetail() {
             <div className="border-b border-hairline mb-6 overflow-x-auto">
                 <nav className="flex gap-6 min-w-max">
                     {([
+                        { key: 'about', label: 'About', icon: 'about' },
                         { key: 'problems', label: 'Problems', icon: 'problems' },
                         { key: 'submissions', label: 'Submissions', icon: 'submissions' },
                         { key: 'clarifications', label: 'Clarifications', icon: 'clarifications', unread: unreadClarifications },
@@ -502,6 +509,7 @@ export default function ContestDetail() {
                                 : 'text-muted hover:text-ink border-b-2 border-transparent'
                                 }`}
                         >
+                            {tab.icon === 'about' && <Info className="w-4 h-4" />}
                             {tab.icon === 'problems' && <FileText className="w-4 h-4" />}
                             {tab.icon === 'submissions' && <Send className="w-4 h-4" />}
                             {tab.icon === 'clarifications' && <MessageSquare className="w-4 h-4" />}
@@ -535,6 +543,100 @@ export default function ContestDetail() {
             <div className={`items-start ${activeTab === 'submissions' ? '' : 'flex gap-6'}`}>
                 {/* Left: Main Content */}
                 <div className={activeTab === 'submissions' ? '' : 'flex-1 min-w-0'}>
+                    {/* About. Everything here is already on the page or in the
+                        payload: the round's description, its format and schedule, and
+                        who runs it. It exists because those facts were spread across
+                        the sidebar and a badge strip, and the one thing a newcomer
+                        wants — what is this round, and who is running it — had no
+                        single place to be read. */}
+                    {activeTab === 'about' && (
+                        <div className="space-y-6">
+                            <div>
+                                <h2 className="text-xl font-bold text-ink mb-4">About this round</h2>
+                                {contest.description?.trim() ? (
+                                    <p className="text-sm text-ink-soft whitespace-pre-wrap leading-relaxed">
+                                        {contest.description}
+                                    </p>
+                                ) : (
+                                    <p className="text-sm text-muted-soft">
+                                        The organizer has not added a description.
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Who runs it. Absent from the payload entirely when the
+                                caller may not read the round as content, which is the
+                                server's call — the page does not decide who may see
+                                the roster. */}
+                            {contest.judges !== undefined && (
+                                <div>
+                                    <h3 className="text-sm font-semibold text-ink uppercase tracking-wide mb-3">
+                                        Organizers
+                                    </h3>
+                                    {contest.judges.length === 0 ? (
+                                        <p className="text-sm text-muted-soft">No organizers are listed.</p>
+                                    ) : (
+                                        <ul className="flex flex-wrap gap-2">
+                                            {contest.judges.map(j => (
+                                                <li
+                                                    key={j.user_id || j.username}
+                                                    className="flex items-center gap-2 rounded-lg border border-hairline bg-surface px-3 py-1.5"
+                                                >
+                                                    <Shield className="w-3.5 h-3.5 text-muted-soft" />
+                                                    {j.username ? (
+                                                        <Link
+                                                            to={`/user/${j.username}`}
+                                                            className="text-sm font-medium text-brand hover:underline"
+                                                        >
+                                                            {j.username}
+                                                        </Link>
+                                                    ) : (
+                                                        <span className="text-sm text-ink-soft">unknown</span>
+                                                    )}
+                                                    <span className="text-[11px] uppercase tracking-wide text-muted-soft">
+                                                        {j.access_level === 'manager' ? 'manager' : 'judge'}
+                                                    </span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* What the round offers. Not a repeat of the sidebar's
+                                Contest Info box — that one carries the schedule, format
+                                and problem count, and this one names the capabilities,
+                                which had no home anywhere. Only the features that are
+                                ON are listed: a row reading "upsolving disabled" is a
+                                list of everything that is not there. */}
+                            <div>
+                                <h3 className="text-sm font-semibold text-ink uppercase tracking-wide mb-3">
+                                    Features
+                                </h3>
+                                <ul className="flex flex-wrap gap-2">
+                                    {[
+                                        { on: contest.pdf_enabled !== false, label: 'Printable booklet' },
+                                        { on: contest.statement_hidden === true, label: 'Statements hidden (onsite)' },
+                                        { on: contest.upsolving_enabled === true, label: 'Upsolving' },
+                                        { on: contest.virtual_contest_enabled === true, label: 'Virtual participation' },
+                                    ].filter(f => f.on).map(f => (
+                                        <li
+                                            key={f.label}
+                                            className="rounded-full border border-hairline bg-surface px-3 py-1 text-xs text-ink-soft"
+                                        >
+                                            {f.label}
+                                        </li>
+                                    ))}
+                                    {contest.registration_required && (
+                                        <li className="rounded-full border border-hairline bg-surface px-3 py-1 text-xs text-ink-soft">
+                                            Registration required
+                                        </li>
+                                    )}
+                                </ul>
+                            </div>
+                        </div>
+                    )}
+
                     {activeTab === 'problems' && (
                         <div>
                             <h2 className="text-xl font-bold text-ink mb-4">Problems</h2>
