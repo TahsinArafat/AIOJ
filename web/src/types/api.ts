@@ -1542,8 +1542,14 @@ export interface ActivityItem {
 }
 
 /** GET /api/contests/{id} — GetByID wraps the contest with its problem set.
- * is_registered / registration_count are read by the contest detail page with
- * `?? false` / `?? 0` fallbacks even though GetByID currently omits them. */
+ *
+ * registration_count / is_registered are now sent by GetByID, and both are 0/false
+ * on a round that does not require registration (there is no roster to count).
+ * They are still optional here, because the handler treats its registration store
+ * as an optional collaborator: a build without one omits them and the page's
+ * `?? 0` / `?? false` fallback is what it renders. They were read with those
+ * fallbacks for a long time against a handler that sent neither, which is why the
+ * participant count was permanently zero. */
 export interface ContestDetailResponse {
     contest: Contest & { is_registered?: boolean; registration_count?: number }
     problems: ContestProblem[]

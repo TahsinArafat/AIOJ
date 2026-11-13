@@ -104,6 +104,33 @@ type ContestHandler struct {
 	// handler without one; a nil store means no round can be unlocked, which
 	// fails closed for password-protected contests.
 	grants *postgres.ContestGrantStore
+	// registrations answers the two questions the contest page needs and the
+	// Contest row cannot: how many people entered, and whether this caller is one
+	// of them. Optional like the others: a nil store omits both fields rather than
+	// sending a zero, because "we do not know" and "nobody registered" are
+	// different answers and the page renders a count.
+	registrations registrationCounter
+}
+
+// registrationCounter is the slice of the registration store the contest page
+// needs. Narrow, on the consumer side, so a test can satisfy it with two methods
+// instead of the whole store.
+type registrationCounter interface {
+	GetRegistrationCount(ctx context.Context, contestID string) (int, error)
+	IsRegistered(ctx context.Context, contestID, userID string) (bool, error)
+}
+
+// WithRegistrations attaches the registration store, which is what makes the
+// contest page's participant count and "you are registered" badge real.
+//
+// Both were read by the client from fields GetByID never sent — the page rendered
+// a hardcoded 0 and never showed the badge for anyone — and the type file
+// documented the omission as known. Kept as an optional setter rather than a
+// constructor argument because the registration store is built after this handler
+// in main, and because every other optional collaborator here follows this shape.
+func (h *ContestHandler) WithRegistrations(rs registrationCounter) *ContestHandler {
+	h.registrations = rs
+	return h
 }
 
 // WithFeed enables the event feed. An empty token leaves it disabled.
@@ -456,7 +483,104 @@ func (h *ContestHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 		// already computed, so the page and the server cannot disagree.
 		"is_staff": isManager,
 		"is_judge": viewer.access.decision.IsJudge(),
+		// The registration facts the page reads. Both were being read with `?? 0` /
+		// `?? false` fallbacks against fields this handler never sent, so the
+		// participant count was a hardcoded zero and the "you are registered" badge
+		// could not appear for anyone — including the person who had just
+		// registered.
+		//
+		// Counted only for a round that requires registration, which is the only
+		// round that has a roster: Register refuses with 400 when
+		// registration_required is false, so on any other round the table is empty by
+		// construction and reporting its zero would read as "nobody entered" rather
+		// than "there is nothing to enter".
+		"registration_count": h.registrationCount(r, c),
+		"is_registered":      h.isRegistered(r, c, userID),
+		// Who runs the round, for the About tab. Judges and managers only: a tester
+		// is staff for access purposes but is not part of the round's public face,
+		// and naming them would publish a role the round does not advertise.
+		//
+		// Gated on being able to OPEN the round, which is the same admission the page
+		// itself just passed — so this cannot widen anything. An unstarted round is
+		// admitted for its shell only, and a roster is not shell: naming the judges
+		// hours early tells the world who is involved in a round that has not begun,
+		// which is the same inference accessNotStarted exists to prevent. So it is
+		// withheld until the round is reachable as content, and for a published round
+		// with nothing locked that is exactly the audience the problems already have.
+		"judges": h.contestJudges(r, c, userID, viewer.access.decision),
 	})
+}
+
+// contestJudges is the round's public-facing staff roster: creator, managers and
+// judges, by username.
+//
+// An empty slice rather than nil so the wire shape is stable, and withheld entirely
+// (nil) when the caller may not read the round as content — the distinction the
+// client uses to decide whether to render the section at all.
+func (h *ContestHandler) contestJudges(r *http.Request, c *model.Contest, userID string, d contestAccessDecision) []model.ContestPermission {
+	if !d.Allowed() && !d.IsStaff() {
+		return nil
+	}
+	perms, err := h.store.GetPermissions(r.Context(), c.ID)
+	if err != nil {
+		return []model.ContestPermission{}
+	}
+	out := make([]model.ContestPermission, 0, len(perms))
+	for _, p := range perms {
+		if p.AccessLevel == model.ContestPermissionManager || p.AccessLevel == model.ContestPermissionJudge {
+			out = append(out, p)
+		}
+	}
+	// The creator is a manager in fact but not always in the permissions table —
+	// Create inserts one, and a round created by an older build may not have it.
+	// Without this a round's own author can be missing from its About page.
+	if c.CreatedBy != "" && !containsUserID(out, c.CreatedBy) {
+		out = append(out, model.ContestPermission{
+			ContestID:   c.ID,
+			UserID:      c.CreatedBy,
+			Username:    h.store.GetUsername(r.Context(), c.CreatedBy),
+			AccessLevel: model.ContestPermissionManager,
+		})
+	}
+	return out
+}
+
+func containsUserID(perms []model.ContestPermission, userID string) bool {
+	for _, p := range perms {
+		if p.UserID == userID {
+			return true
+		}
+	}
+	return false
+}
+
+// registrationCount is the size of the round's roster, or 0 when the round has no
+// roster or the store is not wired. Never an error: a failed count must not turn a
+// readable contest page into a 500, and 0 is the value the page already renders
+// when it has nothing better.
+func (h *ContestHandler) registrationCount(r *http.Request, c *model.Contest) int {
+	if h.registrations == nil || !c.RegistrationRequired {
+		return 0
+	}
+	n, err := h.registrations.GetRegistrationCount(r.Context(), c.ID)
+	if err != nil {
+		return 0
+	}
+	return n
+}
+
+// isRegistered answers whether this caller is on the roster. Anonymous callers are
+// never registered — they hold no account to register — so the store is not
+// consulted for them.
+func (h *ContestHandler) isRegistered(r *http.Request, c *model.Contest, userID string) bool {
+	if h.registrations == nil || userID == "" || !c.RegistrationRequired {
+		return false
+	}
+	ok, err := h.registrations.IsRegistered(r.Context(), c.ID, userID)
+	if err != nil {
+		return false
+	}
+	return ok
 }
 
 func (h *ContestHandler) List(w http.ResponseWriter, r *http.Request) {

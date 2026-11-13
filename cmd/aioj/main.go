@@ -279,8 +279,13 @@ Restore from the pre-deploy dump if the schema is unrecoverable.`, err)
 	submissionH := handler.NewSubmissionHandler(submissionStore, problemStore, contestStore, judgeQueue, wsManager, execClient, cfg.LangDir, vjService, userStore).
 		WithGrants(contestGrantStore)
 	teamStore := postgres.NewTeamStore(db)
+	// Built here rather than beside its handler further down, because the contest
+	// page's participant count needs it: WithRegistrations is what makes GetByID
+	// report a real roster instead of the hardcoded zero the client fell back to.
+	registrationStore := postgres.NewRegistrationStore(db)
 	contestH := handler.NewContestHandler(contestStore, ratingStore, problemStore, userStore, teamStore).
-		WithGrants(contestGrantStore)
+		WithGrants(contestGrantStore).
+		WithRegistrations(registrationStore)
 	contestProblemH := handler.NewContestProblemHandler(contestStore, problemStore).
 		WithGrants(contestGrantStore)
 	contestUnlockH := handler.NewContestUnlockHandler(contestStore, contestGrantStore)
@@ -339,7 +344,6 @@ Restore from the pre-deploy dump if the schema is unrecoverable.`, err)
 	})
 	importH := handler.NewImportHandler(problemStore, "./testdata")
 	ratingH := handler.NewRatingHandler(ratingStore, contestStore)
-	registrationStore := postgres.NewRegistrationStore(db)
 	registrationH := handler.NewRegistrationHandler(registrationStore, contestStore)
 	virtualStore := postgres.NewVirtualStore(db)
 	virtualService := virtual.NewService(virtualStore)
