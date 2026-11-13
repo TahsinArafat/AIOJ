@@ -47,9 +47,11 @@ test('titleForPath distinguishes detail routes from their collections', () => {
 test('titleForPath prefers the more specific rule', () => {
     // /contests/:id/plagiarism must not fall through to the /contests/:id rule.
     expect(titleForPath('/contests/9/plagiarism')).toBe('Plagiarism')
-    // /setter/ai/jobs/:id must not be swallowed by /setter/:slug.
-    expect(titleForPath('/setter/ai/jobs/abc')).toBe('AI generation job')
-    expect(titleForPath('/setter/ai')).toBe('AI problem generation')
+    // /setter/ai must not be swallowed by /setter/:slug. The job-list and job-detail
+    // routes are redirects into the Studio now, so they have no title of their own:
+    // the visitor sees the Studio page, and a transient URL must not claim a title
+    // the page then corrects.
+    expect(titleForPath('/setter/ai')).toBe('AI Studio')
 })
 
 test('titleForPath tolerates a trailing slash', () => {

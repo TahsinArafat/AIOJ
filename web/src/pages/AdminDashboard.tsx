@@ -12,7 +12,7 @@ import BackupsPanel from './admin/BackupsPanel'
 import AIModelsPanel from './admin/AIModelsPanel'
 import FeaturesPanel from './admin/FeaturesPanel'
 import AuthMethodsPanel from './admin/AuthMethodsPanel'
-import AIJobsPage from './AIJobsPage'
+import AIJobsPanel from './admin/AIJobsPanel'
 import { useDocumentTitle } from '../lib/documentTitle'
 
 type AdminTab = 'users' | 'applications' | 'review' | 'bots' | 'languages' | 'remote-languages' | 'submissions' | 'settings' | 'backups' | 'ai-models' | 'ai-jobs' | 'features' | 'auth'
@@ -104,7 +104,7 @@ export default function AdminDashboard() {
                     {activeTab === 'submissions' && <SubmissionsPanel />}
                     {activeTab === 'backups' && <BackupsPanel />}
                     {activeTab === 'ai-models' && <AIModelsPanel />}
-                    {activeTab === 'ai-jobs' && <AIJobsPage />}
+                    {activeTab === 'ai-jobs' && <AIJobsPanel />}
                     {activeTab === 'features' && <FeaturesPanel />}
                     {activeTab === 'auth' && <AuthMethodsPanel />}
                     {activeTab === 'settings' && <SystemSettingsPanel />}

@@ -1,8 +1,14 @@
 import { useEffect, useState } from 'react'
 import { api } from '../../lib/api'
-import type { AIBrief, AIGenerationJob, AIModel, AIProposal } from '../../types/api'
+import type { AIBrief, AIGenerationJob, AIModel } from '../../types/api'
 import { AIBriefForm } from '../AI/AIBriefForm'
 import { DEFAULT_BRIEF } from '../../lib/aiBrief'
+import { isJobActive, statusLabel } from '../../lib/aiJobs'
+import AIJobStatusBadge from '../AI/AIJobStatusBadge'
+import AIValidationList from '../AI/AIValidationList'
+import AIProposalReview from '../AI/AIProposalReview'
+import AIJobList from '../AI/AIJobList'
+import AIJobDetail from '../AI/AIJobDetail'
 
 type Props = {
     /**
@@ -15,6 +21,15 @@ type Props = {
     onApplied?: () => void
     /** Called with the new problem's slug after a new problem is created. */
     onCreated?: (slug: string) => void
+    /**
+     * Whether the job history is on screen. Collapsed by default: the Studio's
+     * question is "what am I generating", and a table of the last fifty jobs is an
+     * answer to a different one. This is what replaced the separate /setter/ai/jobs
+     * page.
+     */
+    showHistory?: boolean
+    /** Admin mode passes through to the history table: every setter's jobs. */
+    isAdmin?: boolean
 }
 
 // Artifact types with labels and what sections they produce.
@@ -28,39 +43,14 @@ const ARTIFACTS = [
 
 type ArtifactId = typeof ARTIFACTS[number]['id']
 
-/** Map each artifact to the apply section keys it can produce. */
-const ARTIFACT_SECTIONS: Record<ArtifactId, string[]> = {
-    full_problem: ['statement', 'solution', 'tests'],
-    statement:    ['statement'],
-    tests:        ['tests'],
-    solution:     ['solution'],
-    editorial:    ['editorial'],
-}
-
-/** Human-readable labels for the apply checkboxes. */
-const SECTION_LABELS: Record<string, string> = {
-    statement: 'Statement & samples',
-    solution:  'Reference solution',
-    tests:     'Test data & generator',
-    editorial: 'Editorial',
-}
-
-function previewValue(section: string, proposal: AIProposal) {
-    switch (section) {
-        case 'statement':
-            return JSON.stringify({ title: proposal.title, description: proposal.description }, null, 2)
-        case 'solution':
-            return proposal.solution_code || '(no solution code)'
-        case 'tests':
-            return JSON.stringify({ generator: proposal.generator_code, seeds: proposal.seeds }, null, 2)
-        case 'editorial':
-            return JSON.stringify({ title: proposal.editorial_title, content: proposal.editorial_content }, null, 2)
-        default:
-            return ''
-    }
-}
-
-export default function AIStudioTab({ problemId, problemUpdatedAt, onApplied, onCreated }: Props) {
+export default function AIStudioTab({
+    problemId,
+    problemUpdatedAt,
+    onApplied,
+    onCreated,
+    showHistory = false,
+    isAdmin = false,
+}: Props) {
     const isNew = !problemId
     const [connections, setConnections] = useState<AIModel[]>([])
     const [modelId, setModelId] = useState<string>('')
@@ -69,9 +59,10 @@ export default function AIStudioTab({ problemId, problemUpdatedAt, onApplied, on
     const [artifact, setArtifact] = useState<ArtifactId>(isNew ? 'full_problem' : 'statement')
     const [brief, setBrief] = useState<AIBrief>({ ...DEFAULT_BRIEF })
     const [job, setJob] = useState<AIGenerationJob | null>(null)
-    const [selected, setSelected] = useState<string[]>([])
     const [error, setError] = useState('')
     const [appliedSlug, setAppliedSlug] = useState<string>('')
+    const [historyOpen, setHistoryOpen] = useState(false)
+    const [historyJobId, setHistoryJobId] = useState<string | null>(null)
 
     useEffect(() => {
         api.ai.connections()
@@ -94,7 +85,7 @@ export default function AIStudioTab({ problemId, problemUpdatedAt, onApplied, on
                         setJob(latest)
                         // Restore artifact picker to match the resumed job
                         const art = latest.artifact_type as ArtifactId
-                        if (ARTIFACT_SECTIONS[art]) setArtifact(art)
+                        if (ARTIFACTS.some(a => a.id === art)) setArtifact(art)
                     }
                 })
                 .catch(() => {})
@@ -102,39 +93,28 @@ export default function AIStudioTab({ problemId, problemUpdatedAt, onApplied, on
     }, [problemId])
 
     // The server runs one generation per setter. A job started from another
-    // problem never shows up in this tab — the per-problem lookup below cannot
+    // problem never shows up in this tab — the per-problem lookup above cannot
     // see it — so it is fetched explicitly. Without this the click looked safe
     // and failed with a limit error that named nothing the setter could find.
     const [activeJobs, setActiveJobs] = useState<AIGenerationJob[]>([])
 
     const refreshActive = () => {
         api.ai.listJobs(0, 20)
-            .then(r => setActiveJobs((r.data || []).filter(j => j.status === 'queued' || j.status === 'running')))
+            .then(r => setActiveJobs((r.data || []).filter(isJobActive)))
             .catch(() => {})
     }
 
     useEffect(() => { refreshActive() }, [])
-    useEffect(() => {
-        if (!job || !['queued', 'running'].includes(job.status)) return
-        const id = window.setInterval(() => api.ai.getJob(job.id).then(setJob).catch(() => {}), 1500)
-        return () => window.clearInterval(id)
-    }, [job])
 
-    // When a job becomes ready, pre-select all sections that have content.
+    // The poll that used to live here is gone: AIJobDetail owns the timer for the
+    // job in view, and it is the only component that needs it. Two loops over one
+    // job was the reason a cancel could appear to do nothing for a second.
     useEffect(() => {
-        if (!job || job.status !== 'ready' || !job.proposal) return
-        const art = (job.artifact_type as ArtifactId)
-        const candidateSections = ARTIFACT_SECTIONS[art] ?? []
-        const p = job.proposal
-        const withContent = candidateSections.filter(s => {
-            if (s === 'statement') return !!p.title
-            if (s === 'solution') return !!p.solution_code
-            if (s === 'tests') return !!p.generator_code
-            if (s === 'editorial') return !!p.editorial_title || !!p.editorial_content
-            return false
-        })
-        // deferred a microtask: selection lands pre-paint (react-hooks/set-state-in-effect)
-        queueMicrotask(() => setSelected(withContent))
+        if (!job || !isJobActive(job)) return
+        const id = window.setInterval(() => {
+            api.ai.getJob(job.id).then(setJob).catch(() => {})
+        }, 1500)
+        return () => window.clearInterval(id)
     }, [job?.status, job?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
     const updateBrief = (patch: Partial<AIBrief>) => setBrief(b => ({ ...b, ...patch }))
@@ -172,12 +152,10 @@ export default function AIStudioTab({ problemId, problemUpdatedAt, onApplied, on
         }
     }
 
-    const apply = async () => {
+    const apply = async (sections: string[]) => {
         if (!job) return
         setError('')
         try {
-            // For a new problem the statement section is mandatory.
-            const sections = isNew && !selected.includes('statement') ? ['statement', ...selected] : selected
             const result = await api.ai.applyJob(job.id, sections, problemUpdatedAt)
             setJob(await api.ai.getJob(job.id))
             if (isNew) {
@@ -190,21 +168,22 @@ export default function AIStudioTab({ problemId, problemUpdatedAt, onApplied, on
         }
     }
 
-    const proposal: AIProposal | undefined = job?.proposal
     // Gate the button on the same rule the server enforces, so the click cannot
     // walk into a limit error. The form stays editable; only starting a run is
     // blocked.
     const blocking = activeJobs[0] ?? null
     const runningCount = activeJobs.filter(j => j.status === 'running').length
-    const queuedCount = activeJobs.filter(j => j.status === 'queued').length
+    const queuedCount = activeJobs.length - runningCount
     const canStart = connections.length > 0 && brief.tags.length > 0 && !blocking
     const blockedReason = blocking
-        ? `A generation is already ${blocking.status} (${blocking.stage.replaceAll('_', ' ')}). Cancel it from AI Jobs to start another.`
+        ? `A generation is already ${blocking.status} (${statusLabel(blocking.stage)}). Cancel it from the job list below to start another.`
         : brief.tags.length === 0
             ? 'Pick at least one topic.'
             : 'Connect an AI model first.'
     const artifactDef = ARTIFACTS.find(a => a.id === artifact)!
-    const applySections = ARTIFACT_SECTIONS[job?.artifact_type as ArtifactId] ?? []
+    // A resumed or just-created job. job.status==='ready' renders the review panel;
+    // every other state is the progress card.
+    const jobActive = job ? isJobActive(job) : false
 
     return (
         <div className="space-y-5">
@@ -304,37 +283,40 @@ export default function AIStudioTab({ problemId, problemUpdatedAt, onApplied, on
 
             {job && (
                 <div className="space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <AIJobStatusBadge status={job.status} />
+                    </div>
+
                     {/* Progress card */}
                     <div className="rounded border border-hairline p-4">
                         <div className="flex items-start justify-between text-sm">
                             <div>
-                                <span className="font-medium capitalize">{job.stage.replaceAll('_', ' ')}</span>
+                                <span className="font-medium capitalize">{statusLabel(job.stage)}</span>
                                 <span className="ml-2 text-xs text-muted-soft capitalize">
-                                    ({job.artifact_type.replaceAll('_', ' ')})
+                                    ({statusLabel(job.artifact_type)})
                                 </span>
                             </div>
                             <span>{job.progress}%</span>
                         </div>
                         <div className="mt-2 h-2 rounded bg-surface-3">
                             <div
-                                className={`h-2 rounded transition-all ${
-                                    job.status === 'failed' || job.status === 'validation_failed' ? 'bg-bad' : 'bg-brand'
-                                }`}
+                                className={`h-2 rounded transition-all ${jobActive ? 'bg-brand' : 'bg-bad'}`}
                                 style={{ width: `${job.progress}%` }}
                             />
                         </div>
                         <p className="mt-2 text-xs text-muted">
-                            {job.status} · {job.prompt_tokens + job.completion_tokens} tokens · {job.latency_ms} ms
+                            {statusLabel(job.status)} · {job.prompt_tokens + job.completion_tokens} tokens · {job.latency_ms} ms
                         </p>
-                        <a
-                            href={`/setter/ai/jobs/${job.id}`}
-                            className="mt-1.5 block text-xs text-brand hover:underline"
+                        <button
+                            type="button"
+                            onClick={() => { setHistoryJobId(job.id); setHistoryOpen(true) }}
+                            className="mt-1.5 cursor-pointer text-xs text-brand hover:underline"
                         >
-                            Open full status page →
-                        </a>
+                            Open full status →
+                        </button>
                     </div>
 
-                    {(job.status === 'running' || job.status === 'queued') ? (
+                    {jobActive && (
                         <button
                             type="button"
                             onClick={cancelCurrent}
@@ -342,72 +324,43 @@ export default function AIStudioTab({ problemId, problemUpdatedAt, onApplied, on
                         >
                             Cancel
                         </button>
-                    ) : null}
+                    )}
 
                     {job.validation_report && (
                         <div className="rounded border border-hairline p-4">
                             <h3 className="mb-2 font-medium">Validation</h3>
-                            {job.validation_report.checks.map(c => (
-                                <p key={c.name} className={`text-sm ${c.passed ? 'text-ok' : 'text-bad'}`}>
-                                    {c.passed ? '✓' : '✗'} {c.name}: {c.message}
-                                </p>
-                            ))}
+                            <AIValidationList report={job.validation_report} />
                         </div>
                     )}
 
-                    {/* Apply section — scoped to what this artifact produces */}
-                    {proposal && job.status === 'ready' && (
+                    {/* Apply section — scoped to what this artifact produces, by the
+                        same component the full status view uses, so the two cannot
+                        offer different sections for one job. */}
+                    {job.status === 'ready' && job.proposal && (
                         <div className="space-y-3">
                             <h3 className="font-medium">
-                                {isNew ? 'Review the generated problem' : `Review proposed ${job.artifact_type.replaceAll('_', ' ')}`}
+                                {isNew ? 'Review the generated problem' : `Review proposed ${statusLabel(job.artifact_type)}`}
                             </h3>
-                            {applySections.map(section => {
-                                // Check if the proposal actually has content for this section
-                                const hasContent =
-                                    section === 'statement' ? !!proposal.title :
-                                    section === 'solution' ? !!proposal.solution_code :
-                                    section === 'tests' ? !!proposal.generator_code :
-                                    section === 'editorial' ? (!!proposal.editorial_title || !!proposal.editorial_content) :
-                                    false
-                                if (!hasContent) return null
-                                const isForced = isNew && section === 'statement'
-                                return (
-                                    <label key={section} className="block rounded border border-hairline p-3 cursor-pointer hover:bg-surface-2">
-                                        <span className="flex items-center gap-2 font-medium">
-                                            <input
-                                                type="checkbox"
-                                                checked={selected.includes(section) || isForced}
-                                                disabled={isForced}
-                                                onChange={e => setSelected(e.target.checked
-                                                    ? [...selected, section]
-                                                    : selected.filter(x => x !== section))}
-                                            />
-                                            {SECTION_LABELS[section] || section}
-                                        </span>
-                                        <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap text-xs text-muted">
-                                            {previewValue(section, proposal)}
-                                        </pre>
-                                    </label>
-                                )
-                            })}
-                            <div className="flex flex-wrap gap-2">
-                                <button type="button" onClick={apply} className="min-h-11 cursor-pointer rounded bg-brand px-4 text-on-brand">
-                                    {isNew ? 'Create problem' : 'Apply selected'}
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => api.ai.discardJob(job.id).then(() => setJob(null))}
-                                    className="min-h-11 cursor-pointer rounded border border-hairline-strong px-4"
-                                >
-                                    Discard
-                                </button>
-                            </div>
+                            <AIProposalReview
+                                proposal={job.proposal}
+                                artifactType={job.artifact_type}
+                                requireStatement={isNew}
+                                applyLabel={isNew ? 'Create problem' : 'Apply selected'}
+                                onApply={apply}
+                            />
+                            <button
+                                type="button"
+                                onClick={() => api.ai.discardJob(job.id).then(() => { setJob(null); refreshActive() })}
+                                className="min-h-11 cursor-pointer rounded border border-hairline-strong px-4"
+                            >
+                                Discard
+                            </button>
                         </div>
                     )}
 
-                    {['failed', 'validation_failed', 'cancelled'].includes(job.status) && (
+                    {(job.status === 'failed' || job.status === 'validation_failed' || job.status === 'cancelled') && (
                         <div>
-                            <p className="text-sm text-bad">{job.error_message || `Job ${job.status}`}</p>
+                            <p className="text-sm text-bad">{job.error_message || `Job ${statusLabel(job.status)}`}</p>
                             <div className="mt-2 flex gap-2">
                                 <button
                                     type="button"
@@ -424,6 +377,43 @@ export default function AIStudioTab({ problemId, problemUpdatedAt, onApplied, on
                                     Start again
                                 </button>
                             </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Job history. Collapsed behind a disclosure, and rendered by the same
+                component the admin tab uses — this is what replaced the standalone
+                /setter/ai/jobs page, whose table, filters, polling and cancel/retry
+                logic were a second copy of exactly this. */}
+            {showHistory && (
+                <div className="border-t border-hairline pt-4">
+                    <button
+                        type="button"
+                        onClick={() => setHistoryOpen(v => !v)}
+                        className="cursor-pointer text-sm font-medium text-ink-soft hover:text-ink"
+                    >
+                        {historyOpen ? '▾' : '▸'} Job history
+                    </button>
+                    {historyOpen && (
+                        <div className="mt-3">
+                            <AIJobList
+                                isAdmin={isAdmin}
+                                selectedId={historyJobId}
+                                onSelect={setHistoryJobId}
+                                renderDetail={(id) => (
+                                    <div className="rounded-xl border border-hairline bg-surface p-4">
+                                        <AIJobDetail
+                                            jobId={id}
+                                            isNew={isNew}
+                                            onCreated={onCreated}
+                                            onApplied={() => { refreshActive(); onApplied?.() }}
+                                            onDiscarded={() => { setHistoryJobId(null); refreshActive(); setJob(null) }}
+                                            onRetried={(newId) => { setHistoryJobId(newId); refreshActive() }}
+                                        />
+                                    </div>
+                                )}
+                            />
                         </div>
                     )}
                 </div>

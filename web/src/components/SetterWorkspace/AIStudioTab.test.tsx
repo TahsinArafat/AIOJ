@@ -30,7 +30,12 @@ test('ready proposal exposes selective apply controls', async () => {
  await waitFor(()=>screen.getByText(/Local/))
  fireEvent.click(screen.getByRole('button',{name:/Generate Statement/}))
  await waitFor(()=>expect(screen.getByRole('button',{name:'Apply selected'})).toBeInTheDocument())
- expect(screen.getByText(/statement: ok/)).toBeInTheDocument()
+ // The gate name and its message are separate nodes now that AIValidationList
+ // renders them (the old inline markup emitted "statement: ok" as one string, which
+ // the shared component deliberately does not — a long message has to wrap on its
+ // own rather than as part of the name).
+ expect(screen.getByText('statement')).toBeInTheDocument()
+ expect(screen.getByText(/— ok/)).toBeInTheDocument()
 })
 
 // Without a problemId the tab authors a brand-new problem: it must not look up

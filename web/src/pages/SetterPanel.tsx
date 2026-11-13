@@ -244,8 +244,7 @@ export default function SetterPanel() {
                             so the create-contest button gave no feedback at all. */}
                         <Link to="/setter/create" className={buttonClass({ size: 'sm' })}>New problem</Link>
                         <Link to="/setter/contest/create" className={buttonClass({ variant: 'secondary', size: 'sm' })}>New contest</Link>
-                        <Link to="/setter/ai" className={buttonClass({ variant: 'secondary', size: 'sm' })}>Generate with AI</Link>
-                        <Link to="/setter/ai/jobs" className={buttonClass({ variant: 'secondary', size: 'sm' })}>AI Jobs</Link>
+                        <Link to="/setter/ai" className={buttonClass({ variant: 'secondary', size: 'sm' })}>AI Studio</Link>
                     </>
                 }
             />

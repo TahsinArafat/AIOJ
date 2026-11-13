@@ -119,9 +119,12 @@ const ROUTE_TITLES: { pattern: RegExp; title: string }[] = [
 
     { pattern: /^\/admin$/, title: 'Admin' },
     { pattern: /^\/setter\/create$/, title: 'Create problem' },
-    { pattern: /^\/setter\/ai\/jobs\/[^/]+$/, title: 'AI generation job' },
-    { pattern: /^\/setter\/ai\/jobs$/, title: 'AI generation jobs' },
-    { pattern: /^\/setter\/ai$/, title: 'AI problem generation' },
+    // The job-list and job-detail routes now redirect into the Studio, so the only
+    // AI page that renders is /setter/ai. The two job patterns are gone rather than
+    // kept for the redirect: titleForPath describes the page a visitor SEES, and a
+    // redirect shows the Studio, so titling a transient URL "AI generation jobs"
+    // would flash the wrong title and then correct itself.
+    { pattern: /^\/setter\/ai$/, title: 'AI Studio' },
     { pattern: /^\/setter\/contest\/create$/, title: 'Create contest' },
     { pattern: /^\/setter\/contest\/[^/]+\/manage$/, title: 'Manage contest' },
     { pattern: /^\/setter\/[^/]+$/, title: 'Problem workspace' },

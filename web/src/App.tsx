@@ -1,5 +1,5 @@
 import { useState, useEffect, Suspense, lazy } from 'react'
-import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom'
 import { api, contestSlug, currentUser } from './lib/api'
 import { ThemeProvider } from './context/ThemeContext'
 import { FeaturesProvider } from './context/FeaturesContext'
@@ -70,8 +70,6 @@ const ContestProblem = lazy(() => import('./pages/ContestProblem'))
 const ContestManage = lazy(() => import('./pages/ContestManage'))
 const IDE = lazy(() => import('./pages/IDE'))
 const AIProblemCreate = lazy(() => import('./pages/AIProblemCreate'))
-const AIJobsPage = lazy(() => import('./pages/AIJobsPage'))
-const AIJobDetailPage = lazy(() => import('./pages/AIJobDetailPage'))
 const TermsOfService = lazy(() => import('./pages/legal/TermsOfService'))
 const PrivacyPolicy = lazy(() => import('./pages/legal/PrivacyPolicy'))
 const DMCA = lazy(() => import('./pages/legal/DMCA'))
@@ -426,8 +424,14 @@ function AppShell() {
                     {/* Declared before /setter/:slug so the static segment wins on
                         its own merits rather than relying on route ranking. */}
                     <Route path="/setter/ai" element={<FeatureGate feature="setter_workspace"><FeatureGate feature="ai_generation"><AIProblemCreate /></FeatureGate></FeatureGate>} />
-                    <Route path="/setter/ai/jobs" element={<FeatureGate feature="setter_workspace"><FeatureGate feature="ai_generation"><AIJobsPage /></FeatureGate></FeatureGate>} />
-                    <Route path="/setter/ai/jobs/:id" element={<FeatureGate feature="setter_workspace"><FeatureGate feature="ai_generation"><AIJobDetailPage /></FeatureGate></FeatureGate>} />
+                    {/* The job list and job detail used to be their own pages. Both are
+                        now inside the Studio — history is a disclosure and the detail
+                        view opens inline — so these redirect rather than 404. Kept as
+                        routes because the URLs were linked from the setter panel, the
+                        Studio and the admin dashboard, and a bookmark or a link in a
+                        chat is the most likely way someone reaches them. */}
+                    <Route path="/setter/ai/jobs" element={<Navigate to="/setter/ai" replace />} />
+                    <Route path="/setter/ai/jobs/:id" element={<Navigate to="/setter/ai" replace />} />
                     <Route path="/setter/contest/create" element={<FeatureGate feature="setter_workspace"><ContestCreate /></FeatureGate>} />
                     <Route path="/setter/:slug" element={<FeatureGate feature="setter_workspace"><SetterProblemWorkspace /></FeatureGate>} />
 
