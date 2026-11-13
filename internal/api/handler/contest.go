@@ -286,6 +286,13 @@ func (h *ContestHandler) Create(w http.ResponseWriter, r *http.Request) {
 		IsRated:     derefBool(req.IsRated, true),
 		RatedForMin: derefInt(req.RatedForMin, 0),
 		RatedForMax: derefInt(req.RatedForMax, 9999),
+		// Listed defaults to true, matching the column default and matching every
+		// round that existed before the field. This has to be spelled out on the
+		// create path: the Go zero value for a bool is false, so a round created by
+		// an older client that never sends `listed` would otherwise be created
+		// unlisted — visible to its own setter and absent from the site, which is
+		// the exact failure the column would then be blamed for.
+		Listed: derefBool(req.Listed, true),
 	}
 
 	if err := h.store.Create(r.Context(), c); err != nil {
@@ -565,8 +572,22 @@ func (h *ContestHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if req.RatedForMax != nil {
 		c.RatedForMax = *req.RatedForMax
 	}
+	// Listed only when sent. c was loaded from the store a few lines above, so an
+	// omitted field keeps the round's current value — which is what makes listing
+	// safe to leave out of a save that only renames the round. Sent as false it
+	// unlists, sent as true it lists; there is no default to apply here, because
+	// unlike create there is always a previous answer.
+	if req.Listed != nil {
+		c.Listed = *req.Listed
+	}
 	if req.Visible != nil {
-		c.Visible = *req.Visible
+		// Deliberately NOT assigned. visible is derived from status by the store
+		// (contests.go Update), so honouring this would make an ordinary settings
+		// save a way to publish a round — the rule the store's comment states and
+		// the same rule that applies to problems. Kept in the request struct for
+		// wire compatibility; reading it here is what the field's presence used to
+		// imply and does not mean.
+		_ = req.Visible
 	}
 	// Registration controls and division. The Settings tab had no control for any
 	// of these, and the store's UPDATE did not write them either, so a round's
@@ -660,8 +681,18 @@ func validateAccessConfig(in model.AccessConfig) (model.AccessConfig, error) {
 			return nil, fmt.Errorf("unknown access surface %q", surface)
 		}
 		if !model.ValidAccessAudience(audience) {
-			return nil, fmt.Errorf("audience for surface %q must be one of %q, %q, %q",
-				surface, model.AccessParticipants, model.AccessPublic, model.AccessStaff)
+			return nil, fmt.Errorf("audience for surface %q must be one of %q, %q, %q, %q",
+				surface, model.AccessOpen, model.AccessParticipants, model.AccessPublic, model.AccessStaff)
+		}
+		// A named 400 rather than the silent coercion NormalizeAccessConfig
+		// performs, because a user is waiting on this response. Storing it would
+		// also be storing a rule the policy refuses to enforce, which is exactly
+		// how "I set it to entrants only" ends up next to a round anyone can
+		// submit to.
+		if !model.SurfaceMayRequireParticipation(surface) && audience == model.AccessParticipants {
+			return nil, fmt.Errorf(
+				"surface %q cannot require an entrant: submitting is how a caller becomes one, so this would block the first submission of every round",
+				surface)
 		}
 		out[surface] = audience
 	}

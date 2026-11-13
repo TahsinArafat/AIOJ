@@ -101,17 +101,21 @@ func TestContestStore_AccessConfig(t *testing.T) {
 		}
 	})
 
-	t.Run("an empty config defaults every surface to participants", func(t *testing.T) {
+	t.Run("an empty config resolves every surface to open", func(t *testing.T) {
 		got, err := contestStore.GetByID(ctx, unset.ID)
 		if err != nil {
 			t.Fatalf("reload: %v", err)
 		}
 		if got.IsScoreboardPublic() {
-			t.Fatal("an unset access_config published the board; the default must be participants")
+			t.Fatal("an unset access_config published the board")
 		}
+		// open, not participants. This is the load-bearing default: every round
+		// that predates the vocabulary has an empty map, so resolving to
+		// participants here would have turned every existing round into an
+		// entrants-only round the moment the field shipped.
 		for _, surface := range model.AccessSurfaceKeys {
-			if a := got.AccessConfig.Audience(surface); a != model.AccessParticipants {
-				t.Errorf("surface %q resolved to %q, want %q", surface, a, model.AccessParticipants)
+			if a := got.AccessConfig.Audience(surface); a != model.AccessOpen {
+				t.Errorf("surface %q resolved to %q, want %q", surface, a, model.AccessOpen)
 			}
 		}
 		// And the map itself is non-nil, so a caller can index it without a check.

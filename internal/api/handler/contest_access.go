@@ -101,11 +101,17 @@ func (d contestAccessDecision) IsJudge() bool { return d.isJudge }
 func (d contestAccessDecision) IsUpcoming() bool { return d.level == accessNotStarted }
 
 // contestAccessStore is the slice of the contest store the policy needs. Declared
-// here, on the consumer side, so a test can satisfy it with two methods instead of
-// the whole ContestStore — and so this file does not depend on postgres.
+// here, on the consumer side, so a test can satisfy it with a few methods instead
+// of the whole ContestStore — and so this file does not depend on postgres.
 type contestAccessStore interface {
 	HasAccess(ctx context.Context, contestID, userID string, requiredLevels ...string) bool
 	CheckGroupRestriction(ctx context.Context, contestID, userID string) (bool, error)
+	// IsParticipant answers "did this user enter this round" — registered, or has
+	// already submitted. The only thing that makes AccessParticipants mean
+	// anything: before it was consulted here, selecting that audience stored a
+	// value no gate ever read, so a setter who believed their problems were
+	// entrants-only had published them to the world.
+	IsParticipant(ctx context.Context, contestID, userID string) (bool, error)
 }
 
 // contestGrantChecker is the publisher half of "did this user type the password".
@@ -223,9 +229,9 @@ func (p contestAccessPolicy) decide(ctx context.Context, c *model.Contest, claim
 		contentAllowed: content.level == accessGranted,
 	}
 
-	// This surface's audience, resolved once. An unset surface inherits the round's
-	// base gate, which is what makes an empty access_config mean exactly today's
-	// behaviour: §4 content rules, unchanged.
+	// This surface's audience, resolved once. An unset surface resolves to
+	// AccessOpen — the §4 content rules and nothing more — which is what makes an
+	// empty access_config mean exactly today's behaviour.
 	switch c.AccessConfig.Audience(surface) {
 	case model.AccessPublic:
 		// The feature, generalised from the scoreboard. A public surface is
@@ -238,6 +244,42 @@ func (p contestAccessPolicy) decide(ctx context.Context, c *model.Contest, claim
 		// "the board is public" can never widen the statements — the bug this
 		// whole axis exists to prevent.
 		decision.level = accessGranted
+	case model.AccessParticipants:
+		// Only people who entered the round. This is the one audience that
+		// RESTRICTS, and it is deliberately applied on top of the content verdict
+		// rather than instead of it: `content` already answered the draft, group
+		// and password questions, and the only case that reaches here with the
+		// surface still open is a caller who cleared all of them.
+		//
+		// Which surfaces may ask this is decided in the model, not here — see
+		// SurfaceMayRequireParticipation. SurfaceSubmit is excluded because
+		// requiring an entrant to submit deadlocks the first submission of every
+		// round, and Audience() has already coerced that pair to AccessOpen, so
+		// this branch is unreachable for submit by construction.
+		if !decision.Allowed() {
+			// Already refused by the group or password rule. Nothing to narrow.
+			break
+		}
+		// An anonymous caller cannot have entered, so the answer is known without
+		// asking — and asking is not merely wasteful here. user_id is a uuid
+		// column, so IsParticipant(ctx, id, "") is not a query that finds nothing:
+		// it is a query Postgres rejects with `invalid input syntax for type
+		// uuid: ""`, which this function turns into a 500. Guarding on the empty
+		// id is what keeps a signed-out visitor's request from becoming a server
+		// error on a round they are merely not entitled to.
+		if userID == "" {
+			decision.level = accessNone
+			break
+		}
+		participant, err := p.contests.IsParticipant(ctx, c.ID, userID)
+		if err != nil {
+			// Fail closed, like every other store fault in this pipeline: a
+			// database error must not become an access grant.
+			return contestAccessDecision{}, err
+		}
+		if !participant {
+			decision.level = accessNone
+		}
 	case model.AccessStaff:
 		// Organizers only. Reached only for a caller who is not already staff (the
 		// staff branch returned above), so the answer is a flat refusal, and it is

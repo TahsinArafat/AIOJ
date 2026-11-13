@@ -32,8 +32,12 @@ func withPublicBoard(c *model.Contest) *model.Contest {
 	return c
 }
 
-// withParticipantsBoard is the default a round has before anyone touches the
-// setting, spelled out so a test that means "the old behaviour" says so.
+// withParticipantsBoard restricts the board to people who entered the round.
+//
+// This is NOT "the old behaviour" — it is a deliberate restriction that used to
+// be a no-op and now withholds the board from anyone who has not registered or
+// submitted. A test that means "nobody has configured this round" wants an empty
+// AccessConfig instead, which resolves to AccessOpen.
 func withParticipantsBoard(c *model.Contest) *model.Contest {
 	c.AccessConfig = model.AccessConfig{model.SurfaceStandings: model.AccessParticipants}
 	return c
@@ -103,41 +107,52 @@ func TestContestAccessPolicyStandingsSurface(t *testing.T) {
 			want: accessGranted, wantContent: true,
 		},
 
-		// --- the default: nothing changes for a participants-only board -------
+		// --- a participants-only board actually withholds the board -----------
 		{
-			// The backwards-compatibility case. Every round that existed before this
-			// column had this behaviour, and it has to be identical to Decide.
-			name:    "participants-only board still asks for the password",
-			contest: withParticipantsBoard(passwordContest()),
-			claims:  user, stub: &accessStub{groupOK: true}, grant: grantStub{granted: false},
-			want: accessPasswordRequired, wantContent: false,
-		},
-		{
-			name:    "participants-only board still refuses a non-member",
-			contest: withParticipantsBoard(publishedContest()),
-			claims:  user, stub: &accessStub{groupOK: false},
-			want: accessNone, wantContent: false,
-		},
-		{
-			// The zero value behaves like participants: a contest built by a caller
-			// that predates the column, or a fixture that omits it, must not publish
-			// its board by accident.
-			name:    "an unset standings audience is participant-only",
+			// The backwards-compatibility case. A round with no configured surface
+			// resolves to open, so it behaves exactly as every round did before this
+			// vocabulary existed — which is the whole reason open is the default
+			// rather than participants.
+			name:    "an unset board still asks for the password",
 			contest: passwordContest(),
 			claims:  user, stub: &accessStub{groupOK: true}, grant: grantStub{granted: false},
 			want: accessPasswordRequired, wantContent: false,
 		},
 		{
-			name:    "participants-only public board is watchable by a participant",
+			name:    "an unset board still refuses a non-member",
+			contest: publishedContest(),
+			claims:  user, stub: &accessStub{groupOK: false},
+			want: accessNone, wantContent: false,
+		},
+		{
+			// The setting this axis withheld before: a board restricted to entrants
+			// must not reach a signed-in stranger who never entered.
+			name:    "a participants board refuses a non-participant who can read the round",
 			contest: withParticipantsBoard(publishedContest()),
-			claims:  user, stub: &accessStub{groupOK: true},
+			claims:  user, stub: &accessStub{groupOK: true, participant: false},
+			want: accessNone, wantContent: true,
+		},
+		{
+			name:    "a participants board is watchable by a participant",
+			contest: withParticipantsBoard(publishedContest()),
+			claims:  user, stub: &accessStub{groupOK: true, participant: true},
 			want: accessGranted, wantContent: true,
 		},
 		{
-			name:    "anonymous watches a participants-only public round",
+			// Anonymous callers cannot have entered, so they are refused. Uses an
+			// unrestricted round so the ONLY thing that can refuse them is the
+			// participation rule — on a password round the prompt would.
+			name:    "a participants board refuses an anonymous visitor on an open round",
 			contest: withParticipantsBoard(publishedContest()),
-			stub:    &accessStub{groupOK: true},
-			want:    accessGranted, wantContent: true,
+			stub:    &accessStub{groupOK: true, participant: false},
+			want:    accessNone, wantContent: true,
+		},
+		{
+			// A store failure answering the participation question must not grant.
+			name:    "a participants board fails closed on a store fault",
+			contest: withParticipantsBoard(publishedContest()),
+			claims:  user, stub: &accessStub{groupOK: true, partErr: errors.New("db down")},
+			wantErr: true,
 		},
 
 		// --- what a public board must NOT open -------------------------------

@@ -25,18 +25,24 @@ import (
 
 const testPasswordHash = "$2a$12$notarealhashbutnonempty"
 
-// accessStub is the narrow store the policy asks. Both questions are settable so a
+// accessStub is the narrow store the policy asks. Every question is settable so a
 // test can place a caller inside or outside a group without a database.
 type accessStub struct {
 	staff bool
 	// levels, when set, is answered per-level so a test can model a tester (staff,
 	// but not a judge). staff=true with no levels means "any level".
-	levels    []string
-	groupOK   bool
-	groupErr  error
-	granted   bool
-	grantErr  error
-	groupSeen bool
+	levels   []string
+	groupOK  bool
+	groupErr error
+	// participant answers "did this user enter the round", which is what makes an
+	// AccessParticipants surface mean anything. Defaults to false, so a test that
+	// says nothing about it is testing a caller who did not enter — the answer
+	// that must NOT grant access.
+	participant bool
+	partErr     error
+	granted     bool
+	grantErr    error
+	groupSeen   bool
 }
 
 func (s *accessStub) HasAccess(_ context.Context, _, _ string, required ...string) bool {
@@ -56,6 +62,10 @@ func (s *accessStub) HasAccess(_ context.Context, _, _ string, required ...strin
 func (s *accessStub) CheckGroupRestriction(context.Context, string, string) (bool, error) {
 	s.groupSeen = true
 	return s.groupOK, s.groupErr
+}
+
+func (s *accessStub) IsParticipant(context.Context, string, string) (bool, error) {
+	return s.participant, s.partErr
 }
 
 type grantStub struct {

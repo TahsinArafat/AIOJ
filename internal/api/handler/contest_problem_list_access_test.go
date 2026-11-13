@@ -207,4 +207,65 @@ func TestContestPageProblemListAudience(t *testing.T) {
 			t.Fatalf("staff problems = %d, want 1", n)
 		}
 	})
+
+	// The regression this whole audience was fixed for.
+	//
+	// On an unrestricted round the page admits everyone, so the ONLY thing that can
+	// withhold the list is the participation rule. Before the fix, `participants`
+	// fell through to the content verdict — which grants any caller on such a round
+	// — so a setter who set their problem list to "Participants only" was served
+	// every title to a signed-out visitor, and the live round was doing exactly
+	// that. Every assertion here would have been vacuously true under the old
+	// behaviour, which is why this case has to use a round with NO password and NO
+	// group: with either present, the content gate refuses on its own and proves
+	// nothing about the audience.
+	unrestricted := mk("unrestricted "+uuid.New().String()[:8],
+		model.AccessConfig{model.SurfaceProblemList: model.AccessParticipants}, started)
+	unrestricted.PasswordHash = ""
+	if err := contestStore.Create(ctx, unrestricted); err != nil {
+		t.Fatalf("create unrestricted contest: %v", err)
+	}
+	if err := contestStore.AddProblem(ctx, unrestricted.ID, problem.ID, "A", 100, 0); err != nil {
+		t.Fatalf("attach problem: %v", err)
+	}
+	defer func() {
+		db.ExecContext(ctx, "DELETE FROM contest_problems WHERE contest_id = $1", unrestricted.ID)
+		db.ExecContext(ctx, "DELETE FROM contests WHERE id = $1", unrestricted.ID)
+	}()
+
+	t.Run("an open round honours participants on its problem list", func(t *testing.T) {
+		// The page still opens — the round itself is public, so refusing it would
+		// be wrong — but the list it carries is empty. That pair is the setting
+		// working: "you may open this round, you may not read its problems."
+		code, n, titled := problemCount(unrestricted, nil)
+		if code != http.StatusOK {
+			t.Fatalf("unrestricted page = %d, want 200: the round itself is open, "+
+				"so the page must still render its shell", code)
+		}
+		if n != 0 {
+			t.Fatalf("problems = %d, want 0 — a signed-out visitor read the problem "+
+				"list of a round whose list is set to Participants only", n)
+		}
+		if titled != 0 {
+			t.Fatalf("titles = %d, want 0", titled)
+		}
+	})
+
+	t.Run("an open round's statements are withheld too", func(t *testing.T) {
+		// The list and the statement are separate surfaces, and an absent statement
+		// entry inherits the base — NOT the problem list's restriction, because
+		// inheritance flows from the base only. Here the base is open, so the
+		// statements fall through to the content rules and ARE readable. Asserting
+		// it keeps the one-way rule honest: restricting the list must not silently
+		// restrict a surface the setter did not touch.
+		p := newContestAccessPolicy(&accessStub{groupOK: true}, grantStub{})
+		decision, err := p.Decide(context.Background(), unrestricted, nil, model.SurfaceStatement)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !decision.Allowed() {
+			t.Fatal("setting the problem list to participants also closed the " +
+				"statements; inheritance must flow from the base, never sideways")
+		}
+	})
 }

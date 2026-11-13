@@ -32,6 +32,15 @@ export interface SurfaceSpec {
      * it.
      */
     allowsStaff: boolean
+    /**
+     * Whether "participants" is a coherent choice. False for submit only, and the
+     * reason is a deadlock the form must not invite: an entrant is by definition
+     * someone who registered or has already submitted, so requiring one in order
+     * to submit means the first submission of a round can never happen. The server
+     * rejects this with a 400 rather than silently storing it, so offering the
+     * option would be offering a save that fails.
+     */
+    allowsParticipants: boolean
 }
 
 /**
@@ -47,41 +56,51 @@ export const SURFACES: SurfaceSpec[] = [
         label: 'Take part',
         hint: 'The round itself. Every surface below inherits this unless it has its own setting.',
         allowsStaff: false,
+        allowsParticipants: true,
     },
     {
         key: 'problem_list',
         label: 'Problem list',
         hint: 'The list of problems, their letters, titles and solve counts.',
         allowsStaff: false,
+        allowsParticipants: true,
     },
     {
         key: 'statement',
         label: 'Problem statements',
         hint: 'Reading an individual problem. This is what a competitor needs to solve it.',
         allowsStaff: false,
+        allowsParticipants: true,
     },
     {
         key: 'pdf',
         label: 'Printable booklet',
         hint: 'The PDF of every problem. Useful for a printed, on-site round.',
         allowsStaff: true,
+        allowsParticipants: true,
     },
     {
         key: 'submit',
         label: 'Submit solutions',
         hint: 'Sending an answer. Independent of reading, so a practice round can accept code from anyone.',
         allowsStaff: false,
+        // Excluded deliberately: see allowsParticipants' doc. A round that wants
+        // to accept submissions only from named people restricts the round itself
+        // (Take part), which leaves registration as the route in.
+        allowsParticipants: false,
     },
     {
         key: 'standings',
         label: 'Standings',
         hint: 'The scoreboard. Often published to spectators while the problems stay private.',
         allowsStaff: false,
+        allowsParticipants: true,
     },
 ]
 
 export const AUDIENCE_LABELS: Record<AccessAudience, string> = {
-    participants: 'Participants',
+    open: 'Anyone who can open the round',
+    participants: 'Participants only',
     public: 'Anyone',
     staff: 'Organizers only',
 }
@@ -91,16 +110,34 @@ export const AUDIENCE_LABELS: Record<AccessAudience, string> = {
  * `AccessConfig.Audience` on the server.
  *
  * An explicit entry wins; otherwise the surface inherits `participate`; otherwise
- * participants. One-way only: a public surface never widens its neighbours, which
- * is the rule that keeps "I published the scoreboard" from publishing the
- * statements.
+ * open, which is the behaviour every round had before this setting existed. One-way
+ * only: a public surface never widens its neighbours, which is the rule that keeps
+ * "I published the scoreboard" from publishing the statements.
  */
 export function surfaceAudience(config: AccessConfig | undefined, surface: AccessSurface): AccessAudience {
     const explicit = config?.[surface]
-    if (explicit) return explicit
+    if (explicit) return coerceAudience(surface, explicit)
     const base = config?.participate
-    if (base) return base
-    return 'participants'
+    if (base) return coerceAudience(surface, base)
+    return 'open'
+}
+
+/**
+ * The mirror of the server's coercion, so the form cannot display a combination
+ * the server would refuse. One case: `participants` on a surface that may not
+ * require an entrant (submit) reads as open.
+ *
+ * Applied on the INHERITED path too, which is the subtle half — a setter who sets
+ * the whole round to "participants" never wrote anything on submit, and the form
+ * would otherwise show submit as restricted while the server treats it as open.
+ */
+export function coerceAudience(surface: AccessSurface, audience: AccessAudience): AccessAudience {
+    if (audience === 'participants' && !allowsParticipants(surface)) return 'open'
+    return audience
+}
+
+export function allowsParticipants(surface: AccessSurface): boolean {
+    return SURFACES.find((s) => s.key === surface)?.allowsParticipants ?? true
 }
 
 /**
@@ -139,13 +176,21 @@ export function publicSurfaces(config: AccessConfig | undefined): SurfaceSpec[] 
     return SURFACES.filter((s) => s.key !== 'participate' && surfaceAudience(config, s.key) === 'public')
 }
 
-/** A copy with every invalid entry dropped, harmless to send back. */
+/**
+ * A copy with every invalid entry dropped, harmless to send back.
+ *
+ * Mirrors the server's NormalizeAccessConfig, including its one coercion: an
+ * invalid audience is dropped, and `participants` on a surface that may not
+ * require an entrant becomes `open`. Sending the raw combination would be a 400
+ * from validateAccessConfig, so a form that could produce it would be a form with
+ * a save button that sometimes fails for reasons the user cannot see.
+ */
 export function sanitizeAccessConfig(config: AccessConfig | undefined): AccessConfig {
     const out: AccessConfig = {}
     for (const surface of SURFACES) {
         const audience = config?.[surface.key]
-        if (audience === 'participants' || audience === 'public' || audience === 'staff') {
-            out[surface.key] = audience
+        if (audience === 'open' || audience === 'participants' || audience === 'public' || audience === 'staff') {
+            out[surface.key] = coerceAudience(surface.key, audience)
         }
     }
     return out

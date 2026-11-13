@@ -7,8 +7,13 @@
  * Per-surface access. The vocabulary lives here rather than in lib/contestAccess.ts
  * because this file has no imports by design (it is generated-shaped), and the
  * lib re-exports these so there is exactly one definition of each.
+ *
+ * `open` is what an ABSENT key resolves to: anyone who can open the round. It is
+ * separately named because a setter needs a way to opt one surface OUT of a
+ * round-wide "participants" base, which clearing the row cannot express — a
+ * cleared row inherits the base.
  */
-export type AccessAudience = 'participants' | 'public' | 'staff'
+export type AccessAudience = 'open' | 'participants' | 'public' | 'staff'
 
 export type AccessSurface =
     | 'participate'
@@ -279,10 +284,22 @@ export interface Contest {
      * the map only ever records a deliberate override, so an empty object is a
      * round that behaves exactly as it did before this setting existed. Read it
      * through the helper in lib/contestAccess.ts rather than indexing directly, or
-     * you will treat "inherit" and "participants" as different things when they
-     * resolve the same way.
+     * you will treat "inherit" and "open" as different things when they resolve
+     * the same way.
      */
     access_config?: AccessConfig
+    /**
+     * Whether the round appears in the public contest catalog and in search.
+     * Defaults to true on the server; every round that predates this field is
+     * listed.
+     *
+     * NOT the same as `visible`, which means "may be opened" and is derived from
+     * status by the server — editing a round can never publish it. An unlisted
+     * round is still reachable by its direct link under its own access rules, and
+     * is simply not enumerated. That pair is what makes this usable for an onsite
+     * or invitation-only round, whose participants hold a URL.
+     */
+    listed?: boolean
     group_id?: string
     rating_calculated: boolean
     created_by: string

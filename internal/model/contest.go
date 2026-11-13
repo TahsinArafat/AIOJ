@@ -24,8 +24,27 @@ type Contest struct {
 	// HasPassword is the only signal the client gets, and it needs it: the
 	// contest page renders an unlock prompt when this is set and the caller has
 	// no grant yet.
-	HasPassword           bool                    `json:"has_password"`
-	Visible               bool                    `json:"visible"`
+	HasPassword bool `json:"has_password"`
+	// Visible is "this round may be opened" — derived from status, never taken
+	// from a caller. It is NOT "this round is advertised": see Listed.
+	Visible bool `json:"visible"`
+	// Listed is whether the round appears in the public contest catalog and in
+	// search. Defaults to true, so every round that existed before this field is
+	// listed exactly as it was.
+	//
+	// Separate from Visible because "may be opened" and "is advertised" are two
+	// questions a setter answers differently. An onsite or school round is open to
+	// its competitors and is not something to publish to the world; an
+	// invitation-only round is open to its invitees and must not be enumerated.
+	// Before this the only way to express either was to unpublish, which also
+	// closed the round to the people it was for.
+	//
+	// Unlisted is not hidden. A round with this false is still reachable by its
+	// direct link, under exactly the access rules its surfaces declare — that is
+	// what makes it usable for a round whose participants hold a URL. What it
+	// loses is enumeration: the catalog listing, the search results, and the
+	// count on the contests page.
+	Listed                bool                    `json:"listed"`
 	Description           string                  `json:"description,omitempty"`
 	RegistrationRequired  bool                    `json:"registration_required"`
 	RegistrationDeadline  *time.Time              `json:"registration_deadline,omitempty"`
@@ -93,10 +112,30 @@ const (
 // scoreboard_visibility was a string in migration 000088), and one enum per
 // surface would give the same word different spellings on each.
 const (
-	// AccessParticipants: reaching this surface is part of reading the round, so
-	// the password and group rules apply exactly as they do to the statements.
-	// This is the default for every surface, and it is what every round did
-	// before any of these settings existed.
+	// AccessOpen: anyone who can open the round may reach this surface — the
+	// password and group rules apply, and nothing else does. This is what an
+	// unset surface resolves to, and it is what every round did before any of
+	// these settings existed, so it is the only safe default.
+	//
+	// It is separately named rather than being the meaning of an absent key for
+	// one reason: a setter has to be able to opt one surface OUT of a round-wide
+	// "participants only" base. Clearing the row would not do it, because a
+	// cleared row inherits the base; "open" is the value that says "this surface
+	// is not restricted to entrants" explicitly.
+	AccessOpen = "open"
+	// AccessParticipants: only people taking part in the round — someone who
+	// registered, or who has already submitted. The setter's choice for a round
+	// whose problems must not be readable by the public, which is the ordinary
+	// case for a graded or onsite round, and could not be expressed before: the
+	// word existed but nothing consulted the registration table, so selecting it
+	// changed nothing and a setter who believed their problems were hidden had
+	// published them.
+	//
+	// Not the default. An unset surface resolves to AccessOpen, and this is only
+	// ever a stored choice — which is why a round with no configured surface
+	// behaves exactly as it did before this vocabulary existed.
+	//
+	// Not honoured on every surface; see SurfaceMayRequireParticipation.
 	AccessParticipants = "participants"
 	// AccessPublic: anyone may reach this surface, including a signed-out visitor
 	// who never held the password. The round's OTHER surfaces are unaffected —
@@ -161,7 +200,22 @@ func ValidAccessSurface(key string) bool {
 // handler rather than left to a constraint, so a bad value is a 400 with a
 // reason instead of a 500.
 func ValidAccessAudience(a string) bool {
-	return a == AccessParticipants || a == AccessPublic || a == AccessStaff
+	return a == AccessOpen || a == AccessParticipants || a == AccessPublic || a == AccessStaff
+}
+
+// SurfaceMayRequireParticipation reports whether requiring an entrant on this
+// surface is coherent.
+//
+// False for exactly one surface, and the reason is a deadlock rather than a
+// preference: an entrant is by definition someone who registered or has already
+// submitted, so gating the submit surface on being an entrant means the first
+// submission of a round can never happen — and on a round that does not require
+// registration there is no other door, because POST /register answers 400
+// "registration not required". The same argument would cover SurfaceParticipate,
+// but there the round's register endpoint is deliberately outside this policy,
+// so the escape exists and the setting is honest.
+func SurfaceMayRequireParticipation(surface string) bool {
+	return surface != SurfaceSubmit
 }
 
 // AccessConfig maps a surface key to the audience that may reach it. An absent
@@ -175,11 +229,17 @@ type AccessConfig map[string]string
 
 // Audience resolves one surface to its effective audience.
 //
-// The two rules, in order:
+// The rules, in order:
 //
 //  1. An explicit entry wins.
-//  2. Otherwise the surface inherits SurfaceParticipate, and if that is also
-//     unset, participants.
+//  2. Otherwise the surface inherits SurfaceParticipate.
+//  3. Otherwise open — the pre-settings behaviour of every round.
+//
+// Rule 3 is the one that has to be right for a round nobody has configured. It
+// answers AccessOpen rather than AccessParticipants: an empty map has to mean
+// what every round did before this feature existed, and that was "anyone who can
+// open the round may read it". Answering participants here would have turned
+// every unconfigured round into an entrants-only round the moment this shipped.
 //
 // Note what is NOT inherited: a surface set to "public" does not make the
 // surfaces below it public, and SurfaceParticipate set to "public" does not
@@ -190,12 +250,28 @@ type AccessConfig map[string]string
 // the scoreboard axis was introduced to fix.
 func (a AccessConfig) Audience(surface string) string {
 	if v, ok := a[surface]; ok && ValidAccessAudience(v) {
-		return v
+		return coerceAudience(surface, v)
 	}
 	if v, ok := a[SurfaceParticipate]; ok && ValidAccessAudience(v) {
-		return v
+		return coerceAudience(surface, v)
 	}
-	return AccessParticipants
+	return AccessOpen
+}
+
+// coerceAudience is the one place a surface's audience is adjusted to something
+// that surface can actually honour, so the store and the policy cannot disagree
+// about what a submitted value means.
+//
+// One coercion only: `participants` on a surface that may not require an entrant
+// becomes `open`. Applied on inheritance as well as on a stored entry, which is
+// the case that matters — a setter who sets the round itself to "participants"
+// would otherwise deadlock submit by inheritance, a rule nobody wrote and the
+// settings screen could not show.
+func coerceAudience(surface, audience string) string {
+	if audience == AccessParticipants && !SurfaceMayRequireParticipation(surface) {
+		return AccessOpen
+	}
+	return audience
 }
 
 // NormalizeAccessConfig returns a config with every invalid entry dropped and
@@ -205,12 +281,19 @@ func (a AccessConfig) Audience(surface string) string {
 // there is no response to write: a row written by an older build, or by hand,
 // must not be able to make a surface permanently unreachable. Validation with a
 // 400 happens in the handler, on input a user supplied.
+//
+// An "open" entry is KEPT even though an absent key resolves to the same value.
+// It looked like a redundant entry, but it is the only way to say "this surface
+// is not restricted to entrants" on a round whose base gate is participants —
+// dropping it would silently re-restrict the one surface the setter was opting
+// out, which is the failure this whole axis keeps producing.
 func NormalizeAccessConfig(a AccessConfig) AccessConfig {
 	out := AccessConfig{}
 	for k, v := range a {
-		if ValidAccessSurface(k) && ValidAccessAudience(v) {
-			out[k] = v
+		if !ValidAccessSurface(k) || !ValidAccessAudience(v) {
+			continue
 		}
+		out[k] = coerceAudience(k, v)
 	}
 	return out
 }
@@ -399,6 +482,17 @@ type CreateContestRequest struct {
 	IsRated     *bool `json:"is_rated,omitempty"`
 	RatedForMin *int  `json:"rated_for_min,omitempty"`
 	RatedForMax *int  `json:"rated_for_max,omitempty"`
+	// Listed is whether the round appears in the catalog and in search. A pointer
+	// for the same reason as the rating controls: this DTO backs both create and
+	// update, and false is a real choice, so an omitted field must mean "leave it
+	// alone" rather than "unlist this round".
+	//
+	// Distinct from Visible, which is in this struct only for compatibility: the
+	// server derives Visible from status on both paths and ignores what a caller
+	// sends, because editing a round must never be a way to publish one. Listed
+	// has no such rule — it is a settable property on a published round, not a
+	// publication action.
+	Listed *bool `json:"listed,omitempty"`
 }
 
 type ContestRegistration struct {
