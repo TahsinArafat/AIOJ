@@ -320,3 +320,39 @@ func TestSpectateHandlerEnforcesPolicy(t *testing.T) {
 		})
 	}
 }
+
+/**
+ * A private round with a published board, watched anonymously.
+ *
+ * This is the combination the setting exists for and the one reported from the
+ * live round: password-protected problems, public standings, viewer signed out.
+ * It answers 200 from the scoreboard and 404 from the contest page — two different
+ * doors, and the spectator is only ever given the first. Getting this wrong makes
+ * the feature useless in exactly its intended case, so it is pinned separately
+ * from the table above where a group stub defaults to allowed.
+ */
+func TestAnonymousSpectatorWatchesAPrivateRoundsPublicBoard(t *testing.T) {
+	// Anonymous: nil claims, so no grant is even possible.
+	private := withPublicBoard(passwordContest())
+	p := newContestAccessPolicy(&accessStub{groupOK: true}, grantStub{granted: false})
+
+	spectate, err := p.DecideSpectate(context.Background(), private, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !spectate.Allowed() {
+		t.Fatalf("anonymous spectator was refused a public board (level=%v); a private round's public board is unlisted but watchable", spectate.level)
+	}
+	// The board is watchable, the round is not readable: that pair is the whole
+	// point, and losing the second half would publish the statements.
+	content, err := p.Decide(context.Background(), private, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if content.Allowed() {
+		t.Fatal("a public board must not make the round's content readable")
+	}
+	if !content.NeedsPassword() {
+		t.Fatalf("content answer = %v, want password_required so the page can prompt rather than 404", content.level)
+	}
+}

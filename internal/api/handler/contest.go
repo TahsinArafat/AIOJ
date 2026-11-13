@@ -646,7 +646,7 @@ func (h *ContestHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 		isJudge = false
 	}
 
-	// Check cache (key: contestID:view:page:limit:judge:titles)
+	// Check cache (key: contestID:view:page:limit:judge:titles:canSeeJudge)
 	pageStr := r.URL.Query().Get("page")
 	limitStr := r.URL.Query().Get("limit")
 	// isJudge belongs in the key: a judge sees past the freeze and gets
@@ -656,8 +656,20 @@ func (h *ContestHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 	// canReadRound belongs in the key for the same reason: it decides whether the
 	// problem titles are in the body, so without it the first participant to load
 	// a public board would have published the titles to every spectator with it.
+	//
+	// canSeeJudge belongs in the key and is the one that was missed. It reports
+	// whether the CALLER may switch to the judge view, and it survives the
+	// ?view=public override above: a judge asking for the public board gets
+	// is_judge=false with can_see_judge=true, while an anonymous spectator on a
+	// public round gets the same is_judge=false, the same view=public, and — since
+	// an unrestricted round is readable by anyone — the same canReadRound=true.
+	// Every other component of the key matched, so the judge's entry was served to
+	// anonymous visitors, and the standings page rendered its "Judge View" toggle
+	// to people who had no judge privilege at all. Verified against a live round:
+	// an anonymous request for ?view=public returned can_see_judge=true from a HIT.
 	cacheKey := contest.ID + ":" + viewParam + ":" + pageStr + ":" + limitStr + ":" +
-		strconv.FormatBool(isJudge) + ":" + strconv.FormatBool(canReadRound)
+		strconv.FormatBool(isJudge) + ":" + strconv.FormatBool(canReadRound) + ":" +
+		strconv.FormatBool(canSeeJudge)
 	if cached, ok := h.cache.get(cacheKey); ok {
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("X-Cache", "HIT")
