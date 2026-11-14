@@ -250,6 +250,10 @@ export default function ContestProblem() {
     const [error, setError] = useState<string | null>(null)
 
     const [tab, setTab] = useState<'statement' | 'submissions' | 'clarifications'>('statement')
+    // Below `lg` the two panes stack, and the statement is long enough that the
+    // editor would sit far below the fold — on a phone that reads as "there is no
+    // code area". A toggle shows one pane at a time, the way the practice page does.
+    const [pane, setPane] = useState<'problem' | 'code'>('problem')
 
     // The round's clarifications for the tab below. Polled only while that tab
     // is open: this page's job is the statement and the editor, and a poll per
@@ -661,12 +665,31 @@ export default function ContestProblem() {
                 // works, and it also stops them collapsing to nothing on a viewport
                 // shorter than the notices above them. When the floor bites, `main`
                 // overflows and scrolls.
-                className={`flex select-none ${isNarrow ? 'flex-col gap-6' : 'lg:min-h-[24rem] lg:flex-1'}`}
+                className={`flex select-none ${isNarrow ? 'flex-col gap-4' : 'lg:min-h-[24rem] lg:flex-1'}`}
                 style={{ cursor: dragging ? 'col-resize' : undefined }}
             >
+                {/* Below `lg` the panes stack, so show one at a time. */}
+                {isNarrow && (
+                    <div className="flex w-full flex-shrink-0 border-b border-hairline bg-surface">
+                        {([['problem', 'Problem'], ['code', 'Code']] as const).map(([key, label]) => (
+                            <button
+                                key={key}
+                                onClick={() => setPane(key)}
+                                aria-pressed={pane === key}
+                                className={`flex-1 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors cursor-pointer ${pane === key
+                                    ? 'border-brand text-brand'
+                                    : 'border-transparent text-muted hover:text-ink'
+                                    }`}
+                            >
+                                {label}
+                            </button>
+                        ))}
+                    </div>
+                )}
+
                 {/* LEFT: Problem content (splitPos% width) */}
                 <div
-                    className="space-y-4 overflow-y-auto pr-1"
+                    className={`space-y-4 overflow-y-auto pr-1 ${isNarrow && pane !== 'problem' ? 'hidden' : ''}`}
                     style={isNarrow ? { width: '100%' } : { width: `${splitPos}%`, minWidth: '20%' }}
                 >
                     {/* Back link */}
@@ -810,7 +833,7 @@ export default function ContestProblem() {
                     short screen the column overflows and scrolls — reaching the
                     scratchpad and quick links — instead of squeezing them out of view. */}
                 <div
-                    className="flex flex-col gap-3 overflow-y-auto pl-1"
+                    className={`flex flex-col gap-3 overflow-y-auto pl-1 ${isNarrow && pane !== 'code' ? 'hidden' : ''}`}
                     style={isNarrow ? { width: '100%' } : { width: `${100 - splitPos}%`, minWidth: '20%' }}
                 >
                     {showSubmit ? (
@@ -846,11 +869,16 @@ export default function ContestProblem() {
                                 verdict are on screen the moment Submit is pressed. */}
                             {result && <SubmissionResult result={result} polling={polling} />}
 
-                            {/* Grows into the room left over, never below 360px: an
-                                explicit min-height overrides the flex default of
-                                `min-height: auto`, so on a short screen the column
-                                overflows and scrolls rather than squeezing the editor. */}
-                            <div className="flex min-h-[360px] flex-1 flex-col">
+                            {/* A *definite* height when the panes are stacked, flex-fill
+                                when they share a row. CodeEditor sizes itself with
+                                `height: 100%`, which resolves against the parent's height
+                                — and a percentage against an auto-height parent is `auto`.
+                                Stacked, this column has auto height, so `min-h-[360px]
+                                flex-1` left the wrapper indefinite and the editor
+                                collapsed to its toolbar, leaving a 1-2px code area on a
+                                phone. An explicit height below `lg`, and `lg:flex-1` where
+                                the column is definite, fixes both. */}
+                            <div className="flex h-[360px] shrink-0 flex-col lg:h-auto lg:min-h-[360px] lg:flex-1 lg:shrink">
                                 <CodeEditor
                                     language={language}
                                     value={code}

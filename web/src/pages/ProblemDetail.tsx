@@ -450,7 +450,10 @@ export default function ProblemDetail() {
             {/* Problem Statement */}
             <div
                 className={`space-y-4 overflow-y-auto pr-1 ${mobileTab === 'problem' ? '' : 'hidden'} md:block`}
-                style={isDesktop ? { width: `${splitPos}%`, minWidth: '20%' } : { flex: 1 }}
+                // No `flex: 1` while stacked: below `md` the column has auto height,
+                // so a basis-0 item is sized by its own content and the value buys
+                // nothing. It is only meaningful once the two panes share a row.
+                style={isDesktop ? { width: `${splitPos}%`, minWidth: '20%' } : undefined}
             >
                 <div>
                     <h1 className="flex flex-wrap items-center gap-2 text-xl font-semibold tracking-tight text-ink sm:text-2xl">
@@ -694,7 +697,7 @@ export default function ProblemDetail() {
                 // short screen the column overflows and scrolls — reaching the
                 // scratchpad — instead of squeezing it out of view.
                 className={`flex-col gap-3 overflow-y-auto pl-1 md:flex ${mobileTab === 'code' ? 'flex' : 'hidden'}`}
-                style={isDesktop ? { width: `${100 - splitPos}%`, minWidth: '20%' } : { flex: 1 }}
+                style={isDesktop ? { width: `${100 - splitPos}%`, minWidth: '20%' } : undefined}
             >
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 flex-shrink-0">
                     <select
@@ -725,11 +728,14 @@ export default function ProblemDetail() {
                 {/* Submission receipt. Sits above the editor so the id and the
                     live verdict are on screen the instant Submit is pressed. */}
                 {result && <div className="flex-shrink-0"><SubmissionStatusPanel submission={result} polling={pollingResult} /></div>}
-                {/* Grows into the room left over, never below 360px: an explicit
-                    min-height overrides the flex default of `min-height: auto`, so on a
-                    short screen the column overflows and scrolls rather than squeezing
-                    the editor down to nothing. */}
-                <div className="min-h-[360px] flex-1">
+                {/* A *definite* height when stacked, flex-fill when side by side.
+                    CodeEditor sizes itself with `height: 100%`, which resolves against
+                    the parent's height — and a percentage against an auto-height parent
+                    is `auto`. Below `md` the column has auto height, so `min-h-[360px]
+                    flex-1` left the wrapper indefinite and the editor collapsed to its
+                    48px toolbar (a 1-2px code area on a phone). An explicit height on
+                    mobile, and `md:flex-1` where the column is definite, fixes both. */}
+                <div className="h-[360px] shrink-0 md:h-auto md:min-h-[360px] md:flex-1 md:shrink">
                     <CodeEditor
                         language={lang}
                         value={code}
