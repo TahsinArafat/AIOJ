@@ -621,11 +621,24 @@ stopped being satisfied, and only the assertions said so.
 |---|---|
 | 1 | The route split is done and an unwired required handler now fails at boot rather than per request. Still open: the 77 fields remain one flat struct, so nothing distinguishes required from optional at the type level. |
 | 3 | Closed for the four widest. `TrainingPlanStore` (21), `GroupStore` (19) and `AIGenerationStore` (20) remain, but each has one or two consumers, so the payoff is smaller than the four done. |
-| 13 | `ContestManage`'s settings form is split, but the file is still 1893 lines and the other four large pages (`ContestDetail` 1204, `Profile` 1226, `ContestProblem` 1017, `ProblemDetail` 853) are untouched. The missing shared fetch hook — 18 raw `await api.*` and 41 `setLoading`/`setError` sites in one page — is the duplication half. |
+| 13 | `ContestManage` is down to 1880 lines with a shared fetch hook, but the other four large pages (`ContestDetail` 1204, `Profile` 1226, `ContestProblem` 1017, `ProblemDetail` 853) are untouched. |
 
 Closed since the first pass: 3 (the four widest stores), 4 (vjudge), 6 (run
 modes), 7 (scoreboard), 8 (recommendations), 9 (the real half), 10 (contest
 refusal), 11 (test stubs), 12 (config), 13 (settings form), 14 (false positive).
+
+### Finding 13 — the shared fetch hook
+
+The duplication half: eleven tab components open-coded the same data/loading/load/
+useEffect scaffold, and each handled failure differently — some did not catch at
+all, two used an empty catch, so a failed fetch was a permanent spinner on one tab
+and an empty list on another.
+
+`useAsyncData` is the shape they all wanted. Five tabs use it now, and
+ContestManage drops 11 `useState` and 5 `useEffect`. Two behaviours the
+hand-rolled versions got wrong are pinned: a superseded request cannot overwrite
+a newer result (verified by removing the guard and watching the test fail), and
+`reload` marks loading immediately.
 
 The `SubmissionStore` split (finding 3) is the worked example for the remaining
 interface carves: measure the consumers first, then carve along the axes the
