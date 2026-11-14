@@ -1,19 +1,22 @@
 package api
 
 import (
+	"context"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"os"
-	"reflect"
-	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/tahsinarafat/aioj/internal/api/handler"
+	"github.com/tahsinarafat/aioj/internal/api/middleware"
 	"github.com/tahsinarafat/aioj/internal/auth"
+	"github.com/tahsinarafat/aioj/internal/model"
 )
 
 /**
@@ -33,6 +36,13 @@ import (
  *
  * then review the diff. A route disappearing from that diff is the whole point
  * of the file.
+ *
+ * The middleware column is classified by behaviour, not by symbol name. The
+ * first version keyed on runtime function names and broke in CI: Go gives every
+ * closure from one function the same name and the same code pointer, so the auth,
+ * role and feature gates were one indistinguishable token, and whether a name
+ * appeared at all depended on inlining. See classifyMiddleware for what replaced
+ * it.
  */
 
 // routeLine is one mounted route as the test records it.
@@ -42,6 +52,10 @@ import (
 // losing AuthMiddleware or a feature gate during a refactor — the endpoint still
 // answers, it just answers to everybody. chi hands the walk the real middleware
 // chain, so the chain is pinned alongside the path.
+//
+// Each entry is a behaviour class — pass-through, optional-auth, auth-required,
+// role-required, rate-limited — not a function name, so the table means the same
+// thing on every machine and every Go build.
 type routeLine struct {
 	Method string
 	Path   string
@@ -51,7 +65,8 @@ type routeLine struct {
 	Middleware []string
 }
 
-func collectRoutes(t *testing.T, mux http.Handler) []routeLine {
+// collectRoutes walks the router and classifies each route's middleware chain.
+func collectRoutes(t *testing.T, mux http.Handler, _ *auth.JWTManager) []routeLine {
 	t.Helper()
 
 	r, ok := mux.(*chi.Mux)
@@ -63,7 +78,7 @@ func collectRoutes(t *testing.T, mux http.Handler) []routeLine {
 	err := chi.Walk(r, func(method, route string, _ http.Handler, mws ...func(http.Handler) http.Handler) error {
 		names := make([]string, 0, len(mws))
 		for _, mw := range mws {
-			names = append(names, middlewareName(mw))
+			names = append(names, classifyMiddleware(mw))
 		}
 		out = append(out, routeLine{Method: method, Path: route, Middleware: names})
 		return nil
@@ -81,46 +96,79 @@ func collectRoutes(t *testing.T, mux http.Handler) []routeLine {
 	return out
 }
 
-// middlewareName reduces a middleware func to a stable, readable name.
+// probeClaims is the identity the second probe carries. AuthMiddleware puts
+// exactly this on the request context in production, so seeding it is what lets a
+// role gate be observed on its own.
 //
-// The runtime name of a closure is not stable: a middleware defined inline in
-// NewRouter reports as "func1" while the same middleware as a method reports as
-// "api.(*routerBuilder).gate.1", and moving that code changes the string without
-// changing a single request's behaviour. A table keyed on those strings would
-// fail on every refactor and be regenerated reflexively, which is how a route
-// table stops being a check.
+// This is why the token probe alone was not enough: RequireRole reads claims from
+// the context and checks the role only once it has them, so a request that merely
+// carries a token still answers 401 — indistinguishable from an auth gate.
+var probeClaims = &auth.Claims{
+	UserID: "classify-probe-user",
+	Role:   model.RoleUser,
+}
+
+// classifyMiddleware identifies a middleware by what it DOES, not by its symbol.
 //
-// So the name is degraded to the part that has meaning: the concrete middleware
-// whose effect is observable (AuthMiddleware, RequireRole, StrictAuth,
-// OptionalAuthMiddleware, and the base chain) keeps its name, and everything
-// else — the feature-gate closures, the anonymous inline funcs — is recorded as
-// "closure". What those closures DO is asserted by behaviour in the gate tests
-// (router_skip_gate_test.go and the *_gate_test.go files), which read the
-// response rather than the symbol.
-func middlewareName(mw func(http.Handler) http.Handler) string {
+// The symbol approach was wrong and failed in CI. Go gives every closure returned
+// by one function the same runtime name AND the same code pointer — proved by
+// probe: two closures from makeAdder report as `makeAdder.func1` with equal
+// pointers. AuthMiddleware, RequireRole and the feature gate are all closures, so
+// all three collapsed into one indistinguishable token, and the admin assertion
+// then reported a privilege escalation that did not exist. Separately, whether a
+// substring like "RealIPFromEnv" appeared at all depended on inlining, so the
+// same source produced a different golden string on the CI runner than on a
+// laptop.
+//
+// So each middleware is probed by serving a request through it and reading what
+// it did. Identity comes from observable behaviour, which is identical on every
+// machine and every Go build.
+//
+// Three probes, because the gates layer:
+//
+//	anonymous           401  auth gate, or a role gate with no claims yet
+//	with claims (user)  403  role gate: it had an identity and refused the role
+//	                    401  auth gate: it never looks at the role
+//	                    pass  optional-auth, or a gate with no resolver wired
+func classifyMiddleware(mw func(http.Handler) http.Handler) string {
 	if mw == nil {
 		return "nil"
 	}
-	full := runtime.FuncForPC(reflect.ValueOf(mw).Pointer()).Name()
-	if i := strings.LastIndex(full, "/"); i >= 0 {
-		full = full[i+1:]
+
+	probe := func(req *http.Request) (reached bool, code int) {
+		inner := http.HandlerFunc(func(http.ResponseWriter, *http.Request) { reached = true })
+		rec := httptest.NewRecorder()
+		mw(inner).ServeHTTP(rec, req)
+		return reached, rec.Code
 	}
-	// Drop the trailing .1 / .func1 closure index.
-	if i := strings.LastIndex(full, ".func"); i >= 0 {
-		full = full[:i] + ".closure"
+
+	// Probe one: anonymous. A gate refuses; a pass-through does not.
+	if reached, _ := probe(httptest.NewRequest(http.MethodGet, "/probe", nil)); reached {
+		return "pass-through"
 	}
-	// A named middleware keeps its name; a bare closure or a method-valued
-	// closure is recorded generically.
-	for _, known := range []string{
-		"SentryRecover", "RequestID", "Logging", "Recoverer", "SecurityHeaders",
-		"RealIPFromEnv", "RateLimit", "MetricsAuth", "AuthMiddleware",
-		"OptionalAuthMiddleware", "RequireRole", "StrictAuth",
-	} {
-		if strings.Contains(full, known) {
-			return known
-		}
+
+	// Probe two: a request that already carries an ordinary user's claims, which
+	// is what AuthMiddleware leaves behind. A role gate now has what it needs to
+	// refuse on the role rather than on the missing identity.
+	withClaims := httptest.NewRequest(http.MethodGet, "/probe", nil)
+	withClaims = withClaims.WithContext(
+		context.WithValue(withClaims.Context(), middleware.UserContextKey, probeClaims))
+
+	reached, code := probe(withClaims)
+	switch {
+	case reached:
+		// Refused the anonymous request but let an identified caller through:
+		// the optional-auth middleware, or a feature gate with no resolver.
+		return "optional-auth"
+	case code == http.StatusForbidden:
+		return "role-required"
+	case code == http.StatusUnauthorized:
+		return "auth-required"
+	case code == http.StatusTooManyRequests:
+		return "rate-limited"
+	default:
+		return "refused-" + strconv.Itoa(code)
 	}
-	return "closure"
 }
 
 // TestRouteTable pins every route the server mounts.
@@ -135,7 +183,7 @@ func TestRouteTable(t *testing.T) {
 	jwt := newTestJWT(t)
 	mux := NewRouter(testDeps(), jwt)
 
-	got := collectRoutes(t, mux)
+	got := collectRoutes(t, mux, jwt)
 
 	// A bare router must still be non-trivial, or the assertions below would
 	// pass against an empty table and prove nothing.
@@ -198,8 +246,9 @@ func firstDiff(want, got string) string {
 // file catches any change; this catches the specific ones that must never
 // disappear, and it reads as a list of the guarantees rather than a table.
 func TestCriticalRoutesAreMounted(t *testing.T) {
-	mux := NewRouter(testDeps(), newTestJWT(t))
-	routes := collectRoutes(t, mux)
+	jwt := newTestJWT(t)
+	mux := NewRouter(testDeps(), jwt)
+	routes := collectRoutes(t, mux, jwt)
 
 	mounted := make(map[string]bool, len(routes))
 	for _, l := range routes {
@@ -231,21 +280,22 @@ func TestCriticalRoutesAreMounted(t *testing.T) {
 // If the admin block is ever relocated and loses one of them, the golden diff
 // would show it — and this would name it.
 func TestAdminRoutesRequireAuthAndAdminRole(t *testing.T) {
-	mux := NewRouter(testDeps(), newTestJWT(t))
+	jwt := newTestJWT(t)
+	mux := NewRouter(testDeps(), jwt)
 
-	for _, l := range collectRoutes(t, mux) {
+	for _, l := range collectRoutes(t, mux, jwt) {
 		if !strings.HasPrefix(l.Path, "/api/admin/") {
 			continue
 		}
 		// /api/admin/backups/{filename} is the one documented exception for the
 		// browser-navigation download; it still requires the admin role.
 		chain := strings.Join(l.Middleware, " ")
-		if !strings.Contains(chain, "RequireRole") {
-			t.Errorf("%s %s has no RequireRole in its chain, so any signed-in user may call it:\n  %s",
+		if !strings.Contains(chain, "role-required") {
+			t.Errorf("%s %s has no role gate in its chain, so any signed-in user may call it:\n  %s",
 				l.Method, l.Path, chain)
 		}
-		if !strings.Contains(chain, "AuthMiddleware") {
-			t.Errorf("%s %s has no AuthMiddleware in its chain, so an anonymous caller may reach it:\n  %s",
+		if !strings.Contains(chain, "auth-required") {
+			t.Errorf("%s %s has no auth gate in its chain, so an anonymous caller may reach it:\n  %s",
 				l.Method, l.Path, chain)
 		}
 	}
@@ -261,7 +311,7 @@ func TestMissingDepsDoNotPanic(t *testing.T) {
 		t.Fatal("NewRouter returned nil for an empty Deps")
 	}
 	// Walking forces chi to realise every handler chain.
-	if got := collectRoutes(t, mux); len(got) == 0 {
+	if got := collectRoutes(t, mux, newTestJWT(t)); len(got) == 0 {
 		t.Fatal("an empty Deps mounted no routes at all")
 	}
 }

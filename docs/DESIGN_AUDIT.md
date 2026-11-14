@@ -339,18 +339,34 @@ alias declarations rewritten (`authH := d.Auth` becomes `authH := b.Auth`).
 
 The harness that proves it: `router_table_test.go` pins all 294 routes with
 their middleware chains in `testdata/route_table.golden`. Middleware is recorded
-by semantic name, not by runtime symbol, because a closure's symbol name changes
-under refactoring while its behaviour does not — a table keyed on symbols fails
-on every move and gets regenerated reflexively, which is how a route table stops
-being a check. On top of the golden file:
+by **behaviour class** — `pass-through`, `optional-auth`, `auth-required`,
+`role-required`, `rate-limited` — not by function name. On top of the golden file:
 
 - `TestAdminRoutesRequireAuthAndAdminRole` — every `/api/admin/*` route carries
-  both `AuthMiddleware` and `RequireRole`, so relocating the admin block cannot
+  both an auth gate and a role gate, so relocating the admin block cannot
   silently drop a privilege check.
 - `TestCriticalRoutesAreMounted` — names eight endpoints whose absence is a
   security or availability failure, with the reason for each.
 - `TestMissingDepsDoNotPanic` — states the property the router always relied on:
   a partially-wired `Deps` degrades an endpoint rather than killing startup.
+
+**The first version of this harness keyed on runtime symbol names and broke in
+CI**, which is worth recording because the failure looked like a security bug. Go
+gives every closure returned by one function the same runtime name *and the same
+code pointer* — verified by probe: two closures from a factory report as
+`factory.func1` with equal pointers. `AuthMiddleware`, `RequireRole` and the
+feature gate are all closures, so all three collapsed to one token, and the admin
+assertion reported a privilege escalation that did not exist. Separately, whether
+a substring like `RealIPFromEnv` appeared at all depended on inlining, so the same
+source produced a different golden string on the CI runner than on a laptop.
+
+Each middleware is now probed instead: serve a request through it and read what
+it did. Two probes, because a role gate and an auth gate answer identically (401)
+to an anonymous request — `RequireRole` checks claims before it checks the role.
+The second probe seeds ordinary-user claims on the context, which is what
+`AuthMiddleware` leaves behind in production, and a 403 there is the role gate
+identifying itself. The table is now identical across runs and across `GOAMD64`
+levels.
 
 Both the golden diff and the admin assertion were confirmed to fail when
 `RequireRole("admin")` is deleted from the new file, so the harness guards the

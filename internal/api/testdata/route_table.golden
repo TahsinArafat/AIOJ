@@ -1,294 +1,294 @@
-GET    /api/activity                                        SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer
-GET    /api/admin/ai-models/                                SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-POST   /api/admin/ai-models/                                SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-POST   /api/admin/ai-models/test                            SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-DELETE /api/admin/ai-models/{id}                            SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-GET    /api/admin/ai-models/{id}                            SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-PUT    /api/admin/ai-models/{id}                            SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-PUT    /api/admin/ai-models/{id}/toggle                     SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-GET    /api/admin/backups/                                  SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-POST   /api/admin/backups/                                  SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-POST   /api/admin/backups/upload                            SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-DELETE /api/admin/backups/{filename}                        SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-GET    /api/admin/backups/{filename}                        SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-POST   /api/admin/backups/{filename}/restore                SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-GET    /api/admin/bot-accounts/                             SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-POST   /api/admin/bot-accounts/                             SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-POST   /api/admin/bot-accounts/test-login                   SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-DELETE /api/admin/bot-accounts/{id}                         SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-GET    /api/admin/bot-accounts/{id}                         SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-PUT    /api/admin/bot-accounts/{id}                         SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-GET    /api/admin/contest-review                            SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-POST   /api/admin/contest-review/{id}                       SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-GET    /api/admin/languages/                                SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-POST   /api/admin/languages/                                SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-GET    /api/admin/languages/detect                          SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-GET    /api/admin/languages/templates                       SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-DELETE /api/admin/languages/{key}                           SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-GET    /api/admin/languages/{key}                           SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-PUT    /api/admin/languages/{key}                           SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-GET    /api/admin/languages/{key}/raw                       SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-PUT    /api/admin/languages/{key}/raw                       SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-POST   /api/admin/languages/{key}/reset                     SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-POST   /api/admin/languages/{key}/test                      SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-GET    /api/admin/problem-review                            SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-POST   /api/admin/problem-review/{slug}                     SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-POST   /api/admin/remote-languages/                         SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-POST   /api/admin/remote-languages/bulk                     SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-POST   /api/admin/remote-languages/detect/{platform}        SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-DELETE /api/admin/remote-languages/{id}                     SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-PUT    /api/admin/remote-languages/{id}                     SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-GET    /api/admin/remote-languages/{platform}               SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-GET    /api/admin/setter-applications                       SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-POST   /api/admin/setter-applications/{id}/review           SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-GET    /api/admin/settings/                                 SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-POST   /api/admin/settings/                                 SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-DELETE /api/admin/settings/{key}                            SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-GET    /api/admin/settings/{key}                            SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-GET    /api/admin/submissions/failed                        SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-GET    /api/admin/submissions/pending-remote                SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-POST   /api/admin/submissions/rejudge-bulk                  SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-POST   /api/admin/submissions/{id}/refresh                  SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-POST   /api/admin/submissions/{id}/rejudge                  SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-GET    /api/admin/users                                     SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-POST   /api/admin/users/bulk                                SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-GET    /api/admin/users/{id}                                SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-DELETE /api/admin/users/{id}/ban                            SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-POST   /api/admin/users/{id}/ban                            SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-PUT    /api/admin/users/{id}/password                       SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-PUT    /api/admin/users/{id}/role                           SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-DELETE /api/admin/users/{id}/verify-email                   SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-POST   /api/admin/users/{id}/verify-email                   SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware RequireRole
-GET    /api/auth/csrf                                       SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer
-POST   /api/auth/forgot-password                            SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer RateLimit
-POST   /api/auth/login                                      SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer RateLimit
-POST   /api/auth/logout                                     SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer
-POST   /api/auth/refresh                                    SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer
-POST   /api/auth/register                                   SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer RateLimit
-POST   /api/auth/reset-password                             SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer RateLimit
-POST   /api/auth/setter-apply                               SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware
-GET    /api/auth/setter-status                              SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware
-POST   /api/auth/verify-email/resend                        SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware
-GET    /api/blog/                                           SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure
-POST   /api/blog/                                           SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-POST   /api/blog/comments                                   SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-POST   /api/blog/vote                                       SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-DELETE /api/blog/{id}                                       SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/blog/{id}                                       SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure
-PUT    /api/blog/{id}                                       SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/blog/{id}/vote                                  SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/blog/{type}/{id}/comments                       SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure
-POST   /api/classes/join                                    SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-DELETE /api/classes/{id}                                    SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/classes/{id}                                    SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure
-PUT    /api/classes/{id}                                    SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-POST   /api/classes/{id}/leave                              SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/classes/{id}/members                            SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure
-GET    /api/contests/                                       SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure
-POST   /api/contests/                                       SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware closure
-POST   /api/contests/educational                            SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware closure
-GET    /api/contests/formats                                SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure
-GET    /api/contests/my                                     SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/contests/{contestId}/clarifications/            SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure
-POST   /api/contests/{contestId}/clarifications/            SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-POST   /api/contests/{contestId}/clarifications/bulk-answer SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-POST   /api/contests/{contestId}/clarifications/{id}/answer SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/contests/{contestId}/notices/                   SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure
-POST   /api/contests/{contestId}/notices/                   SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-DELETE /api/contests/{contestId}/notices/{id}               SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-POST   /api/contests/{contestId}/plagiarism/check           SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-PUT    /api/contests/{contestId}/plagiarism/pairs/{pairId}  SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/contests/{contestId}/plagiarism/report          SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/contests/{contestId}/plagiarism/report/{reportId} SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/contests/{contestId}/plagiarism/report/{reportId}/pairs SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/contests/{contestId}/problems/{index}           SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-DELETE /api/contests/{id}                                   SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware closure
-GET    /api/contests/{id}                                   SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-PUT    /api/contests/{id}                                   SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware closure
-GET    /api/contests/{id}/adjustments/                      SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-POST   /api/contests/{id}/adjustments/                      SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-DELETE /api/contests/{id}/adjustments/{adjustmentId}        SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-POST   /api/contests/{id}/calculate-ratings                 SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware closure
-GET    /api/contests/{id}/feed                              SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure
-GET    /api/contests/{id}/onsite/balloons                   SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-POST   /api/contests/{id}/onsite/balloons/{balloonId}/dispatch SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-POST   /api/contests/{id}/onsite/generate                   SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-POST   /api/contests/{id}/onsite/login                      SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer RateLimit closure
-POST   /api/contests/{id}/onsite/print                      SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/contests/{id}/onsite/prints                     SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-POST   /api/contests/{id}/onsite/prints/{printId}/status    SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/contests/{id}/onsite/users                      SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-DELETE /api/contests/{id}/onsite/users/{userId}             SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/contests/{id}/pdf                               SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/contests/{id}/permissions                       SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware closure
-POST   /api/contests/{id}/permissions                       SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware closure
-DELETE /api/contests/{id}/permissions/{userId}              SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware closure
-POST   /api/contests/{id}/problems                          SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware closure
-DELETE /api/contests/{id}/problems/{problemId}              SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware closure
-PUT    /api/contests/{id}/problems/{problemId}              SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware closure
-POST   /api/contests/{id}/register-team                     SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-DELETE /api/contests/{id}/register/                         SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/contests/{id}/register/                         SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure
-POST   /api/contests/{id}/register/                         SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/contests/{id}/registrations                     SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/contests/{id}/scoreboard                        SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/contests/{id}/stats                             SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/contests/{id}/submissions                       SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware closure
-POST   /api/contests/{id}/submissions/{submissionId}/skip   SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware closure closure
-POST   /api/contests/{id}/submit                            SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware closure
-GET    /api/contests/{id}/team-registrations                SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-POST   /api/contests/{id}/unlock                            SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware RateLimit
-GET    /api/editorials/                                     SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure
-POST   /api/editorials/                                     SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/editorials/problem/{problemId}                  SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure
-GET    /api/editorials/{id}                                 SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure
-GET    /api/groups/                                         SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure
-POST   /api/groups/                                         SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-POST   /api/groups/join-code                                SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/groups/my                                       SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-DELETE /api/groups/{id}                                     SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/groups/{id}                                     SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure
-PUT    /api/groups/{id}                                     SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/groups/{id}/contests                            SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure
-POST   /api/groups/{id}/contests                            SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-DELETE /api/groups/{id}/contests/{contestId}                SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-POST   /api/groups/{id}/invite                              SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-POST   /api/groups/{id}/join                                SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-POST   /api/groups/{id}/leave                               SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/groups/{id}/members                             SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure
-GET    /api/groups/{id}/pending                             SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-POST   /api/groups/{id}/respond                             SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/gym/                                            SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure
-POST   /api/gym/                                            SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/gym/{id}                                        SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure
-POST   /api/gym/{id}/solve                                  SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/gym/{id}/solved                                 SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-POST   /api/hacks/                                          SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/hacks/contest/{contestId}                       SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/hacks/hackable/{contestId}/{problemId}          SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/hacks/{id}                                      SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/health                                          SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer
-GET    /api/keys/                                           SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-POST   /api/keys/                                           SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-DELETE /api/keys/{id}                                       SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/legal/{doc}                                     SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer
-GET    /api/notifications/                                  SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/notifications/preferences                       SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-PUT    /api/notifications/preferences                       SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-POST   /api/notifications/read-all                          SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/notifications/unread-count                      SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-POST   /api/notifications/{id}/read                         SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/organizations/                                  SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure
-POST   /api/organizations/                                  SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/organizations/my                                SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-DELETE /api/organizations/{id}                              SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/organizations/{id}                              SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure
-PUT    /api/organizations/{id}                              SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-POST   /api/organizations/{id}/join                         SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-POST   /api/organizations/{id}/leave                        SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/organizations/{id}/members                      SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure
-POST   /api/organizations/{id}/members                      SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-DELETE /api/organizations/{id}/members/{userId}             SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/organizations/{orgId}/classes/                  SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure
-POST   /api/organizations/{orgId}/classes/                  SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/problems/                                       SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-POST   /api/problems/                                       SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware closure
-POST   /api/problems/import                                 SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware closure closure
-POST   /api/problems/import/atcoder                         SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware closure closure
-POST   /api/problems/import/codeforces                      SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware closure closure
-POST   /api/problems/import/cses                            SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware closure closure
-POST   /api/problems/import/qoj                             SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware closure closure
-POST   /api/problems/import/toph                            SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware closure closure
-GET    /api/problems/my                                     SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/problems/selectable                             SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/problems/tags                                   SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure
-GET    /api/problems/{id}/i18n/                             SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-DELETE /api/problems/{id}/i18n/{lang}                       SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-PUT    /api/problems/{id}/i18n/{lang}                       SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-DELETE /api/problems/{slug}                                 SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware closure
-GET    /api/problems/{slug}                                 SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-PUT    /api/problems/{slug}                                 SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware closure
-GET    /api/problems/{slug}/export                          SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware closure
-GET    /api/problems/{slug}/language-limits                 SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure
-POST   /api/problems/{slug}/language-limits                 SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware closure
-DELETE /api/problems/{slug}/language-limits/{lang}          SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware closure
-POST   /api/problems/{slug}/media                           SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware closure
-GET    /api/problems/{slug}/permissions                     SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware closure
-POST   /api/problems/{slug}/permissions                     SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware closure
-DELETE /api/problems/{slug}/permissions/{userId}            SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware closure
-GET    /api/problems/{slug}/submissions/                    SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure
-GET    /api/problems/{slug}/submissions/manage              SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware closure
-POST   /api/problems/{slug}/submissions/rejudge             SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware closure
-POST   /api/problems/{slug}/submissions/{id}/skip           SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware closure closure
-POST   /api/problems/{slug}/submit                          SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware closure
-GET    /api/problems/{slug}/testcases                       SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware closure
-POST   /api/problems/{slug}/testcases                       SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware closure
-DELETE /api/problems/{slug}/testcases/{name}                SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware closure
-GET    /api/problems/{slug}/testcases/{name}                SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware closure
-PUT    /api/problems/{slug}/testcases/{name}                SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware closure
-POST   /api/problems/{slug}/validate-cases                  SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware closure
-GET    /api/rankings                                        SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure
-GET    /api/rating/contest/{contestId}                      SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer
-GET    /api/rating/user/{userId}                            SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer
-GET    /api/recommendations/                                SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/remote-languages/{platform}                     SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer
-GET    /api/search                                          SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware
-GET    /api/stats/me                                        SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware
-GET    /api/stats/platform                                  SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer
-GET    /api/stats/problems/{problemId}                      SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware
-GET    /api/submissions/                                    SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-POST   /api/submissions/                                    SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/submissions/all                                 SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-POST   /api/submissions/run                                 SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-POST   /api/submissions/run-batch                           SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-POST   /api/submissions/upsolving                           SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/submissions/{id}                                SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-POST   /api/submissions/{id}/recheck-remote                 SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-POST   /api/submissions/{id}/retry-remote                   SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/teams/                                          SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure
-POST   /api/teams/                                          SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-DELETE /api/teams/{id}                                      SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/teams/{id}                                      SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure
-PUT    /api/teams/{id}                                      SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-POST   /api/teams/{id}/invite                               SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-POST   /api/teams/{id}/join                                 SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-POST   /api/teams/{id}/leave                                SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/teams/{id}/members                              SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure
-GET    /api/teams/{id}/pending                              SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-POST   /api/teams/{id}/request                              SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-POST   /api/teams/{id}/respond                              SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/training/                                       SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure
-POST   /api/training/                                       SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-DELETE /api/training/problems/{problemId}                   SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-DELETE /api/training/sections/{sectionId}                   SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-POST   /api/training/sections/{sectionId}/problems          SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-DELETE /api/training/{id}                                   SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/training/{id}                                   SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure
-PUT    /api/training/{id}                                   SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-DELETE /api/training/{id}/enroll                            SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-POST   /api/training/{id}/enroll                            SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/training/{id}/enrollments                       SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure
-GET    /api/training/{id}/progress                          SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-POST   /api/training/{id}/sections                          SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/users/profile/edit                              SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware
-PUT    /api/users/profile/edit                              SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware
-GET    /api/users/profile/invites                           SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware
-PUT    /api/users/profile/password                          SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer AuthMiddleware
-GET    /api/users/{username}                                SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer
-GET    /api/users/{username}/blogs                          SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer
-GET    /api/users/{username}/comments                       SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer
-GET    /api/users/{username}/submissions                    SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer
-POST   /api/virtual/start                                   SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/virtual/status                                  SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-POST   /api/virtual/{id}/complete                           SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/vjudge/bots                                     SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-POST   /api/vjudge/submit                                   SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/webhooks/                                       SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-POST   /api/webhooks/                                       SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-DELETE /api/webhooks/{id}                                   SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer closure AuthMiddleware
-GET    /api/ws                                              SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer
-GET    /meta                                                SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer
-GET    /meta/*                                              SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer
-GET    /meta/problems/{slug}                                SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer
-GET    /metrics                                             SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer MetricsAuth
-GET    /status                                              SecurityHeaders RequestID closure closure RateLimit Logging SentryRecover Recoverer
+GET    /api/activity                                        pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
+GET    /api/admin/ai-models/                                pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+POST   /api/admin/ai-models/                                pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+POST   /api/admin/ai-models/test                            pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+DELETE /api/admin/ai-models/{id}                            pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+GET    /api/admin/ai-models/{id}                            pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+PUT    /api/admin/ai-models/{id}                            pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+PUT    /api/admin/ai-models/{id}/toggle                     pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+GET    /api/admin/backups/                                  pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+POST   /api/admin/backups/                                  pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+POST   /api/admin/backups/upload                            pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+DELETE /api/admin/backups/{filename}                        pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+GET    /api/admin/backups/{filename}                        pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+POST   /api/admin/backups/{filename}/restore                pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+GET    /api/admin/bot-accounts/                             pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+POST   /api/admin/bot-accounts/                             pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+POST   /api/admin/bot-accounts/test-login                   pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+DELETE /api/admin/bot-accounts/{id}                         pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+GET    /api/admin/bot-accounts/{id}                         pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+PUT    /api/admin/bot-accounts/{id}                         pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+GET    /api/admin/contest-review                            pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+POST   /api/admin/contest-review/{id}                       pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+GET    /api/admin/languages/                                pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+POST   /api/admin/languages/                                pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+GET    /api/admin/languages/detect                          pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+GET    /api/admin/languages/templates                       pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+DELETE /api/admin/languages/{key}                           pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+GET    /api/admin/languages/{key}                           pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+PUT    /api/admin/languages/{key}                           pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+GET    /api/admin/languages/{key}/raw                       pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+PUT    /api/admin/languages/{key}/raw                       pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+POST   /api/admin/languages/{key}/reset                     pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+POST   /api/admin/languages/{key}/test                      pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+GET    /api/admin/problem-review                            pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+POST   /api/admin/problem-review/{slug}                     pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+POST   /api/admin/remote-languages/                         pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+POST   /api/admin/remote-languages/bulk                     pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+POST   /api/admin/remote-languages/detect/{platform}        pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+DELETE /api/admin/remote-languages/{id}                     pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+PUT    /api/admin/remote-languages/{id}                     pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+GET    /api/admin/remote-languages/{platform}               pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+GET    /api/admin/setter-applications                       pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+POST   /api/admin/setter-applications/{id}/review           pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+GET    /api/admin/settings/                                 pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+POST   /api/admin/settings/                                 pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+DELETE /api/admin/settings/{key}                            pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+GET    /api/admin/settings/{key}                            pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+GET    /api/admin/submissions/failed                        pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+GET    /api/admin/submissions/pending-remote                pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+POST   /api/admin/submissions/rejudge-bulk                  pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+POST   /api/admin/submissions/{id}/refresh                  pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+POST   /api/admin/submissions/{id}/rejudge                  pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+GET    /api/admin/users                                     pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+POST   /api/admin/users/bulk                                pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+GET    /api/admin/users/{id}                                pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+DELETE /api/admin/users/{id}/ban                            pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+POST   /api/admin/users/{id}/ban                            pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+PUT    /api/admin/users/{id}/password                       pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+PUT    /api/admin/users/{id}/role                           pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+DELETE /api/admin/users/{id}/verify-email                   pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+POST   /api/admin/users/{id}/verify-email                   pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required role-required
+GET    /api/auth/csrf                                       pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
+POST   /api/auth/forgot-password                            pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
+POST   /api/auth/login                                      pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
+POST   /api/auth/logout                                     pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
+POST   /api/auth/refresh                                    pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
+POST   /api/auth/register                                   pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
+POST   /api/auth/reset-password                             pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
+POST   /api/auth/setter-apply                               pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+GET    /api/auth/setter-status                              pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+POST   /api/auth/verify-email/resend                        pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+GET    /api/blog/                                           pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
+POST   /api/blog/                                           pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+POST   /api/blog/comments                                   pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+POST   /api/blog/vote                                       pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+DELETE /api/blog/{id}                                       pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+GET    /api/blog/{id}                                       pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
+PUT    /api/blog/{id}                                       pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+GET    /api/blog/{id}/vote                                  pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+GET    /api/blog/{type}/{id}/comments                       pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
+POST   /api/classes/join                                    pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+DELETE /api/classes/{id}                                    pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+GET    /api/classes/{id}                                    pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
+PUT    /api/classes/{id}                                    pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+POST   /api/classes/{id}/leave                              pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+GET    /api/classes/{id}/members                            pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
+GET    /api/contests/                                       pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
+POST   /api/contests/                                       pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required pass-through
+POST   /api/contests/educational                            pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required pass-through
+GET    /api/contests/formats                                pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
+GET    /api/contests/my                                     pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+GET    /api/contests/{contestId}/clarifications/            pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
+POST   /api/contests/{contestId}/clarifications/            pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+POST   /api/contests/{contestId}/clarifications/bulk-answer pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+POST   /api/contests/{contestId}/clarifications/{id}/answer pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+GET    /api/contests/{contestId}/notices/                   pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
+POST   /api/contests/{contestId}/notices/                   pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+DELETE /api/contests/{contestId}/notices/{id}               pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+POST   /api/contests/{contestId}/plagiarism/check           pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+PUT    /api/contests/{contestId}/plagiarism/pairs/{pairId}  pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+GET    /api/contests/{contestId}/plagiarism/report          pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+GET    /api/contests/{contestId}/plagiarism/report/{reportId} pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+GET    /api/contests/{contestId}/plagiarism/report/{reportId}/pairs pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+GET    /api/contests/{contestId}/problems/{index}           pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
+DELETE /api/contests/{id}                                   pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required pass-through
+GET    /api/contests/{id}                                   pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
+PUT    /api/contests/{id}                                   pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required pass-through
+GET    /api/contests/{id}/adjustments/                      pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+POST   /api/contests/{id}/adjustments/                      pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+DELETE /api/contests/{id}/adjustments/{adjustmentId}        pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+POST   /api/contests/{id}/calculate-ratings                 pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required pass-through
+GET    /api/contests/{id}/feed                              pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
+GET    /api/contests/{id}/onsite/balloons                   pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+POST   /api/contests/{id}/onsite/balloons/{balloonId}/dispatch pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+POST   /api/contests/{id}/onsite/generate                   pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+POST   /api/contests/{id}/onsite/login                      pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
+POST   /api/contests/{id}/onsite/print                      pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+GET    /api/contests/{id}/onsite/prints                     pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+POST   /api/contests/{id}/onsite/prints/{printId}/status    pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+GET    /api/contests/{id}/onsite/users                      pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+DELETE /api/contests/{id}/onsite/users/{userId}             pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+GET    /api/contests/{id}/pdf                               pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
+GET    /api/contests/{id}/permissions                       pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required pass-through
+POST   /api/contests/{id}/permissions                       pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required pass-through
+DELETE /api/contests/{id}/permissions/{userId}              pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required pass-through
+POST   /api/contests/{id}/problems                          pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required pass-through
+DELETE /api/contests/{id}/problems/{problemId}              pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required pass-through
+PUT    /api/contests/{id}/problems/{problemId}              pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required pass-through
+POST   /api/contests/{id}/register-team                     pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+DELETE /api/contests/{id}/register/                         pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+GET    /api/contests/{id}/register/                         pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
+POST   /api/contests/{id}/register/                         pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+GET    /api/contests/{id}/registrations                     pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+GET    /api/contests/{id}/scoreboard                        pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
+GET    /api/contests/{id}/stats                             pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
+GET    /api/contests/{id}/submissions                       pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required pass-through
+POST   /api/contests/{id}/submissions/{submissionId}/skip   pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required pass-through pass-through
+POST   /api/contests/{id}/submit                            pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required pass-through
+GET    /api/contests/{id}/team-registrations                pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+POST   /api/contests/{id}/unlock                            pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required rate-limited
+GET    /api/editorials/                                     pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
+POST   /api/editorials/                                     pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+GET    /api/editorials/problem/{problemId}                  pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
+GET    /api/editorials/{id}                                 pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
+GET    /api/groups/                                         pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
+POST   /api/groups/                                         pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+POST   /api/groups/join-code                                pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+GET    /api/groups/my                                       pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+DELETE /api/groups/{id}                                     pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+GET    /api/groups/{id}                                     pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
+PUT    /api/groups/{id}                                     pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+GET    /api/groups/{id}/contests                            pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
+POST   /api/groups/{id}/contests                            pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+DELETE /api/groups/{id}/contests/{contestId}                pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+POST   /api/groups/{id}/invite                              pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+POST   /api/groups/{id}/join                                pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+POST   /api/groups/{id}/leave                               pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+GET    /api/groups/{id}/members                             pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
+GET    /api/groups/{id}/pending                             pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+POST   /api/groups/{id}/respond                             pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+GET    /api/gym/                                            pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
+POST   /api/gym/                                            pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+GET    /api/gym/{id}                                        pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
+POST   /api/gym/{id}/solve                                  pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+GET    /api/gym/{id}/solved                                 pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+POST   /api/hacks/                                          pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+GET    /api/hacks/contest/{contestId}                       pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+GET    /api/hacks/hackable/{contestId}/{problemId}          pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+GET    /api/hacks/{id}                                      pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+GET    /api/health                                          pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
+GET    /api/keys/                                           pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+POST   /api/keys/                                           pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+DELETE /api/keys/{id}                                       pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+GET    /api/legal/{doc}                                     pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
+GET    /api/notifications/                                  pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+GET    /api/notifications/preferences                       pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+PUT    /api/notifications/preferences                       pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+POST   /api/notifications/read-all                          pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+GET    /api/notifications/unread-count                      pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+POST   /api/notifications/{id}/read                         pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+GET    /api/organizations/                                  pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
+POST   /api/organizations/                                  pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+GET    /api/organizations/my                                pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+DELETE /api/organizations/{id}                              pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+GET    /api/organizations/{id}                              pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
+PUT    /api/organizations/{id}                              pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+POST   /api/organizations/{id}/join                         pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+POST   /api/organizations/{id}/leave                        pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+GET    /api/organizations/{id}/members                      pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
+POST   /api/organizations/{id}/members                      pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+DELETE /api/organizations/{id}/members/{userId}             pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+GET    /api/organizations/{orgId}/classes/                  pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
+POST   /api/organizations/{orgId}/classes/                  pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+GET    /api/problems/                                       pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
+POST   /api/problems/                                       pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required pass-through
+POST   /api/problems/import                                 pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required pass-through pass-through
+POST   /api/problems/import/atcoder                         pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required pass-through pass-through
+POST   /api/problems/import/codeforces                      pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required pass-through pass-through
+POST   /api/problems/import/cses                            pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required pass-through pass-through
+POST   /api/problems/import/qoj                             pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required pass-through pass-through
+POST   /api/problems/import/toph                            pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required pass-through pass-through
+GET    /api/problems/my                                     pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required
+GET    /api/problems/selectable                             pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required
+GET    /api/problems/tags                                   pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through
+GET    /api/problems/{id}/i18n/                             pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through pass-through
+DELETE /api/problems/{id}/i18n/{lang}                       pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required
+PUT    /api/problems/{id}/i18n/{lang}                       pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required
+DELETE /api/problems/{slug}                                 pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required pass-through
+GET    /api/problems/{slug}                                 pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through pass-through
+PUT    /api/problems/{slug}                                 pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required pass-through
+GET    /api/problems/{slug}/export                          pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required pass-through
+GET    /api/problems/{slug}/language-limits                 pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through
+POST   /api/problems/{slug}/language-limits                 pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required pass-through
+DELETE /api/problems/{slug}/language-limits/{lang}          pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required pass-through
+POST   /api/problems/{slug}/media                           pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required pass-through
+GET    /api/problems/{slug}/permissions                     pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required pass-through
+POST   /api/problems/{slug}/permissions                     pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required pass-through
+DELETE /api/problems/{slug}/permissions/{userId}            pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required pass-through
+GET    /api/problems/{slug}/submissions/                    pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through
+GET    /api/problems/{slug}/submissions/manage              pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required pass-through
+POST   /api/problems/{slug}/submissions/rejudge             pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required pass-through
+POST   /api/problems/{slug}/submissions/{id}/skip           pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required pass-through pass-through
+POST   /api/problems/{slug}/submit                          pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required pass-through
+GET    /api/problems/{slug}/testcases                       pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required pass-through
+POST   /api/problems/{slug}/testcases                       pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required pass-through
+DELETE /api/problems/{slug}/testcases/{name}                pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required pass-through
+GET    /api/problems/{slug}/testcases/{name}                pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required pass-through
+PUT    /api/problems/{slug}/testcases/{name}                pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required pass-through
+POST   /api/problems/{slug}/validate-cases                  pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required pass-through
+GET    /api/rankings                                        pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through
+GET    /api/rating/contest/{contestId}                      pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through
+GET    /api/rating/user/{userId}                            pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through
+GET    /api/recommendations/                                pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required
+GET    /api/remote-languages/{platform}                     pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through
+GET    /api/search                                          pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through
+GET    /api/stats/me                                        pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through auth-required
+GET    /api/stats/platform                                  pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through
+GET    /api/stats/problems/{problemId}                      pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through
+GET    /api/submissions/                                    pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required
+POST   /api/submissions/                                    pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required
+GET    /api/submissions/all                                 pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through pass-through
+POST   /api/submissions/run                                 pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required
+POST   /api/submissions/run-batch                           pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required
+POST   /api/submissions/upsolving                           pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required
+GET    /api/submissions/{id}                                pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required
+POST   /api/submissions/{id}/recheck-remote                 pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required
+POST   /api/submissions/{id}/retry-remote                   pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required
+GET    /api/teams/                                          pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through
+POST   /api/teams/                                          pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required
+DELETE /api/teams/{id}                                      pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required
+GET    /api/teams/{id}                                      pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through
+PUT    /api/teams/{id}                                      pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required
+POST   /api/teams/{id}/invite                               pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required
+POST   /api/teams/{id}/join                                 pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required
+POST   /api/teams/{id}/leave                                pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required
+GET    /api/teams/{id}/members                              pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through
+GET    /api/teams/{id}/pending                              pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required
+POST   /api/teams/{id}/request                              pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required
+POST   /api/teams/{id}/respond                              pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required
+GET    /api/training/                                       pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through
+POST   /api/training/                                       pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required
+DELETE /api/training/problems/{problemId}                   pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required
+DELETE /api/training/sections/{sectionId}                   pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required
+POST   /api/training/sections/{sectionId}/problems          pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required
+DELETE /api/training/{id}                                   pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required
+GET    /api/training/{id}                                   pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through
+PUT    /api/training/{id}                                   pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required
+DELETE /api/training/{id}/enroll                            pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required
+POST   /api/training/{id}/enroll                            pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required
+GET    /api/training/{id}/enrollments                       pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through
+GET    /api/training/{id}/progress                          pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required
+POST   /api/training/{id}/sections                          pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required
+GET    /api/users/profile/edit                              pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through auth-required
+PUT    /api/users/profile/edit                              pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through auth-required
+GET    /api/users/profile/invites                           pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through auth-required
+PUT    /api/users/profile/password                          pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through auth-required
+GET    /api/users/{username}                                pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through
+GET    /api/users/{username}/blogs                          pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through
+GET    /api/users/{username}/comments                       pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through
+GET    /api/users/{username}/submissions                    pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through
+POST   /api/virtual/start                                   pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required
+GET    /api/virtual/status                                  pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required
+POST   /api/virtual/{id}/complete                           pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required
+GET    /api/vjudge/bots                                     pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required
+POST   /api/vjudge/submit                                   pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required
+GET    /api/webhooks/                                       pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required
+POST   /api/webhooks/                                       pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required
+DELETE /api/webhooks/{id}                                   pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through pass-through auth-required
+GET    /api/ws                                              pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through
+GET    /meta                                                pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through
+GET    /meta/*                                              pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through
+GET    /meta/problems/{slug}                                pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through
+GET    /metrics                                             pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through auth-required
+GET    /status                                              pass-through pass-through pass-through pass-through rate-limited pass-through pass-through pass-through
