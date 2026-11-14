@@ -688,10 +688,14 @@ export default function ProblemDetail() {
 
             {/* IDE */}
             <div
-                className={`flex flex-col gap-3 overflow-y-auto pl-1 ${mobileTab === 'code' ? '' : 'hidden'} md:block`}
+                // A flex column rather than a scroll container: the editor is the
+                // pane's main content and should take the space left over, not sit
+                // at a fixed 400px with dead room under it. Scrolling lives on the
+                // results block below, so the controls and the editor stay put.
+                className={`flex-col gap-3 pl-1 md:flex ${mobileTab === 'code' ? 'flex' : 'hidden'}`}
                 style={isDesktop ? { width: `${100 - splitPos}%`, minWidth: '20%' } : { flex: 1 }}
             >
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 flex-shrink-0">
                     <select
                         value={lang}
                         onChange={e => setLang(e.target.value)}
@@ -719,18 +723,26 @@ export default function ProblemDetail() {
                 </div>
                 {/* Submission receipt. Sits above the editor so the id and the
                     live verdict are on screen the instant Submit is pressed. */}
-                {result && <SubmissionStatusPanel submission={result} polling={pollingResult} />}
-                <CodeEditor
-                    language={lang}
-                    value={code}
-                    onChange={handleCodeChange}
-                    height={isDesktop ? "400px" : "250px"}
-                />
+                {result && <div className="flex-shrink-0"><SubmissionStatusPanel submission={result} polling={pollingResult} /></div>}
+                {/* The editor takes the pane's remaining height. `min-h-[220px]`
+                    is the floor and does double duty: an explicit min-height is what
+                    overrides the flex default of `min-height: auto`, letting the
+                    editor shrink below its content, while the floor stops it
+                    collapsing to nothing when results are on screen. Do NOT add
+                    `min-h-0` here — it would override the floor and undo both. */}
+                <div className="min-h-[220px] flex-1">
+                    <CodeEditor
+                        language={lang}
+                        value={code}
+                        onChange={handleCodeChange}
+                        height="100%"
+                    />
+                </div>
 
                 {/* Sample Test Results */}
                 {sampleResults.length > 0 && (
-                    <div className="border border-hairline rounded-lg overflow-hidden bg-surface shadow-sm">
-                        <div className="bg-surface-2 border-b border-hairline px-4 py-3 flex items-center justify-between">
+                    <div className="border border-hairline rounded-lg overflow-hidden bg-surface shadow-sm flex-shrink-0 max-h-[45%] flex flex-col">
+                        <div className="bg-surface-2 border-b border-hairline px-4 py-3 flex items-center justify-between flex-shrink-0">
                             <span className="font-semibold text-sm text-ink-soft">Sample Test Results</span>
                             <span className={`text-xs font-medium px-2 py-0.5 rounded ${sampleResults.every(r => r.passed) ? 'bg-ok/12 text-ok' :
                                 sampleResults.some(r => r.passed) ? 'bg-warn/12 text-warn' :
@@ -739,7 +751,7 @@ export default function ProblemDetail() {
                                 {sampleResults.filter(r => r.passed).length}/{sampleResults.length} Passed
                             </span>
                         </div>
-                        <div className="divide-y divide-hairline">
+                        <div className="divide-y divide-hairline overflow-y-auto">
                             {sampleResults.map((r) => (
                                 <div key={r.index} className="p-4">
                                     <div className="flex items-center justify-between mb-2">
@@ -781,8 +793,9 @@ export default function ProblemDetail() {
                     </div>
                 )}
 
-                {/* Custom Scratchpad */}
-                <div className="mt-4 border border-hairline rounded-lg overflow-hidden bg-surface shadow-sm">
+                {/* Custom Scratchpad. `flex-shrink-0` so the editor above cannot
+                    squeeze it out of the pane when results are showing. */}
+                <div className="mt-4 border border-hairline rounded-lg overflow-hidden bg-surface shadow-sm flex-shrink-0">
                     <div className="bg-surface-2 border-b border-hairline px-4 py-3 flex items-center justify-between">
                         <span className="font-semibold text-sm text-ink-soft">Custom Stdin / Scratchpad</span>
                         <button

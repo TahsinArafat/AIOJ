@@ -802,9 +802,17 @@ export default function ContestProblem() {
                     </div>
                 )}
 
-                {/* RIGHT: Submit panel (100-splitPos% width) */}
+                {/* RIGHT: Submit panel (100-splitPos% width).
+
+                    Two regions, because they want opposite things. The top holds the
+                    language bar and the editor and never scrolls, so the editor keeps a
+                    guaranteed share of the panel however much else is on screen. The
+                    bottom — results, the custom scratchpad, quick links — scrolls on its
+                    own. As one scroll container the editor either sat at a fixed 400px
+                    with dead room beneath it, or (once made to flex) was squeezed down to
+                    its floor by the scratchpad and the quick links. */}
                 <div
-                    className="flex flex-col gap-3 overflow-y-auto pl-1"
+                    className="flex flex-col pl-1"
                     style={isNarrow ? { width: '100%' } : { width: `${100 - splitPos}%`, minWidth: '20%' }}
                 >
                     {showSubmit ? (
@@ -840,14 +848,22 @@ export default function ContestProblem() {
                                 verdict are on screen the moment Submit is pressed. */}
                             {result && <SubmissionResult result={result} polling={polling} />}
 
-                            <CodeEditor
-                                language={language}
-                                value={code}
-                                onChange={handleCodeChange}
-                                height="400px"
-                                ariaLabel="Solution source code"
-                            />
+                            {/* Pinned: `min-h-[260px]` keeps the editor usable whatever
+                                else is on screen, and being an explicit min-height it also
+                                overrides the flex default of `min-height: auto`, which is
+                                what lets Monaco shrink into the space it is given. */}
+                            <div className="flex min-h-[260px] flex-1 flex-col">
+                                <CodeEditor
+                                    language={language}
+                                    value={code}
+                                    onChange={handleCodeChange}
+                                    height="100%"
+                                    ariaLabel="Solution source code"
+                                />
+                            </div>
 
+                            {/* Everything below the editor scrolls as one region. */}
+                            <div className="flex min-h-0 flex-col gap-3 overflow-y-auto pt-3">
                             {sampleResults.length > 0 && (
                                 <div className="border border-hairline rounded-lg overflow-hidden bg-surface shadow-sm">
                                     <div className="bg-surface-2 border-b border-hairline px-4 py-3 flex items-center justify-between">
@@ -972,6 +988,7 @@ export default function ContestProblem() {
                                         )
                                     })()}
                                 </div>
+                            </div>
                             </div>
                         </>
                     ) : !isLoggedIn ? (
