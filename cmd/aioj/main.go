@@ -595,7 +595,7 @@ Restore from the pre-deploy dump if the schema is unrecoverable.`, err)
 	// have to land in the same audit trail as the admin endpoints.
 	submissionH.WithAudit(auditH)
 
-	router := api.NewRouter(api.Deps{
+	deps := api.Deps{
 		Auth:          authH,
 		VerifyEmail:   verifyH,
 		TwoFA:         twoFAH,
@@ -865,7 +865,17 @@ Restore from the pre-deploy dump if the schema is unrecoverable.`, err)
 		FeatureResolver:   featureResolver,
 		AIEnabled:         cfg.AI.Enabled,
 		MetricsToken:      cfg.Server.MetricsToken,
-	}, jwtManager)
+	}
+
+	// Refuse to serve with a required handler unwired. A nil handler is a valid
+	// pointer, so the compiler cannot catch this, and the first request to that
+	// route would panic — recovered into an empty 500 that names nothing. Failing
+	// here names every gap at once, at boot, in front of the operator.
+	if err := api.ValidateWiringError(deps); err != nil {
+		log.Fatal(err)
+	}
+
+	router := api.NewRouter(deps, jwtManager)
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port),
