@@ -615,15 +615,32 @@ Role assertions in `interface_assert_test.go` went from 8 to 22, one per role. T
 are not ceremony: at several intermediate points the build passed while a role had
 stopped being satisfied, and only the assertions said so.
 
+### Finding 3 — `AIGenerationStore`, and where to stop
+
+`AIGenerationStore` (20) had three consumers with three shapes, so it became
+`AIGenerationAdminStore` (the HTTP surface) and `AIGenerationJobStore` (the
+worker's claim protocol, including the per-actor limit the job service enforces
+before claiming). `main`'s harness mode now takes `problemgen.JobStore`, the
+further-narrowed view that already existed and belongs to the harness.
+
+Two one-method consumers got seams: the profile's `GetUserPendingInvites` out of
+19 `GroupStore` methods, and `users.go`'s group field.
+
+**Where this stops.** `TrainingPlanStore` (21) has exactly one consumer using 16
+methods, and `group.go` uses 16 of 19. Splitting those would add a layer without
+removing a dependency — the definition of a carve that is not worth doing. The
+measurements are what say so, which is why every one of these started with a
+consumer survey rather than a method count.
+
 ## Still open
 
 | Finding | What remains |
 |---|---|
 | 1 | The route split is done and an unwired required handler now fails at boot rather than per request. Still open: the 77 fields remain one flat struct, so nothing distinguishes required from optional at the type level. |
-| 3 | Closed for the four widest. `TrainingPlanStore` (21), `GroupStore` (19) and `AIGenerationStore` (20) remain, but each has one or two consumers, so the payoff is smaller than the four done. |
 | 13 | `ContestManage` is down to 1880 lines with a shared fetch hook, but the other four large pages (`ContestDetail` 1204, `Profile` 1226, `ContestProblem` 1017, `ProblemDetail` 853) are untouched. |
 
-Closed since the first pass: 3 (the four widest stores), 4 (vjudge), 6 (run
+Closed since the first pass: 3 (every store that had more than one consumer),
+4 (vjudge), 6 (run
 modes), 7 (scoreboard), 8 (recommendations), 9 (the real half), 10 (contest
 refusal), 11 (test stubs), 12 (config), 13 (settings form), 14 (false positive).
 
