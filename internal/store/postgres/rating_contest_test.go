@@ -50,10 +50,14 @@ func TestRatingStore_GetByContestAcceptsDisplayID(t *testing.T) {
 	if err := contestStore.Create(ctx, contest); err != nil {
 		t.Fatalf("create contest: %v", err)
 	}
-	// The ledger row outlives the round by design (the reference is RESTRICT), so
-	// the round cannot be deleted until its rows are.
-	defer db.ExecContext(ctx, "DELETE FROM rating_history WHERE contest_id = $1", contestID)
+	// Everything the ledger hangs off the round is RESTRICT, so the round cannot be
+	// deleted until its rows and its run are. Defers run last-in-first-out, so the
+	// contests delete is declared first and executed last — declaring them in
+	// reading order leaves the round behind, and the next run of this test then
+	// fails on the pinned display_id.
 	defer db.ExecContext(ctx, "DELETE FROM contests WHERE id = $1", contestID)
+	defer db.ExecContext(ctx, "DELETE FROM rating_runs WHERE contest_id = $1", contestID)
+	defer db.ExecContext(ctx, "DELETE FROM rating_history WHERE contest_id = $1", contestID)
 
 	// Pin a high display_id so the numeric form of the URL is unambiguous.
 	var displayID int

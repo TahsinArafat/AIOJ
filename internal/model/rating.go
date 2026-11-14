@@ -41,14 +41,13 @@ type RatingHistory struct {
 
 // RatingRun is one payout: the round it was for, who ran it, and why.
 type RatingRun struct {
-	ID         string    `json:"id"`
-	ContestID  string    `json:"contest_id"`
-	ActorID    string    `json:"actor_id,omitempty"`
-	ActorName  string    `json:"actor_name"`
-	Kind       string    `json:"kind"`
-	Reason     string    `json:"reason"`
-	ReplacesID string    `json:"replaces_run_id,omitempty"`
-	CreatedAt  time.Time `json:"created_at"`
+	ID        string    `json:"id"`
+	ContestID string    `json:"contest_id"`
+	ActorID   string    `json:"actor_id,omitempty"`
+	ActorName string    `json:"actor_name"`
+	Kind      string    `json:"kind"`
+	Reason    string    `json:"reason"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 // Rating run kinds.
@@ -56,8 +55,9 @@ const (
 	// RatingRunApply is the first payout of a round.
 	RatingRunApply = "apply"
 	// RatingRunRecalc replaces an earlier payout: a disputed round voided, an
-	// entrant disqualified, or a suffix replayed after either.
-	RatingRunRecalc = "recalc"
+	// entrant disqualified, or a suffix replayed after either. The value has to
+	// match the check constraint on rating_runs.kind.
+	RatingRunRecalc = "recalculate"
 )
 
 // RatingExclusion is one entrant disqualified from one round. The round still

@@ -24,11 +24,22 @@ func NewRatingStore(db *sql.DB) *RatingStore {
 	return &RatingStore{db: db}
 }
 
-// liveColumns is the projection every reader of the ledger uses. Kept in one
-// place because the row shape is now seven columns wider than it was and three
-// call sites scan it.
+// liveColumns is the ledger projection for a query that reads rating_history
+// alone, or for a RETURNING clause — where Postgres refuses a table qualifier.
 const liveColumns = `id, user_id, contest_id, run_id, COALESCE(superseded_by::text, ''), seq,
 	                     old_rating, new_rating, rank, rating_change, created_at`
+
+// liveColumnsFrom is the same projection qualified for a query that joins
+// another table. Both rating_history and contests carry an `id`, so an
+// unqualified projection is ambiguous there — which is not a compile error, a
+// test error, or anything the in-memory fixtures can see: it is a 500 on the
+// rating history page.
+func liveColumnsFrom(alias string) string {
+	return alias + `.id, ` + alias + `.user_id, ` + alias + `.contest_id, ` + alias + `.run_id, ` +
+		`COALESCE(` + alias + `.superseded_by::text, ''), ` + alias + `.seq, ` +
+		alias + `.old_rating, ` + alias + `.new_rating, ` + alias + `.rank, ` + alias + `.rating_change, ` +
+		alias + `.created_at`
+}
 
 func scanHistory(row interface{ Scan(...any) error }, h *model.RatingHistory) error {
 	return row.Scan(&h.ID, &h.UserID, &h.ContestID, &h.RunID, &h.SupersededBy, &h.Seq,
@@ -59,7 +70,7 @@ var errMissingRun = errors.New("rating history row requires a run")
 // top of the graph with a base that already contained round 2.
 func (s *RatingStore) GetByUser(ctx context.Context, userID string, limit int) ([]model.RatingHistory, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT `+liveColumns+`
+		`SELECT `+liveColumnsFrom("rh")+`
 		   FROM rating_history rh
 		   JOIN contests c ON c.id = rh.contest_id
 		  WHERE rh.user_id = $1 AND rh.superseded_by IS NULL
@@ -108,7 +119,7 @@ func (s *RatingStore) GetByContest(ctx context.Context, contestID string) ([]mod
 func (s *RatingStore) GetLatestByUser(ctx context.Context, userID string) (*model.RatingHistory, error) {
 	var h model.RatingHistory
 	err := scanHistory(s.db.QueryRowContext(ctx,
-		`SELECT `+liveColumns+`
+		`SELECT `+liveColumnsFrom("rh")+`
 		   FROM rating_history rh
 		   JOIN contests c ON c.id = rh.contest_id
 		  WHERE rh.user_id = $1 AND rh.superseded_by IS NULL
@@ -160,10 +171,9 @@ func (s *RatingStore) BaseRatings(ctx context.Context, contestID string) (map[st
 // for callers that only want the run row, which is nothing yet.
 func (s *RatingStore) CreateRun(ctx context.Context, run *model.RatingRun) error {
 	return s.db.QueryRowContext(ctx,
-		`INSERT INTO rating_runs (id, contest_id, actor_id, actor_name, kind, reason, replaces_run_id)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING created_at`,
+		`INSERT INTO rating_runs (id, contest_id, actor_id, actor_name, kind, reason)
+		 VALUES ($1, $2, $3, $4, $5, $6) RETURNING created_at`,
 		runID(run), run.ContestID, nullableUUID(run.ActorID), run.ActorName, run.Kind, run.Reason,
-		nullableUUID(run.ReplacesID),
 	).Scan(&run.CreatedAt)
 }
 
@@ -171,8 +181,7 @@ func (s *RatingStore) CreateRun(ctx context.Context, run *model.RatingRun) error
 // operator can see that a round was rated, withdrawn and rated again.
 func (s *RatingStore) GetRunsByContest(ctx context.Context, contestID string) ([]model.RatingRun, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, contest_id, COALESCE(actor_id::text, ''), actor_name, kind, reason,
-		        COALESCE(replaces_run_id::text, ''), created_at
+		`SELECT id, contest_id, COALESCE(actor_id::text, ''), actor_name, kind, reason, created_at
 		   FROM rating_runs WHERE contest_id = $1 ORDER BY created_at DESC, id`, contestID)
 	if err != nil {
 		return nil, err
@@ -206,10 +215,9 @@ func (s *RatingStore) ApplyRun(ctx context.Context, run *model.RatingRun, scope 
 	defer tx.Rollback()
 
 	if err := tx.QueryRowContext(ctx,
-		`INSERT INTO rating_runs (id, contest_id, actor_id, actor_name, kind, reason, replaces_run_id)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING created_at`,
+		`INSERT INTO rating_runs (id, contest_id, actor_id, actor_name, kind, reason)
+		 VALUES ($1, $2, $3, $4, $5, $6) RETURNING created_at`,
 		runID(run), run.ContestID, nullableUUID(run.ActorID), run.ActorName, run.Kind, run.Reason,
-		nullableUUID(run.ReplacesID),
 	).Scan(&run.CreatedAt); err != nil {
 		return err
 	}
@@ -407,6 +415,5 @@ func nullableUUID(id string) any {
 }
 
 func scanRun(row interface{ Scan(...any) error }, r *model.RatingRun) error {
-	return row.Scan(&r.ID, &r.ContestID, &r.ActorID, &r.ActorName, &r.Kind, &r.Reason,
-		&r.ReplacesID, &r.CreatedAt)
+	return row.Scan(&r.ID, &r.ContestID, &r.ActorID, &r.ActorName, &r.Kind, &r.Reason, &r.CreatedAt)
 }
