@@ -44,19 +44,64 @@ func (s *Service) WithNotifier(n *notify.Notifier) *Service {
 	return s
 }
 
+// effectiveRating is the rating a participant enters a round with.
+//
+// A user with no rating history has no rating yet, which the store reports as 0.
+// That is "unrated", not "rated zero": CalculateRating already substitutes
+// DefaultRating for it. The eligibility window and the delta have to read the
+// same number, because computing the change against 0 records a newcomer's first
+// rating as a gain of ~1500 and draws their graph as a climb from nothing.
+func effectiveRating(r int) int {
+	if r == 0 {
+		return DefaultRating
+	}
+	return r
+}
+
+// RatedField narrows a ranked field to the participants a round is rated for.
+//
+// A round can be rated for a rating window (rated_for_min..rated_for_max) while
+// its standings include everyone who submitted, and the calculator reads only
+// rank and field size. Leaving the ineligible rows in place would count them in
+// the field size and leave holes in the ranks, so an eligible entrant finishing
+// 7th of 20 would be scored as though six people had beaten them when only three
+// had. Re-ranking compactly keeps ties: participants sharing a board rank keep
+// sharing a rank here.
+//
+// The input must be in board order, which is rank order.
+func RatedField(standings []ContestStanding, min, max int) []ContestStanding {
+	field := make([]ContestStanding, 0, len(standings))
+	boardRank := 0
+	for _, s := range standings {
+		r := effectiveRating(s.OldRating)
+		if r < min || r > max {
+			continue
+		}
+		rank := len(field) + 1
+		if len(field) > 0 && s.Rank == boardRank {
+			rank = field[len(field)-1].Rank
+		}
+		boardRank = s.Rank
+		s.Rank = rank
+		field = append(field, s)
+	}
+	return field
+}
+
 // CalculateContestRatings computes rating changes for all participants
 func (s *Service) CalculateContestRatings(standings []ContestStanding) []model.RatingChange {
 	participants := len(standings)
 	changes := make([]model.RatingChange, 0, participants)
 
 	for _, standing := range standings {
-		newRating := CalculateRating(standing.OldRating, standing.Rank, participants)
-		ratingChange := CalculateRatingChange(standing.OldRating, newRating)
+		oldRating := effectiveRating(standing.OldRating)
+		newRating := CalculateRating(oldRating, standing.Rank, participants)
+		ratingChange := CalculateRatingChange(oldRating, newRating)
 
 		changes = append(changes, model.RatingChange{
 			UserID:       standing.UserID,
 			Username:     standing.Username,
-			OldRating:    standing.OldRating,
+			OldRating:    oldRating,
 			NewRating:    newRating,
 			RatingChange: ratingChange,
 			Rank:         standing.Rank,

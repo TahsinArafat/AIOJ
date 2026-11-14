@@ -882,6 +882,70 @@ func validateAccessConfig(in model.AccessConfig) (model.AccessConfig, error) {
 	return out, nil
 }
 
+// contestBoard assembles and ranks a round's standings from its submissions.
+//
+// The standings page and the rating job both read this function. A rating change
+// is derived from a rank, so a rating run that ranked the field its own way would
+// rewrite every participant's profile against an order nobody else can see. That
+// is exactly what the rating job used to do: it numbered GetParticipants' rows
+// 1..n, and GetParticipants is `SELECT DISTINCT user_id` with no ORDER BY.
+//
+// viewPastFreeze is true for the rating job, which must score the final board
+// rather than the rows a spectator was allowed to see when the round froze.
+func (h *ContestHandler) contestBoard(r *http.Request, contest *model.Contest, viewPastFreeze bool) (*format.Board, []model.ContestProblem, error) {
+	problems, _ := h.store.GetProblems(r.Context(), contest.ID)
+	rows, _ := h.store.GetScoreboardRows(r.Context(), contest.ID, nil)
+	participants, _ := h.store.GetParticipants(r.Context(), contest.ID)
+
+	// One lookup for each half of a row's label: the handle from the users row,
+	// the team from the onsite batch row. The board used to make one GetUsername
+	// query per participant — 500 round trips on a full standings page — and a
+	// failed username lookup is logged rather than fatal, because the rows still
+	// render with the display label and a blank handle. The rating job treats a
+	// blank handle as fatal at its own call site instead.
+	displayNames, _ := h.store.GetDisplayNames(r.Context(), contest.ID, participants)
+	usernames, err := h.store.GetUsernames(r.Context(), participants)
+	if err != nil {
+		slog.Warn("contest board usernames", "contest_id", contest.ID, "error", err)
+		usernames = map[string]string{}
+	}
+
+	// Manual corrections. They are applied to each participant's totals BEFORE
+	// ranking, so a judge's decision actually moves the order.
+	adjustments, _ := h.adjustmentsFor(r, contest.ID)
+
+	fmtName := contest.Format
+	if fmtName == "" {
+		fmtName = "acm"
+	}
+
+	// The freeze window, the bucketing, the scoring, the correction layering and
+	// the ranking all live in format.BuildBoard. They were inline in the handler
+	// and had no test that could reach them without a database; they are pure
+	// functions of their inputs now, and board_test.go covers the freeze and the
+	// corrections.
+	board, err := format.BuildBoard(format.BoardInput{
+		ContestID:      contest.ID,
+		StartTime:      contest.StartTime,
+		EndTime:        contest.EndTime,
+		FormatName:     fmtName,
+		FormatConfig:   contest.FormatConfig,
+		Problems:       problems,
+		Rows:           rows,
+		Participants:   participants,
+		Usernames:      usernames,
+		DisplayNames:   displayNames,
+		FreezeTime:     contest.FreezeTime,
+		Now:            time.Now(),
+		ViewPastFreeze: viewPastFreeze,
+		Corrections:    adjustments,
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	return board, problems, nil
+}
+
 func (h *ContestHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	contest, err := h.store.GetByID(r.Context(), id)
@@ -944,7 +1008,11 @@ func (h *ContestHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	problems, _ := h.store.GetProblems(r.Context(), contest.ID)
+	board, problems, err := h.contestBoard(r, contest, isJudge)
+	if err != nil {
+		http.Error(w, "invalid contest format: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	// The board carries letters, never names.
 	//
@@ -969,56 +1037,6 @@ func (h *ContestHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 			Index:     p.Index,
 			Score:     p.Score,
 		}
-	}
-
-	rows, _ := h.store.GetScoreboardRows(r.Context(), contest.ID, nil)
-	participants, _ := h.store.GetParticipants(r.Context(), contest.ID)
-
-	// One lookup per page for each half of a row's label: the handle from the
-	// users row, the team from the onsite batch row. The board used to make one
-	// GetUsername query per participant — 500 round trips on a full standings
-	// page — and a failed username lookup is logged rather than fatal, because
-	// the rows still render with the display label and a blank handle.
-	displayNames, _ := h.store.GetDisplayNames(r.Context(), contest.ID, participants)
-	usernames, err := h.store.GetUsernames(r.Context(), participants)
-	if err != nil {
-		slog.Warn("scoreboard usernames", "contest_id", contest.ID, "error", err)
-		usernames = map[string]string{}
-	}
-
-	// Manual corrections, loaded once for the page. They are applied to each
-	// participant's totals BEFORE ranking, so a judge's decision actually moves
-	// the order here and on the full scoreboard — the two read the same function.
-	adjustments, _ := h.adjustmentsFor(r, contest.ID)
-
-	fmtName := contest.Format
-	if fmtName == "" {
-		fmtName = "acm"
-	}
-
-	// The freeze window, the bucketing, the scoring, the correction layering and
-	// the ranking all live in format.BuildBoard. They were inline here and had no
-	// test that could reach them without a database; they are pure functions of
-	// their inputs now, and board_test.go covers the freeze and the corrections.
-	board, err := format.BuildBoard(format.BoardInput{
-		ContestID:      contest.ID,
-		StartTime:      contest.StartTime,
-		EndTime:        contest.EndTime,
-		FormatName:     fmtName,
-		FormatConfig:   contest.FormatConfig,
-		Problems:       problems,
-		Rows:           rows,
-		Participants:   participants,
-		Usernames:      usernames,
-		DisplayNames:   displayNames,
-		FreezeTime:     contest.FreezeTime,
-		Now:            time.Now(),
-		ViewPastFreeze: isJudge,
-		Corrections:    adjustments,
-	})
-	if err != nil {
-		http.Error(w, "invalid contest format: "+err.Error(), http.StatusInternalServerError)
-		return
 	}
 
 	entries := board.Entries
@@ -1277,35 +1295,53 @@ func (h *ContestHandler) CalculateRatings(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	participants, _ := h.store.GetParticipants(r.Context(), contest.ID)
-
-	// Names resolved once, and a failure here aborts the calculation. Unlike the
-	// scoreboard's display path, this one feeds an irreversible write, so a name
-	// that cannot be read must not become an empty string on a rating record.
-	usernames, err := h.store.GetUsernames(r.Context(), participants)
+	// A second run is not a recalculation, it is a second payout: every
+	// participant would get another history row and another delta on top of the
+	// rating the first run gave them.
+	applied, err := h.ratingStore.GetByContest(r.Context(), contest.ID)
 	if err != nil {
-		http.Error(w, "failed to resolve participant names", http.StatusInternalServerError)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if len(applied) > 0 {
+		http.Error(w, "ratings already applied to this contest", http.StatusConflict)
 		return
 	}
 
-	standings := make([]rating.ContestStanding, 0, len(participants))
-	for i, uid := range participants {
-		latest, _ := h.ratingStore.GetLatestByUser(r.Context(), uid)
-		oldRating := 0
-		if latest != nil {
-			oldRating = latest.NewRating
-		}
+	// The board, not the submissions table, is what decides the order: a rating
+	// change is a function of the rank a participant finished on.
+	board, _, err := h.contestBoard(r, contest, true)
+	if err != nil {
+		http.Error(w, "invalid contest format: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
 
-		standings = append(standings, rating.ContestStanding{
-			UserID:    uid,
-			Rank:      i + 1,
-			OldRating: oldRating,
-			Username:  usernames[uid],
-		})
+	// Names resolved once, and a blank one aborts the calculation. Unlike the
+	// scoreboard's display path, this one feeds an irreversible write, so a name
+	// that cannot be read must not become an empty string on a rating record.
+	oldRatings := make(map[string]int, len(board.Entries))
+	for _, entry := range board.Entries {
+		if entry.Username == "" {
+			http.Error(w, "failed to resolve participant names", http.StatusInternalServerError)
+			return
+		}
+		if latest, _ := h.ratingStore.GetLatestByUser(r.Context(), entry.UserID); latest != nil {
+			oldRatings[entry.UserID] = latest.NewRating
+		}
+	}
+
+	// The round is rated for a rating window, its standings are not: everyone who
+	// submitted appears on the board. RatedField narrows the field to the entrants
+	// the round counts for, and re-ranks it so the survivors are not scored as
+	// though the ineligible rows had beaten them.
+	field := rating.RatedField(standingsFromBoard(board.Entries, oldRatings), contest.RatedForMin, contest.RatedForMax)
+	if len(field) == 0 {
+		http.Error(w, fmt.Sprintf("no participant is inside the rated window %d-%d", contest.RatedForMin, contest.RatedForMax), http.StatusConflict)
+		return
 	}
 
 	ratingService := rating.NewService(h.ratingStore, h.userStore).WithNotifier(h.notify)
-	changes := ratingService.CalculateContestRatings(standings)
+	changes := ratingService.CalculateContestRatings(field)
 
 	if err := ratingService.ApplyContestRatings(r.Context(), contest.ID, changes); err != nil {
 		http.Error(w, "failed to apply ratings", http.StatusInternalServerError)
@@ -1323,11 +1359,42 @@ func (h *ContestHandler) CalculateRatings(w http.ResponseWriter, r *http.Request
 		slog.Error("team rating recalculation failed", "contest_id", contest.ID, "error", err)
 	}
 
-	resp := map[string]interface{}{"changes": changes}
+	// The standings are cached for 30s and that response carries both the rating
+	// column and rating_calculated, so without this the page would keep serving
+	// the pre-rating board to everyone, including the operator who just applied
+	// the ratings.
+	h.cache.invalidate(contest.ID)
+
+	resp := map[string]interface{}{
+		"changes": changes,
+		// Both counts, because the gap between them is the rating window doing its
+		// job: a round that rated 0 of 25 entrants has to look like that in the
+		// response rather than like a successful run.
+		"participants": len(board.Entries),
+		"rated":        len(changes),
+	}
 	if teamErr != "" {
 		resp["team_rating_error"] = teamErr
 	}
 	respondJSON(w, http.StatusOK, resp)
+}
+
+// standingsFromBoard projects a ranked board onto the rating job's input.
+//
+// The order is the board's, because the board is what ranked the field. Reading
+// participants straight out of the submissions table and numbering them 1..n is
+// what made a rating change depend on row order instead of placement.
+func standingsFromBoard(entries []format.Entry, oldRatings map[string]int) []rating.ContestStanding {
+	standings := make([]rating.ContestStanding, 0, len(entries))
+	for _, entry := range entries {
+		standings = append(standings, rating.ContestStanding{
+			UserID:    entry.UserID,
+			Rank:      entry.Rank,
+			OldRating: oldRatings[entry.UserID],
+			Username:  entry.Username,
+		})
+	}
+	return standings
 }
 
 func (h *ContestHandler) CreateEducational(w http.ResponseWriter, r *http.Request) {

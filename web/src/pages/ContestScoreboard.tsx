@@ -86,6 +86,18 @@ function isOI(format?: string): boolean {
   return format === 'ioi' || format === 'oi';
 }
 
+/**
+ * Whether the round's clock has run out.
+ *
+ * `contest.status` is the review state — draft, pending, published, rejected — so
+ * it is never 'ended'. Gating the admin rating button on `status === 'ended'` made
+ * that button unreachable for every round, including finished ones.
+ */
+function hasEnded(endTime?: string): boolean {
+  if (!endTime) return false;
+  return new Date(endTime).getTime() < Date.now();
+}
+
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function ContestScoreboard() {
@@ -167,14 +179,14 @@ export default function ContestScoreboard() {
     });
   }, [fetchScoreboard, fetchRatings, viewMode, currentPage]);
 
-  // Auto-refresh every 30s for running contests
+  // Auto-refresh every 30s while the round is still running
   useEffect(() => {
-    if (!data?.contest || data.contest.status === 'ended') return;
+    if (!data?.contest || hasEnded(data.contest.end_time)) return;
     const interval = setInterval(() => {
       fetchScoreboard(viewMode, currentPage);
     }, 30_000);
     return () => clearInterval(interval);
-  }, [data?.contest?.status, fetchScoreboard, viewMode, currentPage]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [data?.contest?.end_time, fetchScoreboard, viewMode, currentPage]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Determine first-solve problem indices
   const firstSolves = useMemo(() => {
@@ -210,12 +222,20 @@ export default function ContestScoreboard() {
         },
       });
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.message || `HTTP ${res.status}`);
+        // The endpoint answers plain text, not JSON: the status line is the only
+        // place the reason appears, so read it instead of reporting "HTTP 409".
+        const text = await res.text().catch(() => '');
+        throw new Error(text.trim() || `HTTP ${res.status}`);
       }
-      setRatingMsg('Rating calculation started!');
-      // Refresh ratings after a delay
-      setTimeout(() => fetchRatings(), 3000);
+      // The counts are the operator's only evidence that the rating window did
+      // something: "rated 22 of 25" is the distribution, "done" is not.
+      const body = (await res.json().catch(() => null)) as { participants?: number; rated?: number } | null;
+      setRatingMsg(
+        body && typeof body.rated === 'number' && typeof body.participants === 'number'
+          ? `Rated ${body.rated} of ${body.participants} entrants.`
+          : 'Ratings applied.',
+      );
+      await Promise.all([fetchScoreboard(viewMode, currentPage), fetchRatings()]);
     } catch (e) {
       setRatingMsg(errorMessage(e) || 'Failed to trigger rating');
     } finally {
@@ -262,6 +282,7 @@ export default function ContestScoreboard() {
 
   const { entries, problems, frozen, contest, pagination } = data;
   const oi = isOI(contest.format);
+  const ended = hasEnded(contest.end_time);
   const problemIndices = problems.map((p) => p.index).sort();
 
   return (
@@ -326,16 +347,22 @@ export default function ContestScoreboard() {
         </div>
       )}
 
-      {/* Admin rating button */}
-      {isAdmin && contest.status === 'ended' && (
+      {/* Admin rating controls. Hidden once the ratings are applied: the endpoint
+          refuses a second run, so offering "Recalculate" would only produce an
+          error for a button that looks like it should work. */}
+      {isAdmin && contest.is_rated && ended && (
         <div className="mb-3 flex items-center gap-3">
-          <button
-            onClick={handleRateContest}
-            disabled={ratingLoading}
-            className="px-4 py-1.5 text-sm font-medium rounded bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50 transition-colors"
-          >
-            {ratingLoading ? 'Calculating...' : contest.rating_calculated ? 'Recalculate Ratings' : 'Rate This Contest'}
-          </button>
+          {contest.rating_calculated ? (
+            <span className="text-sm text-muted">Ratings have been applied for this round.</span>
+          ) : (
+            <button
+              onClick={handleRateContest}
+              disabled={ratingLoading}
+              className="px-4 py-1.5 text-sm font-medium rounded bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50 transition-colors"
+            >
+              {ratingLoading ? 'Applying...' : 'Rate This Contest'}
+            </button>
+          )}
           {ratingMsg && (
             <span className="text-sm text-muted">{ratingMsg}</span>
           )}
