@@ -18,7 +18,7 @@ Severity reflects cost to change and likelihood of causing a bug, not taste.
 
 ## Findings
 
-### 1. `Deps` is a service locator and `NewRouter` was a second program — **High** (router split fixed)
+### 1. `Deps` is a service locator and `NewRouter` was a second program — **High** (partly fixed) (router split fixed)
 
 `internal/api/deps.go:14`, `internal/api/router.go`
 
@@ -45,11 +45,22 @@ sit on top: every `/api/admin/*` route must carry both `AuthMiddleware` and
 still encoded as `if d.X != nil` across **32** sites rather than in the type.
 Grouping `Deps` into required and optional sub-structs remains the fix.
 
-That refactor is now safe to attempt because the contract the guards encode is
-pinned: `TestMissingDepsDoNotPanic` serves a request through a partially-wired
-router and requires a 404, not a panic. Removing any one guard makes it fail with
-the nil dereference. Which fields are nilable is what the refactor changes, so the
-assertion is the thing to keep green while doing it.
+That refactor is now safe to attempt because both halves of the contract are
+pinned: `TestMissingDepsDoNotPanic` requires a partially-wired router to answer
+404 rather than panic, and `api.ValidateWiring` refuses to boot with a required
+handler unwired.
+
+The second one is a fix, not just a guard. A nil handler is a valid pointer, so
+a handler added to a mount file but forgotten in `main` compiled, started, and
+then panicked on the nil receiver for every request to that route — recovered
+into an empty 500 that named nothing. Verified directly:
+`(*handler.GymHandler)(nil).List` is a nil-pointer dereference. `main` now aborts
+at boot with every gap named, and `TestOptionalListMatchesMountGuards` keeps the
+hand-maintained optional list honest against the actual guards in the mount files.
+
+**Still open:** the 77 fields are still one flat struct, so nothing distinguishes
+a required handler from a gated one at the type level. Grouping them into
+required and optional sub-structs is the remaining half.
 
 ### 2. Handlers depend on the Postgres implementation, not the interfaces — **High**
 
@@ -608,7 +619,7 @@ stopped being satisfied, and only the assertions said so.
 
 | Finding | What remains |
 |---|---|
-| 1 | `Deps` is still a 77-field service locator, and optionality is still `if d.X != nil` rather than a type. The route split is done. |
+| 1 | The route split is done and an unwired required handler now fails at boot rather than per request. Still open: the 77 fields remain one flat struct, so nothing distinguishes required from optional at the type level. |
 | 3 | Closed for the four widest. `TrainingPlanStore` (21), `GroupStore` (19) and `AIGenerationStore` (20) remain, but each has one or two consumers, so the payoff is smaller than the four done. |
 | 13 | `ContestManage`'s settings form is split, but the file is still 1893 lines and the other four large pages (`ContestDetail` 1204, `Profile` 1226, `ContestProblem` 1017, `ProblemDetail` 853) are untouched. The missing shared fetch hook — 18 raw `await api.*` and 41 `setLoading`/`setError` sites in one page — is the duplication half. |
 
