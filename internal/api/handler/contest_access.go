@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
@@ -488,20 +487,7 @@ func (h *contestHandlerAccess) requireContestPageAccess(
 		// round is private. It is safe to say — they already hold the id, and those
 		// surfaces are available to anyone — and without it a published surface has
 		// no route a stranger can follow.
-		body := map[string]string{
-			"error": "password_required",
-			"code":  "password_required",
-		}
-		// Kept for the standings page, which reads it. published_surfaces is the
-		// general form; this one names the board so an existing client keeps
-		// working when the board is what was published.
-		if c.AccessConfig.Audience(model.SurfaceStandings) == model.AccessPublic {
-			body["scoreboard_public"] = "true"
-		}
-		if public := c.PublicSurfaces(); len(public) > 0 {
-			body["published_surfaces"] = strings.Join(public, ",")
-		}
-		respondJSON(w, http.StatusForbidden, body)
+		contestPasswordRequired(w, c)
 	case notFoundWhenDenied:
 		http.Error(w, "contest not found", http.StatusNotFound)
 	default:
@@ -549,17 +535,7 @@ func (h *contestHandlerAccess) resolveContestAccess(
 		// stale (and been wrong) the first time a round published its booklet
 		// instead. scoreboard_public is still sent when the board is one of them, so
 		// the existing standings page keeps working unchanged.
-		body := map[string]string{
-			"error": "password_required",
-			"code":  "password_required",
-		}
-		if c.AccessConfig.Audience(model.SurfaceStandings) == model.AccessPublic {
-			body["scoreboard_public"] = "true"
-		}
-		if public := c.PublicSurfaces(); len(public) > 0 {
-			body["published_surfaces"] = strings.Join(public, ",")
-		}
-		respondJSON(w, http.StatusForbidden, body)
+		contestPasswordRequired(w, c)
 		return contestViewer{}, false
 	case notFoundWhenDenied:
 		http.Error(w, "contest not found", http.StatusNotFound)

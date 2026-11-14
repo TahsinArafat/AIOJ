@@ -239,6 +239,13 @@ func (h *AdminAIModelHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 // TestConnection handles POST /api/admin/ai-models/test.
 // Sends a trivial completion to the provided endpoint and reports whether it succeeded.
+//
+// The 200-with-ok:false responses below are deliberate, not an oversight. This is
+// a diagnostic: the request succeeded, and the answer to "does this endpoint
+// work" is no. A 4xx would say the *probe* failed, which is a different question.
+// The admin panel branches on res.ok to show the endpoint's own error text rather than treating the failure as a transport
+// problem. Every other handler uses a 4xx; this one is the exception, and it is
+// the only one.
 func (h *AdminAIModelHandler) TestConnection(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		ID                   string `json:"id"`
