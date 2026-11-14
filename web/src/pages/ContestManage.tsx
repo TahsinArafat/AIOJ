@@ -23,11 +23,10 @@ import { isPendingVerdict, isSkippedVerdict } from '../components/ui/verdict'
 import { useFeature } from '../context/FeaturesContext'
 import { SkipSubmissionDialog } from '../components/SkipSubmissionDialog'
 import { ContestAdjustmentsPanel } from './admin/ContestAdjustmentsPanel'
-import {
-    SURFACES, AUDIENCE_LABELS, surfaceAudience, isInherited,
-    setSurface, clearSurface, publicSurfaces, sanitizeAccessConfig,
-} from '../lib/contestAccess'
-import type { AccessAudience, AccessConfig } from '../lib/contestAccess'
+import { sanitizeAccessConfig } from '../lib/contestAccess'
+import type { AccessConfig } from '../lib/contestAccess'
+import { AccessTable } from '../components/ContestManage/AccessTable'
+import { FormatSettings } from '../components/ContestManage/FormatSettings'
 import {
     formatSpec, defaultFormatConfig, formFromFormatConfig, configFromForm,
 } from '../lib/contestFormatConfig'
@@ -1625,74 +1624,16 @@ function SettingsTab({ contestId }: { contestId: string }) {
                         to apply to.
                     </p>
 
-                    {/* The format's own settings. This block is why the create page's copy
-                        could be deleted: it was the only UI that could reach them, so
-                        without it a round could change format and never tune it. */}
-                    {(() => {
-                        const spec = formatSpec(form.format)
-                        if (!spec) {
-                            return (
-                                <p className="mt-2 text-xs text-warn">
-                                    This round uses a format this build has no settings for
-                                    ({form.format}). Its stored settings are left untouched.
-                                </p>
-                            )
-                        }
-                        return (
-                            <fieldset className="mt-3 rounded-lg border border-hairline p-3">
-                                <legend className="px-1 text-xs font-semibold text-ink-soft">
-                                    {spec.label} settings
-                                </legend>
-                                <div className="mt-2 space-y-3">
-                                    {spec.fields.map(f => (
-                                        <div key={f.key}>
-                                            {f.type === 'checkbox' ? (
-                                                <label className="flex items-center gap-2 cursor-pointer">
-                                                    <input
-                                                        type="checkbox"
-                                                        aria-label={f.label}
-                                                        checked={form.format_config[f.key] === 'true'}
-                                                        onChange={e => setForm(p => ({
-                                                            ...p,
-                                                            format_config: {
-                                                                ...p.format_config,
-                                                                [f.key]: e.target.checked ? 'true' : 'false',
-                                                            },
-                                                        }))}
-                                                        className="rounded border-hairline-strong text-brand focus-visible:outline-[var(--ring)]"
-                                                    />
-                                                    <span className="text-sm text-ink-soft">{f.label}</span>
-                                                </label>
-                                            ) : (
-                                                <>
-                                                    <label className="block text-sm font-medium text-ink-soft mb-1">
-                                                        {f.label}
-                                                    </label>
-                                                    <input
-                                                        type="number"
-                                                        aria-label={f.label}
-                                                        min={f.min}
-                                                        max={f.max}
-                                                        step={f.step}
-                                                        value={form.format_config[f.key] ?? ''}
-                                                        onChange={e => setForm(p => ({
-                                                            ...p,
-                                                            format_config: {
-                                                                ...p.format_config,
-                                                                [f.key]: e.target.value,
-                                                            },
-                                                        }))}
-                                                        className="w-full max-w-xs border border-hairline-strong rounded-lg px-3 py-2 text-sm focus:ring-2 focus-visible:outline-[var(--ring)] focus:border-brand bg-surface"
-                                                    />
-                                                </>
-                                            )}
-                                            {f.hint && <p className="mt-1 text-xs text-muted-soft">{f.hint}</p>}
-                                        </div>
-                                    ))}
-                                </div>
-                            </fieldset>
-                        )
-                    })()}
+                    {/* The format's own settings. Extracted to its own component;
+                        the values stay in this form's state. */}
+                    <FormatSettings
+                        format={form.format}
+                        config={form.format_config}
+                        onChange={(key, value) => setForm(p => ({
+                            ...p,
+                            format_config: { ...p.format_config, [key]: value },
+                        }))}
+                    />
                 </div>
 
                 {/* Description */}
@@ -1758,123 +1699,13 @@ function SettingsTab({ contestId }: { contestId: string }) {
                     </label>
                 </div>
 
-                {/* Per-surface access. Replaces the single "Scoreboard
-                    Visibility" select, which was the first surface to need its
-                    own audience and turned out not to be the last: a round's
-                    problem list, statements, booklet, submit path and board are
-                    five independent answers, and one dropdown could only express
-                    the board's.
-
-                    Rows, not a matrix of checkboxes: each surface has a small
-                    closed set of audiences, and a select per row keeps the
-                    vocabulary visible next to the surface it applies to. The
-                    "inherited" marker matters — an inherited audience and one
-                    stored on this round look identical otherwise, and a setter
-                    who cannot tell which rows they changed will not dare clear
-                    one. */}
-                <div>
-                    <label className="block text-sm font-medium text-ink-soft mb-2">Who can access what</label>
-                    <div className="rounded-lg border border-hairline-strong overflow-hidden">
-                        <table className="w-full text-sm">
-                            <thead className="bg-surface-2">
-                                <tr>
-                                    <th className="text-left px-3 py-2 font-medium text-muted">Part of the round</th>
-                                    <th className="text-left px-3 py-2 font-medium text-muted w-56">Who can access it</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-hairline">
-                                {SURFACES.map((surface) => {
-                                    const inherited = isInherited(form.access_config, surface.key)
-                                    const audience = surfaceAudience(form.access_config, surface.key)
-                                    // Surfacing the resolved value on an inherited
-                                    // row is the point: "inherited" alone does not
-                                    // tell the setter whether the surface is
-                                    // currently open or closed.
-                                    const effective = inherited
-                                        ? `Inherited — ${AUDIENCE_LABELS[audience].toLowerCase()}`
-                                        : AUDIENCE_LABELS[audience]
-                                    return (
-                                        <tr key={surface.key}>
-                                            <td className="px-3 py-2.5 align-top">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="font-medium text-ink">{surface.label}</span>
-                                                    {inherited && (
-                                                        <span className="text-[11px] px-1.5 py-0.5 rounded bg-surface-2 text-muted-soft">
-                                                            inherited
-                                                        </span>
-                                                    )}
-                                                    {!inherited && surface.key !== 'participate' && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setForm(p => ({ ...p, access_config: clearSurface(p.access_config, surface.key) }))}
-                                                            className="text-[11px] text-muted-soft hover:text-brand underline"
-                                                            aria-label={`Reset ${surface.label} to inherited`}
-                                                        >
-                                                            reset
-                                                        </button>
-                                                    )}
-                                                </div>
-                                                <p className="text-xs text-muted-soft mt-0.5">{surface.hint}</p>
-                                            </td>
-                                            <td className="px-3 py-2.5 align-top">
-                                                <select
-                                                    aria-label={`${surface.label} access`}
-                                                    value={form.access_config[surface.key] ?? ''}
-                                                    onChange={e => {
-                                                        const v = e.target.value
-                                                        setForm(p => ({
-                                                            ...p,
-                                                            access_config: v === ''
-                                                                ? clearSurface(p.access_config, surface.key)
-                                                                : setSurface(p.access_config, surface.key, v as AccessAudience),
-                                                        }))
-                                                    }}
-                                                    className="w-full border border-hairline-strong rounded-lg px-2.5 py-1.5 text-sm focus:ring-2 focus-visible:outline-[var(--ring)] focus:border-brand bg-surface"
-                                                >
-                                                    <option value="">Same as the round ({AUDIENCE_LABELS[surfaceAudience(form.access_config, 'participate')].toLowerCase()})</option>
-                                                    <option value="open">Anyone who can open the round</option>
-                                                    {/* Not offered for submit: requiring an entrant in order to
-                                                        submit deadlocks the first submission of a round, because
-                                                        submitting is one of the two ways to become one. The server
-                                                        answers 400 for it, so showing it would be showing an option
-                                                        that cannot be saved. */}
-                                                    {surface.allowsParticipants && <option value="participants">Participants only</option>}
-                                                    <option value="public">Anyone</option>
-                                                    {surface.allowsStaff && <option value="staff">Organizers only</option>}
-                                                </select>
-                                                <p className="text-[11px] text-muted-soft mt-1">
-                                                    {surface.key === 'participate'
-                                                        ? 'The base rule. Surfaces left on "same as the round" follow this.'
-                                                        : inherited
-                                                            ? `Currently ${AUDIENCE_LABELS[audience].toLowerCase()}, following the round's setting.`
-                                                            : effective + '.'}
-                                                </p>
-                                            </td>
-                                        </tr>
-                                    )
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
-                    <p className="text-xs text-muted-soft mt-2">
-                        {(() => {
-                            const open = publicSurfaces(form.access_config)
-                            // Whether the round is discoverable is a separate setting
-                            // (List in the public contests list), so this line says
-                            // what the audiences do and defers the listing question
-                            // to the control that owns it. Before that control
-                            // existed this text asserted the round stayed out of the
-                            // list, which was true only because publishing and
-                            // listing were the same bit.
-                            const reach = open.length === 0
-                                ? 'Nothing here is public: only the people who can open the round reach any of it.'
-                                : `Anyone with the link can reach: ${open.map(s => s.label.toLowerCase()).join(', ')}.`
-                            return form.listed
-                                ? `${reach} This round is listed, so it also appears in the contest list and in search.`
-                                : `${reach} This round is unlisted: reachable by its direct link, and not in the contest list or search.`
-                        })()}
-                    </p>
-                </div>
+                {/* Per-surface access. The table is its own component; the state
+                    stays here because it is one field of this form. */}
+                <AccessTable
+                    accessConfig={form.access_config}
+                    listed={form.listed}
+                    onChange={next => setForm(p => ({ ...p, access_config: next }))}
+                />
 
                 {form.visibility === 'private' && (
                     <div>
