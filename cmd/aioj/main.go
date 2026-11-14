@@ -26,8 +26,6 @@ import (
 	"github.com/tahsinarafat/aioj/internal/feature"
 	"github.com/tahsinarafat/aioj/internal/generate"
 	"github.com/tahsinarafat/aioj/internal/hack"
-	"github.com/tahsinarafat/aioj/internal/harness"
-	"github.com/tahsinarafat/aioj/internal/harness/problemgen"
 	"github.com/tahsinarafat/aioj/internal/judge"
 	"github.com/tahsinarafat/aioj/internal/judge/compiler"
 	"github.com/tahsinarafat/aioj/internal/judge/executor"
@@ -184,30 +182,7 @@ Restore from the pre-deploy dump if the schema is unrecoverable.`, err)
 	defer cancel()
 
 	if *mode == "judge-worker" {
-		// Only dedicated judge processes consume the shared queue. The API
-		// server must not silently become a third decider.
-		reclaimer := judge.NewReclaimer(submissionStore, judgeQueue, judge.DefaultStaleClaimAfter, judge.DefaultReclaimInterval)
-		go reclaimer.Start(ctx)
-		go workerPool.Start(ctx)
-
-		// The probe Docker's healthcheck calls. This process serves no HTTP
-		// otherwise, so before this a wedged worker was undetectable from
-		// outside: the container stayed "running" and `restart: unless-stopped`
-		// never fired, which is why a human had to restart it by hand.
-		if cfg.Judge.HealthAddr != "" {
-			go workerPool.ServeHealth(ctx, cfg.Judge.HealthAddr)
-		}
-
-		slog.Info("running in judge-worker mode, waiting for submissions")
-		quit := make(chan os.Signal, 1)
-		signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-		<-quit
-		slog.Info("judge-worker shutting down")
-		cancel()
-		// Drain before returning: cancelling alone abandons in-flight judgments
-		// mid-write, and the old code recorded a System Error over them.
-		workerPool.Stop()
-		judgeQueue.Close()
+		runJudgeWorker(ctx, cancel, cfg, submissionStore, judgeQueue, workerPool)
 		return
 	}
 
@@ -509,16 +484,7 @@ Restore from the pre-deploy dump if the schema is unrecoverable.`, err)
 		}()
 	}
 	if *mode == "ai-worker" {
-		if !cfg.AI.Enabled {
-			log.Fatal("ai-worker mode requires AI_ENABLED=true")
-		}
-		startAIWorkers()
-		startAIRetention()
-		slog.Info("running in ai-worker mode, waiting for generation jobs")
-		quit := make(chan os.Signal, 1)
-		signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-		<-quit
-		cancel()
+		runAIWorker(cfg, cancel, startAIWorkers, startAIRetention)
 		return
 	}
 
@@ -528,50 +494,10 @@ Restore from the pre-deploy dump if the schema is unrecoverable.`, err)
 	// separate container) so a long, token-heavy run cannot compete with API
 	// traffic. AI_HARNESS_ENABLED gates it.
 	if *mode == "ai-harness" {
-		if !cfg.AI.Enabled || !cfg.AI.Harness {
-			log.Fatal("ai-harness mode requires AI_ENABLED=true and AI_HARNESS_ENABLED=true")
-		}
-		problemgen.MaxN = cfg.AI.MaxCaseN
-		runner, err := problemgen.NewJudgeRunner(execClient, cfg.LangDir)
-		if err != nil {
-			log.Fatalf("ai harness: %v", err)
-		}
-		harnessWorker := &problemgen.Worker{
-			Jobs:       aiGenerationStore,
-			Runner:     runner,
-			Corpus:     postgres.NewNoveltyCorpus(db),
-			Problems:   problemStore,
-			Transcript: postgres.NewHarnessTranscript(db),
-			Staging:    cfg.AI.StagedTestdataRoot,
-			MaxBytes:   cfg.AI.MaxJobBytes,
-			Budget:     problemgen.DefaultBudget(cfg.AI.RepairTurns),
-			Resolve: func(ctx context.Context, modelID *string) (harness.Model, error) {
-				m, err := aiModelStore.GetDefault(ctx)
-				if modelID != nil {
-					m, err = aiModelStore.GetByID(ctx, *modelID)
-				}
-				if err != nil || m == nil {
-					return nil, fmt.Errorf("no AI model is enabled")
-				}
-				return ai.NewWithOptions(m.Endpoint, m.APIKey, m.ModelName, ai.ClientOptions{
-					Mode:                m.StructuredOutputMode,
-					Timeout:             time.Duration(m.RequestTimeoutSeconds) * time.Second,
-					MaxOutputTokens:     m.MaxOutputTokens,
-					AllowPrivateNetwork: m.AllowPrivateNetwork,
-				}), nil
-			},
-		}
-		if err := harnessWorker.Ready(); err != nil {
-			log.Fatalf("ai harness: %v", err)
-		}
-		go harnessWorker.Run(ctx)
-		slog.Info("running in ai-harness mode, waiting for generation jobs")
-		quit := make(chan os.Signal, 1)
-		signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-		<-quit
-		cancel()
+		runAIHarness(ctx, cancel, cfg, execClient, db, aiGenerationStore, aiModelStore, problemStore)
 		return
 	}
+
 	// Development/default deployment: process jobs in the API process. A
 	// dedicated --mode=ai-worker can be used to isolate workloads.
 	//

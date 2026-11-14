@@ -756,6 +756,12 @@ type AIGenerationStore interface {
 	ClaimNext(ctx context.Context, claimToken string) (*model.AIGenerationJob, error)
 	Heartbeat(ctx context.Context, id, claimToken, stage string, progress int) error
 	Complete(ctx context.Context, id, claimToken string, proposal, validation json.RawMessage, promptTokens, completionTokens, latencyMS int) error
+	// SetManifest stores the case manifest a harness run produced and marks the
+	// job ready for review. Declared here rather than only on the concrete type
+	// because problemgen.Worker takes a JobStore, and until this was added the
+	// interface did not satisfy it — so main had to pass the concrete
+	// *postgres.AIGenerationStore and nothing checked the two stayed in step.
+	SetManifest(ctx context.Context, id, token string, proposal, manifest, report json.RawMessage, ready bool, turns int) error
 	Fail(ctx context.Context, id, claimToken, code, message string, validation json.RawMessage) error
 	RequestCancel(ctx context.Context, id, actorID string) (bool, error)
 	MarkCancelled(ctx context.Context, id, claimToken string) error
