@@ -92,6 +92,60 @@ async function scrollStatementAndMeasureEditor(page: Page) {
   }, STATEMENT_PANE);
 }
 
+/**
+ * The editor must have real height and the panels below it must stay reachable.
+ *
+ * The regression this pins: the editor was pinned to `height="400px"`, so on a
+ * tall viewport it left dead space under it (looking "shrunk" next to a
+ * full-height statement), and once the right column was made to flex, the
+ * scratchpad and quick links squeezed the editor instead. Both directions are
+ * wrong; the editor should grow into the room left over but never collapse, and
+ * the column should scroll to reach whatever does not fit.
+ */
+async function expectEditorUsable(page: Page) {
+  const editor = await page.evaluate(() => {
+    const monaco = document.querySelector('.monaco-editor');
+    if (!monaco) return null;
+
+    // The right column is the scroll container that holds the editor.
+    let column: HTMLElement | null = monaco as HTMLElement;
+    while (column && !(
+      typeof column.className === 'string' &&
+      column.className.includes('overflow-y-auto') &&
+      column.className.includes('pl-1')
+    )) {
+      column = column.parentElement;
+    }
+
+    const quickLinks = [...document.querySelectorAll('h4')].find((h) =>
+      /Quick Links/i.test(h.textContent ?? ''),
+    );
+
+    let quickLinksReachable: boolean | null = null;
+    if (column && quickLinks) {
+      column.scrollTop = column.scrollHeight;
+      const linkRect = quickLinks.getBoundingClientRect();
+      const columnRect = column.getBoundingClientRect();
+      quickLinksReachable = linkRect.top >= columnRect.top - 1 && linkRect.bottom <= columnRect.bottom + 1;
+    }
+
+    return {
+      height: Math.round(monaco.getBoundingClientRect().height),
+      columnScrollable: column ? column.scrollHeight > column.clientHeight + 4 : null,
+      quickLinksReachable,
+    };
+  });
+
+  expect(editor, 'the editor must be mounted').not.toBeNull();
+  // 360px floor minus Monaco's own chrome (~43px of tabs/breadcrumb).
+  expect(editor!.height, 'the editor must keep a usable height').toBeGreaterThan(250);
+
+  // Whatever does not fit must be reachable by scrolling the column, never clipped.
+  if (editor!.columnScrollable) {
+    expect(editor!.quickLinksReachable, 'the column must scroll to reach Quick Links').toBe(true);
+  }
+}
+
 /** The assertions both problem pages share. */
 async function expectIndependentPanes(page: Page) {
   const metrics = await paneMetrics(page);
@@ -107,6 +161,8 @@ async function expectIndependentPanes(page: Page) {
   expect(scrolled, 'the statement pane and editor must both be present').not.toBeNull();
   expect(scrolled!.paneScrollTop, 'the statement pane did not scroll').toBeGreaterThan(0);
   expect(scrolled!.moved, 'scrolling the statement moved the editor').toBe(0);
+
+  await expectEditorUsable(page);
 }
 
 test('the practice problem page scrolls its panes independently', async ({ page }) => {

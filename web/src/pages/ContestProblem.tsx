@@ -804,20 +804,18 @@ export default function ContestProblem() {
 
                 {/* RIGHT: Submit panel (100-splitPos% width).
 
-                    Two regions, because they want opposite things. The top holds the
-                    language bar and the editor and never scrolls, so the editor keeps a
-                    guaranteed share of the panel however much else is on screen. The
-                    bottom — results, the custom scratchpad, quick links — scrolls on its
-                    own. As one scroll container the editor either sat at a fixed 400px
-                    with dead room beneath it, or (once made to flex) was squeezed down to
-                    its floor by the scratchpad and the quick links. */}
+                    One scroll container, like the statement beside it: the column
+                    scrolls as a whole and the two panes stay independent. The editor
+                    grows into whatever room is left but never below its floor, so on a
+                    short screen the column overflows and scrolls — reaching the
+                    scratchpad and quick links — instead of squeezing them out of view. */}
                 <div
-                    className="flex flex-col pl-1"
+                    className="flex flex-col gap-3 overflow-y-auto pl-1"
                     style={isNarrow ? { width: '100%' } : { width: `${100 - splitPos}%`, minWidth: '20%' }}
                 >
                     {showSubmit ? (
                         <>
-                            <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex flex-wrap items-center justify-between gap-2 flex-shrink-0">
                                 <select
                                     value={language}
                                     onChange={e => setLanguage(e.target.value)}
@@ -848,11 +846,11 @@ export default function ContestProblem() {
                                 verdict are on screen the moment Submit is pressed. */}
                             {result && <SubmissionResult result={result} polling={polling} />}
 
-                            {/* Pinned: `min-h-[260px]` keeps the editor usable whatever
-                                else is on screen, and being an explicit min-height it also
-                                overrides the flex default of `min-height: auto`, which is
-                                what lets Monaco shrink into the space it is given. */}
-                            <div className="flex min-h-[260px] flex-1 flex-col">
+                            {/* Grows into the room left over, never below 360px: an
+                                explicit min-height overrides the flex default of
+                                `min-height: auto`, so on a short screen the column
+                                overflows and scrolls rather than squeezing the editor. */}
+                            <div className="flex min-h-[360px] flex-1 flex-col">
                                 <CodeEditor
                                     language={language}
                                     value={code}
@@ -862,10 +860,8 @@ export default function ContestProblem() {
                                 />
                             </div>
 
-                            {/* Everything below the editor scrolls as one region. */}
-                            <div className="flex min-h-0 flex-col gap-3 overflow-y-auto pt-3">
                             {sampleResults.length > 0 && (
-                                <div className="border border-hairline rounded-lg overflow-hidden bg-surface shadow-sm">
+                                <div className="border border-hairline rounded-lg overflow-hidden bg-surface shadow-sm flex-shrink-0">
                                     <div className="bg-surface-2 border-b border-hairline px-4 py-3 flex items-center justify-between">
                                         <span className="font-semibold text-sm text-ink-soft">Sample Test Results</span>
                                         <span className={`text-xs font-medium px-2 py-0.5 rounded ${sampleResults.every(r => r.passed) ? 'bg-ok/12 text-ok' :
@@ -917,7 +913,7 @@ export default function ContestProblem() {
                                 </div>
                             )}
 
-                            <div className="border border-hairline rounded-lg overflow-hidden bg-surface shadow-sm">
+                            <div className="border border-hairline rounded-lg overflow-hidden bg-surface shadow-sm flex-shrink-0">
                                 <div className="bg-surface-2 border-b border-hairline px-4 py-3 flex items-center justify-between">
                                     <span className="font-semibold text-sm text-ink-soft">Custom Stdin / Scratchpad</span>
                                     <button
@@ -989,7 +985,6 @@ export default function ContestProblem() {
                                     })()}
                                 </div>
                             </div>
-                            </div>
                         </>
                     ) : !isLoggedIn ? (
                         <div className="p-5 bg-surface-2/20 border border-hairline rounded-lg text-center">
@@ -1016,7 +1011,7 @@ export default function ContestProblem() {
                     ) : null}
 
                     {/* Quick links */}
-                    <div className="p-4 bg-surface border border-hairline rounded-lg">
+                    <div className="p-4 bg-surface border border-hairline rounded-lg flex-shrink-0">
                         <h4 className="text-xs font-semibold text-muted uppercase tracking-wide mb-2">Quick Links</h4>
                         <div className="space-y-1.5">
                             <Link

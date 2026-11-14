@@ -688,11 +688,12 @@ export default function ProblemDetail() {
 
             {/* IDE */}
             <div
-                // A flex column rather than a scroll container: the editor is the
-                // pane's main content and should take the space left over, not sit
-                // at a fixed 400px with dead room under it. Scrolling lives on the
-                // results block below, so the controls and the editor stay put.
-                className={`flex-col gap-3 pl-1 md:flex ${mobileTab === 'code' ? 'flex' : 'hidden'}`}
+                // One scroll container, like the statement beside it: the column
+                // scrolls as a whole and the two panes stay independent. The editor
+                // grows into whatever room is left but never below its floor, so on a
+                // short screen the column overflows and scrolls — reaching the
+                // scratchpad — instead of squeezing it out of view.
+                className={`flex-col gap-3 overflow-y-auto pl-1 md:flex ${mobileTab === 'code' ? 'flex' : 'hidden'}`}
                 style={isDesktop ? { width: `${100 - splitPos}%`, minWidth: '20%' } : { flex: 1 }}
             >
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 flex-shrink-0">
@@ -724,13 +725,11 @@ export default function ProblemDetail() {
                 {/* Submission receipt. Sits above the editor so the id and the
                     live verdict are on screen the instant Submit is pressed. */}
                 {result && <div className="flex-shrink-0"><SubmissionStatusPanel submission={result} polling={pollingResult} /></div>}
-                {/* The editor takes the pane's remaining height. `min-h-[220px]`
-                    is the floor and does double duty: an explicit min-height is what
-                    overrides the flex default of `min-height: auto`, letting the
-                    editor shrink below its content, while the floor stops it
-                    collapsing to nothing when results are on screen. Do NOT add
-                    `min-h-0` here — it would override the floor and undo both. */}
-                <div className="min-h-[220px] flex-1">
+                {/* Grows into the room left over, never below 360px: an explicit
+                    min-height overrides the flex default of `min-height: auto`, so on a
+                    short screen the column overflows and scrolls rather than squeezing
+                    the editor down to nothing. */}
+                <div className="min-h-[360px] flex-1">
                     <CodeEditor
                         language={lang}
                         value={code}
