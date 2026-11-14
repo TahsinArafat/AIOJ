@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -17,10 +18,24 @@ import (
 	"github.com/tahsinarafat/aioj/internal/store"
 )
 
+// oauthUserStore is the user surface a first-time OAuth sign-in needs: find the
+// account a provider identity maps to, or mint one, and confirm the address the
+// provider vouched for.
+//
+// Five operations, and no more — a callback handler has no business listing users
+// or changing a role, both of which the field granted it.
+type oauthUserStore interface {
+	Create(ctx context.Context, user *model.User) error
+	GetByID(ctx context.Context, id string) (*model.User, error)
+	GetByUsername(ctx context.Context, username string) (*model.User, error)
+	GetByEmail(ctx context.Context, email string) (*model.User, error)
+	MarkEmailVerified(ctx context.Context, userID string) error
+}
+
 // OAuthCallbackHandler exchanges the provider code, loads or creates the
 // local account, and issues JWT tokens.
 type OAuthCallbackHandler struct {
-	Users       store.UserStore
+	Users       oauthUserStore
 	Links       store.OAuthLinkStore
 	Providers   map[string]oauth.Provider
 	JWT         *auth.JWTManager

@@ -17,7 +17,7 @@ type EditorialHandler struct {
 	contestHandlerAccess
 	store        store.EditorialStore
 	problemStore store.ProblemStore
-	contestStore store.ContestStore
+	contestStore contestReadAccess
 }
 
 // WithGrants attaches the password-entitlement store and rebuilds the access
@@ -27,7 +27,7 @@ func (h *EditorialHandler) WithGrants(gs contestGrantChecker) *EditorialHandler 
 	return h
 }
 
-func NewEditorialHandler(s store.EditorialStore, ps store.ProblemStore, cs store.ContestStore) *EditorialHandler {
+func NewEditorialHandler(s store.EditorialStore, ps store.ProblemStore, cs contestReadAccess) *EditorialHandler {
 	h := &EditorialHandler{store: s, problemStore: ps, contestStore: cs}
 	h.access = newContestAccessPolicy(cs, nil)
 	return h

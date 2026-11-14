@@ -243,10 +243,10 @@ func (h *ClarificationHandler) Answer(w http.ResponseWriter, r *http.Request) {
 
 type ContestNoticeHandler struct {
 	noticeStore  store.ContestNoticeStore
-	contestStore store.ContestStore
+	contestStore contestReadAccess
 }
 
-func NewContestNoticeHandler(ns store.ContestNoticeStore, cts store.ContestStore) *ContestNoticeHandler {
+func NewContestNoticeHandler(ns store.ContestNoticeStore, cts contestReadAccess) *ContestNoticeHandler {
 	return &ContestNoticeHandler{
 		noticeStore:  ns,
 		contestStore: cts,

@@ -30,13 +30,13 @@ type BackupMeta struct {
 
 // AdminBackupHandler manages backup and restore operations.
 type AdminBackupHandler struct {
-	userStore store.UserStore
+	userStore store.UserReader
 	dbCfg     config.DatabaseConfig
 	dir       string
 }
 
 // NewAdminBackupHandler creates a new AdminBackupHandler.
-func NewAdminBackupHandler(u store.UserStore, dbCfg config.DatabaseConfig, dir string) *AdminBackupHandler {
+func NewAdminBackupHandler(u store.UserReader, dbCfg config.DatabaseConfig, dir string) *AdminBackupHandler {
 	return &AdminBackupHandler{
 		userStore: u,
 		dbCfg:     dbCfg,

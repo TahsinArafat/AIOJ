@@ -34,6 +34,14 @@ const (
 	PriorityBulk = 3
 )
 
+// emailVerifiedReader is the one user-store call the submission gate makes: it
+// needs to know whether the caller's address is confirmed. Narrower than
+// store.UserCredentialStore, which would also hand it the password field and
+// the ban operations.
+type emailVerifiedReader interface {
+	IsEmailVerified(ctx context.Context, userID string) (bool, error)
+}
+
 // submissionServiceStore is the submission surface this handler serves. It
 // spans read, write and remote hand-off because this is the one handler that
 // does all three: a user submits, reads their own verdict, and the row may
@@ -53,13 +61,13 @@ type SubmissionHandler struct {
 	contestHandlerAccess
 	subStore     submissionServiceStore
 	probStore    store.ProblemStore
-	contestStore store.ContestStore
+	contestStore contestReadAccess
 	queue        queue.JudgeQueue
 	wsManager    *WSManager
 	exec         *executor.Client
 	langDir      string
 	vjudgeSvc    *vjudge.Service
-	users        store.UserStore
+	users        emailVerifiedReader
 	// submitQuota and runQuota are per-user budgets. Without them a single
 	// account could flood the judge queue or use /run as a free compile-and-
 	// execute service, starving everybody else.
@@ -97,9 +105,9 @@ func (h *SubmissionHandler) WithGrants(gs contestGrantChecker) *SubmissionHandle
 	return h
 }
 
-func NewSubmissionHandler(sub submissionServiceStore, prob store.ProblemStore, contest store.ContestStore,
+func NewSubmissionHandler(sub submissionServiceStore, prob store.ProblemStore, contest contestReadAccess,
 	q queue.JudgeQueue, ws *WSManager, exec *executor.Client, langDir string, vjSvc *vjudge.Service,
-	users store.UserStore) *SubmissionHandler {
+	users emailVerifiedReader) *SubmissionHandler {
 	h := &SubmissionHandler{subStore: sub, probStore: prob, contestStore: contest, queue: q, wsManager: ws, exec: exec, langDir: langDir, vjudgeSvc: vjSvc, users: users,
 		submitQuota: newSubmissionQuota(), runQuota: newRunQuota()}
 	h.access = newContestAccessPolicy(contest, nil)

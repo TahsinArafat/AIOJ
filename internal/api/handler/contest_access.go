@@ -10,6 +10,7 @@ import (
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
 	"github.com/tahsinarafat/aioj/internal/auth"
 	"github.com/tahsinarafat/aioj/internal/model"
+	"github.com/tahsinarafat/aioj/internal/store"
 )
 
 /**
@@ -112,6 +113,17 @@ type contestAccessStore interface {
 	// value no gate ever read, so a setter who believed their problems were
 	// entrants-only had published them to the world.
 	IsParticipant(ctx context.Context, contestID, userID string) (bool, error)
+}
+
+// contestReadAccess is the seam for a handler that embeds the access policy and
+// also reads the round itself: the two roles, composed rather than restated.
+//
+// Four handlers (gym, group, editorial, virtual) each held the whole 31-method
+// ContestStore for exactly this pair of needs, which is what made them
+// impossible to test without a contest store.
+type contestReadAccess interface {
+	store.ContestReader
+	store.ContestAccessStore
 }
 
 // contestGrantChecker is the publisher half of "did this user type the password".

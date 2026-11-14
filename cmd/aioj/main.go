@@ -443,9 +443,11 @@ Restore from the pre-deploy dump if the schema is unrecoverable.`, err)
 	langAdminH := handler.NewAdminLanguageHandler(cfg.LangDir, execClient)
 
 	remoteLangH := handler.NewRemoteLanguageHandler(remoteLangStore, vjService)
+	// No WithContestStore here: it used to attach the contest store for a
+	// bulk-rejudge membership check that was never written, so the setter stored
+	// a field nothing read. Removed rather than kept as a placeholder.
 	adminSubH := handler.NewAdminSubmissionHandler(submissionStore, problemStore, vjService).
-		WithQueue(judgeQueue).
-		WithContestStore(contestStore)
+		WithQueue(judgeQueue)
 	backupH := handler.NewAdminBackupHandler(userStore, cfg.Database, "./backups")
 
 	credentialKey, err := ai.ParseCredentialKey(cfg.AI.CredentialMasterKey)

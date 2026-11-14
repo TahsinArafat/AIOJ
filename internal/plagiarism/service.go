@@ -16,9 +16,17 @@ type problemSubmissionLister interface {
 	ListByProblem(ctx context.Context, problemID string, offset, limit int) ([]model.Submission, int, error)
 }
 
+// contestProblemReader is the one contest query a plagiarism run makes: the
+// round's problems, so their submissions can be compared. Narrower than
+// store.ContestStore, and narrower than store.ContestProblemStore — the run
+// never edits the roster.
+type contestProblemReader interface {
+	GetProblems(ctx context.Context, contestID string) ([]model.ContestProblem, error)
+}
+
 type Service struct {
 	store    store.PlagiarismStore
-	contestS store.ContestStore
+	contestS contestProblemReader
 	subS     problemSubmissionLister
 
 	// engine performs the scan. fallback runs instead when engine fails at
@@ -30,13 +38,13 @@ type Service struct {
 }
 
 // NewService wires a service with the pure-Go engine.
-func NewService(s store.PlagiarismStore, c store.ContestStore, sub problemSubmissionLister) *Service {
+func NewService(s store.PlagiarismStore, c contestProblemReader, sub problemSubmissionLister) *Service {
 	return &Service{store: s, contestS: c, subS: sub, engine: NativeEngine{}}
 }
 
 // NewServiceWithEngine wires a service with a specific engine, keeping the
 // pure-Go engine as a runtime fallback unless that is the engine requested.
-func NewServiceWithEngine(s store.PlagiarismStore, c store.ContestStore, sub problemSubmissionLister, engine Engine) *Service {
+func NewServiceWithEngine(s store.PlagiarismStore, c contestProblemReader, sub problemSubmissionLister, engine Engine) *Service {
 	svc := NewService(s, c, sub)
 	if engine == nil {
 		return svc

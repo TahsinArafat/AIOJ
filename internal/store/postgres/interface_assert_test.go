@@ -17,3 +17,26 @@ var (
 	_ store.TeamStore         = (*TeamStore)(nil)
 	_ store.GymStore          = (*GymStore)(nil)
 )
+
+// The submission, contest and user stores are each split into roles, with the
+// wide interface reduced to an embed of them. Assert each role separately: a
+// signature that drifts on any one role must fail here, not at the one call site
+// that happens not to be exercised.
+var (
+	_ store.SubmissionReader      = (*SubmissionStore)(nil)
+	_ store.SubmissionWriter      = (*SubmissionStore)(nil)
+	_ store.SubmissionJudgeQueue  = (*SubmissionStore)(nil)
+	_ store.SubmissionRemoteJudge = (*SubmissionStore)(nil)
+	_ store.SubmissionStats       = (*SubmissionStore)(nil)
+
+	_ store.ContestReader       = (*ContestStore)(nil)
+	_ store.ContestWriter       = (*ContestStore)(nil)
+	_ store.ContestProblemStore = (*ContestStore)(nil)
+	_ store.ContestAccessStore  = (*ContestStore)(nil)
+	_ store.ContestResultStore  = (*ContestStore)(nil)
+
+	_ store.UserReader          = (*UserStore)(nil)
+	_ store.UserWriter          = (*UserStore)(nil)
+	_ store.UserAdminStore      = (*UserStore)(nil)
+	_ store.UserCredentialStore = (*UserStore)(nil)
+)

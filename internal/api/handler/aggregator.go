@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/tahsinarafat/aioj/internal/model"
-	"github.com/tahsinarafat/aioj/internal/store"
 )
 
 // userDataAggregator adapts existing stores to UserDataAggregator.
@@ -15,12 +14,19 @@ type submissionAggregateReader interface {
 	ListByUser(ctx context.Context, userID string, offset, limit int, problemID, contestID string) ([]model.Submission, int, error)
 }
 
+// userProfileReader is the pair of user reads the aggregator performs: the
+// account row and its extended profile.
+type userProfileReader interface {
+	GetByID(ctx context.Context, id string) (*model.User, error)
+	GetProfile(ctx context.Context, userID string) (*model.UserProfile, error)
+}
+
 type userDataAggregator struct {
-	users    store.UserStore
+	users    userProfileReader
 	subStore submissionAggregateReader
 }
 
-func NewUserDataAggregator(users store.UserStore, subs submissionAggregateReader) UserDataAggregator {
+func NewUserDataAggregator(users userProfileReader, subs submissionAggregateReader) UserDataAggregator {
 	return &userDataAggregator{users: users, subStore: subs}
 }
 

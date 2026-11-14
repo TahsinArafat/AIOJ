@@ -16,11 +16,11 @@ type GroupHandler struct {
 	// handler asks the same object every other surface asks.
 	contestHandlerAccess
 	store     store.GroupStore
-	userStore store.UserStore
+	userStore usernameResolver
 	// contestStore answers "may this group's manager see the contest they are
 	// attaching" — the group used to be able to adopt any contest id, including
 	// an unpublished one.
-	contestStore store.ContestStore
+	contestStore contestReadAccess
 }
 
 // WithGrants attaches the password-entitlement store and rebuilds the access
@@ -30,7 +30,7 @@ func (h *GroupHandler) WithGrants(gs contestGrantChecker) *GroupHandler {
 	return h
 }
 
-func NewGroupHandler(s store.GroupStore, us store.UserStore, cs store.ContestStore) *GroupHandler {
+func NewGroupHandler(s store.GroupStore, us usernameResolver, cs contestReadAccess) *GroupHandler {
 	h := &GroupHandler{store: s, userStore: us, contestStore: cs}
 	h.access = newContestAccessPolicy(cs, nil)
 	return h

@@ -22,8 +22,21 @@ type publicSubmissionLister interface {
 	ListPublicByUser(ctx context.Context, userID string, offset, limit int) ([]model.Submission, int, error)
 }
 
+// userProfileStore is the user surface the profile pages serve: read the account,
+// its public and private profile, and let the owner edit either.
+//
+// Note the two absences — no admin listing, and no ban or role operation. The
+// profile page had all of them, because the field declared store.UserStore.
+type userProfileStore interface {
+	GetByID(ctx context.Context, id string) (*model.User, error)
+	GetProfile(ctx context.Context, userID string) (*model.UserProfile, error)
+	GetPublicProfile(ctx context.Context, username string) (*model.PublicProfile, error)
+	UpdateProfile(ctx context.Context, userID string, p *model.UserProfile) error
+	UpdatePassword(ctx context.Context, id, passwordHash string) error
+}
+
 type UsersHandler struct {
-	userStore   store.UserStore
+	userStore   userProfileStore
 	blogStore   store.BlogStore
 	subStore    publicSubmissionLister
 	teamStore   store.TeamStore
@@ -31,7 +44,7 @@ type UsersHandler struct {
 	refreshToks store.RefreshTokenStore
 }
 
-func NewUsersHandler(us store.UserStore, bs store.BlogStore, ss publicSubmissionLister, ts store.TeamStore, gs store.GroupStore, rt store.RefreshTokenStore) *UsersHandler {
+func NewUsersHandler(us userProfileStore, bs store.BlogStore, ss publicSubmissionLister, ts store.TeamStore, gs store.GroupStore, rt store.RefreshTokenStore) *UsersHandler {
 	return &UsersHandler{userStore: us, blogStore: bs, subStore: ss, teamStore: ts, groupStore: gs, refreshToks: rt}
 }
 

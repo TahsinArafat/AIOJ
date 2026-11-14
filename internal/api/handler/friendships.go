@@ -1,24 +1,32 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
+	"github.com/tahsinarafat/aioj/internal/model"
 	"github.com/tahsinarafat/aioj/internal/store"
 )
 
 var errUserNotFound = errors.New("user not found")
 
+// usernameResolver is the one user-store call the social graph makes: it needs
+// the account a handle refers to, and nothing else about it.
+type usernameResolver interface {
+	GetByUsername(ctx context.Context, username string) (*model.User, error)
+}
+
 // FriendshipHandler exposes follow/unfollow and list endpoints.
 type FriendshipHandler struct {
 	Friends store.FriendshipStore
-	Users   store.UserStore
+	Users   usernameResolver
 }
 
-func NewFriendshipHandler(f store.FriendshipStore, u store.UserStore) *FriendshipHandler {
+func NewFriendshipHandler(f store.FriendshipStore, u usernameResolver) *FriendshipHandler {
 	return &FriendshipHandler{Friends: f, Users: u}
 }
 

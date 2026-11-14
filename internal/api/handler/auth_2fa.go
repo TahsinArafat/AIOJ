@@ -16,7 +16,7 @@ import (
 )
 
 type TwoFactorHandler struct {
-	Users   store.UserStore
+	Users   store.UserReader
 	Secrets store.TOTPSecretStore
 	Backups store.BackupCodeStore
 }
@@ -130,7 +130,7 @@ type TwoFactorVerifyHandler struct {
 	Secrets store.TOTPSecretStore
 	Backups store.BackupCodeStore
 	JWT     *auth.JWTManager
-	Users   store.UserStore
+	Users   store.UserReader
 	Refresh store.RefreshTokenStore
 }
 

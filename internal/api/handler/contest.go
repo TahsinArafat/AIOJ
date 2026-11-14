@@ -85,7 +85,7 @@ type ContestHandler struct {
 	store        store.ContestStore
 	ratingStore  store.RatingStore
 	problemStore store.ProblemStore
-	userStore    store.UserStore
+	userStore    contestUserStore
 	teamStore    store.TeamStore
 	cache        *scoreboardCache
 	// adjustments holds the manual corrections judges apply to a round. Optional
@@ -151,7 +151,7 @@ func (h *ContestHandler) WithNotifier(n *notify.Notifier) *ContestHandler {
 	return h
 }
 
-func NewContestHandler(s store.ContestStore, rs store.RatingStore, ps store.ProblemStore, us store.UserStore, ts store.TeamStore) *ContestHandler {
+func NewContestHandler(s store.ContestStore, rs store.RatingStore, ps store.ProblemStore, us contestUserStore, ts store.TeamStore) *ContestHandler {
 	h := &ContestHandler{store: s, ratingStore: rs, problemStore: ps, userStore: us, teamStore: ts, cache: newScoreboardCache(30 * time.Second)}
 	h.access = newContestAccessPolicy(s, nil)
 	return h
@@ -1300,6 +1300,17 @@ func (h *ContestHandler) AddPermission(w http.ResponseWriter, r *http.Request) {
 // moderators box takes either spelling in one field.
 func (h *ContestHandler) resolveUserRef(ctx context.Context, ref string) (string, error) {
 	return resolveUserRef(ctx, h.userStore, ref, "")
+}
+
+// contestUserStore is the user-store surface ContestHandler performs: resolve a
+// user by id or handle for the permission roster, read a profile, and write the
+// rating a rated round produces. Four operations, where the field declared all
+// 21 and the handler called four.
+type contestUserStore interface {
+	GetByID(ctx context.Context, id string) (*model.User, error)
+	GetByUsername(ctx context.Context, username string) (*model.User, error)
+	GetProfile(ctx context.Context, userID string) (*model.UserProfile, error)
+	UpdateRating(ctx context.Context, userID string, rating, maxRating, contestCount int) error
 }
 
 // userRefLookup is the slice of the user store this resolution needs, declared on

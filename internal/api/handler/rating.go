@@ -10,10 +10,10 @@ import (
 
 type RatingHandler struct {
 	ratingStore  store.RatingStore
-	contestStore store.ContestStore
+	contestStore store.ContestReader
 }
 
-func NewRatingHandler(rs store.RatingStore, cs store.ContestStore) *RatingHandler {
+func NewRatingHandler(rs store.RatingStore, cs store.ContestReader) *RatingHandler {
 	return &RatingHandler{ratingStore: rs, contestStore: cs}
 }
 

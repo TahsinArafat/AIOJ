@@ -36,11 +36,10 @@ type adminSubmissionStore interface {
 }
 
 type AdminSubmissionHandler struct {
-	subStore     adminSubmissionStore
-	probStore    store.ProblemStore
-	contestStore store.ContestStore
-	queue        queue.JudgeQueue
-	vjudgeSvc    *vjudge.Service
+	subStore  adminSubmissionStore
+	probStore store.ProblemStore
+	queue     queue.JudgeQueue
+	vjudgeSvc *vjudge.Service
 }
 
 func NewAdminSubmissionHandler(subStore adminSubmissionStore, probStore store.ProblemStore, vjSvc *vjudge.Service) *AdminSubmissionHandler {
@@ -51,13 +50,6 @@ func NewAdminSubmissionHandler(subStore adminSubmissionStore, probStore store.Pr
 // local-problem submissions.  Call this after NewAdminSubmissionHandler.
 func (h *AdminSubmissionHandler) WithQueue(q queue.JudgeQueue) *AdminSubmissionHandler {
 	h.queue = q
-	return h
-}
-
-// WithContestStore attaches the contest store so bulk-rejudge can query
-// contest membership.
-func (h *AdminSubmissionHandler) WithContestStore(cs store.ContestStore) *AdminSubmissionHandler {
-	h.contestStore = cs
 	return h
 }
 

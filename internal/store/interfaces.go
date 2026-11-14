@@ -20,14 +20,44 @@ type PendingSubmissionInfo struct {
 	IsUpsolving bool
 }
 
+// UserStore is the whole user surface. Prefer one of the roles below when a
+// consumer needs only part of it; this union exists for the two consumers that
+// genuinely span it (the auth flow and the admin console).
+//
+// The roles were measured, not guessed. Twenty consumers hold a UserStore and
+// fourteen of them use one to five methods: three want GetByUsername alone, two
+// want GetByID alone, one wants MarkEmailVerified alone. Depending on all 21
+// forced every one of those to be tested through a 21-method fake, which is why
+// the handlers carried their own one-method interfaces instead.
 type UserStore interface {
-	Create(ctx context.Context, user *model.User) error
+	UserReader
+	UserWriter
+	UserAdminStore
+	UserCredentialStore
+}
+
+// UserReader is the lookup side: identity by id, handle or address, plus the
+// two profile projections the public pages render.
+type UserReader interface {
 	GetByID(ctx context.Context, id string) (*model.User, error)
 	GetByUsername(ctx context.Context, username string) (*model.User, error)
 	GetByEmail(ctx context.Context, email string) (*model.User, error)
 	GetPublicProfile(ctx context.Context, username string) (*model.PublicProfile, error)
 	GetProfile(ctx context.Context, userID string) (*model.UserProfile, error)
+}
+
+// UserWriter is account creation and self-service profile editing.
+type UserWriter interface {
+	Create(ctx context.Context, user *model.User) error
 	UpdateProfile(ctx context.Context, userID string, p *model.UserProfile) error
+	// UpdateRating is the rating job's write: a contest result moves the
+	// account's rating and its historical maximum.
+	UpdateRating(ctx context.Context, userID string, rating, maxRating, contestCount int) error
+}
+
+// UserAdminStore is the admin console's surface: the filtered listing, the
+// detail view, and the moderation and role operations.
+type UserAdminStore interface {
 	ListUsers(ctx context.Context, offset, limit int) ([]model.User, int, error)
 	// ListAdminUsers is the filtered/sorted/paginated listing the admin panel
 	// uses. ListUsers is kept for the plain offset/limit callers.
@@ -38,23 +68,31 @@ type UserStore interface {
 	// SetUserBan sets or clears the ban. A reason is only meaningful when
 	// banning; unbanning clears both columns.
 	SetUserBan(ctx context.Context, id string, banned bool, reason string) error
-	// IsBanned reports whether the account is suspended. Read on every login and
-	// refresh: a ban that did not stop the next token would not be a ban.
-	IsBanned(ctx context.Context, id string) (bool, error)
+	// CountAdmins feeds the "never remove the last administrator" guard.
+	CountAdmins(ctx context.Context) (int, error)
+	UpdateRole(ctx context.Context, id, role string) error
 	// SetEmailVerified lets an admin mark an address verified (support path for
 	// a user whose mail never arrived) or un-verify it.
 	SetEmailVerified(ctx context.Context, id string, verified bool) error
-	// CountAdmins feeds the "never remove the last administrator" guard.
-	CountAdmins(ctx context.Context) (int, error)
+}
+
+// UserCredentialStore is everything the sign-in path touches: the password, the
+// ban check that must stop the next token, and the email-verification flag.
+//
+// Separate from UserAdminStore because the auth flow must not be able to change
+// a role or count admins, and the admin console must not be able to set a
+// password without going through the reset path that flags it.
+type UserCredentialStore interface {
+	// IsBanned reports whether the account is suspended. Read on every login and
+	// refresh: a ban that did not stop the next token would not be a ban.
+	IsBanned(ctx context.Context, id string) (bool, error)
 	// TouchLastLogin records a successful sign-in. Best effort: a login must
 	// not fail because a bookkeeping write did.
 	TouchLastLogin(ctx context.Context, id string) error
-	UpdateRole(ctx context.Context, id, role string) error
 	UpdatePassword(ctx context.Context, id, passwordHash string) error
 	// SetMustChangePassword re-flags an account whose password an administrator
 	// just set, so the admin-chosen value cannot become permanent.
 	SetMustChangePassword(ctx context.Context, id string, required bool) error
-	UpdateRating(ctx context.Context, userID string, rating, maxRating, contestCount int) error
 	MarkEmailVerified(ctx context.Context, userID string) error
 	IsEmailVerified(ctx context.Context, userID string) (bool, error)
 }
@@ -271,8 +309,24 @@ type OAuthLinkStore interface {
 	Delete(ctx context.Context, id string) error
 }
 
+// ContestStore is the whole contest surface. Prefer one of the roles below when
+// a consumer needs only part of it; this union exists for the contest handler,
+// which is the one consumer that genuinely spans it (26 methods).
+//
+// Measured: of fourteen consumers, five want GetByID alone and three more want
+// GetByID plus the access checks. Those eight were each carrying their own
+// one-or-two-method interface; with the roles declared here they can name one.
 type ContestStore interface {
-	Create(ctx context.Context, c *model.Contest) error
+	ContestReader
+	ContestWriter
+	ContestProblemStore
+	ContestAccessStore
+	ContestResultStore
+}
+
+// ContestReader is the read side the HTTP layer serves contests from. GetByID is
+// the single most-used method in the package: eight consumers need nothing else.
+type ContestReader interface {
 	GetByID(ctx context.Context, id string) (*model.Contest, error)
 	GetBySlug(ctx context.Context, slug string) (*model.Contest, error)
 	List(ctx context.Context, offset, limit int) ([]model.Contest, int, error)
@@ -282,13 +336,26 @@ type ContestStore interface {
 	// unlisted round. division is optional; a nil viewerID means anonymous.
 	ListForViewer(ctx context.Context, offset, limit int, division *int, viewerID string) ([]model.Contest, int, error)
 	ListByCreatedBy(ctx context.Context, userID string, offset, limit int) ([]model.Contest, int, error)
+	// ListByStatus is the admin contest review queue.
+	ListByStatus(ctx context.Context, status string, offset, limit int) ([]model.Contest, int, error)
+}
+
+// ContestWriter is authoring: create, edit, delete, and the review verdict.
+type ContestWriter interface {
+	Create(ctx context.Context, c *model.Contest) error
 	Update(ctx context.Context, c *model.Contest) error
 	Delete(ctx context.Context, id string) error
 	// SetReviewState applies an admin verdict and derives visible from it, so a
 	// proposal cannot publish itself.
 	SetReviewState(ctx context.Context, id, status, note, reviewerID string) error
-	// ListByStatus is the admin contest review queue.
-	ListByStatus(ctx context.Context, status string, offset, limit int) ([]model.Contest, int, error)
+}
+
+// ContestProblemStore is the roster of problems attached to a round, and the
+// per-viewer progress the contest page shows.
+//
+// Named ContestProblemStore rather than ContestProblemAdmin because the same
+// shape is what the contest-problem handler embeds when it narrows the store.
+type ContestProblemStore interface {
 	AddProblem(ctx context.Context, contestID, problemID, index string, score, sortOrder int) error
 	UpdateProblem(ctx context.Context, contestID, problemID, index string, score, sortOrder int) error
 	RemoveProblem(ctx context.Context, contestID, problemID string) error
@@ -296,9 +363,43 @@ type ContestStore interface {
 	// RenumberProblems rewrites every letter and sort_order from position,
 	// closing any gap left by a removal. Returns the new ordering.
 	RenumberProblems(ctx context.Context, contestID string) ([]model.ContestProblem, error)
+	GetContestProblemByIndex(ctx context.Context, contestID, index string) (*model.Problem, error)
 	// GetProblemProgress is the per-viewer solve state and round-wide solve count
 	// for each problem, keyed by problem id. viewerID may be empty.
 	GetProblemProgress(ctx context.Context, contestID, viewerID string, beforeTime *time.Time) (map[string]model.ContestProblemProgress, error)
+}
+
+// ContestAccessStore is "may this caller see this round", plus the per-round
+// permission rows that answer it. Separate from the reader because access checks
+// are consulted on every content surface and must be satisfiable by a test
+// without a contest, a problem list or a scoreboard.
+type ContestAccessStore interface {
+	GetParticipants(ctx context.Context, contestID string) ([]string, error)
+	IsParticipant(ctx context.Context, contestID, userID string) (bool, error)
+	AddPermission(ctx context.Context, contestID, userID, accessLevel string) error
+	RemovePermission(ctx context.Context, contestID, userID string) error
+	GetPermissions(ctx context.Context, contestID string) ([]model.ContestPermission, error)
+	// HasAccess reports whether the user holds one of requiredLevels on this
+	// contest. Fails closed on a store error, for the reason given on the
+	// problem store's HasAccess.
+	HasAccess(ctx context.Context, contestID, userID string, requiredLevels ...string) bool
+	CheckGroupRestriction(ctx context.Context, contestID, userID string) (bool, error)
+	// GetUsername resolves one user id to a display name, best effort. Prefer
+	// GetUsernames where the ids are known up front.
+	GetUsername(ctx context.Context, userID string) string
+	// GetUsernames resolves many ids to display names in one query. Prefer this
+	// over GetUsername wherever the ids are known up front: a standings page
+	// carries up to 500 entries, and the per-row call was a query each.
+	GetUsernames(ctx context.Context, userIDs []string) (map[string]string, error)
+	// GetDisplayNames maps user id to the name a scoreboard should show. For a
+	// generated contestant account that is the team it was minted for, not the
+	// throwaway username. A missing key means "use the username".
+	GetDisplayNames(ctx context.Context, contestID string, userIDs []string) (map[string]model.ContestDisplayName, error)
+}
+
+// ContestResultStore is the judged output: standings rows, statistics, and the
+// team entry a round may register instead of individuals.
+type ContestResultStore interface {
 	// GetScoreboardRows is the judged rows the standings are computed from.
 	// beforeTime, when set, applies the freeze cutoff.
 	GetScoreboardRows(ctx context.Context, contestID string, beforeTime *time.Time) ([]model.ScoreboardRow, error)
@@ -310,26 +411,6 @@ type ContestStore interface {
 	// recalculation reads the second.
 	RegisterTeam(ctx context.Context, contestID, teamID string) (*model.TeamRegistration, error)
 	ListTeamRegistrations(ctx context.Context, contestID string) ([]model.TeamRegistration, error)
-	GetContestProblemByIndex(ctx context.Context, contestID, index string) (*model.Problem, error)
-	GetParticipants(ctx context.Context, contestID string) ([]string, error)
-	IsParticipant(ctx context.Context, contestID, userID string) (bool, error)
-	GetUsername(ctx context.Context, userID string) string
-	// GetUsernames resolves many ids to display names in one query. Prefer this
-	// over GetUsername wherever the ids are known up front: a standings page
-	// carries up to 500 entries, and the per-row call was a query each.
-	GetUsernames(ctx context.Context, userIDs []string) (map[string]string, error)
-	// GetDisplayNames maps user id to the name a scoreboard should show. For a
-	// generated contestant account that is the team it was minted for, not the
-	// throwaway username. A missing key means "use the username".
-	GetDisplayNames(ctx context.Context, contestID string, userIDs []string) (map[string]model.ContestDisplayName, error)
-	AddPermission(ctx context.Context, contestID, userID, accessLevel string) error
-	RemovePermission(ctx context.Context, contestID, userID string) error
-	GetPermissions(ctx context.Context, contestID string) ([]model.ContestPermission, error)
-	// HasAccess reports whether the user holds one of requiredLevels on this
-	// contest. Fails closed on a store error, for the reason given on the
-	// problem store's HasAccess.
-	HasAccess(ctx context.Context, contestID, userID string, requiredLevels ...string) bool
-	CheckGroupRestriction(ctx context.Context, contestID, userID string) (bool, error)
 }
 
 // ContestGrantStore holds proof that a contestant typed a round's access

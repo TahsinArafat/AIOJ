@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"net/http"
@@ -10,9 +11,16 @@ import (
 	"github.com/tahsinarafat/aioj/internal/store"
 )
 
+// markEmailVerifier is the one user-store call the verification link makes.
+// Narrower than store.UserCredentialStore, which also carries the password and
+// ban operations this endpoint must not reach.
+type markEmailVerifier interface {
+	MarkEmailVerified(ctx context.Context, userID string) error
+}
+
 // EmailVerificationHandler completes email verification from a signed link.
 type EmailVerificationHandler struct {
-	Users  store.UserStore
+	Users  markEmailVerifier
 	Tokens store.EmailVerificationTokenStore
 }
 

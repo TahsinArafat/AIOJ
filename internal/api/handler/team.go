@@ -13,10 +13,10 @@ import (
 
 type TeamHandler struct {
 	store     store.TeamStore
-	userStore store.UserStore
+	userStore usernameResolver
 }
 
-func NewTeamHandler(s store.TeamStore, us store.UserStore) *TeamHandler {
+func NewTeamHandler(s store.TeamStore, us usernameResolver) *TeamHandler {
 	return &TeamHandler{store: s, userStore: us}
 }
 

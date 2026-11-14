@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/csv"
 	"encoding/json"
 	"net/http"
@@ -14,19 +15,27 @@ import (
 	"github.com/tahsinarafat/aioj/internal/store"
 )
 
+// userCreator is the user-store surface the onsite generator needs: it mints an
+// account per team and resolves one to report it. Narrower than store.UserStore,
+// which would also hand it the admin listing and the ban and role operations.
+type userCreator interface {
+	Create(ctx context.Context, user *model.User) error
+	GetByID(ctx context.Context, id string) (*model.User, error)
+}
+
 type OnsiteBatchHandler struct {
 	// contestLookup, not the full store.ContestStore: this handler asks only
 	// "which round is this, and may this caller manage it". Narrowing it is what
 	// lets a redirect-target test stub two methods instead of twenty.
 	contestStore contestLookup
 	onsiteStore  store.OnsiteUserStore
-	userStore    store.UserStore
+	userStore    userCreator
 	refreshToks  store.RefreshTokenStore
 	twoFA        store.TOTPSecretStore
 	jwtManager   *auth.JWTManager
 }
 
-func NewOnsiteBatchHandler(cs contestLookup, os store.OnsiteUserStore, us store.UserStore, rt store.RefreshTokenStore, twoFA store.TOTPSecretStore, jwtManager *auth.JWTManager) *OnsiteBatchHandler {
+func NewOnsiteBatchHandler(cs contestLookup, os store.OnsiteUserStore, us userCreator, rt store.RefreshTokenStore, twoFA store.TOTPSecretStore, jwtManager *auth.JWTManager) *OnsiteBatchHandler {
 	return &OnsiteBatchHandler{
 		contestStore: cs,
 		onsiteStore:  os,

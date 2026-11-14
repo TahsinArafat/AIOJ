@@ -24,12 +24,31 @@ import (
 	"github.com/tahsinarafat/aioj/internal/store/postgres"
 )
 
+// authUserStore is the user surface the sign-in flow performs: create, look up
+// by handle or address, check the ban that must stop the next token, and manage
+// the password and the verified flag.
+//
+// Nine operations out of the store's 21. The omissions are the point: signing in
+// must not be able to change a role, count administrators, or read the admin
+// listing, all of which the field granted it.
+type authUserStore interface {
+	Create(ctx context.Context, user *model.User) error
+	GetByID(ctx context.Context, id string) (*model.User, error)
+	GetByUsername(ctx context.Context, username string) (*model.User, error)
+	GetByEmail(ctx context.Context, email string) (*model.User, error)
+	IsBanned(ctx context.Context, id string) (bool, error)
+	TouchLastLogin(ctx context.Context, id string) error
+	UpdatePassword(ctx context.Context, id, passwordHash string) error
+	MarkEmailVerified(ctx context.Context, userID string) error
+	IsEmailVerified(ctx context.Context, userID string) (bool, error)
+}
+
 type AuthHandler struct {
-	users             store.UserStore
+	users             authUserStore
 	refreshToks       store.RefreshTokenStore
 	passwordResetToks store.PasswordResetTokenStore
 	onsiteStore       store.OnsiteUserStore
-	contestStore      store.ContestStore
+	contestStore      contestRefResolver
 	jwt               *auth.JWTManager
 	evt               store.EmailVerificationTokenStore
 	twoFA             store.TOTPSecretStore
@@ -48,11 +67,11 @@ type AuthHandler struct {
 func (h *AuthHandler) SetAuthMethods(m *authmethod.Resolver) { h.methods = m }
 
 func NewAuthHandler(
-	users store.UserStore,
+	users authUserStore,
 	refreshToks store.RefreshTokenStore,
 	passwordResetToks store.PasswordResetTokenStore,
 	onsiteStore store.OnsiteUserStore,
-	contestStore store.ContestStore,
+	contestStore contestRefResolver,
 	jwt *auth.JWTManager,
 	evt store.EmailVerificationTokenStore,
 	twoFA store.TOTPSecretStore,

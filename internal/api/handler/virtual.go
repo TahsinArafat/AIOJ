@@ -20,7 +20,7 @@ type VirtualHandler struct {
 	virtualStore store.VirtualStore
 	// contestStore is needed to refuse starting a virtual contest on a contest
 	// the caller cannot read; the handler used to pass the id straight through.
-	contestStore store.ContestStore
+	contestStore contestReadAccess
 }
 
 // WithGrants attaches the password-entitlement store and rebuilds the access
@@ -30,7 +30,7 @@ func (h *VirtualHandler) WithGrants(gs contestGrantChecker) *VirtualHandler {
 	return h
 }
 
-func NewVirtualHandler(s *virtual.Service, vs store.VirtualStore, cs store.ContestStore) *VirtualHandler {
+func NewVirtualHandler(s *virtual.Service, vs store.VirtualStore, cs contestReadAccess) *VirtualHandler {
 	h := &VirtualHandler{service: s, virtualStore: vs, contestStore: cs}
 	h.access = newContestAccessPolicy(cs, nil)
 	return h

@@ -12,10 +12,10 @@ import (
 
 type RegistrationHandler struct {
 	registrationStore store.RegistrationStore
-	contestStore      store.ContestStore
+	contestStore      contestReadAccess
 }
 
-func NewRegistrationHandler(rs store.RegistrationStore, cs store.ContestStore) *RegistrationHandler {
+func NewRegistrationHandler(rs store.RegistrationStore, cs contestReadAccess) *RegistrationHandler {
 	return &RegistrationHandler{
 		registrationStore: rs,
 		contestStore:      cs,

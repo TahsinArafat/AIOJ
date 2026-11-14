@@ -26,11 +26,11 @@ const plagiarismCheckTimeout = 10 * time.Minute
 type PlagiarismHandler struct {
 	service      *plagiarism.Service
 	store        store.PlagiarismStore
-	contestStore store.ContestStore
+	contestStore contestReadAccess
 	sem          chan struct{}
 }
 
-func NewPlagiarismHandler(s *plagiarism.Service, plStore store.PlagiarismStore, contestStore store.ContestStore) *PlagiarismHandler {
+func NewPlagiarismHandler(s *plagiarism.Service, plStore store.PlagiarismStore, contestStore contestReadAccess) *PlagiarismHandler {
 	return &PlagiarismHandler{
 		service:      s,
 		store:        plStore,

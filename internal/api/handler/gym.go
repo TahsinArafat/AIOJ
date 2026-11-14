@@ -18,7 +18,7 @@ type GymHandler struct {
 	store store.GymStore
 	// contestStore is needed to answer "may this caller see the contest this gym
 	// points at" — the check the handler shipped without.
-	contestStore store.ContestStore
+	contestStore contestReadAccess
 }
 
 // WithGrants attaches the password-entitlement store and rebuilds the access
@@ -28,7 +28,7 @@ func (h *GymHandler) WithGrants(gs contestGrantChecker) *GymHandler {
 	return h
 }
 
-func NewGymHandler(s store.GymStore, cs store.ContestStore) *GymHandler {
+func NewGymHandler(s store.GymStore, cs contestReadAccess) *GymHandler {
 	h := &GymHandler{store: s, contestStore: cs}
 	h.access = newContestAccessPolicy(cs, nil)
 	return h

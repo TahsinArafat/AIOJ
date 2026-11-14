@@ -16,14 +16,22 @@ type ContestStanding struct {
 	Username  string
 }
 
+// userRatingStore is the pair of user operations the rating job performs: read
+// the current rating from the profile, write the new one back. Narrower than
+// store.UserStore so the job cannot reach the ban, role or password fields.
+type userRatingStore interface {
+	GetProfile(ctx context.Context, userID string) (*model.UserProfile, error)
+	UpdateRating(ctx context.Context, userID string, rating, maxRating, contestCount int) error
+}
+
 type Service struct {
 	ratingStore store.RatingStore
-	userStore   store.UserStore
+	userStore   userRatingStore
 	// notify is optional; a nil notifier is a no-op.
 	notify *notify.Notifier
 }
 
-func NewService(rs store.RatingStore, us store.UserStore) *Service {
+func NewService(rs store.RatingStore, us userRatingStore) *Service {
 	return &Service{
 		ratingStore: rs,
 		userStore:   us,
