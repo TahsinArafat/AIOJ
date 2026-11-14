@@ -241,11 +241,29 @@ holding 19 stateful sub-components in one file (`SettingsTab` 8 state,
 `ContestDetail.tsx` (1204), `Profile.tsx` (1226), `ContestProblem.tsx` (1017),
 `ProblemDetail.tsx` (853) have the same shape.
 
-### 14. `With*` mutators as a second constructor — **Low**
+### 14. `With*` mutators as a second constructor — **Low** (re-examined: not a defect)
 
-**21** `With*` methods mutate a handler after construction; 5 call
-`rebuildWithGrants`, re-deriving the same access policy. Confidence `this` is
-discarded, so the fluent form misleads at a type level.
+**20** `With*` methods attach an optional collaborator after construction.
+
+On re-examination this is a **false positive**, recorded here rather than
+"fixed". Three things make it sound:
+
+- **The constructor always leaves a usable handler.** `NewContestHandler` builds
+  a fail-closed access policy with a nil grant store, so a handler built without
+  `WithGrants` refuses password rounds rather than opening them. The optional
+  dependency has a safe zero value; nothing is half-initialised.
+- **The fluent form is idiomatic Go.** Returning the receiver for chaining is the
+  standard builder shape, and every call site in `main.go` uses it that way.
+- **Coverage is complete and checkable.** Seven handlers embed the grant-aware
+  access policy and `main.go` wires exactly seven `WithGrants` calls — no handler
+  is left on the fail-closed default by accident.
+
+The one genuine cost is that a forgotten `With*` is invisible to the compiler. It
+is not worth a redesign: the failure mode is a refused request, not a security
+hole, and the count is small enough to check by grep.
+
+The five `With*` calls that rebuild the access policy (`rebuildWithGrants`) do
+re-derive it, but only once per handler at startup, which is not a hot path.
 
 ---
 
@@ -262,6 +280,10 @@ Recorded so these are not "fixed" later:
 - `hooks/useContestAnnouncements.ts`, `hooks/useClarifications.ts` are properly
   extracted hooks.
 - `internal/contest/format/` is a correct open/closed plugin registry.
+- `HasAccess(...) bool` returning a bare bool is **deliberate fail-closed**
+  design (see finding 9), not a defect.
+- `TestConnection`'s HTTP 200 with `{"ok": false}` is a deliberate diagnostic
+  contract the admin panel branches on (see finding 10).
 - Handler *bodies* are clean: exactly **one** raw SQL statement in the whole
   handler package (`user_cascade_deleter.go:26`).
 - `contest_access.go` is a genuine single-policy seam with a documented
@@ -431,19 +453,97 @@ now asserts all five.
 Verified: `go build ./...` and `go vet` clean; `make lint` passes; handler
 failures 12 and postgres failures 40 — both unchanged from baseline.
 
+### Finding 6 — `main()` and the run modes
+
+`main()` was 919 lines: the shared wiring every mode needs, then one inline block
+per run mode, each ending with its own copy of the signal-wait-shutdown sequence.
+The three non-server modes are now `runJudgeWorker`, `runAIWorker` and
+`runAIHarness` in `cmd/aioj/modes.go`, each taking exactly what it uses.
+
+The signal handling was identical in all three but the teardown was not, and the
+teardown is the part that matters — a judge worker must drain, or cancelling alone
+abandons in-flight judgments mid-write. `awaitShutdown` takes the teardown as a
+callback so the wait is shared and the difference stays visible.
+
+`main()` is 850 lines now, and the remainder is genuine wiring. Extracting the
+modes also surfaced that `store.AIGenerationStore` was missing `SetManifest`, so
+`problemgen.JobStore` was satisfied only by the concrete postgres type and
+`main` had to pass it — the interface now declares it.
+
+### Finding 7 — `Scoreboard`
+
+320 lines, roughly two-thirds of which was the round's scoring policy. It is now
+`format.BuildBoard`, a pure function of a `BoardInput`; the handler is 188 lines
+doing fetch, ask, paginate, respond.
+
+Two silent bugs surfaced during the move, and both are why the tests exist:
+
+- The verdict was upper-cased in the handler because every format implementation
+  compares `sub.Status == "AC"` exactly while the database stores `'ac'`. Dropping
+  that made every submission look unsolved, so every score read zero.
+- `Entry` and its cells had explicit JSON tags as a handler-local type.
+  `format.Entry` had none, so Go would have emitted `Rank`/`UserID`/
+  `TotalSolved` and the scoreboard would have rendered empty.
+
+The freeze rule needed one deliberate choice: "is the clock past the freeze AND
+before the end" is not "does the freeze fall inside the window", and the two
+disagree for an ended round — where the second reading would withhold rows from
+the one board that must show everything. `BuildBoard` takes `Now` explicitly.
+
+### Finding 8 — recommendations
+
+`GetRecommendations` was 159 lines on `ProblemStore`: four SQL queries plus the
+policy deciding what the rows mean. The queries stay; the policy is
+`internal/recommend`, a pure function with nine tests.
+
+The move caught an ordering bug. The original applied `applyWeakTagDefaults`
+*before* searching for weak-tag problems, because that search is driven by the tag
+list. Defaulting only inside `Build` meant the search ran with the raw list, so a
+user with no failed submissions — the user who most needs a recommendation — got
+no weak-tag problems at all. The store's integration test caught it.
+
+### Finding 10 — error responses
+
+The two inline copies of the "this round needs its password" body in
+`contest_access.go` had already drifted in what they included. Both are now
+`contestPasswordRequired`, which derives its fields from the round, so a new
+public surface is reported everywhere at once.
+
+`errorBody` is a struct rather than a map because `scoreboard_public` and
+`published_surfaces` are read by name in the SPA.
+
+Not converted: the 1191 `http.Error` sites. The client already handles both shapes
+(text fallback in `throwForStatus`), so a mechanical conversion is a very large
+diff with no behavioural benefit. `TestConnection`'s 200-with-`ok:false` is
+documented as a deliberate diagnostic the admin panel branches on, not an
+oversight.
+
+### Finding 12 — configuration
+
+`main()` read eight environment variables directly while `config.Load` resolved
+others. Four were in no config struct, absent from `config.yaml.example`, and
+invisible to `Validate`: `FEED_TOKEN`, `CF_SUBMIT_URL`, `ATCODER_SUBMIT_URL`, and
+`PUBLIC_ORIGIN`.
+
+`PUBLIC_ORIGIN` was the worst: `Load` already resolved it into `Mail.PublicURL`,
+but the sitemap and the link-preview cards re-read the variable at six call sites,
+so setting `public_url` in yaml had no effect on them. An operator could configure
+it correctly and watch it be ignored.
+
+All four now live in `Config`, env as the override, previous defaults preserved.
+`main()` has zero direct env reads.
+
 ## Still open
 
 | Finding | What remains |
 |---|---|
-| 1 | Findings 4 and 11 are closed. `Deps` is still a 77-field service locator and optionality is still `if d.X != nil` rather than a type; the route split is done. |
-| 3 | Still owed to `ContestStore`, `UserStore`, `ProblemStore`, `TrainingPlanStore`, `GroupStore`, `AIGenerationStore`. |
-| 6 | `main()` is still 920 lines across four run modes. |
-| 7 | Business rules still live in the HTTP layer (`Scoreboard`, 320 lines). |
-| 8 | Report logic still lives in the postgres layer (`GetRecommendations`). |
-| 10 | Error response shapes are still four-way inconsistent. |
-| 12 | Config is still read three ways. |
-| 13 | God page components are untouched. |
-| 14 | `With*` mutators still form a second constructor. |
+| 1 | `Deps` is still a 77-field service locator, and optionality is still `if d.X != nil` rather than a type. The route split is done. |
+| 3 | The same carve is still owed to `ContestStore`, `UserStore`, `ProblemStore`, `TrainingPlanStore`, `GroupStore` and `AIGenerationStore`. |
+| 13 | God page components — `ContestManage.tsx` at 2062 lines with 50 `useState` across 19 sub-components in one file. The largest remaining item. |
+
+Closed since the first pass: 4 (vjudge), 6 (run modes), 7 (scoreboard), 8
+(recommendations), 9 (the real half), 10 (contest refusal), 11 (test stubs), 12
+(config), 14 (false positive).
 
 The `SubmissionStore` split (finding 3) is the worked example for the remaining
 interface carves: measure the consumers first, then carve along the axes the
