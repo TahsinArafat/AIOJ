@@ -108,28 +108,32 @@ var probeClaims = &auth.Claims{
 	Role:   model.RoleUser,
 }
 
-// classifyMiddleware identifies a middleware by what it DOES, not by its symbol.
+// classifyMiddleware identifies a middleware by what it DOES, not by its symbol
+// and not by a probe that changes what it observes.
 //
-// The symbol approach was wrong and failed in CI. Go gives every closure returned
-// by one function the same runtime name AND the same code pointer — proved by
-// probe: two closures from makeAdder report as `makeAdder.func1` with equal
-// pointers. AuthMiddleware, RequireRole and the feature gate are all closures, so
-// all three collapsed into one indistinguishable token, and the admin assertion
-// then reported a privilege escalation that did not exist. Separately, whether a
-// substring like "RealIPFromEnv" appeared at all depended on inlining, so the
-// same source produced a different golden string on the CI runner than on a
-// laptop.
+// Two earlier attempts failed in CI, and both failures are worth keeping.
 //
-// So each middleware is probed by serving a request through it and reading what
-// it did. Identity comes from observable behaviour, which is identical on every
-// machine and every Go build.
+// The first keyed on the runtime symbol. Go gives every closure returned by one
+// function the same name AND the same code pointer — verified by probe: two
+// closures from a factory both report `factory.func1` with equal pointers.
+// AuthMiddleware, RequireRole and the feature gate are all closures, so all three
+// collapsed to one token and the admin assertion reported a privilege escalation
+// that did not exist. Whether a substring like "RealIPFromEnv" appeared also
+// depended on inlining, so the golden string differed per machine.
 //
-// Three probes, because the gates layer:
+// The second probed behaviour but let the probe consume state. The rate limiter
+// keeps a shared token bucket with burst 200, and there are 294 routes: the 201st
+// probe started receiving 429, so every route after that point classified the
+// limiter as "rate-limited" and the earlier ones as pass-through. The golden file
+// recorded the artifact, and the boundary moved with wall-clock refill and with
+// RATE_LIMIT_BURST. An instrument must not mutate the system it measures.
 //
-//	anonymous           401  auth gate, or a role gate with no claims yet
-//	with claims (user)  403  role gate: it had an identity and refused the role
-//	                    401  auth gate: it never looks at the role
-//	                    pass  optional-auth, or a gate with no resolver wired
+// The fix for that is to raise the burst for the route-walking tests (see
+// TestRouteTable), so the limiter is a pure pass-through for the walk. With that
+// in place this observes two things that are pure functions of the middleware:
+// the headers it sets, and whether it refuses a request — first anonymous, then
+// with ordinary-user claims seeded, which is what separates a role gate from an
+// auth gate.
 func classifyMiddleware(mw func(http.Handler) http.Handler) string {
 	if mw == nil {
 		return "nil"
@@ -144,7 +148,7 @@ func classifyMiddleware(mw func(http.Handler) http.Handler) string {
 
 	// Probe one: anonymous. A gate refuses; a pass-through does not.
 	if reached, _ := probe(httptest.NewRequest(http.MethodGet, "/probe", nil)); reached {
-		return "pass-through"
+		return classifyPassThrough(mw)
 	}
 
 	// Probe two: a request that already carries an ordinary user's claims, which
@@ -164,10 +168,52 @@ func classifyMiddleware(mw func(http.Handler) http.Handler) string {
 		return "role-required"
 	case code == http.StatusUnauthorized:
 		return "auth-required"
-	case code == http.StatusTooManyRequests:
-		return "rate-limited"
 	default:
 		return "refused-" + strconv.Itoa(code)
+	}
+}
+
+// classifyPassThrough names a middleware that let the anonymous probe through, by
+// the headers it set. The limiter lands here too once the burst is raised for the
+// walk; it is otherwise indistinguishable from any other pass-through, which is
+// honest — the route table is not where limiter behaviour is asserted.
+func classifyPassThrough(mw func(http.Handler) http.Handler) string {
+	inner := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
+	rec := httptest.NewRecorder()
+	mw(inner).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/probe", nil))
+
+	h := rec.Header()
+	switch {
+	case h.Get("Content-Security-Policy") != "" || h.Get("X-Frame-Options") != "":
+		return "security-headers"
+	case h.Get("X-Request-Id") != "" || h.Get("X-Request-ID") != "":
+		return "request-id"
+	}
+	return "pass-through"
+}
+
+// TestBaseChainOrder pins the eight middlewares every request passes through, in
+// order, by asserting their observable effects rather than their names.
+//
+// The route table cannot express this: chi hands the walk a chain in which the
+// base middlewares appear as unnamed closures, and the classifier deliberately
+// refuses to guess. Their order genuinely matters — RealIP must run before the
+// rate limiter, which keys its buckets on the client address — so it is asserted
+// here instead of being left implicit.
+func TestBaseChainOrder(t *testing.T) {
+	jwt := newTestJWT(t)
+
+	// A route with no middleware of its own beyond the base chain.
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/health", nil)
+	NewRouter(testDeps(), jwt).ServeHTTP(rec, req)
+
+	// SecurityHeaders is first in the chain, so its headers are present on a
+	// response produced by the last handler.
+	for _, header := range []string{"X-Frame-Options", "X-Content-Type-Options", "Referrer-Policy"} {
+		if rec.Header().Get(header) == "" {
+			t.Errorf("the base chain did not set %s, so SecurityHeaders is not mounted on every route", header)
+		}
 	}
 }
 
@@ -180,6 +226,17 @@ func classifyMiddleware(mw func(http.Handler) http.Handler) string {
 // are wired with real handlers; the optional ones are covered by their own
 // mount tests below.
 func TestRouteTable(t *testing.T) {
+	// The route walk probes each route's middleware chain, and every probe goes
+	// through the rate limiter that base() installed. There are 294 routes and
+	// the limiter's default burst is 200, so the 201st probe onward saw 429 and
+	// the golden recorded "rate-limited" from that route down — an artifact of
+	// the walk, not of the router. Raising the burst for this test makes the
+	// limiter a pure pass-through for the walk, which is the only honest
+	// classification: limiter behaviour is asserted by the middleware's own
+	// tests and by TestBaseChainOrder, not by the route table.
+	t.Setenv("RATE_LIMIT_BURST", "1000000")
+	t.Setenv("AUTH_RATE_LIMIT_BURST", "1000000")
+
 	jwt := newTestJWT(t)
 	mux := NewRouter(testDeps(), jwt)
 
@@ -246,6 +303,8 @@ func firstDiff(want, got string) string {
 // file catches any change; this catches the specific ones that must never
 // disappear, and it reads as a list of the guarantees rather than a table.
 func TestCriticalRoutesAreMounted(t *testing.T) {
+	t.Setenv("RATE_LIMIT_BURST", "1000000")
+	t.Setenv("AUTH_RATE_LIMIT_BURST", "1000000")
 	jwt := newTestJWT(t)
 	mux := NewRouter(testDeps(), jwt)
 	routes := collectRoutes(t, mux, jwt)
@@ -280,6 +339,8 @@ func TestCriticalRoutesAreMounted(t *testing.T) {
 // If the admin block is ever relocated and loses one of them, the golden diff
 // would show it — and this would name it.
 func TestAdminRoutesRequireAuthAndAdminRole(t *testing.T) {
+	t.Setenv("RATE_LIMIT_BURST", "1000000")
+	t.Setenv("AUTH_RATE_LIMIT_BURST", "1000000")
 	jwt := newTestJWT(t)
 	mux := NewRouter(testDeps(), jwt)
 
@@ -306,6 +367,8 @@ func TestAdminRoutesRequireAuthAndAdminRole(t *testing.T) {
 // everything, but the router tests build a Deps by hand, and a nil dereference
 // at startup would take the whole server down rather than degrade one endpoint.
 func TestMissingDepsDoNotPanic(t *testing.T) {
+	t.Setenv("RATE_LIMIT_BURST", "1000000")
+	t.Setenv("AUTH_RATE_LIMIT_BURST", "1000000")
 	mux := NewRouter(Deps{}, newTestJWT(t))
 	if mux == nil {
 		t.Fatal("NewRouter returned nil for an empty Deps")

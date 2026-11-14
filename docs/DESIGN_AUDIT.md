@@ -350,23 +350,33 @@ by **behaviour class** — `pass-through`, `optional-auth`, `auth-required`,
 - `TestMissingDepsDoNotPanic` — states the property the router always relied on:
   a partially-wired `Deps` degrades an endpoint rather than killing startup.
 
-**The first version of this harness keyed on runtime symbol names and broke in
-CI**, which is worth recording because the failure looked like a security bug. Go
-gives every closure returned by one function the same runtime name *and the same
-code pointer* — verified by probe: two closures from a factory report as
-`factory.func1` with equal pointers. `AuthMiddleware`, `RequireRole` and the
-feature gate are all closures, so all three collapsed to one token, and the admin
-assertion reported a privilege escalation that did not exist. Separately, whether
-a substring like `RealIPFromEnv` appeared at all depended on inlining, so the same
-source produced a different golden string on the CI runner than on a laptop.
+**The harness broke in CI twice, and both failures are worth recording.**
 
-Each middleware is now probed instead: serve a request through it and read what
-it did. Two probes, because a role gate and an auth gate answer identically (401)
-to an anonymous request — `RequireRole` checks claims before it checks the role.
-The second probe seeds ordinary-user claims on the context, which is what
-`AuthMiddleware` leaves behind in production, and a 403 there is the role gate
-identifying itself. The table is now identical across runs and across `GOAMD64`
-levels.
+The first version keyed on runtime symbol names. Go gives every closure returned
+by one function the same runtime name *and the same code pointer* — verified by
+probe: two closures from a factory report as `factory.func1` with equal pointers.
+`AuthMiddleware`, `RequireRole` and the feature gate are all closures, so all
+three collapsed to one token, and the admin assertion reported a privilege
+escalation that did not exist. Separately, whether a substring like
+`RealIPFromEnv` appeared at all depended on inlining, so the same source produced
+a different golden string on the CI runner than on a laptop.
+
+The second version probed behaviour but let the probe consume state. The rate
+limiter keeps a shared token bucket with burst 200, and there are 294 routes, so
+the 201st probe started receiving 429 and every route after it classified the
+limiter as `rate-limited`. The golden recorded the artifact, and the boundary
+moved with wall-clock refill and with `RATE_LIMIT_BURST`. **An instrument must
+not mutate the system it measures.**
+
+Each middleware is now probed with the limiter's burst raised for the
+route-walking tests (`t.Setenv`, which also overrides a hostile ambient value),
+so the limiter is a pure pass-through for the walk. Two probes remain, because a
+role gate and an auth gate answer identically (401) to an anonymous request —
+`RequireRole` checks claims before it checks the role. The second probe seeds
+ordinary-user claims on the context, which is what `AuthMiddleware` leaves behind
+in production, and a 403 there is the role gate identifying itself. The table is
+now identical across runs, across `GOAMD64` levels, and under a hostile
+`RATE_LIMIT_BURST=5`.
 
 Both the golden diff and the admin assertion were confirmed to fail when
 `RequireRole("admin")` is deleted from the new file, so the harness guards the
