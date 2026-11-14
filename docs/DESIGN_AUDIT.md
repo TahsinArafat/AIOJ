@@ -382,7 +382,21 @@ failures 12 and postgres failures 40 — both unchanged from baseline.
 
 ## Still open
 
-Findings 1, 4, 6–14, plus the same carve for `ContestStore`, `UserStore`,
-`ProblemStore`, `TrainingPlanStore`, `GroupStore` and `AIGenerationStore`. The
-`SubmissionStore` split above is the worked example to copy: measure the
-consumers first, then carve along the axes the measurements show.
+| Finding | What remains |
+|---|---|
+| 1 | `Deps` is still a 77-field service locator; optionality is still `if d.X != nil` rather than a type. The route split is done. |
+| 3 | Still owed to `ContestStore`, `UserStore`, `ProblemStore`, `TrainingPlanStore`, `GroupStore`, `AIGenerationStore`. |
+| 4 | The vjudge platform branches still bypass the `Bot` interface next to them. |
+| 6 | `main()` is still 919 lines across four run modes. |
+| 7 | Business rules still live in the HTTP layer (`Scoreboard`, 320 lines). |
+| 8 | Report logic still lives in the postgres layer (`GetRecommendations`). |
+| 10 | Error response shapes are still four-way inconsistent. |
+| 12 | Config is still read three ways. |
+| 13 | God page components are untouched. |
+| 14 | `With*` mutators still form a second constructor. |
+
+The `SubmissionStore` split (finding 3) is the worked example for the remaining
+interface carves: measure the consumers first, then carve along the axes the
+measurements show. The router split (finding 1) is the worked example for moving
+code that nothing else can check — write the equivalence harness first, confirm
+it fails when you break something, then move the code.
