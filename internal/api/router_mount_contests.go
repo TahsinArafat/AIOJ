@@ -53,11 +53,10 @@ func (b *routerBuilder) mountContests(r chi.Router) {
 			r.Put("/{id}/problems/{problemId}", contestH.UpdateProblem)
 			r.Delete("/{id}/problems/{problemId}", contestH.RemoveProblem)
 			r.Get("/{id}/submissions", submissionH.ListByContest)
-			// Voiding from the round's own submissions tab. Scoped by contest so
-			// the accountability check runs against the round the submission was
-			// made in — see submission_skip.go. The role policy is the same gate
-			// the problem-scoped route uses.
-			r.With(b.gate(feature.KeySkipSubmission)).Post("/{id}/submissions/{submissionId}/skip", submissionH.SkipContestSubmission)
+			// Voiding and rejudging are not mounted here: they act on one
+			// submission and live under /api/submissions, which is what lets the
+			// round's tab and the problem's offer the same actions from the same
+			// code.
 			// Ratings are a ledger, so the endpoints are the ledger's operations
 			// rather than one button: apply once, then recalculate or withdraw.
 			// Recalculation replays every rated round after the one named, because

@@ -6,16 +6,40 @@ import { Button } from './ui/Button'
 import { Table, TableShell, Td, Th, THead, Tr } from './ui/Table'
 import { VerdictBadge } from './ui/VerdictBadge'
 import { isPendingVerdict, isSkippedVerdict } from './ui/verdict'
-import type { Submission } from '../types/api'
 
 /**
- * One rendering of the submission table, shared by the site-wide status page
- * and a problem's setter view.
+ * One rendering of a submission table, shared by the site-wide status page and
+ * both organizer tabs (a problem's and a round's).
  *
- * `can_view` decides link vs. plain text: the submission API returns source
- * code to its owner, admins and the problem's setters only, so linking a row
- * the viewer cannot open would land them on a 403.
+ * The row type is structural rather than `Submission` so the contest listing,
+ * which is judge-aware and returns a narrower row, renders through the same
+ * table without a cast. Everything the table draws is named here.
  */
+export interface SubmissionRowView {
+    id?: string
+    created_at: string
+    status: string
+    username?: string
+    user_id?: string
+    contest_id?: string
+    language?: string
+    problem_id?: string
+    problem_slug?: string
+    problem_title?: string
+    problem_index?: string
+    time_used?: number
+    memory_used?: number
+    judge_error?: string
+    /**
+     * Per-viewer capabilities, resolved by the server from the same
+     * accountability rule the action endpoints enforce. The table offers an
+     * action only where the flag says the API would accept it, so a row can
+     * never show a button that comes back 403.
+     */
+    can_view?: boolean
+    can_rejudge?: boolean
+    can_skip?: boolean
+}
 
 function formatTime(ms?: number): string {
     if (!ms || ms <= 0) return '—'
@@ -39,20 +63,23 @@ export function SubmissionTable({
     showProblem = false,
     showUser = false,
     onRejudge,
+    onSkip,
     busyIds,
 }: {
-    rows: Submission[]
+    rows: SubmissionRowView[]
     showProblem?: boolean
     showUser?: boolean
     /** Omit to hide the action column entirely. */
-    onRejudge?: (row: Submission) => void
+    onRejudge?: (row: SubmissionRowView) => void
+    onSkip?: (row: SubmissionRowView) => void
     busyIds?: Set<string>
 }) {
     // Resolve display names against the judge's own list, so a language an
     // admin renamed in the panel shows its current name here too.
     const { languages } = useLanguages()
+    const hasActions = !!(onRejudge || onSkip)
     // The inline failure row below a System Error spans every column.
-    const columns = 5 + (showUser ? 1 : 0) + (showProblem ? 1 : 0) + (onRejudge ? 1 : 0)
+    const columns = 5 + (showUser ? 1 : 0) + (showProblem ? 1 : 0) + (hasActions ? 1 : 0)
 
     return (
         <TableShell>
@@ -67,33 +94,35 @@ export function SubmissionTable({
                         <Th className="hidden text-right sm:table-cell">Time</Th>
                         <Th className="hidden text-right md:table-cell">Memory</Th>
                         <Th className="hidden w-40 text-right lg:table-cell">When</Th>
-                        {onRejudge && <Th className="w-24 text-right">Actions</Th>}
+                        {hasActions && <Th className="w-40 text-right">Actions</Th>}
                     </tr>
                 </THead>
                 <tbody>
                     {rows.flatMap(row => {
                         const pending = isPendingVerdict(row.status)
                         // A voided submission has no verdict to recompute: the
-                        // judge refuses to overwrite it, so offering the action
-                        // would only fail. The store search skips it too, so a
-                        // bulk rejudge would leave it alone either way.
+                        // judge refuses to overwrite it, so offering either
+                        // action would only fail. The store search skips it too,
+                        // so a bulk rejudge would leave it alone either way.
                         const voided = isSkippedVerdict(row.status)
+                        const id = row.id || ''
+                        const short = id.slice(0, 8)
                         const result = (
-                            <Tr key={row.id}>
+                            <Tr key={id}>
                                 <Td>
-                                    {row.can_view ? (
+                                    {row.can_view !== false && id ? (
                                         <Link
-                                            to={`/submissions/${row.id}`}
+                                            to={`/submissions/${id}`}
                                             className="tnum font-mono text-xs text-brand hover:underline"
                                         >
-                                            {row.id.slice(0, 8)}
+                                            {short}
                                         </Link>
                                     ) : (
                                         <span
                                             className="tnum font-mono text-xs text-muted-soft"
                                             title="Source code is private"
                                         >
-                                            {row.id.slice(0, 8)}
+                                            {short || '—'}
                                         </span>
                                     )}
                                 </Td>
@@ -110,7 +139,15 @@ export function SubmissionTable({
                                 )}
                                 {showProblem && (
                                     <Td className="text-xs">
-                                        {row.problem_slug ? (
+                                        {/* The round's letter is how a problem is identified
+                                            inside a round; a uuid is unreadable at the
+                                            desk. Fall back to the problem's own identity
+                                            when the row has no letter. */}
+                                        {row.problem_index ? (
+                                            <span className="font-mono text-xs" title={row.problem_title || row.problem_slug}>
+                                                {row.problem_index}
+                                            </span>
+                                        ) : row.problem_slug ? (
                                             <Link to={`/problems/${row.problem_slug}`} className="text-brand hover:underline">
                                                 {row.problem_title || row.problem_slug}
                                             </Link>
@@ -119,7 +156,7 @@ export function SubmissionTable({
                                         )}
                                     </Td>
                                 )}
-                                <Td className="text-xs text-ink-soft">{languageName(row.language, languages)}</Td>
+                                <Td className="text-xs text-ink-soft">{languageName(row.language || '', languages)}</Td>
                                 <Td>
                                     <VerdictBadge status={row.status} />
                                 </Td>
@@ -132,22 +169,38 @@ export function SubmissionTable({
                                 <Td className="hidden text-right text-xs text-muted-soft lg:table-cell">
                                     {formatWhen(row.created_at)}
                                 </Td>
-                                {onRejudge && (
+                                {hasActions && (
                                     <Td className="text-right">
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            disabled={pending || voided || busyIds?.has(row.id)}
-                                            onClick={() => onRejudge(row)}
-                                            title={
-                                                voided ? 'This submission was voided and will not be rejudged'
-                                                    : pending ? 'Already queued for judging'
-                                                        : 'Rejudge this submission'
-                                            }
-                                        >
-                                            <RefreshCw className="h-3.5 w-3.5" />
-                                            <span className="sr-only">Rejudge {row.id.slice(0, 8)}</span>
-                                        </Button>
+                                        {voided ? (
+                                            <span className="text-xs text-muted-soft">Voided</span>
+                                        ) : pending ? (
+                                            <span className="text-xs text-muted-soft">Judging…</span>
+                                        ) : (
+                                            <span className="inline-flex items-center gap-3">
+                                                {onRejudge && row.can_rejudge && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        disabled={busyIds?.has(id)}
+                                                        onClick={() => onRejudge(row)}
+                                                        title="Rejudge this submission"
+                                                    >
+                                                        <RefreshCw className="h-3.5 w-3.5" />
+                                                        <span className="sr-only">Rejudge {short}</span>
+                                                    </Button>
+                                                )}
+                                                {onSkip && row.can_skip && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => onSkip(row)}
+                                                        className="text-xs text-warn hover:underline"
+                                                        title="Void this submission"
+                                                    >
+                                                        Void
+                                                    </button>
+                                                )}
+                                            </span>
+                                        )}
                                     </Td>
                                 )}
                             </Tr>
@@ -157,7 +210,7 @@ export function SubmissionTable({
                         // failed row to see the same crash text.
                         if (row.status !== 'se' || !row.judge_error) return [result]
                         return [result, (
-                            <tr key={`${row.id}-error`} className="border-b border-hairline last:border-0 bg-bad/5">
+                            <tr key={`${id}-error`} className="border-b border-hairline last:border-0 bg-bad/5">
                                 <td colSpan={columns} className="px-4 py-2">
                                     <pre className="overflow-x-auto font-mono text-[11px] leading-relaxed whitespace-pre-wrap text-bad">
                                         {row.judge_error}

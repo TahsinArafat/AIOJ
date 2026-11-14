@@ -87,10 +87,13 @@ type Submission struct {
 	// contest-scoped listings; empty everywhere else, since a practice problem
 	// has no letter.
 	ProblemIndex string `json:"problem_index,omitempty"`
-	// CanView / CanRejudge are per-viewer capabilities computed by the handler;
-	// they are never stored.
+	// CanView / CanRejudge / CanSkip are per-viewer capabilities computed by
+	// the handler from the same accountability rule the action endpoints
+	// enforce, so a listing never offers an action the API would refuse. They
+	// are never stored.
 	CanView    bool       `json:"can_view,omitempty"`
 	CanRejudge bool       `json:"can_rejudge,omitempty"`
+	CanSkip    bool       `json:"can_skip,omitempty"`
 	CreatedAt  time.Time  `json:"created_at"`
 	JudgedAt   *time.Time `json:"judged_at,omitempty"`
 }
@@ -117,8 +120,8 @@ type SubmissionFilter struct {
 	ProblemID string
 	Language  string
 	Status    string
-	// ContestID, Username and IDs are honoured by the problem-scoped listings
-	// (ListByProblemManage, ListIDsForProblemRejudge); ListByContest ignores them.
+	// ContestID and Username are honoured by every organizer listing
+	// (ListByProblemManage, ListByContest, ListForRejudge).
 	ContestID string
 	Username  string
 	IDs       []string

@@ -1,12 +1,9 @@
 import { useEffect, useState } from 'react'
-import { RefreshCw } from 'lucide-react'
 import { api } from '../../lib/api'
 import { errorMessage } from '../../lib/errors'
 import { useLanguages } from '../../lib/useLanguages'
-import { useConfirm } from '../ConfirmDialog'
-import { useToast } from '../Toast'
 import { EmptyState } from '../EmptyState'
-import { SubmissionTable } from '../SubmissionTable'
+import { SubmissionPanel } from '../SubmissionPanel'
 import { Button } from '../ui/Button'
 import { Field, Input, Select } from '../ui/Field'
 import { Skeleton } from '../ui/PageHeader'
@@ -17,8 +14,9 @@ import type { Submission } from '../../types/api'
  * A problem's submissions, from the setter's side.
  *
  * This is the surface the authoring gate exists for: the setter sees who
- * submitted what, can open any row's source, and can rejudge a single row or
- * the whole problem after fixing test data.
+ * submitted what, can open any row's source, and can void or rejudge a row (or
+ * the whole problem) after fixing test data. The actions themselves live in
+ * SubmissionPanel, which the round's tab mounts too.
  */
 
 const PAGE_SIZE = 50
@@ -34,9 +32,7 @@ interface Filters {
 
 const EMPTY_FILTERS: Filters = { handle: '', status: '', language: '' }
 
-export default function SubmissionsTab({ problemSlug }: { problemSlug: string }) {
-    const confirm = useConfirm()
-    const toast = useToast()
+export default function SubmissionsTab({ problemSlug, problemId }: { problemSlug: string; problemId: string }) {
     // The judge's own languages, so the filter offers what can actually be submitted.
     const { options: languageOptions } = useLanguages()
     const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS)
@@ -46,9 +42,9 @@ export default function SubmissionsTab({ problemSlug }: { problemSlug: string })
     const [offset, setOffset] = useState(0)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
-    const [busyIds, setBusyIds] = useState<Set<string>>(new Set())
-    const [bulkBusy, setBulkBusy] = useState(false)
-    const [pollTick, setPollTick] = useState(0)
+    // Bumping this refetches: the poll below uses it, and so does the panel
+    // after an action lands, so a void or a rejudge is reflected immediately.
+    const [reloadTick, setReloadTick] = useState(0)
 
     useEffect(() => {
         let cancelled = false
@@ -70,58 +66,15 @@ export default function SubmissionsTab({ problemSlug }: { problemSlug: string })
             if (!cancelled) setLoading(false)
         })
         return () => { cancelled = true }
-    }, [problemSlug, offset, applied, pollTick])
+    }, [problemSlug, offset, applied, reloadTick])
 
     // Keep the table live while anything on the page is still judging.
     const hasPending = rows.some(r => isPendingVerdict(r.status))
     useEffect(() => {
         if (!hasPending) return
-        const timer = setTimeout(() => setPollTick(n => n + 1), 3000)
+        const timer = setTimeout(() => setReloadTick(n => n + 1), 3000)
         return () => clearTimeout(timer)
-    }, [hasPending, pollTick])
-
-    const rejudgeOne = async (row: Submission) => {
-        const ok = await confirm({
-            title: 'Rejudge submission',
-            message: `Rejudge ${row.username || 'this user'}'s submission ${row.id.slice(0, 8)}? The previous verdict is discarded.`,
-            confirmLabel: 'Rejudge',
-        })
-        if (!ok) return
-        setBusyIds(prev => new Set(prev).add(row.id))
-        try {
-            await api.problems.rejudgeSubmissions(problemSlug, { submission_id: row.id })
-            toast.success('Rejudge queued')
-            setPollTick(n => n + 1)
-        } catch (err) {
-            toast.error(errorMessage(err) || 'Rejudge failed')
-        } finally {
-            setBusyIds(prev => {
-                const next = new Set(prev)
-                next.delete(row.id)
-                return next
-            })
-        }
-    }
-
-    const rejudgeAll = async () => {
-        const ok = await confirm({
-            title: 'Rejudge all submissions',
-            message: 'Rejudge every judged submission of this problem, ignoring the filters above? Use this after fixing test data; it queues at background priority.',
-            confirmLabel: 'Rejudge all',
-            variant: 'danger',
-        })
-        if (!ok) return
-        setBulkBusy(true)
-        try {
-            const res = await api.problems.rejudgeSubmissions(problemSlug, {})
-            toast.success(`Queued ${res.enqueued.toLocaleString()} submission${res.enqueued === 1 ? '' : 's'}`)
-            setPollTick(n => n + 1)
-        } catch (err) {
-            toast.error(errorMessage(err) || 'Rejudge failed')
-        } finally {
-            setBulkBusy(false)
-        }
-    }
+    }, [hasPending, reloadTick])
 
     const apply = (e: React.FormEvent) => {
         e.preventDefault()
@@ -140,15 +93,6 @@ export default function SubmissionsTab({ problemSlug }: { problemSlug: string })
                             : 'No submissions yet'}
                     </p>
                 </div>
-                <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={rejudgeAll}
-                    disabled={bulkBusy || total === 0}
-                >
-                    <RefreshCw className={`h-3.5 w-3.5 ${bulkBusy ? 'animate-spin' : ''}`} />
-                    Rejudge all
-                </Button>
             </div>
 
             <form onSubmit={apply} className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -215,7 +159,14 @@ export default function SubmissionsTab({ problemSlug }: { problemSlug: string })
                     />
                 </div>
             ) : (
-                <SubmissionTable rows={rows} showUser onRejudge={rejudgeOne} busyIds={busyIds} />
+                <SubmissionPanel
+                    rows={rows}
+                    onChanged={() => setReloadTick(n => n + 1)}
+                    // A batch rejudge covers the whole problem, not just the page
+                    // and not the filters — which is why the confirmation says so.
+                    rejudgeAllBody={{ problem_id: problemId }}
+                    rejudgeAllHint="this problem"
+                />
             )}
 
             <nav aria-label="Pagination" className="flex items-center justify-between text-xs text-muted">

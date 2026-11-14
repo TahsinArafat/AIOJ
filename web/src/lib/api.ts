@@ -499,24 +499,6 @@ export const api = {
             if (filters?.contestId) qs.set('contest_id', filters.contestId);
             return request<{ data: Submission[]; total: number }>(`/problems/${slug}/submissions/manage?${qs.toString()}`);
         },
-        /** Rejudge one submission, a whole contest's, or every judged row. */
-        rejudgeSubmissions: (slug: string, d: { submission_id?: string; contest_id?: string } = {}) =>
-            request<{ enqueued: number; total: number }>(`/problems/${slug}/submissions/rejudge`, {
-                method: 'POST',
-                body: JSON.stringify(d),
-            }),
-        /**
-         * Void a submission: it stops counting as an attempt and stops scoring.
-         * A reason is required — a void nobody can explain later is worse than
-         * the submission it removed. Which roles may do this is an admin
-         * setting (Admin → Feature Gates), and the caller must also own the
-         * problem or run the round.
-         */
-        skipSubmission: (slug: string, submissionId: string, reason: string) =>
-            request<{ id: string; status: string; was: string }>(`/problems/${slug}/submissions/${submissionId}/skip`, {
-                method: 'POST',
-                body: JSON.stringify({ reason }),
-            }),
         addPermission: (slug: string, username: string, accessLevel: string) =>
             request<{ status: string }>(`/problems/${slug}/permissions`, {
                 method: 'POST',
@@ -662,6 +644,32 @@ export const api = {
             if (contestId) url += `&contest_id=${contestId}`;
             return request<{ data: Submission[]; total: number }>(url);
         },
+        /**
+         * Rejudge: one submission, a whole problem, a whole round, or a problem
+         * inside a round. One call for every scope, because a round's
+         * submissions tab and a problem's are looking at the same rows and the
+         * server resolves the authority from what the request names.
+         *
+         * A batch is queued at background priority, so a rejudge after fixing
+         * test data cannot delay live contest judging.
+         */
+        rejudge: (d: { submission_id?: string; problem_id?: string; contest_id?: string }) =>
+            request<{ enqueued: number; total: number }>('/submissions/rejudge', {
+                method: 'POST',
+                body: JSON.stringify(d),
+            }),
+        /**
+         * Void a submission: it stops counting as an attempt and stops scoring.
+         * A reason is required — a void nobody can explain later is worse than
+         * the submission it removed. Which roles may do this is an admin
+         * setting (Admin → Feature Gates: "Void a submission"), and the caller
+         * must also answer for the row: own its problem, or run its round.
+         */
+        skip: (submissionId: string, reason: string) =>
+            request<{ id: string; status: string; was: string }>(`/submissions/${submissionId}/skip`, {
+                method: 'POST',
+                body: JSON.stringify({ reason }),
+            }),
     },
     features: {
         /**
@@ -970,16 +978,6 @@ export const api = {
             if (filters?.status) params.set('status', filters.status);
             return request<ContestSubmissionsResponse>(`/contests/${id}/submissions${params.toString() ? '?' + params : ''}`);
         },
-        /**
-         * Void a submission from the round's own submissions tab. Same action
-         * and same admin-configured role policy as the problem-scoped route;
-         * the contest in the path is what the accountability check runs against.
-         */
-        skipSubmission: (id: string, submissionId: string, reason: string) =>
-            request<{ id: string; status: string; was: string }>(`/contests/${id}/submissions/${submissionId}/skip`, {
-                method: 'POST',
-                body: JSON.stringify({ reason }),
-            }),
     },
     /**
      * Manual standings corrections. A delta layered over the computed result, so

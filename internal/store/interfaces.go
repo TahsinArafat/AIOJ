@@ -240,13 +240,13 @@ type SubmissionWriter interface {
 	// from the submissions table. Rejudging does not touch those counters, so
 	// they are recomputed once per batch instead of being double-counted.
 	RecomputeProblemCounts(ctx context.Context, problemID string) error
-	// ListIDsForProblemRejudge returns judged local submissions of one problem,
-	// optionally narrowed to a contest, for a batch rejudge.
-	ListIDsForProblemRejudge(ctx context.Context, problemID string, filter model.SubmissionFilter) ([]string, error)
-	// ListForBulkRejudge returns IDs of all judged local submissions in a
-	// contest (optionally filtered to one problem) suitable for rejudging.
-	// It excludes submissions still pending/judging to avoid double-dispatch.
-	ListForBulkRejudge(ctx context.Context, contestID, problemID string) ([]string, error)
+	// ListForRejudge returns the judged local submissions a batch rejudge would
+	// reset, plus the distinct problems they belong to so the caller can
+	// rebuild those problems' denormalised counters. The filter must name a
+	// problem, a contest, or both. Rows still pending or judging are excluded
+	// (the judge owns them), as are skipped rows (a void is a human ruling the
+	// judge must not overwrite) and remote rows (nothing local to re-execute).
+	ListForRejudge(ctx context.Context, filter model.SubmissionFilter) (ids, problemIDs []string, err error)
 	// ResetForRejudge atomically resets a batch of submissions to 'pending'
 	// and clears their judge result, preparing them for re-execution.
 	ResetForRejudge(ctx context.Context, ids []string) error

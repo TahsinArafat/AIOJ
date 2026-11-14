@@ -8,10 +8,12 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
 	"github.com/tahsinarafat/aioj/internal/auth"
 	"github.com/tahsinarafat/aioj/internal/model"
 	"github.com/tahsinarafat/aioj/internal/store"
+	"github.com/tahsinarafat/aioj/internal/store/postgres"
 )
 
 // withURLParam attaches a chi URL parameter, which chi.URLParam reads back.
@@ -136,22 +138,124 @@ func TestPageParams(t *testing.T) {
 }
 
 // A rejudge request must be rejected before it reaches the queue when the
-// caller does not own the problem.
-func TestRejudgeProblemSubmissionsForbiddenForStranger(t *testing.T) {
-	h := &SubmissionHandler{probStore: &mockProblemStore{
-		getBySlug: &model.Problem{ID: "p1", Slug: "two-sum"},
-		access:    map[string]string{"owner1/p1": "owner"},
-	}}
+// caller answers for neither the submission nor the scope it names.
+func TestRejudgeForbiddenForStranger(t *testing.T) {
+	db := openRosterTestDB(t)
+	defer db.Close()
 
-	req := httptest.NewRequest("POST", "/api/problems/two-sum/submissions/rejudge", strings.NewReader(`{}`))
-	req = req.WithContext(context.WithValue(req.Context(), middleware.UserContextKey, &auth.Claims{UserID: "stranger", Role: "user"}))
-	req = withURLParam(req, "slug", "two-sum")
-	rec := httptest.NewRecorder()
+	ctx := context.Background()
+	users := postgres.NewUserStore(db)
+	problems := postgres.NewProblemStore(db)
+	contests := postgres.NewContestStore(db)
+	subs := postgres.NewSubmissionStore(db)
+	h := NewSubmissionHandler(subs, problems, contests, &nopQueue{}, nil, nil, "", nil, users)
 
-	h.RejudgeProblemSubmissions(rec, req)
+	newUser := func(role string) *model.User {
+		u := &model.User{
+			ID: uuid.NewString(), Username: "rejudge_" + uuid.NewString()[:8],
+			Email: uuid.NewString() + "@example.com", PasswordHash: "hashed", Role: role,
+		}
+		if err := users.Create(ctx, u); err != nil {
+			t.Fatalf("create user %s: %v", role, err)
+		}
+		return u
+	}
 
-	if rec.Code != http.StatusForbidden {
-		t.Fatalf("expected 403, got %d body=%s", rec.Code, rec.Body.String())
+	owner := newUser(model.RoleSetter)
+	stranger := newUser(model.RoleUser)
+	solver := newUser(model.RoleUser)
+
+	problemID := uuid.NewString()
+	if err := problems.Create(ctx, &model.Problem{
+		ID: problemID, Slug: "rejudge-" + uuid.NewString()[:8], Title: "Rejudge",
+		Description: "d", TimeLimit: 1000, MemoryLimit: 262144, Difficulty: "easy",
+		Tags: []string{}, CreatedBy: owner.ID,
+		Status: model.ProblemStatusPublished, Visible: true,
+	}); err != nil {
+		t.Fatalf("create problem: %v", err)
+	}
+	subID := uuid.NewString()
+	if err := subs.Create(ctx, &model.Submission{
+		ID: subID, ProblemID: problemID, UserID: solver.ID,
+		Language: "cpp-gpp-64", SourceCode: "int main(){}", Status: model.StatusWA,
+		SubmissionType: model.SubmissionTypeCode,
+	}); err != nil {
+		t.Fatalf("create submission: %v", err)
+	}
+	defer func() {
+		db.ExecContext(ctx, "DELETE FROM submissions WHERE problem_id=$1", problemID)
+		db.ExecContext(ctx, "DELETE FROM problems WHERE id=$1", problemID)
+		db.ExecContext(ctx, "DELETE FROM users WHERE id IN ($1,$2,$3)", owner.ID, stranger.ID, solver.ID)
+	}()
+
+	cases := []struct {
+		name   string
+		caller *model.User
+		body   string
+	}{
+		{"one submission, a stranger", stranger, `{"submission_id":"` + subID + `"}`},
+		{"a problem, a stranger", stranger, `{"problem_id":"` + problemID + `"}`},
+		{"nothing named at all", owner, `{}`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			claims := &auth.Claims{UserID: tc.caller.ID, Username: tc.caller.Username, Role: tc.caller.Role}
+			req := httptest.NewRequest("POST", "/api/submissions/rejudge", strings.NewReader(tc.body))
+			req = req.WithContext(context.WithValue(req.Context(), middleware.UserContextKey, claims))
+			rec := httptest.NewRecorder()
+
+			h.Rejudge(rec, req)
+
+			if rec.Code != http.StatusForbidden && rec.Code != http.StatusBadRequest {
+				t.Fatalf("expected 403 or 400, got %d body=%s", rec.Code, rec.Body.String())
+			}
+			// Whichever refusal it is, it has to be a refusal: the row keeps the
+			// verdict it had and no work was handed to the judge.
+			got, _ := subs.GetByID(ctx, subID)
+			if got.Status != model.StatusWA {
+				t.Fatalf("status = %q after a refused rejudge, want it unchanged", got.Status)
+			}
+		})
+	}
+}
+
+// The two halves of the accountability rule are the same halves for both
+// actions, so the per-row capability flags a listing carries have to agree with
+// them: a round's judge may void and rejudge inside the round and nowhere else.
+func TestDecorateCapabilitiesFollowAccountability(t *testing.T) {
+	ownerStore := &mockProblemStore{access: map[string]string{"owner1/p1": "owner"}}
+	h := &SubmissionHandler{probStore: ownerStore, contestStore: stubContestStore{isJudge: true}}
+
+	subs := []model.Submission{
+		{ID: "s1", ProblemID: "p1", UserID: "solver1"},
+		{ID: "s2", ProblemID: "p2", UserID: "solver1", ContestID: "c1"},
+		{ID: "s3", ProblemID: "p2", UserID: "solver1"},
+	}
+	req := requestAs(&auth.Claims{UserID: "owner1", Role: "setter"})
+	h.decorate(req, subs, middleware.GetUserClaims(req))
+
+	// Owns the problem.
+	if !subs[0].CanRejudge || !subs[0].CanSkip {
+		t.Error("the problem's owner must be offered both actions on its rows")
+	}
+	// Does not own the problem, but judges the round the row was made in.
+	if !subs[1].CanRejudge || !subs[1].CanSkip {
+		t.Error("a round's judge must be offered both actions on the round's rows")
+	}
+	// Neither: a stranger's practice row.
+	if subs[2].CanRejudge || subs[2].CanSkip {
+		t.Error("nobody may act on a row they do not answer for")
+	}
+	if subs[2].CanView {
+		t.Error("and a row they did not submit is not theirs to open either")
+	}
+
+	// An onsite account is a competitor, never an organizer, whatever it owns.
+	contestant := []model.Submission{{ID: "s4", ProblemID: "p1", UserID: "onsie1"}}
+	req = requestAs(&auth.Claims{UserID: "onsie1", Role: model.RoleContestant})
+	h.decorate(req, contestant, middleware.GetUserClaims(req))
+	if contestant[0].CanRejudge || contestant[0].CanSkip {
+		t.Error("a generated onsie account must not be offered organizer actions")
 	}
 }
 

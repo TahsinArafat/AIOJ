@@ -75,8 +75,8 @@ func (f *fencingStore) GetPlatformStats(context.Context) (*model.PlatformStats, 
 func (f *fencingStore) GetHackableSubmissions(context.Context, string, string) ([]model.Submission, error) {
 	return nil, nil
 }
-func (f *fencingStore) ListForBulkRejudge(context.Context, string, string) ([]string, error) {
-	return nil, nil
+func (f *fencingStore) ListForRejudge(context.Context, model.SubmissionFilter) ([]string, []string, error) {
+	return nil, nil, nil
 }
 func (f *fencingStore) ResetForRejudge(context.Context, []string) error { return nil }
 
@@ -89,9 +89,6 @@ func (f *fencingStore) ListByProblemManage(context.Context, string, int, int, mo
 }
 func (f *fencingStore) ListPublic(context.Context, int, int, model.PublicSubmissionFilter) ([]model.Submission, int, error) {
 	return nil, 0, nil
-}
-func (f *fencingStore) ListIDsForProblemRejudge(context.Context, string, model.SubmissionFilter) ([]string, error) {
-	return nil, nil
 }
 func (f *fencingStore) RecomputeProblemCounts(context.Context, string) error { return nil }
 func (f *fencingStore) ListRecentFailures(context.Context, int) ([]model.Submission, error) {

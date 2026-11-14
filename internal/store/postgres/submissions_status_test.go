@@ -283,16 +283,28 @@ func TestListByProblemManage(t *testing.T) {
 	}
 }
 
-// A batch rejudge must skip rows that are already queued and remote rows.
-func TestListIDsForProblemRejudge(t *testing.T) {
+// A batch rejudge must skip rows that are already queued, voided rows, and
+// remote rows.
+func TestListForRejudge(t *testing.T) {
 	ctx := context.Background()
 	f, cleanup := newStatusFixture(t, ctx)
 	defer cleanup()
 	store := NewSubmissionStore(f.db)
 
-	ids, err := store.ListIDsForProblemRejudge(ctx, f.visibleID, model.SubmissionFilter{})
+	// Created here rather than in the shared fixture: the other cases in this
+	// file count rows on this problem and would have to learn about it.
+	skippedID := uuid.NewString()
+	if err := store.Create(ctx, &model.Submission{
+		ID: skippedID, ProblemID: f.visibleID, UserID: f.otherID,
+		Language: "cpp-gpp-64", SourceCode: "int main(){}", Status: model.StatusSkipped,
+		SubmissionType: model.SubmissionTypeCode,
+	}); err != nil {
+		t.Fatalf("create skipped submission: %v", err)
+	}
+
+	ids, problemIDs, err := store.ListForRejudge(ctx, model.SubmissionFilter{ProblemID: f.visibleID})
 	if err != nil {
-		t.Fatalf("ListIDsForProblemRejudge: %v", err)
+		t.Fatalf("ListForRejudge: %v", err)
 	}
 	got := map[string]bool{}
 	for _, id := range ids {
@@ -301,16 +313,36 @@ func TestListIDsForProblemRejudge(t *testing.T) {
 	if got[f.subs["pending"]] {
 		t.Error("a pending row must not be enqueued twice")
 	}
+	if got[skippedID] {
+		t.Error("a voided row must not be rejudged: the void is a human ruling")
+	}
 	if !got[f.subs["practice_ac"]] || !got[f.subs["live_contest"]] {
 		t.Error("judged local rows must be included")
 	}
+	// The counters of every problem a batch touches have to be rebuilt, and the
+	// caller learns which ones from this return value.
+	if len(problemIDs) != 1 || problemIDs[0] != f.visibleID {
+		t.Fatalf("problem scope: want the one problem, got %v", problemIDs)
+	}
 
-	scoped, err := store.ListIDsForProblemRejudge(ctx, f.visibleID, model.SubmissionFilter{ContestID: f.doneContestID})
+	scoped, _, err := store.ListForRejudge(ctx, model.SubmissionFilter{
+		ProblemID: f.visibleID, ContestID: f.doneContestID,
+	})
 	if err != nil {
-		t.Fatalf("ListIDsForProblemRejudge(contest): %v", err)
+		t.Fatalf("ListForRejudge(contest): %v", err)
 	}
 	if len(scoped) != 1 || scoped[0] != f.subs["finished_contest"] {
 		t.Fatalf("contest scope: want only the finished-contest row, got %v", scoped)
+	}
+
+	// A round is a scope on its own: the contest tab rejudges its whole set
+	// without naming a problem.
+	round, _, err := store.ListForRejudge(ctx, model.SubmissionFilter{ContestID: f.doneContestID})
+	if err != nil {
+		t.Fatalf("ListForRejudge(contest only): %v", err)
+	}
+	if len(round) != 1 || round[0] != f.subs["finished_contest"] {
+		t.Fatalf("contest-only scope: want the finished-contest row, got %v", round)
 	}
 }
 

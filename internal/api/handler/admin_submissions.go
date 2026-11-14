@@ -27,8 +27,7 @@ type adminSubmissionStore interface {
 	store.SubmissionRemoteJudge
 	GetByID(ctx context.Context, id string) (*model.Submission, error)
 	ListRecentFailures(ctx context.Context, limit int) ([]model.Submission, error)
-	ListForBulkRejudge(ctx context.Context, contestID, problemID string) ([]string, error)
-	ListIDsForProblemRejudge(ctx context.Context, problemID string, filter model.SubmissionFilter) ([]string, error)
+	ListForRejudge(ctx context.Context, filter model.SubmissionFilter) (ids, problemIDs []string, err error)
 	ResetForRejudge(ctx context.Context, ids []string) error
 	RecomputeProblemCounts(ctx context.Context, problemID string) error
 	UpdateStatus(ctx context.Context, id string, status model.SubmissionStatus)
@@ -181,7 +180,10 @@ func (h *AdminSubmissionHandler) RejudgeBulk(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	ids, err := h.subStore.ListForBulkRejudge(r.Context(), req.ContestID, req.ProblemID)
+	ids, problemIDs, err := h.subStore.ListForRejudge(r.Context(), model.SubmissionFilter{
+		ProblemID: req.ProblemID,
+		ContestID: req.ContestID,
+	})
 	if err != nil {
 		slog.Error("bulk rejudge: list failed", "contest", req.ContestID, "problem", req.ProblemID, "error", err)
 		respondJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to list submissions"})
@@ -208,6 +210,13 @@ func (h *AdminSubmissionHandler) RejudgeBulk(w http.ResponseWriter, r *http.Requ
 			continue
 		}
 		enqueued++
+	}
+	// The counters are incremented per judged row and untouched by a reset, so a
+	// rejudge would double-count them. Rebuild once per problem in the batch.
+	for _, id := range problemIDs {
+		if err := h.subStore.RecomputeProblemCounts(r.Context(), id); err != nil {
+			slog.Warn("bulk rejudge: recount failed", "problem", id, "error", err)
+		}
 	}
 	slog.Info("bulk rejudge enqueued", "contest", req.ContestID, "problem", req.ProblemID,
 		"total", len(ids), "enqueued", enqueued)

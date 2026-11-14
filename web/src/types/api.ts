@@ -1191,9 +1191,16 @@ export interface Submission {
     /** Filled by the submission listings so a status table can name the problem. */
     problem_slug?: string
     problem_title?: string
-    /** Per-viewer capabilities: may this viewer open / rejudge this row? */
+    /** The round's letter (A, B, …), filled by the contest-scoped listings. */
+    problem_index?: string
+    /**
+     * Per-viewer capabilities. Voiding and rejudging come from the same
+     * accountability rule the API enforces, so a row offers one only where it
+     * would offer the other.
+     */
     can_view?: boolean
     can_rejudge?: boolean
+    can_skip?: boolean
     created_at: string
     judged_at?: string | null
 }
@@ -1621,18 +1628,29 @@ export interface ScoreboardData {
     pagination: PaginationInfo
 }
 
-/** GET /api/contests/{id}/submissions — judge-aware wrapper. */
+/**
+ * GET /api/contests/{id}/submissions — judge-aware wrapper.
+ *
+ * The contest listing returns the same row shape as the status page and the
+ * setter listing, so the three surfaces can render one table.
+ */
 export interface SubmissionRow {
     id?: string
     created_at: string
     status: string
     language?: string
     problem_id?: string
+    /** The round's letter, which identifies a problem inside a contest. */
+    problem_index?: string
     user_id?: string
     username?: string
     time_used?: number
     memory_used?: number
     score?: number
+    judge_error?: string
+    can_view?: boolean
+    can_rejudge?: boolean
+    can_skip?: boolean
 }
 export interface ContestSubmissionsResponse {
     data: SubmissionRow[]

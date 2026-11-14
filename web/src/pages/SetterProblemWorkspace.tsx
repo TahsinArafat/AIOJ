@@ -733,7 +733,7 @@ useDocumentTitle(problem ? `${problem.title} — setter` : null)
           )}
 
           {activeTab === 'submissions' && (
-            <SubmissionsTab problemSlug={problem.slug as string} />
+            <SubmissionsTab problemSlug={problem.slug as string} problemId={problem.id} />
           )}
 
           {activeTab === 'permissions' && (

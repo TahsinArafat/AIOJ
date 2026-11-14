@@ -154,9 +154,9 @@ func TestProblemRejudgeIncludesAISource(t *testing.T) {
 		t.Fatalf("UpdateResult: %v", err)
 	}
 
-	ids, err := subs.ListIDsForProblemRejudge(ctx, problemID, model.SubmissionFilter{})
+	ids, _, err := subs.ListForRejudge(ctx, model.SubmissionFilter{ProblemID: problemID})
 	if err != nil {
-		t.Fatalf("ListIDsForProblemRejudge: %v", err)
+		t.Fatalf("ListForRejudge: %v", err)
 	}
 	if len(ids) != 1 || ids[0] != subID {
 		t.Fatalf("an AI problem's judged submission must be rejudgeable, got %v", ids)

@@ -139,7 +139,6 @@ GET    /api/contests/{id}/registrations                     security-headers pas
 GET    /api/contests/{id}/scoreboard                        security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
 GET    /api/contests/{id}/stats                             security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
 GET    /api/contests/{id}/submissions                       security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required pass-through
-POST   /api/contests/{id}/submissions/{submissionId}/skip   security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required pass-through pass-through
 POST   /api/contests/{id}/submit                            security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required pass-through
 GET    /api/contests/{id}/team-registrations                security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
 POST   /api/contests/{id}/unlock                            security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required pass-through
@@ -225,8 +224,6 @@ POST   /api/problems/{slug}/permissions                     security-headers pas
 DELETE /api/problems/{slug}/permissions/{userId}            security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required pass-through
 GET    /api/problems/{slug}/submissions/                    security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
 GET    /api/problems/{slug}/submissions/manage              security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required pass-through
-POST   /api/problems/{slug}/submissions/rejudge             security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required pass-through
-POST   /api/problems/{slug}/submissions/{id}/skip           security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required pass-through pass-through
 POST   /api/problems/{slug}/submit                          security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required pass-through
 GET    /api/problems/{slug}/testcases                       security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required pass-through
 POST   /api/problems/{slug}/testcases                       security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required pass-through
@@ -246,12 +243,14 @@ GET    /api/stats/problems/{problemId}                      security-headers pas
 GET    /api/submissions/                                    security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
 POST   /api/submissions/                                    security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
 GET    /api/submissions/all                                 security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
+POST   /api/submissions/rejudge                             security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required pass-through
 POST   /api/submissions/run                                 security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
 POST   /api/submissions/run-batch                           security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
 POST   /api/submissions/upsolving                           security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
 GET    /api/submissions/{id}                                security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
 POST   /api/submissions/{id}/recheck-remote                 security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
 POST   /api/submissions/{id}/retry-remote                   security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+POST   /api/submissions/{id}/skip                           security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required pass-through pass-through
 GET    /api/teams/                                          security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
 POST   /api/teams/                                          security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
 DELETE /api/teams/{id}                                      security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required

@@ -158,9 +158,9 @@ func TestSkippedIsExcludedFromRejudgeSelection(t *testing.T) {
 		t.Fatalf("SetSkipped: %v", err)
 	}
 
-	ids, err := subs.ListIDsForProblemRejudge(ctx, problemID, model.SubmissionFilter{})
+	ids, _, err := subs.ListForRejudge(ctx, model.SubmissionFilter{ProblemID: problemID})
 	if err != nil {
-		t.Fatalf("ListIDsForProblemRejudge: %v", err)
+		t.Fatalf("ListForRejudge: %v", err)
 	}
 	for _, id := range ids {
 		if id == subID {

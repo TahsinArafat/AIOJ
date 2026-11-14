@@ -38,23 +38,15 @@ func (b *routerBuilder) mountProblems(r chi.Router) {
 			r.With(middleware.AuthMiddleware(b.jwt)).Delete("/{lang}", problemI18nH.Delete)
 		})
 		// A problem's submission list. `/` stays readable without an account;
-		// `/manage` and `/rejudge` are the setter's own view and actions.
+		// `/manage` is the setter's own view. The rejudge and void actions are
+		// not here: they act on a submission, not on a problem, and live under
+		// /api/submissions so the round's tab and this one share them.
 		r.Route("/{slug}/submissions", func(r chi.Router) {
 			r.Get("/", submissionH.ListByProblem)
 			r.Group(func(r chi.Router) {
 				r.Use(middleware.AuthMiddleware(b.jwt))
 				r.Use(b.gate(feature.KeySetterWorkspace))
 				r.Get("/manage", submissionH.ListByProblemManage)
-				r.Post("/rejudge", submissionH.RejudgeProblemSubmissions)
-				// Voiding a submission is an accusation that moves a public
-				// leaderboard, so which roles may do it is an admin decision
-				// (Admin → Feature Gates: "Void a submission") rather than a
-				// side effect of holding the setter role. b.gate() rejects a
-				// disallowed role before the handler runs; the handler then
-				// checks the caller is accountable for THIS submission. The
-				// route is problem-scoped so the permission is always checked
-				// against the problem that was actually answered.
-				r.With(b.gate(feature.KeySkipSubmission)).Post("/{id}/skip", submissionH.SkipProblemSubmission)
 			})
 		})
 		r.Get("/{slug}/language-limits", langLimitH.List)

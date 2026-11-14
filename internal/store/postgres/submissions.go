@@ -486,16 +486,28 @@ func (s *SubmissionStore) ListByContest(ctx context.Context, contestID string, o
 		args = append(args, filter.Status)
 		argIdx++
 	}
+	// Same handle match as the problem-scoped listing, so a filter means the
+	// same thing on both tabs.
+	if filter.Username != "" {
+		where += fmt.Sprintf(" AND LOWER(u.username)=LOWER($%d)", argIdx)
+		args = append(args, filter.Username)
+		argIdx++
+	}
 	var total int
-	s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM submissions s WHERE "+where, args...).Scan(&total)
+	s.db.QueryRowContext(ctx,
+		"SELECT COUNT(*) FROM submissions s LEFT JOIN users u ON s.user_id = u.id WHERE "+where, args...).Scan(&total)
 	args = append(args, offset, limit)
 	// The LEFT JOIN to contest_problems resolves the round's letter for each
 	// row. It is LEFT, not INNER, so a row whose problem has since been removed
 	// from the round (or a submission written with a problem_id the contest
 	// never listed) still appears instead of silently vanishing; the letter
 	// comes back empty and the caller falls back to the problem's identity.
+	//
+	// judge_error comes along because the shared submission table shows a
+	// System Error's failure text inline; the handler blanks it for callers who
+	// may not see judge internals.
 	rows, err := s.db.QueryContext(ctx,
-		fmt.Sprintf(`SELECT s.id,s.user_id,COALESCE(u.username,''),s.problem_id,COALESCE(cp.index,''),s.language,s.status,s.score,s.time_used,s.memory_used,s.created_at,s.submission_type
+		fmt.Sprintf(`SELECT s.id,s.user_id,COALESCE(u.username,''),s.problem_id,COALESCE(cp.index,''),s.language,s.status,s.score,s.time_used,s.memory_used,s.created_at,s.submission_type,COALESCE(s.judge_error,'')
 		 FROM submissions s
 		 LEFT JOIN users u ON s.user_id = u.id
 		 LEFT JOIN contest_problems cp ON cp.contest_id = s.contest_id AND cp.problem_id = s.problem_id
@@ -507,7 +519,7 @@ func (s *SubmissionStore) ListByContest(ctx context.Context, contestID string, o
 	var items []model.Submission
 	for rows.Next() {
 		var sub model.Submission
-		rows.Scan(&sub.ID, &sub.UserID, &sub.Username, &sub.ProblemID, &sub.ProblemIndex, &sub.Language, &sub.Status, &sub.Score, &sub.TimeUsed, &sub.MemoryUsed, &sub.CreatedAt, &sub.SubmissionType)
+		rows.Scan(&sub.ID, &sub.UserID, &sub.Username, &sub.ProblemID, &sub.ProblemIndex, &sub.Language, &sub.Status, &sub.Score, &sub.TimeUsed, &sub.MemoryUsed, &sub.CreatedAt, &sub.SubmissionType, &sub.JudgeError)
 		items = append(items, sub)
 	}
 	if items == nil {
@@ -631,39 +643,62 @@ func (s *SubmissionStore) GetPlatformStats(ctx context.Context) (*model.Platform
 	return &stats, nil
 }
 
-// ListForBulkRejudge returns IDs of judged local submissions in a contest,
-// optionally filtered to one problem.  Pending/judging rows are excluded so
-// they don't get double-enqueued by a concurrent reclaimer sweep.
-func (s *SubmissionStore) ListForBulkRejudge(ctx context.Context, contestID, problemID string) ([]string, error) {
-	query := `
-		SELECT s.id
+// ListForRejudge returns the rows a batch rejudge would reset, plus the
+// distinct problems those rows belong to. The caller rebuilds the denormalised
+// counters for those problems afterwards: a verdict increments them, a reset
+// does not, so a rejudge would otherwise double-count every row it touched.
+//
+// Three kinds of row are excluded. Pending and judging rows are owned by the
+// judge and must not be double-enqueued by a concurrent reclaimer sweep. A
+// skipped row is a human ruling that the submission does not count: the judge
+// must never overwrite that, which is why the listing offers no rejudge button
+// on one either. Remote rows are excluded because their verdict belongs to
+// another judge and there is nothing local to re-execute.
+//
+// The filter must name a problem, a contest, or both; naming neither is
+// refused by the handler, not here.
+func (s *SubmissionStore) ListForRejudge(ctx context.Context, filter model.SubmissionFilter) (ids, problemIDs []string, err error) {
+	where := []string{
+		"s.status NOT IN ('pending', 'judging', 'skipped')",
+		"COALESCE(s.remote_id, '') = ''",
+		"COALESCE(p.source,'') NOT IN " + remoteSourceList,
+	}
+	var args []interface{}
+	next := func(v interface{}) string {
+		args = append(args, v)
+		return fmt.Sprintf("$%d", len(args))
+	}
+	if filter.ProblemID != "" {
+		where = append(where, "s.problem_id = "+next(filter.ProblemID))
+	}
+	if filter.ContestID != "" {
+		where = append(where, "s.contest_id = "+next(filter.ContestID))
+	}
+
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT s.id, s.problem_id
 		  FROM submissions s
 		  JOIN problems p ON p.id = s.problem_id
-		 WHERE s.contest_id = $1
-		   AND s.status NOT IN ('pending', 'judging')
-		   AND COALESCE(s.remote_id, '') = ''
-		   AND COALESCE(p.source,'') NOT IN ` + remoteSourceList + ``
-	args := []interface{}{contestID}
-	if problemID != "" {
-		args = append(args, problemID)
-		query += ` AND s.problem_id = $2`
-	}
-	query += ` ORDER BY s.created_at ASC`
-
-	rows, err := s.db.QueryContext(ctx, query, args...)
+		 WHERE `+strings.Join(where, " AND ")+`
+		 ORDER BY s.created_at ASC`, args...)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer rows.Close()
-	var ids []string
+
+	seen := map[string]bool{}
 	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
+		var id, problemID string
+		if err := rows.Scan(&id, &problemID); err != nil {
+			return nil, nil, err
 		}
 		ids = append(ids, id)
+		if !seen[problemID] {
+			seen[problemID] = true
+			problemIDs = append(problemIDs, problemID)
+		}
 	}
-	return ids, rows.Err()
+	return ids, problemIDs, rows.Err()
 }
 
 // SetSkipped voids a submission: an organizer rules that it should not count
@@ -893,39 +928,6 @@ func (s *SubmissionStore) ListPublic(ctx context.Context, offset, limit int, fil
 		items[i].JudgeError = ""
 	}
 	return items, total, err
-}
-
-// ListIDsForProblemRejudge returns the judged local submissions of a problem.
-func (s *SubmissionStore) ListIDsForProblemRejudge(ctx context.Context, problemID string, filter model.SubmissionFilter) ([]string, error) {
-	query := `
-		SELECT s.id
-		  FROM submissions s
-		  JOIN problems p ON p.id = s.problem_id
-		 WHERE s.problem_id = $1
-		   AND s.status NOT IN ('pending', 'judging', 'skipped')
-		   AND COALESCE(s.remote_id, '') = ''
-		   AND COALESCE(p.source,'') NOT IN ` + remoteSourceList + ``
-	args := []interface{}{problemID}
-	if filter.ContestID != "" {
-		args = append(args, filter.ContestID)
-		query += ` AND s.contest_id = $2`
-	}
-	query += ` ORDER BY s.created_at ASC`
-
-	rows, err := s.db.QueryContext(ctx, query, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var ids []string
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		ids = append(ids, id)
-	}
-	return ids, rows.Err()
 }
 
 // RecomputeProblemCounts rebuilds the denormalised counters from the table.

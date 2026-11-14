@@ -26,6 +26,20 @@ func (b *routerBuilder) mountSubmissions(r chi.Router) {
 			r.Get("/{id}", submissionH.GetByID)
 			r.Post("/{id}/retry-remote", submissionH.RetryRemote)
 			r.Post("/{id}/recheck-remote", submissionH.RecheckRemote)
+			// Organizer actions on submissions, and the only two that exist.
+			// They hang off the submission rather than off a problem or a round
+			// because they are one decision about one row: the caller names the
+			// row (or the set), and the handler derives the authority from what
+			// the row actually is. Scoping the URL by problem or by round only
+			// produced two ways to say the same thing, and left the round's tab
+			// without a rejudge because a round spans problems.
+			r.With(b.gate(feature.KeySetterWorkspace)).Post("/rejudge", submissionH.Rejudge)
+			// Voiding is an accusation that moves a public leaderboard, so which
+			// roles may do it is an admin decision (Admin → Feature Gates: "Void
+			// a submission") rather than a side effect of holding the setter
+			// role. The handler then checks the caller answers for THIS row.
+			r.With(b.gate(feature.KeySetterWorkspace), b.gate(feature.KeySkipSubmission)).
+				Post("/{id}/skip", submissionH.SkipSubmission)
 		})
 	})
 }

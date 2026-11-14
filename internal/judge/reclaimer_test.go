@@ -106,8 +106,8 @@ func (f *fakeSubStore) GetPlatformStats(context.Context) (*model.PlatformStats, 
 func (f *fakeSubStore) GetHackableSubmissions(context.Context, string, string) ([]model.Submission, error) {
 	return nil, nil
 }
-func (f *fakeSubStore) ListForBulkRejudge(context.Context, string, string) ([]string, error) {
-	return nil, nil
+func (f *fakeSubStore) ListForRejudge(context.Context, model.SubmissionFilter) ([]string, []string, error) {
+	return nil, nil, nil
 }
 func (f *fakeSubStore) ResetForRejudge(context.Context, []string) error { return nil }
 
@@ -120,9 +120,6 @@ func (f *fakeSubStore) ListByProblemManage(context.Context, string, int, int, mo
 }
 func (f *fakeSubStore) ListPublic(context.Context, int, int, model.PublicSubmissionFilter) ([]model.Submission, int, error) {
 	return nil, 0, nil
-}
-func (f *fakeSubStore) ListIDsForProblemRejudge(context.Context, string, model.SubmissionFilter) ([]string, error) {
-	return nil, nil
 }
 func (f *fakeSubStore) RecomputeProblemCounts(context.Context, string) error { return nil }
 func (f *fakeSubStore) ListRecentFailures(context.Context, int) ([]model.Submission, error) {

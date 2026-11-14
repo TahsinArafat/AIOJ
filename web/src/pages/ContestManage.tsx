@@ -19,10 +19,8 @@ import { DIVISIONS } from '../lib/divisions'
 import { useClarifications } from '../hooks/useClarifications'
 import { useAsyncData } from '../hooks/useAsyncData'
 import { ClarificationsPanel } from '../components/ClarificationsPanel'
-import { VerdictBadge } from '../components/ui/VerdictBadge'
-import { isPendingVerdict, isSkippedVerdict } from '../components/ui/verdict'
-import { useFeature } from '../context/FeaturesContext'
-import { SkipSubmissionDialog } from '../components/SkipSubmissionDialog'
+import { SubmissionPanel } from '../components/SubmissionPanel'
+import type { SubmissionRowView } from '../components/SubmissionTable'
 import { ContestAdjustmentsPanel } from './admin/ContestAdjustmentsPanel'
 import { sanitizeAccessConfig } from '../lib/contestAccess'
 import type { AccessConfig } from '../lib/contestAccess'
@@ -69,19 +67,6 @@ interface ChallengeRow { problem_id: string; index?: string; score?: number; sor
 interface ProblemHit { id: string; title?: string; difficulty?: string }
 interface RegistrationList { data?: ParticipantRow[]; count?: number }
 interface ParticipantRow { user_id?: string; username?: string; registered_at: string }
-interface SubmissionRow {
-    id?: string
-    username?: string
-    user_id?: string
-    problem_index?: string
-    problem_id?: string
-    language?: string
-    status: string
-    score?: number
-    time_used?: number
-    memory_used?: number
-    created_at?: string
-}
 interface PrintRow { id: string; filename?: string; status: string; content?: string; username?: string; created_at?: string }
 interface ContestStats {
     total_participants?: number
@@ -626,38 +611,17 @@ function ParticipantsTab({ contestId }: { contestId: string }) {
 // SUBMISSIONS TAB
 // ═══════════════════════════════════════════════
 function SubmissionsTab({ contestId }: { contestId: string }) {
-    const toast = useToast()
-    const [items, setItems] = useState<SubmissionRow[]>([])
+    const [items, setItems] = useState<SubmissionRowView[]>([])
     const [loading, setLoading] = useState(true)
-    // The row awaiting a reason, and the in-flight state of the void.
-    const [voiding, setVoiding] = useState<SubmissionRow | null>(null)
-    const [busy, setBusy] = useState(false)
-    // Which rows may be voided at all is an admin policy (Admin → Feature
-    // Gates). The API enforces it; this only keeps the button honest.
-    const { allowed: mayVoid } = useFeature('skip_submission')
+    const [reloadTick, setReloadTick] = useState(0)
 
-    const load = useCallback(() => {
+    useEffect(() => {
+        let cancelled = false
         api.contests.submissions(contestId, 0, 100, { mine: false })
-            .then(d => setItems(d.data || []))
-            .finally(() => setLoading(false))
-    }, [contestId])
-
-    useEffect(() => { load() }, [load])
-
-    const confirmVoid = async (reason: string) => {
-        if (!voiding?.id) return
-        setBusy(true)
-        try {
-            await api.contests.skipSubmission(contestId, voiding.id, reason)
-            toast.success('Submission voided')
-            setVoiding(null)
-            load()
-        } catch (err) {
-            toast.error(errorMessage(err) || 'Could not void the submission')
-        } finally {
-            setBusy(false)
-        }
-    }
+            .then(d => { if (!cancelled) setItems((d.data || []) as SubmissionRowView[]) })
+            .finally(() => { if (!cancelled) setLoading(false) })
+        return () => { cancelled = true }
+    }, [contestId, reloadTick])
 
     if (loading) return <TabLoading />
 
@@ -668,65 +632,16 @@ function SubmissionsTab({ contestId }: { contestId: string }) {
                 text="No submissions yet"
                 description="Contest submissions will appear here as participants submit solutions."
             /> : (
-                <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                        <thead><tr className="border-b border-hairline text-left text-xs text-muted uppercase">
-                            <th className="py-2 pr-3">ID</th><th className="py-2 pr-3">User</th><th className="py-2 pr-3">Problem</th>
-                            <th className="py-2 pr-3">Lang</th><th className="py-2 pr-3">Verdict</th><th className="py-2 pr-3">Time</th>
-                            <th className="py-2 pr-3">When</th>{mayVoid && <th className="py-2 text-right">Actions</th>}
-                        </tr></thead>
-                        <tbody className="divide-y divide-hairline">
-                            {items.slice(0, 100).map((s) => (
-                                <tr key={s.id} className="hover:bg-surface-2">
-                                    <td className="py-2 pr-3"><Link to={`/submissions/${s.id}`} className="text-brand hover:underline font-mono text-xs">{s.id?.slice(0, 8)}</Link></td>
-                                    <td className="py-2 pr-3">{s.username || s.user_id?.slice(0, 8)}</td>
-                                    {/* The round's letter is how a problem is identified inside a contest; a
-                                        uuid here is unreadable at the desk. Fall back to the uuid only when the
-                                        problem is no longer listed in the round. */}
-                                    <td className="py-2 pr-3 font-mono text-xs">{s.problem_index || s.problem_id?.slice(0, 8)}</td>
-                                    <td className="py-2 pr-3 text-xs">{s.language}</td>
-                                    <td className="py-2 pr-3"><VerdictBadge status={s.status} short /></td>
-                                    <td className="py-2 pr-3 text-xs text-muted">{s.time_used ? `${s.time_used}ms` : '—'}</td>
-                                    <td className="py-2 pr-3 text-xs text-muted-soft">{s.created_at ? new Date(s.created_at).toLocaleString() : '—'}</td>
-                                    {mayVoid && (
-                                        <td className="py-2 text-right">
-                                            {/* A void is only meaningful once the judge has produced a
-                                                verdict; while a row is pending or in flight the API refuses
-                                                it, so the button is disabled instead of failing on click. */}
-                                            {isSkippedVerdict(s.status) ? (
-                                                <span className="text-xs text-muted-soft">Voided</span>
-                                            ) : isPendingVerdict(s.status) ? (
-                                                <span className="text-xs text-muted-soft">Judging…</span>
-                                            ) : (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setVoiding(s)}
-                                                    className="text-xs text-warn hover:underline"
-                                                    title="Void this submission"
-                                                >
-                                                    Void
-                                                </button>
-                                            )}
-                                        </td>
-                                    )}
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                <SubmissionPanel
+                    rows={items}
+                    onChanged={() => setReloadTick(n => n + 1)}
+                    // The round is the scope: every judged submission in it, at
+                    // background priority so a bulk rejudge cannot delay live
+                    // judging of the round still running.
+                    rejudgeAllBody={{ contest_id: contestId }}
+                    rejudgeAllHint="this round"
+                />
             )}
-
-            <SkipSubmissionDialog
-                // Keyed per row so the reason field resets when a different
-                // submission is picked, without an effect.
-                key={voiding?.id ?? 'none'}
-                open={voiding !== null}
-                was={voiding?.status}
-                username={voiding?.username}
-                busy={busy}
-                onCancel={() => setVoiding(null)}
-                onConfirm={confirmVoid}
-            />
         </TabShell>
     )
 }

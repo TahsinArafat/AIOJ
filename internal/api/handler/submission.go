@@ -605,6 +605,18 @@ func (h *SubmissionHandler) ListByContest(w http.ResponseWriter, r *http.Request
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	// The round's submissions tab renders the same table as the problem's, so
+	// its rows carry the same per-viewer capabilities: whoever runs the round
+	// may void and rejudge what was submitted to it, and a contestant reading
+	// their own rows may open them and nothing more.
+	h.decorate(r, subs, claims)
+	if !isJudge {
+		// The judge's failure text is an internal detail of the round; only the
+		// people running it get it.
+		for i := range subs {
+			subs[i].JudgeError = ""
+		}
+	}
 	respondJSON(w, http.StatusOK, map[string]interface{}{"data": subs, "total": total, "is_judge": isJudge})
 }
 

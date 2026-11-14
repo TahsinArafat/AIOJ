@@ -109,7 +109,7 @@ func TestSkipSubmissionAuthorization(t *testing.T) {
 
 	t.Run("a setter accountable for neither is refused", func(t *testing.T) {
 		subID := mkSub(model.StatusWA)
-		rec := serveSkipContest(t, h, contest.ID, subID, stranger, "looked suspicious")
+		rec := serveSkip(t, h, subID, stranger, "looked suspicious")
 		if rec.Code != http.StatusForbidden {
 			t.Fatalf("stranger skip = %d, want 403 (body=%q)", rec.Code, rec.Body.String())
 		}
@@ -122,7 +122,7 @@ func TestSkipSubmissionAuthorization(t *testing.T) {
 
 	t.Run("a missing reason is refused", func(t *testing.T) {
 		subID := mkSub(model.StatusWA)
-		rec := serveSkipContest(t, h, contest.ID, subID, owner, "   ")
+		rec := serveSkip(t, h, subID, owner, "   ")
 		if rec.Code != http.StatusBadRequest {
 			t.Fatalf("reasonless skip = %d, want 400 (body=%q)", rec.Code, rec.Body.String())
 		}
@@ -136,7 +136,7 @@ func TestSkipSubmissionAuthorization(t *testing.T) {
 
 	t.Run("the problem's author may void", func(t *testing.T) {
 		subID := mkSub(model.StatusAC)
-		rec := serveSkipContest(t, h, contest.ID, subID, owner, "resubmitted from a second account")
+		rec := serveSkip(t, h, subID, owner, "resubmitted from a second account")
 		if rec.Code != http.StatusOK {
 			t.Fatalf("owner skip = %d, want 200 (body=%q)", rec.Code, rec.Body.String())
 		}
@@ -148,7 +148,7 @@ func TestSkipSubmissionAuthorization(t *testing.T) {
 
 	t.Run("the round's manager may void", func(t *testing.T) {
 		subID := mkSub(model.StatusTLE)
-		rec := serveSkipContest(t, h, contest.ID, subID, roundManager, "copied from a public solution")
+		rec := serveSkip(t, h, subID, roundManager, "copied from a public solution")
 		if rec.Code != http.StatusOK {
 			t.Fatalf("manager skip = %d, want 200 (body=%q)", rec.Code, rec.Body.String())
 		}
@@ -162,7 +162,7 @@ func TestSkipSubmissionAuthorization(t *testing.T) {
 		admin := newUser(model.RoleAdmin)
 		defer db.ExecContext(ctx, "DELETE FROM users WHERE id=$1", admin.ID)
 		subID := mkSub(model.StatusRE)
-		rec := serveSkipContest(t, h, contest.ID, subID, admin, "ruled void by the jury")
+		rec := serveSkip(t, h, subID, admin, "ruled void by the jury")
 		if rec.Code != http.StatusOK {
 			t.Fatalf("admin skip = %d, want 200 (body=%q)", rec.Code, rec.Body.String())
 		}
@@ -170,10 +170,10 @@ func TestSkipSubmissionAuthorization(t *testing.T) {
 
 	t.Run("already skipped is a conflict, not a second void", func(t *testing.T) {
 		subID := mkSub(model.StatusWA)
-		if rec := serveSkipContest(t, h, contest.ID, subID, owner, "first"); rec.Code != http.StatusOK {
+		if rec := serveSkip(t, h, subID, owner, "first"); rec.Code != http.StatusOK {
 			t.Fatalf("first skip = %d, want 200", rec.Code)
 		}
-		rec := serveSkipContest(t, h, contest.ID, subID, owner, "second")
+		rec := serveSkip(t, h, subID, owner, "second")
 		if rec.Code != http.StatusConflict {
 			t.Fatalf("second skip = %d, want 409 (body=%q)", rec.Code, rec.Body.String())
 		}
@@ -181,13 +181,13 @@ func TestSkipSubmissionAuthorization(t *testing.T) {
 
 	t.Run("a submission the judge still owns is refused", func(t *testing.T) {
 		subID := mkSub(model.StatusJudging)
-		rec := serveSkipContest(t, h, contest.ID, subID, owner, "too early")
+		rec := serveSkip(t, h, subID, owner, "too early")
 		if rec.Code != http.StatusConflict {
 			t.Fatalf("in-flight skip = %d, want 409 (body=%q)", rec.Code, rec.Body.String())
 		}
 	})
 
-	t.Run("a submission from another round cannot be reached through this one", func(t *testing.T) {
+	t.Run("a manager of another round is refused", func(t *testing.T) {
 		other := &model.Contest{
 			ID: uuid.New().String(), Title: "Other " + uuid.New().String()[:8],
 			Type: "acm", Format: "acm", StartTime: start, EndTime: start.Add(3 * time.Hour),
@@ -207,11 +207,12 @@ func TestSkipSubmissionAuthorization(t *testing.T) {
 		}); err != nil {
 			t.Fatalf("create submission: %v", err)
 		}
-		// The manager of `contest` must not reach a submission made in `other`,
-		// even though the problem is the same one they can author.
-		rec := serveSkipContest(t, h, contest.ID, subID, roundManager, "wrong round")
-		if rec.Code != http.StatusNotFound {
-			t.Fatalf("cross-round skip = %d, want 404 (body=%q)", rec.Code, rec.Body.String())
+		// The manager of `contest` must not reach a submission made in `other`:
+		// the authority comes from the row, so it is checked against the round
+		// the submission was actually made in, not the one the caller runs.
+		rec := serveSkip(t, h, subID, roundManager, "wrong round")
+		if rec.Code != http.StatusForbidden {
+			t.Fatalf("cross-round skip = %d, want 403 (body=%q)", rec.Code, rec.Body.String())
 		}
 		got, _ := subStore.GetByID(ctx, subID)
 		if got.Status != model.StatusWA {
@@ -220,21 +221,22 @@ func TestSkipSubmissionAuthorization(t *testing.T) {
 	})
 }
 
-func serveSkipContest(t *testing.T, h *SubmissionHandler, contestID, subID string, u *model.User, reason string) *httptest.ResponseRecorder {
+// serveSkip drives the one void route. The submission names itself, so there is
+// no scope in the URL to get wrong: the handler reads the row and asks whether
+// this caller answers for it.
+func serveSkip(t *testing.T, h *SubmissionHandler, subID string, u *model.User, reason string) *httptest.ResponseRecorder {
 	t.Helper()
 	body := bytes.NewBufferString(`{"reason":` + jsonString(reason) + `}`)
-	req := httptest.NewRequest(http.MethodPost, "/api/contests/"+contestID+"/submissions/"+subID+"/skip", body)
+	req := httptest.NewRequest(http.MethodPost, "/api/submissions/"+subID+"/skip", body)
 	rctx := chi.NewRouteContext()
-	// Both params, exactly as the route declares them: {id} is the CONTEST.
-	rctx.URLParams.Add("id", contestID)
-	rctx.URLParams.Add("submissionId", subID)
+	rctx.URLParams.Add("id", subID)
 	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 	if u != nil {
 		req = req.WithContext(context.WithValue(req.Context(), middleware.UserContextKey,
 			&auth.Claims{UserID: u.ID, Username: u.Username, Role: u.Role}))
 	}
 	rec := httptest.NewRecorder()
-	h.SkipContestSubmission(rec, req)
+	h.SkipSubmission(rec, req)
 	return rec
 }
 

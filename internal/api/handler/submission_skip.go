@@ -32,21 +32,16 @@ import (
  *  1. The role policy (`feature.KeySkipSubmission`, edited under Admin →
  *     Feature Gates) decides which roles may void anything at all. It is
  *     enforced by middleware on the route, before this code runs.
- *  2. The caller must also be accountable for THIS submission: they manage the
- *     problem it answers (owner/co-author) or they run the round it was made in
- *     (manager/judge). It is not enough to be a platform admin or a setter
- *     somewhere else on the site — voiding moves a public leaderboard, so the
- *     people who answer for that leaderboard are the ones who may do it.
+ *  2. The caller must also be accountable for THIS submission — see
+ *     canGovernSubmission below.
  *
- * There are two entry points because the tab that shows the rows differs: a
- * round's submissions are read under the contest (where the round is in the
- * URL), and a problem's submissions under the problem. The check that matters —
- * half 2 above — is identical, and lives in one place so the two routes cannot
- * drift apart.
+ * The route is on the submission itself (`POST /api/submissions/{id}/skip`),
+ * not under a problem or a contest. Voiding is one decision about one row, and
+ * it is the same decision whichever tab the organizer happens to be looking at;
+ * scoping the URL by problem or by round only created two ways to say it.
  */
 
-// skipWindow is how much of the submission's identity the audit entry records,
-// so the action stays attributable without duplicating the row.
+// skipRequest carries the ruling.
 type skipRequest struct {
 	// Reason is required: a void nobody can explain later is worse than the
 	// submission it removed. Mirrors the corrections endpoint, which requires one
@@ -54,19 +49,22 @@ type skipRequest struct {
 	Reason string `json:"reason"`
 }
 
-// canSkip reports whether the caller is accountable for this submission.
+// canGovernSubmission reports whether the caller answers for this submission,
+// which is the single rule behind every organizer action on it: voiding it,
+// rejudging it, or being offered either button in a listing.
 //
-// A skipped submission is checked first: it is already void, so there is
-// nothing to authorize and reporting it as such is more useful than a 403 that
-// suggests a permission problem.
-func (h *SubmissionHandler) canSkip(r *http.Request, sub *model.Submission) bool {
+// It is not enough to hold an organizer role somewhere: voiding moves a public
+// leaderboard, so the people who answer for that leaderboard are the ones who
+// may do it. That is either the problem the submission answers (its owner or a
+// co-author) or the round it was made in (its manager or judge).
+func (h *SubmissionHandler) canGovernSubmission(r *http.Request, sub *model.Submission) bool {
 	claims := middleware.GetUserClaims(r)
 	if claims == nil {
 		return false
 	}
 	// A generated onsite account is a competitor, never an organizer. The role
 	// policy cannot save this: such an account can be minted with a setter-ish
-	// role, and it must still not be able to void anybody's submission.
+	// role, and it must still not be able to rule on anybody's submission.
 	if isArchiveBlocked(claims) {
 		return false
 	}
@@ -86,68 +84,22 @@ func (h *SubmissionHandler) canSkip(r *http.Request, sub *model.Submission) bool
 	return false
 }
 
-// loadForSkip resolves the submission named in the URL and applies the shared
-// half of the authorization. It writes the response and returns nil when the
-// request cannot proceed, so both entry points fail identically.
-func (h *SubmissionHandler) loadForSkip(w http.ResponseWriter, r *http.Request) *model.Submission {
-	// submissionId is read first: on the contest-scoped route {id} is the
-	// CONTEST, so treating it as the submission would look up the wrong row.
-	id := chi.URLParam(r, "submissionId")
-	if id == "" {
-		id = chi.URLParam(r, "id")
-	}
-	sub, err := h.subStore.GetByID(r.Context(), id)
+// SkipSubmission serves POST /api/submissions/{id}/skip.
+func (h *SubmissionHandler) SkipSubmission(w http.ResponseWriter, r *http.Request) {
+	sub, err := h.subStore.GetByID(r.Context(), chi.URLParam(r, "id"))
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
-		return nil
+		return
 	}
 	if sub == nil {
 		http.Error(w, "submission not found", http.StatusNotFound)
-		return nil
+		return
 	}
-	// Scoped route: the submission must belong to the contest or problem in the
-	// path. Without this, the permission check would be made against the wrong
-	// round — a manager of the contest in the URL could void a submission made
-	// in a round they do not run.
-	//
-	// Which param holds the contest depends on the route: the contest-scoped
-	// route names it {id} (alongside {submissionId}), the problem-scoped route
-	// has no contest segment at all and names the problem {slug}.
-	rawContest := chi.URLParam(r, "contestId")
-	if rawContest == "" && chi.URLParam(r, "submissionId") != "" {
-		rawContest = chi.URLParam(r, "id")
-	}
-	if rawContest != "" {
-		contest, cerr := resolveContest(r.Context(), rawContest, h.contestStore)
-		if cerr != nil {
-			respondContestLookupError(w, cerr)
-			return nil
-		}
-		if sub.ContestID != contest.ID {
-			http.Error(w, "submission not in this contest", http.StatusNotFound)
-			return nil
-		}
-	}
-	if raw := chi.URLParam(r, "slug"); raw != "" {
-		problem, perr := h.probStore.GetBySlug(r.Context(), raw)
-		if perr != nil || problem == nil {
-			http.Error(w, "problem not found", http.StatusNotFound)
-			return nil
-		}
-		if sub.ProblemID != problem.ID {
-			http.Error(w, "submission not in this problem", http.StatusNotFound)
-			return nil
-		}
-	}
-	if !h.canSkip(r, sub) {
+	if !h.canGovernSubmission(r, sub) {
 		http.Error(w, "forbidden", http.StatusForbidden)
-		return nil
+		return
 	}
-	return sub
-}
 
-// applySkip performs the void and records it.
-func (h *SubmissionHandler) applySkip(w http.ResponseWriter, r *http.Request, sub *model.Submission) {
 	var req skipRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid body", http.StatusBadRequest)
@@ -200,24 +152,6 @@ func (h *SubmissionHandler) applySkip(w http.ResponseWriter, r *http.Request, su
 		// rather than just "skipped".
 		"was": sub.Status,
 	})
-}
-
-// SkipContestSubmission serves POST /api/contests/{contestId}/submissions/{id}/skip.
-func (h *SubmissionHandler) SkipContestSubmission(w http.ResponseWriter, r *http.Request) {
-	sub := h.loadForSkip(w, r)
-	if sub == nil {
-		return
-	}
-	h.applySkip(w, r, sub)
-}
-
-// SkipProblemSubmission serves POST /api/problems/{slug}/submissions/{id}/skip.
-func (h *SubmissionHandler) SkipProblemSubmission(w http.ResponseWriter, r *http.Request) {
-	sub := h.loadForSkip(w, r)
-	if sub == nil {
-		return
-	}
-	h.applySkip(w, r, sub)
 }
 
 // recordSkip writes the audit entry. This is the only durable record of who

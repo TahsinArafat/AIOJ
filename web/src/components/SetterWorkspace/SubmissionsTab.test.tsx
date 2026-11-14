@@ -11,7 +11,10 @@ vi.mock('../../lib/api', () => ({
     api: {
         problems: {
             submissions: vi.fn(),
-            rejudgeSubmissions: vi.fn(),
+        },
+        submissions: {
+            rejudge: vi.fn(),
+            skip: vi.fn(),
         },
     },
     getAccessToken: vi.fn(() => 'mock-token'),
@@ -34,6 +37,7 @@ function row(overrides: Partial<Submission> = {}): Submission {
         is_remote: false,
         can_view: true,
         can_rejudge: true,
+        can_skip: true,
         created_at: '2026-01-01T10:00:00Z',
         ...overrides,
     }
@@ -44,7 +48,7 @@ function renderTab() {
         <MemoryRouter>
             <ToastProvider>
                 <ConfirmProvider>
-                    <SubmissionsTab problemSlug="two-sum" />
+                    <SubmissionsTab problemSlug="two-sum" problemId="p1" />
                 </ConfirmProvider>
             </ToastProvider>
         </MemoryRouter>
@@ -54,7 +58,10 @@ function renderTab() {
 beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(api.problems.submissions).mockResolvedValue({ data: [], total: 0 })
-    vi.mocked(api.problems.rejudgeSubmissions).mockResolvedValue({ enqueued: 1, total: 1 })
+    vi.mocked(api.submissions.rejudge).mockResolvedValue({ enqueued: 1, total: 1 })
+    vi.mocked(api.submissions.skip).mockResolvedValue({
+        id: 'aaaaaaaa-1111-4111-8111-111111111111', status: 'skipped', was: 'wa',
+    })
 })
 
 test('lists the problem submissions with the submitter', async () => {
@@ -77,7 +84,9 @@ test('rejudges a single submission after confirmation', async () => {
     const confirmButton = await screen.findByRole('button', { name: 'Rejudge' })
     fireEvent.click(confirmButton)
 
-    await waitFor(() => expect(api.problems.rejudgeSubmissions).toHaveBeenCalledWith('two-sum', {
+    // The one canonical endpoint: the row names itself, so neither tab needs a
+    // problem- or round-scoped path to say the same thing.
+    await waitFor(() => expect(api.submissions.rejudge).toHaveBeenCalledWith({
         submission_id: 'aaaaaaaa-1111-4111-8111-111111111111',
     }))
 })
@@ -93,7 +102,23 @@ test('rejudge all covers the whole problem', async () => {
     const buttons = await screen.findAllByRole('button', { name: 'Rejudge all' })
     fireEvent.click(buttons[buttons.length - 1])
 
-    await waitFor(() => expect(api.problems.rejudgeSubmissions).toHaveBeenCalledWith('two-sum', {}))
+    await waitFor(() => expect(api.submissions.rejudge).toHaveBeenCalledWith({ problem_id: 'p1' }))
+})
+
+test('voids a submission with a required reason', async () => {
+    vi.mocked(api.problems.submissions).mockResolvedValue({ data: [row()], total: 1 })
+    renderTab()
+
+    await waitFor(() => expect(screen.getByText('alice')).toBeInTheDocument())
+    fireEvent.click(screen.getByRole('button', { name: 'Void' }))
+
+    const reason = await screen.findByLabelText('Reason')
+    fireEvent.change(reason, { target: { value: 'copied from a public solution' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Void submission' }))
+
+    await waitFor(() => expect(api.submissions.skip).toHaveBeenCalledWith(
+        'aaaaaaaa-1111-4111-8111-111111111111', 'copied from a public solution',
+    ))
 })
 
 test('filters by handle and verdict', async () => {
@@ -114,7 +139,33 @@ test('a pending row cannot be rejudged again', async () => {
     renderTab()
 
     await waitFor(() => expect(screen.getByText('alice')).toBeInTheDocument())
-    expect(screen.getByRole('button', { name: /Rejudge aaaaaaaa/ })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: /Rejudge aaaaaaaa/ })).not.toBeInTheDocument()
+    expect(screen.getByText('Judging…')).toBeInTheDocument()
+})
+
+// The capability flags are the server's answer, and the table must follow them:
+// a viewer who answers for none of these rows is offered neither action.
+test('a row the viewer does not govern offers no action', async () => {
+    vi.mocked(api.problems.submissions).mockResolvedValue({
+        data: [row({ can_rejudge: false, can_skip: false })],
+        total: 1,
+    })
+    renderTab()
+
+    await waitFor(() => expect(screen.getByText('alice')).toBeInTheDocument())
+    expect(screen.queryByRole('button', { name: /Rejudge aaaaaaaa/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Void' })).not.toBeInTheDocument()
+})
+
+// A void is a human ruling the judge must not overwrite, so a voided row offers
+// nothing to rejudge.
+test('a voided row offers neither action', async () => {
+    vi.mocked(api.problems.submissions).mockResolvedValue({ data: [row({ status: 'skipped' })], total: 1 })
+    renderTab()
+
+    await waitFor(() => expect(screen.getByText('alice')).toBeInTheDocument())
+    expect(screen.queryByRole('button', { name: /Rejudge aaaaaaaa/ })).not.toBeInTheDocument()
+    expect(screen.getByText('Voided')).toBeInTheDocument()
 })
 
 // A setter scanning the list should see why a submission failed without
