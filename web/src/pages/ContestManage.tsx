@@ -17,6 +17,7 @@ import { EmptyState } from '../components/EmptyState'
 import { isoToLocalInput, localInputToIso } from '../lib/datetime'
 import { DIVISIONS } from '../lib/divisions'
 import { useClarifications } from '../hooks/useClarifications'
+import { useAsyncData } from '../hooks/useAsyncData'
 import { ClarificationsPanel } from '../components/ClarificationsPanel'
 import { VerdictBadge } from '../components/ui/VerdictBadge'
 import { isPendingVerdict, isSkippedVerdict } from '../components/ui/verdict'
@@ -587,12 +588,10 @@ function ClarificationsTab({ contestId }: { contestId: string }) {
 // PARTICIPANTS TAB
 // ═══════════════════════════════════════════════
 function ParticipantsTab({ contestId }: { contestId: string }) {
-    const [data, setData] = useState<RegistrationList | null>(null)
-    const [loading, setLoading] = useState(true)
-
-    useEffect(() => {
-        api.contests.listRegistrations(contestId).then(setData).finally(() => setLoading(false))
-    }, [contestId])
+    const { data, loading } = useAsyncData<RegistrationList | null>(
+        () => api.contests.listRegistrations(contestId),
+        [contestId],
+    )
 
     if (loading) return <TabLoading />
     const participants = data?.data || []
@@ -736,13 +735,11 @@ function SubmissionsTab({ contestId }: { contestId: string }) {
 // PRINTS TAB
 // ═══════════════════════════════════════════════
 function PrintsTab({ contestId }: { contestId: string }) {
-    const [items, setItems] = useState<PrintRow[]>([])
-    const [loading, setLoading] = useState(true)
-
-    const load = useCallback(() => {
-        api.onsite.listPrints(contestId).then(d => setItems((d.data || []) as PrintRow[])).finally(() => setLoading(false))
-    }, [contestId])
-    useEffect(() => { load() }, [load])
+    const { data, loading, reload: load } = useAsyncData<{ data?: PrintRow[] }>(
+        () => api.onsite.listPrints(contestId) as Promise<{ data?: PrintRow[] }>,
+        [contestId],
+    )
+    const items = (data?.data || []) as PrintRow[]
 
     const updateStatus = async (printId: string, status: string) => {
         await api.onsite.updatePrintStatus(contestId, printId, status)
@@ -813,16 +810,10 @@ function StandingsTab({ contestId }: { contestId: string }) {
 // STATISTICS TAB
 // ═══════════════════════════════════════════════
 function StatisticsTab({ contestId }: { contestId: string }) {
-    const [stats, setStats] = useState<ContestStats | null>(null)
-    const [loading, setLoading] = useState(true)
-    const [error, setError] = useState('')
-
-    useEffect(() => {
-        api.contests.stats(contestId)
-            .then(r => setStats(r as ContestStats))
-            .catch(e => setError(e.message))
-            .finally(() => setLoading(false))
-    }, [contestId])
+    const { data: stats, loading, error } = useAsyncData(
+        () => api.contests.stats(contestId) as Promise<ContestStats>,
+        [contestId],
+    )
 
     if (loading) return <TabLoading />
     if (error) return <TabShell title="Statistics"><div className="text-bad text-sm p-4">{error}</div></TabShell>
@@ -922,14 +913,12 @@ function PlagiarismsTab({ contestId }: { contestId: string }) {
 // ═══════════════════════════════════════════════
 function BalloonsTab({ contestId }: { contestId: string }) {
     const { theme } = useTheme()
-    const [items, setItems] = useState<BalloonRow[]>([])
-    const [loading, setLoading] = useState(true)
+    const { data, loading, reload: load } = useAsyncData<{ data?: BalloonRow[] }>(
+        () => api.onsite.listBalloons(contestId) as Promise<{ data?: BalloonRow[] }>,
+        [contestId],
+    )
+    const items = (data?.data || []) as BalloonRow[]
     const [filter, setFilter] = useState<'all' | 'pending' | 'dispatched'>('pending')
-
-    const load = useCallback(() => {
-        api.onsite.listBalloons(contestId).then(d => setItems((d.data || []) as BalloonRow[])).finally(() => setLoading(false))
-    }, [contestId])
-    useEffect(() => { load() }, [load])
 
     const dispatch = async (id: string) => {
         await api.onsite.dispatchBalloon(contestId, id)
@@ -1006,14 +995,12 @@ function BalloonsTab({ contestId }: { contestId: string }) {
 // ANNOUNCEMENTS TAB
 // ═══════════════════════════════════════════════
 function AnnouncementsTab({ contestId }: { contestId: string }) {
-    const [items, setItems] = useState<NoticeRow[]>([])
-    const [loading, setLoading] = useState(true)
+    const { data, loading, reload: load } = useAsyncData<{ data: NoticeRow[] }>(
+        () => api.notices.list(contestId) as Promise<{ data: NoticeRow[] }>,
+        [contestId],
+    )
+    const items = data?.data || []
     const [content, setContent] = useState('')
-
-    const load = useCallback(() => {
-        api.notices.list(contestId).then(d => setItems(d.data || [])).finally(() => setLoading(false))
-    }, [contestId])
-    useEffect(() => { load() }, [load])
 
     const create = async () => {
         if (!content.trim()) return
