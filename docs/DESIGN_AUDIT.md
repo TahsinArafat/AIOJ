@@ -639,8 +639,7 @@ consumer survey rather than a method count.
 
 | Finding | What remains |
 |---|---|
-| 1 | Closed. `NewRouter` is 58 lines plus 16 mount files; `Deps` separates required fields from `Deps.Optional`; and an unwired required handler fails at boot. |
-| 13 | `ContestManage` 1880 and `ContestDetail` 1123, both with the shared fetch hook and an extracted tab. `Profile` (1226), `ContestProblem` (1072) and `ProblemDetail` (877) remain, but each is already built from 12+ shared modules — long because it renders a lot, not because it is tangled. |
+| 13 | `ContestManage` 1880 and `ContestDetail` 1123, both with the shared fetch hook and an extracted tab. `Profile` (1226), `ContestProblem` (1072) and `ProblemDetail` (877) remain. Each is built from 12+ shared modules already, so they are long because they render a lot rather than because they are tangled — splitting them would trade length for prop-drilling. Judged not worth it; revisit only if one of them grows a second responsibility. |
 
 Closed since the first pass: 3 (every store that had more than one consumer),
 4 (vjudge), 6 (run
@@ -665,3 +664,36 @@ interface carves: measure the consumers first, then carve along the axes the
 measurements show. The router split (finding 1) is the worked example for moving
 code that nothing else can check — write the equivalence harness first, confirm
 it fails when you break something, then move the code.
+
+---
+
+## Where this landed
+
+Of the fourteen findings, twelve are closed and two are recorded as deliberate
+non-actions:
+
+- **#14** (`With*` mutators) was a false positive on re-examination: the
+  constructor leaves a fail-closed handler and every grant-aware handler is wired.
+- **#13**'s remaining pages are long because they render a lot. Each already
+  imports 12+ shared modules; splitting them would trade length for prop-drilling.
+
+Three findings produced defects nobody had reported:
+
+1. **A memory-limit-exceeded submission was recorded as Wrong Answer** on every
+   remote platform. The verdict mapping existed in four copies and none knew about
+   `MLE`.
+2. **An unwired required handler panicked per request**, recovered into an empty
+   500 that named nothing. It compiled and booted fine.
+3. **`PUBLIC_ORIGIN` was silently ignored** by the sitemap and link previews, which
+   re-read the variable while `Load` had already resolved it into the config.
+
+And three findings were corrected rather than "fixed", because fixing them would
+have made the code worse: `HasAccess`'s fail-closed bool, the 1191 `http.Error`
+sites the client already handles, and `TestConnection`'s 200-with-`ok:false`
+diagnostic contract.
+
+The pattern across the whole pass: **measure before carving**. Every interface
+split started with a consumer survey, and that is what showed `TrainingPlanStore`
+and `group.go` should be left alone — one consumer using most of the interface is
+not an interface-segregation problem, and splitting it would add a layer without
+removing a dependency.
