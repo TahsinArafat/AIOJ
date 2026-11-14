@@ -61,7 +61,7 @@ assumes.
 
 **Fixed** — see "Repairs made" below.
 
-### 3. `SubmissionStore` and friends are far wider than any consumer — **High**
+### 3. Store interfaces far wider than any consumer — **High** (closed)
 
 `internal/store/interfaces.go`
 
@@ -85,6 +85,10 @@ what forces 30-method test stubs. Same shape in `ContestStore` (25),
 
 *Direction:* carve along the consumer axes above. `ContestGrantStore` is the
 in-house proof it works — it was split out for exactly this reason.
+
+**Closed.** `SubmissionStore`, `ContestStore`, `UserStore` and `ProblemStore` are
+now role sets with the wide name kept as a union for the one consumer that spans
+it. See "Repairs made".
 
 **Fixed for `SubmissionStore`** — see "Repairs made" below. The same carve is
 still open for `ContestStore` (25), `UserStore`/`ProblemStore`/
@@ -568,18 +572,43 @@ format says its settings are untouched rather than rendering an empty fieldset
 that a save would clear, and a stored value the registry no longer knows is still
 rendered so a save cannot silently drop it.
 
+### Finding 3 — the rest of the stores
+
+After `SubmissionStore` came `ContestStore` (31 → 5 roles), `UserStore`
+(21 → 4), and `ProblemStore` (21 → 4). Each is a union of embeds now, so the wide
+name still works for the one consumer that spans it.
+
+Measured before carving, every time. For `ProblemStore`: nineteen consumers, twelve
+using one to three methods, only the problem handler spanning the set. Those twelve
+moved onto seams sized to what they call, and `canReadProblem` /
+`canSeeSpoilers` / `problemIsLive` — which took the wide interface while using
+three methods between them — moved onto `problemVisibility`.
+
+Two things surfaced that the compiler could not catch, because a concrete type
+always satisfies a narrower interface:
+
+- Six handler-called methods were declared on no interface at all
+  (`GetScoreboardRows`, `GetContestStats`, `RegisterTeam`,
+  `ListTeamRegistrations`, `GetByIDForViewer`, `ListUsersByRating`). A test double
+  could not have implemented them.
+- `SetManifest` was missing from `AIGenerationStore`, so `problemgen.JobStore` was
+  satisfied only by the concrete postgres type and `main` had to pass it.
+
+Role assertions in `interface_assert_test.go` went from 8 to 22, one per role. They
+are not ceremony: at several intermediate points the build passed while a role had
+stopped being satisfied, and only the assertions said so.
+
 ## Still open
 
 | Finding | What remains |
 |---|---|
 | 1 | `Deps` is still a 77-field service locator, and optionality is still `if d.X != nil` rather than a type. The route split is done. |
-| 3 | The same carve is still owed to `ContestStore`, `UserStore`, `ProblemStore`, `TrainingPlanStore`, `GroupStore` and `AIGenerationStore`. |
+| 3 | Closed for the four widest. `TrainingPlanStore` (21), `GroupStore` (19) and `AIGenerationStore` (20) remain, but each has one or two consumers, so the payoff is smaller than the four done. |
 | 13 | `ContestManage`'s settings form is split, but the file is still 1893 lines and the other four large pages (`ContestDetail` 1204, `Profile` 1226, `ContestProblem` 1017, `ProblemDetail` 853) are untouched. The missing shared fetch hook — 18 raw `await api.*` and 41 `setLoading`/`setError` sites in one page — is the duplication half. |
-| 3 (web) | The same carve is owed to `ContestStore`, `UserStore`, `ProblemStore`, `TrainingPlanStore`, `GroupStore` and `AIGenerationStore` in the Go store. |
 
-Closed since the first pass: 4 (vjudge), 6 (run modes), 7 (scoreboard), 8
-(recommendations), 9 (the real half), 10 (contest refusal), 11 (test stubs), 12
-(config), 14 (false positive).
+Closed since the first pass: 3 (the four widest stores), 4 (vjudge), 6 (run
+modes), 7 (scoreboard), 8 (recommendations), 9 (the real half), 10 (contest
+refusal), 11 (test stubs), 12 (config), 13 (settings form), 14 (false positive).
 
 The `SubmissionStore` split (finding 3) is the worked example for the remaining
 interface carves: measure the consumers first, then carve along the axes the
