@@ -186,15 +186,6 @@ func (h *ContestHandler) adjustmentsFor(r *http.Request, contestID string) (map[
 	return h.adjustments.TotalsByUser(r.Context(), contestID)
 }
 
-// adjustmentFor reports the deltas applied to one participant, or nil when the
-// round has not corrected them.
-func adjustmentFor(adjusted map[string]model.AdjustmentTotals, userID string) *model.AdjustmentTotals {
-	if adj, ok := adjusted[userID]; ok {
-		return &adj
-	}
-	return nil
-}
-
 // initialContestStatus mirrors the problem rule: an admin publishes directly,
 // everyone else proposes. A setter announcing a rated round to the public
 // without review is exactly what the queue exists to prevent.
@@ -902,7 +893,6 @@ func (h *ContestHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
-	now := time.Now()
 	// The board's own gate, not the content one. A round may publish its board and
 	// keep its statements private — that is what an onsite final or a hiring round
 	// is — and gating the board on content made publishing the result impossible
@@ -981,82 +971,15 @@ func (h *ContestHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	frozen := contest.FreezeTime != nil && now.After(*contest.FreezeTime) && now.Before(contest.EndTime)
-
-	var beforeTime *time.Time
-	if frozen && !isJudge {
-		beforeTime = contest.FreezeTime
-	}
-
 	rows, _ := h.store.GetScoreboardRows(r.Context(), contest.ID, nil)
 	participants, _ := h.store.GetParticipants(r.Context(), contest.ID)
 
-	fmtName := contest.Format
-	if fmtName == "" {
-		fmtName = "acm"
-	}
-	contestFormat, err := format.Create(fmtName, contest.FormatConfig)
-	if err != nil {
-		http.Error(w, "invalid contest format: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// A submission carries the problem's UUID; the board reads the frozen count
-	// back with the letter it already has in hand. Translate once, here, or the
-	// two identifiers never meet and every cell reports zero pending.
-	problemIndexByID := make(map[string]string, len(problems))
-	for _, p := range problems {
-		problemIndexByID[p.ProblemID] = p.Index
-	}
-
-	type userProblemKey struct {
-		UserID    string
-		ProblemID string
-	}
-	type userProblemLetterKey struct {
-		UserID string
-		Letter string
-	}
-	submissionsByUserProblem := make(map[userProblemKey][]format.Submission)
-	frozenSubmissionsByUserProblem := make(map[userProblemLetterKey]int)
-
-	for _, row := range rows {
-		key := userProblemKey{UserID: row.UserID, ProblemID: row.ProblemID}
-		if frozen && !isJudge && beforeTime != nil && row.CreatedAt.After(*beforeTime) {
-			frozenKey := userProblemLetterKey{UserID: row.UserID, Letter: problemIndexByID[row.ProblemID]}
-			frozenSubmissionsByUserProblem[frozenKey]++
-			continue
-		}
-		sub := format.Submission{
-			ID:        "",
-			UserID:    row.UserID,
-			ProblemID: row.ProblemID,
-			Status:    strings.ToUpper(row.Status),
-			Score:     float64(row.Score),
-			CreatedAt: row.CreatedAt,
-		}
-		submissionsByUserProblem[key] = append(submissionsByUserProblem[key], sub)
-	}
-
-	formatProblems := make([]format.Problem, len(problems))
-	for i, p := range problems {
-		formatProblems[i] = format.Problem{
-			ID:    p.ProblemID,
-			Index: p.Index,
-		}
-	}
-
-	// One lookup for the whole page: a generated onsite account is labelled with
-	// the team it was minted for, not its throwaway username. Missing keys fall
-	// back to the username below.
+	// One lookup per page for each half of a row's label: the handle from the
+	// users row, the team from the onsite batch row. The board used to make one
+	// GetUsername query per participant — 500 round trips on a full standings
+	// page — and a failed username lookup is logged rather than fatal, because
+	// the rows still render with the display label and a blank handle.
 	displayNames, _ := h.store.GetDisplayNames(r.Context(), contest.ID, participants)
-
-	// The other half of that page-wide lookup: the usernames themselves. Read in
-	// one query rather than one per participant, which on a 500-entry board was
-	// 500 round trips for the labels alone. A failed lookup is not fatal here —
-	// the rows still render with the display label and a blank handle, which is
-	// what the single-row call produced anyway — so the error is logged and the
-	// map is left empty.
 	usernames, err := h.store.GetUsernames(r.Context(), participants)
 	if err != nil {
 		slog.Warn("scoreboard usernames", "contest_id", contest.ID, "error", err)
@@ -1068,113 +991,38 @@ func (h *ContestHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 	// the order here and on the full scoreboard — the two read the same function.
 	adjustments, _ := h.adjustmentsFor(r, contest.ID)
 
-	participantsScores := make([]format.ParticipantScore, 0, len(participants))
-	// Participants carrying a correction, so the row can be marked and a reader
-	// knows the number they see is not purely the judge's output.
-	adjustedUsers := make(map[string]model.AdjustmentTotals)
-	for _, uid := range participants {
-		uname := usernames[uid]
-		ps := format.ParticipantScore{
-			UserID:   uid,
-			Username: uname,
-			Problems: make([]format.ProblemResult, 0, len(problems)),
-		}
-
-		for _, problem := range formatProblems {
-			key := userProblemKey{UserID: uid, ProblemID: problem.ID}
-			subs := submissionsByUserProblem[key]
-
-			ctx := format.ScoringContext{
-				ContestID:           contest.ID,
-				ContestDuration:     contest.EndTime.Sub(contest.StartTime),
-				SubmissionStartTime: contest.StartTime,
-				Problem:             problem,
-				Submissions:         subs,
-				FormatConfig:        contest.FormatConfig,
-			}
-
-			result, err := contestFormat.ScoreProblem(ctx)
-			if err != nil {
-				http.Error(w, "scoring error: "+err.Error(), http.StatusInternalServerError)
-				return
-			}
-
-			ps.Problems = append(ps.Problems, result)
-			if result.Solved {
-				ps.TotalSolved++
-			}
-			ps.TotalScore += result.Score
-			ps.TotalPenalty += result.Penalty
-		}
-
-		// Layer the human correction over the computed totals. The submissions
-		// keep the verdicts they earned; this is a separate, reasoned delta, so
-		// the round stays reproducible and the correction stays visible.
-		if adj, ok := adjustments[uid]; ok && !adj.IsZero() {
-			ps.TotalScore += float64(adj.PointDelta)
-			ps.TotalSolved += adj.SolvedDelta
-			ps.TotalPenalty += adj.PenaltyDelta
-			// TotalSolved is a count of problems; a correction can never push it
-			// below zero, and a negative count would rank better than solving
-			// nothing.
-			if ps.TotalSolved < 0 {
-				ps.TotalSolved = 0
-			}
-			if ps.TotalPenalty < 0 {
-				ps.TotalPenalty = 0
-			}
-			adjustedUsers[uid] = adj
-		}
-
-		participantsScores = append(participantsScores, ps)
+	fmtName := contest.Format
+	if fmtName == "" {
+		fmtName = "acm"
 	}
 
-	ranks := contestFormat.RankParticipants(participantsScores)
-
-	type Entry struct {
-		Rank         int                            `json:"rank"`
-		UserID       string                         `json:"user_id"`
-		Username     string                         `json:"username"`
-		TeamName     string                         `json:"team_name,omitempty"`
-		Institution  string                         `json:"institution,omitempty"`
-		TotalSolved  int                            `json:"total_solved"`
-		TotalPenalty int                            `json:"total_penalty"`
-		TotalScore   int                            `json:"total_score"`
-		Problems     map[string]model.ProblemResult `json:"problems"`
-		// Set when a judge corrected this participant's standing: the deltas that
-		// were applied, so the scoreboard can mark the row as adjusted.
-		Adjustment *model.AdjustmentTotals `json:"adjustment,omitempty"`
+	// The freeze window, the bucketing, the scoring, the correction layering and
+	// the ranking all live in format.BuildBoard. They were inline here and had no
+	// test that could reach them without a database; they are pure functions of
+	// their inputs now, and board_test.go covers the freeze and the corrections.
+	board, err := format.BuildBoard(format.BoardInput{
+		ContestID:      contest.ID,
+		StartTime:      contest.StartTime,
+		EndTime:        contest.EndTime,
+		FormatName:     fmtName,
+		FormatConfig:   contest.FormatConfig,
+		Problems:       problems,
+		Rows:           rows,
+		Participants:   participants,
+		Usernames:      usernames,
+		DisplayNames:   displayNames,
+		FreezeTime:     contest.FreezeTime,
+		Now:            time.Now(),
+		ViewPastFreeze: isJudge,
+		Corrections:    adjustments,
+	})
+	if err != nil {
+		http.Error(w, "invalid contest format: "+err.Error(), http.StatusInternalServerError)
+		return
 	}
 
-	entries := make([]*Entry, len(ranks))
-	for i, rank := range ranks {
-		probMap := make(map[string]model.ProblemResult)
-		for _, pResult := range rank.Score.Problems {
-			key := userProblemLetterKey{UserID: rank.Score.UserID, Letter: pResult.ProblemIndex}
-			pending := frozenSubmissionsByUserProblem[key]
-
-			probMap[pResult.ProblemIndex] = model.ProblemResult{
-				Solved:   pResult.Solved,
-				Attempts: pResult.Attempts,
-				Time:     pResult.Penalty,
-				Score:    int(pResult.Score),
-				Pending:  pending,
-			}
-		}
-
-		entries[i] = &Entry{
-			Rank:         rank.Position,
-			UserID:       rank.Score.UserID,
-			Username:     rank.Score.Username,
-			TeamName:     displayNames[rank.Score.UserID].TeamName,
-			Institution:  displayNames[rank.Score.UserID].Institution,
-			TotalSolved:  rank.Score.TotalSolved,
-			TotalPenalty: rank.Score.TotalPenalty,
-			TotalScore:   int(rank.Score.TotalScore),
-			Problems:     probMap,
-			Adjustment:   adjustmentFor(adjustedUsers, rank.Score.UserID),
-		}
-	}
+	entries := board.Entries
+	frozen := board.Frozen
 
 	// Pagination
 	totalEntries := len(entries)
