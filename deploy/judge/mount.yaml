@@ -94,11 +94,20 @@ mount:
   - type: bind
     source: /dev/full
     target: /dev/full
-  # work dir
+  # Work dir. Every command starts in /w, and copyIn materialises the test input
+  # plus the compiled artifact here — so this is a hard cap on test-data size,
+  # independent of the problem's memory limit. At 128m a large input file failed
+  # the run even when the memory limit was generous. 512m matches the largest
+  # problem we support (2 GB of memory) with room for a multi-hundred-MB input.
+  #
+  # RAM COST: tmpfs pages are resident host memory, not disk. These two mounts can
+  # hold up to JUDGE_CONCURRENCY × (512m + 128m) at once — 1.25 GB at concurrency
+  # 2. That figure is part of the host memory budget; do not raise it without
+  # lowering JUDGE_CONCURRENCY or JUDGE_MAX_JUDGMENT_MEM_MB to compensate.
   - type: tmpfs
     target: /w
-    data: size=128m,nr_inodes=4k
-  # tmp dir
+    data: size=512m,nr_inodes=16k
+  # tmp dir (HOME for compilers; java/rust scratch)
   - type: tmpfs
     target: /tmp
     data: size=128m,nr_inodes=4k

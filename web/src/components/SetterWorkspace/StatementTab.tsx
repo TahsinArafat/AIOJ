@@ -117,10 +117,13 @@ export default function StatementTab({
           <label className="block text-xs font-semibold text-muted uppercase mb-1">Memory Limit (KB)</label>
           <input aria-label="Memory Limit (KB)"
             type="number"
+            min={1}
+            max={2097152}
             value={formState.memoryLimit}
             onChange={e => onUpdate('memoryLimit', Number(e.target.value))}
             className="w-full border border-hairline-strong rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)] bg-surface text-ink"
           />
+          <p className="mt-1 text-xs text-muted-soft">Max 2097152 KB (2 GiB). Multiplied per language at judge time — Java and Python count double.</p>
         </div>
       </div>
 

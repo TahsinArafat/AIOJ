@@ -56,6 +56,36 @@ services:
     # from the backend/worker services on the compose network.
     expose:
       - "5050"
+    environment:
+      # File store MUST NOT live on /dev/shm. go-judge defaults ES_DIR to
+      # /dev/shm/go-judge, which Docker caps at 64 MB of tmpfs. Every judgment
+      # caches a compiled artifact there (CopyOutCached) and AIOJ never deletes
+      # them, so after ~60-120 submissions the store filled and every subsequent
+      # copyOut died with:
+      #
+      #   copyout: failed to copy content for "spj": write
+      #   /dev/shm/go-judge/UCZEIFWP: no space left on device
+      #
+      # On disk a leak costs disk instead of RAM. /dev/shm is tmpfs, so leaked
+      # artifacts there permanently hold host memory.
+      ES_DIR: /var/lib/go-judge
+      # MANDATORY, not optional: go-judge only installs its shutdown cleanup
+      # (newFileStore's cleanUp -> os.RemoveAll) when ES_DIR is left at its
+      # default. Setting ES_DIR explicitly makes this TTL the ONLY reclamation
+      # path, so without it the store grows forever. It is also why restarting
+      # the container "fixed" a full store — restart is the one thing that ever
+      # ran that cleanup.
+      #
+      # Must exceed JUDGE_JUDGMENT_TIMEOUT_SECONDS (600s) or a long judgment
+      # loses its artifact mid-run. 20m also clears DefaultStaleClaimAfter (15m).
+      ES_FILE_TIMEOUT: 20m
+    volumes:
+      - judgedata:/var/lib/go-judge
+    # go-judge no longer stores files here, but the sandbox still uses shm.
+    # 128m is headroom, not a limit on judged code — problem memory limits are
+    # enforced per-sandbox by cgroups and are unrelated to this value.
+    shm_size: 128m
+
     # /version is served before the optional auth-token middleware and executes
     # nothing, so it answers "is this server responsive" without consuming a
     # sandbox slot. A `go-judge --version` probe would fork a fresh process and
@@ -215,6 +245,10 @@ services:
       DB_USER: aioj
       DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set in .env}
       JUDGE_ENDPOINT: http://judge:5050
+      # Sandbox slots. Each slot may hold a full problem memory limit, so this is
+      # the multiplier on host RAM: concurrency 2 with 2 GB problems means up to
+      # 4 GB of live sandboxes. 2 is the safe default on a shared 8 GB host.
+      JUDGE_CONCURRENCY: ${JUDGE_CONCURRENCY:-2}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env (openssl rand -hex 32)}
       AIOJ_ENV: ${AIOJ_ENV:-production}
       REDIS_URL: ${REDIS_URL:-redis:6379}
@@ -227,6 +261,18 @@ services:
       # another slot is released. Set to 0 to disable each check individually.
       JUDGE_MIN_FREE_MEM_MB: ${JUDGE_MIN_FREE_MEM_MB:-512}
       JUDGE_MAX_LOAD_PER_CPU: ${JUDGE_MAX_LOAD_PER_CPU:-1.5}
+      # Admission is requirement-aware, not just a flat floor: a judgment is
+      # dispatched only when free RAM covers its own limit (after the language
+      # multiplier) plus this headroom. The old flat 512 MB floor would admit a
+      # 2 GB judgment into 600 MB of free memory.
+      JUDGE_MEM_HEADROOM_MB: ${JUDGE_MEM_HEADROOM_MB:-256}
+      # Largest per-judgment requirement this host will attempt. A submission
+      # above it is failed immediately with an explanatory verdict instead of
+      # waiting in the queue for memory that can never be free. Must exceed the
+      # biggest problem limit you support AFTER the language multiplier (Java's
+      # is 2.0). 3072 admits a 2 GB problem and rejects a 2 GB Java one, which
+      # would need 4096 — use a language_limits memory_limit_kb override for that.
+      JUDGE_MAX_JUDGMENT_MEM_MB: ${JUDGE_MAX_JUDGMENT_MEM_MB:-3072}
       # Bound one submission so a wedged sandbox cannot hold a judge slot
       # indefinitely, and serve the probe the healthcheck below calls.
       JUDGE_JUDGMENT_TIMEOUT_SECONDS: ${JUDGE_JUDGMENT_TIMEOUT_SECONDS:-600}
@@ -254,13 +300,12 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
-    # Judge-worker compiles and runs code. Memory budget per worker:
-    #   - C/C++: ~50–100 MB per concurrent slot
-    #   - Python/Node: ~50–80 MB
-    #   - Java (javac + JVM): ~300–500 MB per concurrent slot ← the spike
-    #   - Rust (rustc): ~200–400 MB during compilation
-    # With concurrency=4 and all Java: 4 × 500 MB = 2 GB worst-case.
-    # Set concurrency=2 (JUDGE_CONCURRENCY env) on servers with ≤4 GB RAM.
+    # This limit bounds the judge-worker PROCESS, which is an HTTP client that
+    # talks to go-judge over the sandbox network. It does NOT bound judged code:
+    # compilation and execution happen inside the `judge` container, where
+    # go-judge creates a cgroup per sandbox. Sizing judged memory is therefore a
+    # question of JUDGE_CONCURRENCY × the per-sandbox limit, and it is enforced by
+    # JUDGE_MAX_JUDGMENT_MEM_MB plus the admission gate above — not by this value.
     mem_limit: 2g
     restart: unless-stopped
 
@@ -407,6 +452,7 @@ volumes:
   pgdata:
   redisdata:
   testdata:
+  judgedata:
   promdata:
   grafdata:
   caddy_data:

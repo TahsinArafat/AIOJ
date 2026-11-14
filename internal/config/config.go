@@ -214,6 +214,19 @@ type JudgeConfig struct {
 	// ratio. 1.5 means "allow 50% over-subscription before pausing".
 	// Set via JUDGE_MAX_LOAD_PER_CPU.
 	MaxLoadPerCPU float64 `yaml:"max_load_per_cpu"`
+	// MemHeadroomMB is slack kept free on top of a submission's own memory
+	// requirement before it is admitted. The requirement is only what the
+	// sandbox may allocate; the compile step, the judge process and the rest of
+	// the stack need room too. Set via JUDGE_MEM_HEADROOM_MB.
+	MemHeadroomMB uint64 `yaml:"mem_headroom_mb"`
+	// MaxJudgmentMemMB is the largest per-judgment memory requirement this host
+	// will attempt. A submission above it is failed immediately with an
+	// explanatory verdict rather than queued forever, because no amount of freed
+	// memory will ever satisfy it. Must exceed the largest problem memory limit
+	// you intend to support, after the language multiplier (Java's is 2.0, so a
+	// 2 GB problem in Java needs 4096 here). 0 means the default, 3072.
+	// Set via JUDGE_MAX_JUDGMENT_MEM_MB.
+	MaxJudgmentMemMB uint64 `yaml:"max_judgment_mem_mb"`
 	// JudgmentTimeoutSeconds bounds one submission end to end, across every test
 	// case. It is the backstop that stops a wedged sandbox from holding a judge
 	// slot indefinitely. 0 means the package default (10 minutes). Set via
@@ -335,6 +348,23 @@ func Load(path string) (*Config, error) {
 	if v := os.Getenv("JUDGE_MAX_LOAD_PER_CPU"); v != "" {
 		f, _ := strconv.ParseFloat(v, 64)
 		cfg.Judge.MaxLoadPerCPU = f
+	}
+	if v := os.Getenv("JUDGE_MEM_HEADROOM_MB"); v != "" {
+		n, _ := strconv.ParseUint(v, 10, 64)
+		cfg.Judge.MemHeadroomMB = n
+	}
+	if v := os.Getenv("JUDGE_MAX_JUDGMENT_MEM_MB"); v != "" {
+		n, _ := strconv.ParseUint(v, 10, 64)
+		cfg.Judge.MaxJudgmentMemMB = n
+	}
+	// Defaults for the memory-aware admission knobs. These are deliberately on
+	// out of the box: without a budget, a submission larger than the host can
+	// ever satisfy waits in the queue forever instead of failing with a message.
+	if cfg.Judge.MemHeadroomMB == 0 {
+		cfg.Judge.MemHeadroomMB = 256
+	}
+	if cfg.Judge.MaxJudgmentMemMB == 0 {
+		cfg.Judge.MaxJudgmentMemMB = 3072
 	}
 	if v := os.Getenv("JUDGE_JUDGMENT_TIMEOUT_SECONDS"); v != "" {
 		cfg.Judge.JudgmentTimeoutSeconds = atoi(v)

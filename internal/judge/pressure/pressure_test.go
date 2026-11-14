@@ -163,3 +163,151 @@ func (c *callCountSampler) Sample() (pressure.Snapshot, error) {
 	c.idx++
 	return s, nil
 }
+
+func TestAdmit_ImmediateWhenEnoughMemory(t *testing.T) {
+	cases := []struct {
+		name       string
+		freeMB     uint64
+		needBytes  uint64
+		reserved   uint64
+		headroomMB uint64
+		wantBlock  bool
+	}{
+		{
+			name: "ample memory", freeMB: 4096, needBytes: 512 << 20,
+			wantBlock: false,
+		},
+		{
+			// The exact bug this replaced: a flat 512 MB floor says "go" while
+			// the judgment is about to ask for 2 GB.
+			name: "big judgment into small free memory", freeMB: 600, needBytes: 2048 << 20,
+			wantBlock: true,
+		},
+		{
+			name: "exactly enough", freeMB: 2048, needBytes: 2048 << 20,
+			wantBlock: false,
+		},
+		{
+			name: "one MB short", freeMB: 2047, needBytes: 2048 << 20,
+			wantBlock: true,
+		},
+		{
+			// Reservations from in-flight judgments must be subtracted, or two
+			// 2 GB judgments are admitted on one pool of memory.
+			name: "reserved by in-flight judgment", freeMB: 2048, needBytes: 2048 << 20,
+			reserved: 1536 << 20, wantBlock: true,
+		},
+		{
+			// need=0 means "requirement unknown"; it must never block on the
+			// memory dimension, even when reservations exceed free RAM.
+			name: "unknown requirement never blocks on memory", freeMB: 1024, needBytes: 0,
+			reserved: 4096 << 20, wantBlock: false,
+		},
+		{
+			name: "headroom pushes over the line", freeMB: 2300, needBytes: 2048 << 20,
+			headroomMB: 512, wantBlock: true,
+		},
+		{
+			name: "headroom fits", freeMB: 4096, needBytes: 2048 << 20,
+			headroomMB: 512, wantBlock: false,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			gate := pressure.NewGate(
+				&fakeSampler{snap: pressure.Snapshot{FreeMemMB: tc.freeMB}},
+				pressure.Thresholds{MinFreeMemMB: 512, MemHeadroomMB: tc.headroomMB},
+			)
+			ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
+			defer cancel()
+
+			start := time.Now()
+			err := gate.Admit(ctx, tc.needBytes, tc.reserved)
+			elapsed := time.Since(start)
+
+			if tc.wantBlock {
+				if err == nil {
+					t.Fatal("expected Admit to block until context cancellation, got nil")
+				}
+				if elapsed < 100*time.Millisecond {
+					t.Fatalf("Admit returned too quickly (%v); expected it to wait", elapsed)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Admit returned error when it should admit: %v", err)
+			}
+		})
+	}
+}
+
+func TestAdmit_RespectsFlatFloorIndependently(t *testing.T) {
+	// A tiny judgment must still wait when the server is below the floor: the
+	// floor protects the whole stack, not just this submission.
+	gate := pressure.NewGate(
+		&fakeSampler{snap: pressure.Snapshot{FreeMemMB: 100}},
+		pressure.Thresholds{MinFreeMemMB: 512},
+	)
+	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
+	defer cancel()
+	if err := gate.Admit(ctx, 1<<20, 0); err == nil {
+		t.Fatal("Admit must honor MinFreeMemMB even for a tiny judgment")
+	}
+}
+
+func TestAdmit_CPUThresholdApplies(t *testing.T) {
+	gate := pressure.NewGate(
+		&fakeSampler{snap: pressure.Snapshot{FreeMemMB: ^uint64(0), LoadAvg1: 10000}},
+		pressure.Thresholds{MaxLoadPerCPU: 1.5},
+	)
+	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
+	defer cancel()
+	if err := gate.Admit(ctx, 1<<20, 0); err == nil {
+		t.Fatal("Admit must block when the CPU load threshold is exceeded")
+	}
+}
+
+func TestAdmit_DisabledGateIsTransparent(t *testing.T) {
+	gate := pressure.NewGate(
+		&fakeSampler{snap: pressure.Snapshot{FreeMemMB: 0, LoadAvg1: 999}},
+		pressure.Thresholds{},
+	)
+	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
+	defer cancel()
+	if err := gate.Admit(ctx, 4096<<20, 0); err != nil {
+		t.Fatalf("disabled gate must admit immediately, got %v", err)
+	}
+}
+
+func TestAdmit_FailOpenOnSamplerError(t *testing.T) {
+	gate := pressure.NewGate(
+		&fakeSampler{err: context.DeadlineExceeded},
+		pressure.Thresholds{MinFreeMemMB: 512},
+	)
+	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
+	defer cancel()
+	if err := gate.Admit(ctx, 4096<<20, 0); err != nil {
+		t.Fatalf("sampler error must fail open, got %v", err)
+	}
+}
+
+func TestAdmit_ResumesWhenMemoryFrees(t *testing.T) {
+	callCount := 0
+	sampler := &callCountSampler{
+		responses: []pressure.Snapshot{
+			{FreeMemMB: 256},  // too small for a 2 GB judgment
+			{FreeMemMB: 4096}, // memory freed
+			{FreeMemMB: 4096},
+		},
+		callCount: &callCount,
+	}
+	gate := pressure.NewGate(sampler, pressure.Thresholds{MinFreeMemMB: 128})
+	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
+	defer cancel()
+	if err := gate.Admit(ctx, 2048<<20, 0); err != nil {
+		t.Fatalf("Admit should have resumed once memory freed: %v", err)
+	}
+	if callCount < 2 {
+		t.Fatalf("expected ≥ 2 samples, got %d", callCount)
+	}
+}

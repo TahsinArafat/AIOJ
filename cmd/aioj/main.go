@@ -160,13 +160,25 @@ Restore from the pre-deploy dump if the schema is unrecoverable.`, err)
 	pressureThresholds := pressure.Thresholds{
 		MinFreeMemMB:  cfg.Judge.MinFreeMemMB,
 		MaxLoadPerCPU: cfg.Judge.MaxLoadPerCPU,
+		MemHeadroomMB: cfg.Judge.MemHeadroomMB,
 	}
 	if !pressureThresholds.Disabled() {
 		workerPool.WithPressureGate(pressure.DefaultGate(pressureThresholds))
 		slog.Info("judge pressure gate enabled",
 			"min_free_mem_mb", pressureThresholds.MinFreeMemMB,
 			"max_load_per_cpu", pressureThresholds.MaxLoadPerCPU,
+			"mem_headroom_mb", pressureThresholds.MemHeadroomMB,
 		)
+	}
+
+	// Cap what a single judgment may require. Without this a submission bigger
+	// than the host can ever satisfy would sit in the queue indefinitely, since
+	// the gate would keep waiting for memory that never becomes free.
+	if cfg.Judge.MaxJudgmentMemMB > 0 {
+		budget := cfg.Judge.MaxJudgmentMemMB << 20
+		workerPool.WithMaxJudgmentMemory(budget)
+		slog.Info("judge per-judgment memory budget configured",
+			"max_judgment_mem_mb", cfg.Judge.MaxJudgmentMemMB)
 	}
 
 	// Bound one submission so a wedged sandbox cannot hold a judge slot forever.

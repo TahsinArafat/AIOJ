@@ -35,6 +35,18 @@ judge:
   endpoint: "http://localhost:5050"
   concurrency: 4
   max_code_size: 262144
+  # Pressure gate + requirement-aware admission. Both thresholds at 0 disables
+  # the gate entirely; compose sets sane values for production.
+  #   min_free_mem_mb:   flat floor; pause when MemAvailable drops below it.
+  #   max_load_per_cpu:  pause when (1-min loadavg / numCPU) exceeds this ratio.
+  #   mem_headroom_mb:   slack required on top of a judgment's own limit.
+  #   max_judgment_mem_mb: largest per-judgment requirement to attempt, AFTER the
+  #     language multiplier (Java's is 2.0). A submission above it fails with an
+  #     explanatory verdict instead of queueing forever. 0 means 3072.
+  min_free_mem_mb: 512
+  max_load_per_cpu: 1.5
+  mem_headroom_mb: 256
+  max_judgment_mem_mb: 3072
 redis:
   url: "localhost:6379"       # leave empty to use in-memory judge queue
 ai:

@@ -209,6 +209,27 @@ func defaultLimit(v, fallback int) int {
 	return fallback
 }
 
+// maxProblemMemoryKB is the largest memory limit a problem may carry: 2 GiB.
+//
+// defaultLimit only guards the low end, so before this an admin (or an API
+// client) could store any value at all. That value is handed straight to the
+// sandbox as a cgroup memory limit, so an oversized one asks the host for RAM it
+// does not have — the judge then either fails the submission or takes the whole
+// machine down with it. The judge additionally rejects anything above its own
+// JUDGE_MAX_JUDGMENT_MEM_MB budget, but a problem should not be storable in a
+// shape that can never be judged.
+const maxProblemMemoryKB = 2097152 // 2 GiB
+
+// memoryLimitError reports why a memory limit is unusable, or "" when it is fine.
+// Returns "" for non-positive values: those are the "input cleared mid-edit" case
+// defaultLimit already handles, not a deliberate oversized request.
+func memoryLimitError(kb int) string {
+	if kb > maxProblemMemoryKB {
+		return "memory_limit must be at most 2097152 KB (2 GiB)"
+	}
+	return ""
+}
+
 func (h *ProblemHandler) Update(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetUserClaims(r)
 	if claims == nil {
@@ -258,6 +279,10 @@ func (h *ProblemHandler) Update(w http.ResponseWriter, r *http.Request) {
 	// defaulting them too keeps the two paths from disagreeing.
 	p.TimeLimit = defaultLimit(req.TimeLimit, 1000)
 	p.MemoryLimit = defaultLimit(req.MemoryLimit, 262144)
+	if msg := memoryLimitError(p.MemoryLimit); msg != "" {
+		http.Error(w, msg, http.StatusBadRequest)
+		return
+	}
 	p.Difficulty = req.Difficulty
 	p.Rating = max(req.Rating, 0)
 	p.InputFormat = req.InputFormat
@@ -475,6 +500,10 @@ func (h *ProblemHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	req.TimeLimit = defaultLimit(req.TimeLimit, 1000)
 	req.MemoryLimit = defaultLimit(req.MemoryLimit, 262144)
+	if msg := memoryLimitError(req.MemoryLimit); msg != "" {
+		http.Error(w, msg, http.StatusBadRequest)
+		return
+	}
 	if req.Difficulty == "" {
 		req.Difficulty = "easy"
 	}

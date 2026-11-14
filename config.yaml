@@ -35,6 +35,20 @@ judge:
   #   1.5 = allow 50% run-queue over-subscription before pausing.
   #   Set via env: JUDGE_MAX_LOAD_PER_CPU
   max_load_per_cpu: 0
+  #
+  # mem_headroom_mb: slack required on top of a judgment's own memory limit
+  #   before it is admitted. The limit describes what the sandbox may allocate;
+  #   the compile step and the rest of the stack need room too.
+  #   Set via env: JUDGE_MEM_HEADROOM_MB (default 256)
+  mem_headroom_mb: 256
+  #
+  # max_judgment_mem_mb: largest per-judgment memory requirement this host will
+  #   attempt. A submission above it is failed immediately with an explanatory
+  #   verdict rather than queued forever, because waiting cannot help. Must
+  #   exceed the biggest problem limit you support AFTER the language multiplier
+  #   (Java's is 2.0, so a 2 GB Java problem needs 4096 here). 0 means 3072.
+  #   Set via env: JUDGE_MAX_JUDGMENT_MEM_MB (default 3072)
+  max_judgment_mem_mb: 3072
 redis:
   url: "localhost:6379"
 ai:

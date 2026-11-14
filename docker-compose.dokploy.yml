@@ -100,6 +100,36 @@ services:
       - sandbox
     expose:
       - "5050"
+    environment:
+      # File store MUST NOT live on /dev/shm. go-judge defaults ES_DIR to
+      # /dev/shm/go-judge, which Docker caps at 64 MB of tmpfs. Every judgment
+      # caches a compiled artifact there (CopyOutCached) and AIOJ never deletes
+      # them, so after ~60-120 submissions the store filled and every subsequent
+      # copyOut died with:
+      #
+      #   copyout: failed to copy content for "spj": write
+      #   /dev/shm/go-judge/UCZEIFWP: no space left on device
+      #
+      # On disk a leak costs disk instead of RAM. /dev/shm is tmpfs, so leaked
+      # artifacts there permanently hold host memory.
+      ES_DIR: /var/lib/go-judge
+      # MANDATORY, not optional: go-judge only installs its shutdown cleanup
+      # (newFileStore's cleanUp -> os.RemoveAll) when ES_DIR is left at its
+      # default. Setting ES_DIR explicitly makes this TTL the ONLY reclamation
+      # path, so without it the store grows forever. It is also why restarting
+      # the container "fixed" a full store — restart is the one thing that ever
+      # ran that cleanup.
+      #
+      # Must exceed JUDGE_JUDGMENT_TIMEOUT_SECONDS (600s) or a long judgment
+      # loses its artifact mid-run. 20m also clears DefaultStaleClaimAfter (15m).
+      ES_FILE_TIMEOUT: 20m
+    volumes:
+      - judgedata:/var/lib/go-judge
+    # go-judge no longer stores files here, but the sandbox still uses shm.
+    # 128m is headroom, not a limit on judged code — problem memory limits are
+    # enforced per-sandbox by cgroups and are unrelated to this value.
+    shm_size: 128m
+
     # Without a healthcheck `restart: unless-stopped` can never fire: Docker only
     # restarts a container that has *exited*, and a wedged sandbox has not — it is
     # still running, just not answering. That is why a judge that stopped
@@ -226,6 +256,18 @@ services:
       JUDGE_CONCURRENCY: ${JUDGE_CONCURRENCY:-2}
       JUDGE_MIN_FREE_MEM_MB: ${JUDGE_MIN_FREE_MEM_MB:-512}
       JUDGE_MAX_LOAD_PER_CPU: ${JUDGE_MAX_LOAD_PER_CPU:-1.5}
+      # Admission is requirement-aware, not just a flat floor: a judgment is
+      # dispatched only when free RAM covers its own limit (after the language
+      # multiplier) plus this headroom. The old flat 512 MB floor would admit a
+      # 2 GB judgment into 600 MB of free memory.
+      JUDGE_MEM_HEADROOM_MB: ${JUDGE_MEM_HEADROOM_MB:-256}
+      # Largest per-judgment requirement this host will attempt. A submission
+      # above it is failed immediately with an explanatory verdict instead of
+      # waiting in the queue for memory that can never be free. Must exceed the
+      # biggest problem limit you support AFTER the language multiplier (Java's
+      # is 2.0). 3072 admits a 2 GB problem and rejects a 2 GB Java one, which
+      # would need 4096 — use a language_limits memory_limit_kb override for that.
+      JUDGE_MAX_JUDGMENT_MEM_MB: ${JUDGE_MAX_JUDGMENT_MEM_MB:-3072}
       # Bound one submission, so a wedged sandbox cannot hold a slot forever.
       JUDGE_JUDGMENT_TIMEOUT_SECONDS: ${JUDGE_JUDGMENT_TIMEOUT_SECONDS:-600}
       JUDGE_HEALTH_ADDR: ${JUDGE_HEALTH_ADDR:-:8081}
@@ -479,6 +521,7 @@ volumes:
   pgdata:
   redisdata:
   testdata:
+  judgedata:
   promdata:
   grafdata:
   backups:

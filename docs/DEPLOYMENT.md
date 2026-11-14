@@ -510,6 +510,68 @@ When deployed behind Caddy, Nginx, or NPM, only these ports should be open to th
 
 ---
 
+### Judge memory and disk sizing
+
+Two independent resources are at play, and confusing them is the usual source of
+"the judge ran out of space" reports.
+
+**1. Memory for judged code (cgroups).** Each sandbox gets the problem's memory
+limit, scaled by that language's multiplier from `lang/*.yaml`:
+
+| Language | Multiplier | 256 MB problem asks for | 2 GB problem asks for |
+|---|---|---|---|
+| C, C++, Rust, Clang | 1.0 | 256 MB | 2048 MB |
+| Node, JavaScript, C# | 1.5 | 384 MB | 3072 MB |
+| Java, Python, PyPy | 2.0 | 512 MB | **4096 MB** |
+
+The live requirement is `problem.memory_limit (KB) × multiplier × 1024` bytes,
+or the per-language override from `problem_language_limits.memory_limit_kb`,
+which **replaces the base before the multiplier is applied**.
+
+**2. Disk for the judge's file store.** go-judge caches every compiled artifact
+in `ES_DIR` and AIOJ never deletes them, so this is reclaimed by TTL
+(`ES_FILE_TIMEOUT`, 20 minutes) alone. It must be a disk volume — the default is
+`/dev/shm/go-judge`, which is tmpfs, so leaked artifacts consume **RAM** and fill
+at 64 MB.
+
+#### Sizing a shared 8 GB host
+
+```
+ 8.0 GB  host RAM
+-1.5 GB  postgres + redis + backend + frontend + judge-worker
+-0.5 GB  OS + dockerd
+-1.2 GB  vJudge browser services (only if the `vjudge` profile is enabled)
+------
+ ~4.8 GB  available for sandboxes  (~6.0 GB with the browser profile off)
+```
+
+Sandbox memory is bounded by three things that must agree:
+
+| Setting | Value | What it does |
+|---|---|---|
+| `JUDGE_CONCURRENCY` | 2 | Slots. Each may hold a full problem limit. |
+| `JUDGE_MAX_JUDGMENT_MEM_MB` | 3072 | Largest single requirement attempted. Above this the submission fails immediately with an explanatory verdict instead of queueing forever. |
+| `JUDGE_MEM_HEADROOM_MB` | 256 | Slack required on top of the requirement before dispatch. |
+
+Also count the sandbox scratch: `/w` (512 MB) and `/tmp` (128 MB) in
+`deploy/judge/mount.yaml` are tmpfs, so at concurrency 2 they can hold up to
+1.25 GB of host RAM. Raising either mount without lowering concurrency
+over-commits the host.
+
+**Offering a 2 GB problem in Java.** A 2 GB problem in Java needs 4096 MB, over
+the 3072 MB budget, so it is rejected. Do **not** raise
+`JUDGE_MAX_JUDGMENT_MEM_MB` past what the host can actually hold. Instead give
+Java a smaller base in the `language_limits` table, which is applied *before* the
+multiplier:
+
+```
+memory_limit_kb = 1048576   →  1048576 × 2.0 = 2048 MB   ✅ fits a 3072 budget
+```
+
+The API rejects any problem `memory_limit` above `2097152` KB (2 GiB).
+
+---
+
 ### Troubleshooting
 
 | Problem | Likely Cause | Fix |
@@ -531,6 +593,8 @@ When deployed behind Caddy, Nginx, or NPM, only these ports should be open to th
 | `login form not found. CF blocked: True` | Cloudflare challenge page returned | Your proxy is not working. Codeforces sees your real (datacenter) IP. Get a residential proxy. |
 | `cf-submit error: crash: ... ImportError: geoip2 is required` | `cloakbrowser[geoip]` not installed | Reinstall: `pip install "cloakbrowser[geoip]" --break-system-packages` |
 | 32-bit C/C++ submits fail with `/usr/bin/ld: cannot find /lib32/libc.so.6` | The go-judge sandbox mount table does not expose `/lib32` | Rebuild the judge image: `docker compose build judge && docker compose up -d judge`. See [Sandbox Smoke Test](#sandbox-smoke-test). |
+| `copyout: failed to copy content for "spj": write /dev/shm/go-judge/…: no space left on device` | The judge's file store is exhausted. go-judge defaults it to `/dev/shm/go-judge` (64 MB of tmpfs), and every judgment caches a compiled artifact there that AIOJ never deletes. | Verify the fix is deployed: `docker exec $(docker ps -qf name=judge) sh -c 'echo $ES_DIR $ES_FILE_TIMEOUT'` must print `/var/lib/go-judge 20m`. Then `docker exec $(docker ps -qf name=judge) df -h /var/lib/go-judge` and `ls /var/lib/go-judge \| wc -l`. **Restarting the container only masks this** — restart is the one thing that ever ran go-judge's shutdown cleanup. See [Judge memory and disk sizing](#judge-memory-and-disk-sizing). |
+| Submission stuck on "Judging…" and never finishes | Its memory requirement exceeds `JUDGE_MAX_JUDGMENT_MEM_MB`, so admission can never be satisfied | The worker now fails these immediately with an explanatory System Error. If you still see a stuck row, check `docker compose logs judge-worker \| grep "memory budget"`. |
 | A language saved in admin#languages shows an empty compile command | A `LangConfig` that decodes the JSON body without matching field tags | Fixed in-tree; see `internal/judge/compiler/lang.go`. Use "Reset to Default" to restore the shipped config. |
 | Judge stops compiling, test cases stop running, the IDE hangs — restarting `judge` + `judge-worker` fixes it | A judgment held its slot indefinitely: nothing bounded a submission end to end, so a slow sandbox multiplied one 60s call per test case inside a single slot. With concurrency 2 × 1 worker, a few wedged jobs stalled the whole judge while both containers still looked healthy | Fixed in-tree (judgment deadline + health probes). Verify with [Judge Health](#judge-health) below. If it recurs the probe did not fire, which is a bug worth reporting rather than another restart. |
 | `judge-worker` restarts in a loop | The health probe trips faster than judgments finish | `docker compose logs judge-worker` will say "stalled judge worker". A judgment legitimately longer than `JUDGE_JUDGMENT_TIMEOUT_SECONDS` trips it — raise the timeout rather than disabling the probe. |

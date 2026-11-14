@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -21,6 +22,9 @@ import (
 // drainTimeout bounds how long Stop waits for in-flight judgments to finish.
 // Beyond it the process exits anyway; the reclaimer picks the rows back up.
 const drainTimeout = 30 * time.Second
+
+// megabyte is used to render memory figures in the verdict text an admin reads.
+const megabyte uint64 = 1 << 20
 
 // DefaultJudgmentTimeout is the overall budget for one submission, across every
 // test case and every sandbox call it needs.
@@ -69,6 +73,18 @@ type WorkerPool struct {
 	// gate holds dispatch when the host is under memory or CPU pressure.
 	// A nil gate (or disabled thresholds) means dispatch is always immediate.
 	gate *pressure.PressureGate
+
+	// reservedBytes is memory committed to judgments that have been admitted but
+	// whose sandbox has not allocated yet. The gate subtracts it from the free
+	// reading so two large judgments are not admitted on the strength of one
+	// pool of memory. Atomic because every slot goroutine updates it.
+	reservedBytes atomic.Int64
+
+	// maxJudgmentBytes is the largest per-judgment memory requirement this host
+	// will attempt. A submission above it is failed immediately instead of being
+	// queued: waiting cannot help, because no amount of freed memory will ever
+	// satisfy a requirement larger than the machine's budget.
+	maxJudgmentBytes uint64
 
 	// notifier pushes finished verdicts to subscribed browsers. Nil is valid.
 	notifier VerdictNotifier
@@ -125,6 +141,15 @@ func (wp *WorkerPool) WithPressureGate(g *pressure.PressureGate) *WorkerPool {
 	return wp
 }
 
+// WithMaxJudgmentMemory sets the largest per-judgment memory requirement the
+// host will attempt, in bytes. Non-zero is what makes an unsatisfiable
+// submission fail fast instead of waiting in the queue forever; zero disables
+// the check, which is the right behaviour only when the gate is also disabled.
+func (wp *WorkerPool) WithMaxJudgmentMemory(limit uint64) *WorkerPool {
+	wp.maxJudgmentBytes = limit
+	return wp
+}
+
 // WithNotifier attaches a verdict notifier so finished judgments are pushed to
 // the browser over the existing WebSocket instead of waiting for a poll.
 func (wp *WorkerPool) WithNotifier(n VerdictNotifier) *WorkerPool {
@@ -160,13 +185,43 @@ func (wp *WorkerPool) Start(ctx context.Context) {
 			continue
 		}
 
+		// Resolve how much RAM this judgment will ask the sandbox for *before*
+		// waiting on resources. The gate cannot judge "is there room" without
+		// knowing the size of what is coming; without this it only sees a flat
+		// free-memory floor and admits a 2 GB judgment into 600 MB.
+		//
+		// Skipped entirely when neither feature is configured, so a deployment
+		// with the gate off pays no extra reads per submission.
+		//
+		// An error here is not fatal: process() re-reads the submission and
+		// writes the real verdict, so a transient read failure falls back to the
+		// gate's flat floor rather than failing the submission twice.
+		var needBytes uint64
+		if wp.gate != nil || wp.maxJudgmentBytes > 0 {
+			var err error
+			needBytes, err = wp.requiredMemoryBytes(ctx, subID)
+			if err != nil {
+				slog.Warn("could not resolve judgment memory requirement; admitting on the flat floor",
+					"id", subID, "error", err)
+				needBytes = 0
+			}
+		}
+
+		// A requirement larger than this host's budget can never be satisfied, so
+		// waiting would park the submission in the queue forever. Fail it with a
+		// message an admin can act on instead.
+		if wp.maxJudgmentBytes > 0 && needBytes > wp.maxJudgmentBytes {
+			wp.rejectOversized(ctx, subID, needBytes)
+			continue
+		}
+
 		// Hold the job in-hand and wait until the server has enough free
 		// resources before dispatching it. The job has already been removed
 		// from the queue, so no other worker will pick it up. If the context
 		// is cancelled while we are waiting (graceful shutdown), re-enqueue
 		// the job so the reclaimer can pick it back up.
 		if wp.gate != nil {
-			if err := wp.gate.WaitUntilReady(ctx); err != nil {
+			if err := wp.gate.Admit(ctx, needBytes, uint64(wp.reservedBytes.Load())); err != nil {
 				// Context cancelled — put the submission back so it isn't lost.
 				if reqErr := wp.queue.Enqueue(ctx, subID, 0); reqErr != nil {
 					slog.Error("pressure: failed to re-enqueue submission after shutdown",
@@ -179,13 +234,15 @@ func (wp *WorkerPool) Start(ctx context.Context) {
 		select {
 		case wp.sem <- struct{}{}:
 			wp.wg.Add(1)
-			go func(id string) {
+			wp.reservedBytes.Add(int64(needBytes))
+			go func(id string, reserved uint64) {
 				defer func() {
+					wp.reservedBytes.Add(-int64(reserved))
 					<-wp.sem
 					wp.wg.Done()
 				}()
 				wp.process(ctx, id)
-			}(subID)
+			}(subID, needBytes)
 		case <-ctx.Done():
 			return
 		}
@@ -430,6 +487,82 @@ func (wp *WorkerPool) runAndFinalize(ctx context.Context, sub *model.Submission,
 		return
 	}
 	slog.Info("judged", "id", sub.ID, "verdict", out.FinalStatus)
+}
+
+// requiredMemoryBytes resolves what the sandbox will be asked to allocate for
+// this submission, in bytes.
+//
+// It mirrors the conversion the judge path applies (see judge()): the problem's
+// KB limit, replaced by any per-language override, then scaled by that
+// language's memory multiplier. The multiplier is why this cannot simply read
+// the problem row — Java's is 2.0, so a 2 GB problem needs a 4 GB budget.
+//
+// A submission whose language is unknown resolves to 0: judge() fails it as a
+// compile error before any sandbox runs, so there is nothing to reserve.
+func (wp *WorkerPool) requiredMemoryBytes(ctx context.Context, submissionID string) (uint64, error) {
+	sub, err := wp.subStore.GetByID(ctx, submissionID)
+	if err != nil {
+		return 0, err
+	}
+	if sub == nil {
+		return 0, fmt.Errorf("submission %s not found", submissionID)
+	}
+	// Output-only submissions are checked by comparing files; they never enter a
+	// sandbox, so reserving the problem's memory limit for one would idle a slot's
+	// worth of RAM for nothing.
+	if sub.SubmissionType == model.SubmissionTypeOutput {
+		return 0, nil
+	}
+	prob, err := wp.probStore.GetByID(ctx, sub.ProblemID)
+	if err != nil {
+		return 0, err
+	}
+	if prob == nil {
+		return 0, fmt.Errorf("problem %s not found", sub.ProblemID)
+	}
+	// The judge path folds these in before computing the limit; do the same here
+	// or the reservation is computed from a limit that will not be applied.
+	if wp.langLimitStore != nil {
+		if limits, lerr := wp.langLimitStore.GetByProblem(ctx, prob.ID); lerr == nil {
+			for _, ll := range limits {
+				if ll != nil {
+					prob.LanguageLimits = append(prob.LanguageLimits, *ll)
+				}
+			}
+		}
+	}
+	cfg := wp.loadLangs()[sub.Language]
+	if cfg == nil {
+		return 0, nil
+	}
+	_, memoryLimitKB := getEffectiveLimits(prob, sub.Language)
+	return uint64(float64(memoryLimitKB)*cfg.MemoryLimitMultiplier) * 1024, nil
+}
+
+// rejectOversized fails a submission whose memory requirement exceeds this
+// host's per-judgment budget.
+//
+// This is the alternative to blocking in the gate: a requirement larger than the
+// budget can never be met, so waiting would park the row in the queue forever
+// with the user staring at "Judging...". The verdict names the three ways an
+// admin can resolve it.
+func (wp *WorkerPool) rejectOversized(ctx context.Context, submissionID string, needBytes uint64) {
+	claimToken := uuid.NewString()
+	claimed, err := wp.subStore.ClaimPending(ctx, submissionID, claimToken)
+	if err != nil {
+		slog.Error("claim oversized submission failed", "id", submissionID, "error", err)
+		return
+	}
+	if !claimed {
+		return
+	}
+	slog.Error("rejecting submission above the judge memory budget",
+		"id", submissionID, "need_mb", needBytes/megabyte, "budget_mb", wp.maxJudgmentBytes/megabyte)
+	detail := fmt.Sprintf(
+		"memory limit too large for this judge: the submission needs %d MB but the per-judgment budget is %d MB. "+
+			"Lower the problem's memory limit, raise JUDGE_MAX_JUDGMENT_MEM_MB, or set a per-language memory_limit_kb override.",
+		needBytes/megabyte, wp.maxJudgmentBytes/megabyte)
+	wp.finish(ctx, submissionID, claimToken, model.StatusSE, 0, 0, 0, detail, nil)
 }
 
 func getEffectiveLimits(prob *model.Problem, language string) (timeLimitMs int, memoryLimitKB int) {
