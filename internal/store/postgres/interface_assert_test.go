@@ -44,4 +44,7 @@ var (
 	_ store.UserWriter          = (*UserStore)(nil)
 	_ store.UserAdminStore      = (*UserStore)(nil)
 	_ store.UserCredentialStore = (*UserStore)(nil)
+
+	_ store.AIGenerationAdminStore = (*AIGenerationStore)(nil)
+	_ store.AIGenerationJobStore   = (*AIGenerationStore)(nil)
 )

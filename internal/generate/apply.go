@@ -22,7 +22,7 @@ type ApplyResult struct {
 	ProblemSlug string `json:"problem_slug"`
 }
 type ApplyService struct {
-	Jobs         store.AIGenerationStore
+	Jobs         store.AIGenerationJobStore
 	Problems     generateProblemStore
 	Editorials   store.EditorialStore
 	Assets       GenerationAssetStore

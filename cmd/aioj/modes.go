@@ -113,7 +113,7 @@ func runAIHarness(
 	cfg *config.Config,
 	execClient *executor.Client,
 	db *sql.DB,
-	aiGenerationStore store.AIGenerationStore,
+	aiGenerationStore problemgen.JobStore,
 	aiModelStore store.AIModelStore,
 	problemStore store.ProblemStore,
 ) {

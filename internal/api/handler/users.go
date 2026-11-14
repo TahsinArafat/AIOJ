@@ -22,6 +22,12 @@ type publicSubmissionLister interface {
 	ListPublicByUser(ctx context.Context, userID string, offset, limit int) ([]model.Submission, int, error)
 }
 
+// groupInviteLister is the one group query the profile makes: the invitations
+// addressed to this user. It held all nineteen GroupStore methods to call one.
+type groupInviteLister interface {
+	GetUserPendingInvites(ctx context.Context, userID string) ([]model.GroupPendingInvite, error)
+}
+
 // userProfileStore is the user surface the profile pages serve: read the account,
 // its public and private profile, and let the owner edit either.
 //
@@ -40,11 +46,11 @@ type UsersHandler struct {
 	blogStore   store.BlogStore
 	subStore    publicSubmissionLister
 	teamStore   store.TeamStore
-	groupStore  store.GroupStore
+	groupStore  groupInviteLister
 	refreshToks store.RefreshTokenStore
 }
 
-func NewUsersHandler(us userProfileStore, bs store.BlogStore, ss publicSubmissionLister, ts store.TeamStore, gs store.GroupStore, rt store.RefreshTokenStore) *UsersHandler {
+func NewUsersHandler(us userProfileStore, bs store.BlogStore, ss publicSubmissionLister, ts store.TeamStore, gs groupInviteLister, rt store.RefreshTokenStore) *UsersHandler {
 	return &UsersHandler{userStore: us, blogStore: bs, subStore: ss, teamStore: ts, groupStore: gs, refreshToks: rt}
 }
 

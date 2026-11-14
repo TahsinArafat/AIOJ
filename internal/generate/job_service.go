@@ -15,7 +15,7 @@ import (
 )
 
 type JobService struct {
-	Jobs     store.AIGenerationStore
+	Jobs     store.AIGenerationJobStore
 	Models   store.AIModelStore
 	Problems problemReadAccess
 }
@@ -100,7 +100,7 @@ func limitMessage(running, queued int, blocking *model.AIGenerationJob) string {
 }
 
 type JobWorker struct {
-	Jobs    store.AIGenerationStore
+	Jobs    store.AIGenerationJobStore
 	Models  store.AIModelStore
 	Poll    time.Duration
 	Timeout time.Duration

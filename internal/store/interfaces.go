@@ -766,7 +766,17 @@ type AIModelStore interface {
 	SetEnabled(ctx context.Context, id string, enabled bool) error
 }
 
+// AIGenerationStore is the whole AI-generation surface. Three consumers, three
+// shapes: the HTTP handler lists and cancels, the job service runs the pipeline,
+// and the harness worker claims. The roles below are those three.
 type AIGenerationStore interface {
+	AIGenerationAdminStore
+	AIGenerationJobStore
+}
+
+// AIGenerationAdminStore is the HTTP surface: create a job, list it, cancel or
+// discard it. Nothing here runs a job.
+type AIGenerationAdminStore interface {
 	Create(ctx context.Context, job *model.AIGenerationJob) error
 	GetByID(ctx context.Context, id string) (*model.AIGenerationJob, error)
 	ListByProblem(ctx context.Context, problemID string, offset, limit int) ([]model.AIGenerationJob, error)
@@ -777,32 +787,40 @@ type AIGenerationStore interface {
 	ListAll(ctx context.Context, actorID, status string, offset, limit int) ([]model.AIGenerationJob, int, error)
 	// AdminRequestCancel cancels any job regardless of actor (admin use only).
 	AdminRequestCancel(ctx context.Context, id string) (bool, error)
+	RequestCancel(ctx context.Context, id, actorID string) (bool, error)
+	MarkDiscarded(ctx context.Context, id, actorID string) (bool, error)
 	// CountActiveByActor reports the actor's in-flight jobs. Jobs the actor has
 	// already asked to cancel are excluded: they no longer hold a slot.
 	CountActiveByActor(ctx context.Context, actorID string) (running, queued int, err error)
 	// ActiveJobByActor returns the in-flight job holding the actor's slot, so a
 	// limit error can name it. Nil when nothing is in flight.
 	ActiveJobByActor(ctx context.Context, actorID string) (*model.AIGenerationJob, error)
+}
+
+// AIGenerationJobStore is the worker's claim protocol: take a job, report
+// progress, finish it. Every write is fenced by the claim token, so a superseded
+// worker cannot overwrite a newer result.
+//
+// The harness's own problemgen.JobStore is a further-narrowed view of this, for
+// the multi-turn pipeline; that one stays where it is because it belongs to the
+// harness package and the harness is the only thing that uses it.
+type AIGenerationJobStore interface {
+	// Create enqueues a job, and the two counters answer "may this actor start
+	// another". They are here rather than in the admin role because the job
+	// service enforces the per-actor limit before it claims anything.
+	Create(ctx context.Context, job *model.AIGenerationJob) error
+	CountActiveByActor(ctx context.Context, actorID string) (running, queued int, err error)
+	ActiveJobByActor(ctx context.Context, actorID string) (*model.AIGenerationJob, error)
+
 	ClaimNext(ctx context.Context, claimToken string) (*model.AIGenerationJob, error)
 	Heartbeat(ctx context.Context, id, claimToken, stage string, progress int) error
 	Complete(ctx context.Context, id, claimToken string, proposal, validation json.RawMessage, promptTokens, completionTokens, latencyMS int) error
-	// SetManifest stores the case manifest a harness run produced and marks the
-	// job ready for review. Declared here rather than only on the concrete type
-	// because problemgen.Worker takes a JobStore, and until this was added the
-	// interface did not satisfy it — so main had to pass the concrete
-	// *postgres.AIGenerationStore and nothing checked the two stayed in step.
 	SetManifest(ctx context.Context, id, token string, proposal, manifest, report json.RawMessage, ready bool, turns int) error
 	Fail(ctx context.Context, id, claimToken, code, message string, validation json.RawMessage) error
-	RequestCancel(ctx context.Context, id, actorID string) (bool, error)
 	MarkCancelled(ctx context.Context, id, claimToken string) error
-	IsCancellationRequested(ctx context.Context, id string) (bool, error)
-	MarkDiscarded(ctx context.Context, id, actorID string) (bool, error)
 	MarkApplied(ctx context.Context, id string) error
+	IsCancellationRequested(ctx context.Context, id string) (bool, error)
 	RequeueStale(ctx context.Context, olderThan time.Duration) ([]string, error)
-	// PurgeCompletedBefore deletes terminal (complete/failed/cancelled/
-	// discarded/applied) jobs older than the cutoff and returns how many rows
-	// were removed. Active jobs are never deleted, however old, so a long run
-	// cannot be purged out from under the worker holding its claim.
 	PurgeCompletedBefore(ctx context.Context, cutoff time.Time) (int, error)
 }
 

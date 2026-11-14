@@ -13,12 +13,12 @@ import (
 type AIGenerationHandler struct {
 	service  *generate.JobService
 	apply    *generate.ApplyService
-	jobs     store.AIGenerationStore
+	jobs     store.AIGenerationAdminStore
 	models   store.AIModelStore
 	problems store.ProblemStore
 }
 
-func NewAIGenerationHandler(s *generate.JobService, a *generate.ApplyService, j store.AIGenerationStore, m store.AIModelStore, p store.ProblemStore) *AIGenerationHandler {
+func NewAIGenerationHandler(s *generate.JobService, a *generate.ApplyService, j store.AIGenerationAdminStore, m store.AIModelStore, p store.ProblemStore) *AIGenerationHandler {
 	return &AIGenerationHandler{service: s, apply: a, jobs: j, models: m, problems: p}
 }
 func (h *AIGenerationHandler) Connections(w http.ResponseWriter, r *http.Request) {
