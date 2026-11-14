@@ -5,6 +5,9 @@ server:
   host: "0.0.0.0"
   port: 8080
   metrics_token: ""           # override with METRICS_TOKEN; /metrics is admin-only when empty
+  # Shared token for the ICPC-style event feed an external scorer polls. Empty
+  # disables the feed (the endpoint answers 503 rather than serving it to anyone).
+  feed_token: ""              # override with FEED_TOKEN
 database:
   host: "localhost"
   port: 5432
@@ -68,3 +71,11 @@ oauth:
     client_secret: ""         # override with GOOGLE_CLIENT_SECRET
     redirect_url: "http://localhost:8081/api/auth/oauth/google/callback"
 lang_dir: "./lang"
+
+# Out-of-process submit services. Codeforces and AtCoder both need a real browser
+# session to submit, which the judge's HTTP client cannot hold, so each has a
+# small separate service. These were previously read from the environment in
+# main() with the defaults inlined there, which left them out of this file.
+remote_judge:
+  cf_submit_url: "http://host.docker.internal:8003"       # override with CF_SUBMIT_URL
+  atcoder_submit_url: "http://host.docker.internal:8004"  # override with ATCODER_SUBMIT_URL

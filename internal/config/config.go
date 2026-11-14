@@ -21,17 +21,30 @@ type Config struct {
 	// Environment selects the deployment profile. Development relaxes a few
 	// safety checks (weak secrets warn instead of aborting, dev-only routes are
 	// mounted). Default is production.
-	Environment string         `yaml:"environment"`
-	Server      ServerConfig   `yaml:"server"`
-	Database    DatabaseConfig `yaml:"database"`
-	Auth        AuthConfig     `yaml:"auth"`
-	OAuth       OAuthConfig    `yaml:"oauth"`
-	Judge       JudgeConfig    `yaml:"judge"`
-	Redis       RedisConfig    `yaml:"redis"`
-	AI          AIConfig       `yaml:"ai"`
-	Mail        MailConfig     `yaml:"mail"`
-	Features    FeaturesConfig `yaml:"features"`
-	LangDir     string         `yaml:"lang_dir"`
+	Environment string            `yaml:"environment"`
+	Server      ServerConfig      `yaml:"server"`
+	Database    DatabaseConfig    `yaml:"database"`
+	Auth        AuthConfig        `yaml:"auth"`
+	OAuth       OAuthConfig       `yaml:"oauth"`
+	Judge       JudgeConfig       `yaml:"judge"`
+	Redis       RedisConfig       `yaml:"redis"`
+	AI          AIConfig          `yaml:"ai"`
+	Mail        MailConfig        `yaml:"mail"`
+	RemoteJudge RemoteJudgeConfig `yaml:"remote_judge"`
+	Features    FeaturesConfig    `yaml:"features"`
+	LangDir     string            `yaml:"lang_dir"`
+}
+
+// PublicOrigin returns the externally visible origin for absolute links, or ""
+// when the operator configured none.
+//
+// It lives on Config because the value is one fact about the deployment, and
+// main() was re-reading PUBLIC_ORIGIN at five separate call sites while Load had
+// already resolved it into Mail.PublicURL. A reader could set the yaml key, see
+// it ignored by the sitemap, and have no way to tell which of the two sources
+// won.
+func (c *Config) PublicOrigin() string {
+	return strings.TrimSpace(c.Mail.PublicURL)
 }
 
 // IsDevelopment reports whether dev-only behaviour (mail catcher inspector,
@@ -120,6 +133,23 @@ type ServerConfig struct {
 	// MetricsToken authenticates Prometheus scrapes of /metrics (METRICS_TOKEN).
 	// When empty only an admin access token may scrape.
 	MetricsToken string `yaml:"metrics_token"`
+	// FeedToken authorizes the ICPC-style event feed an external scorer polls.
+	// Empty disables the feed: the endpoint answers 503 rather than serving it to
+	// anyone. Declared here rather than read at the call site because a credential
+	// with no default needs to be visible to Validate and to the example file.
+	FeedToken string `yaml:"feed_token"`
+}
+
+// RemoteJudgeConfig holds the out-of-process submit services.
+//
+// Codeforces and AtCoder both need a real browser session to submit, which an
+// in-process HTTP client cannot hold, so each has a small separate service. Their
+// addresses were read straight from the environment in main(), which left them
+// invisible to Validate and absent from the example file — an operator could only
+// discover them by reading main.go.
+type RemoteJudgeConfig struct {
+	CFSubmitURL      string `yaml:"cf_submit_url"`
+	AtCoderSubmitURL string `yaml:"atcoder_submit_url"`
 }
 
 type DatabaseConfig struct {
@@ -437,6 +467,17 @@ func Load(path string) (*Config, error) {
 	if v := os.Getenv("PUBLIC_ORIGIN"); v != "" && cfg.Mail.PublicURL == "" {
 		cfg.Mail.PublicURL = v
 	}
+	if v := os.Getenv("FEED_TOKEN"); v != "" {
+		cfg.Server.FeedToken = v
+	}
+	// Defaults matching what main() hardcoded, so a deployment that sets neither
+	// the yaml key nor the env var behaves exactly as before.
+	if cfg.RemoteJudge.CFSubmitURL == "" {
+		cfg.RemoteJudge.CFSubmitURL = envOr("CF_SUBMIT_URL", "http://host.docker.internal:8003")
+	}
+	if cfg.RemoteJudge.AtCoderSubmitURL == "" {
+		cfg.RemoteJudge.AtCoderSubmitURL = envOr("ATCODER_SUBMIT_URL", "http://host.docker.internal:8004")
+	}
 	if v := os.Getenv("REMOTE_BOTS_REGIONS"); v != "" {
 		// Comma-separated ISO country codes; empty string clears the allowlist.
 		parts := strings.Split(v, ",")
@@ -471,4 +512,16 @@ func (f FeaturesConfig) RemoteBotsAllowed(country string) bool {
 		}
 	}
 	return false
+}
+
+// envOr returns the environment value for key, or fallback when it is unset or
+// empty.
+//
+// The inline `if v := os.Getenv(k); v != ""` was repeated dozens of times in
+// Load; this is the same behaviour with the branch at the call site.
+func envOr(key, fallback string) string {
+	if v := strings.TrimSpace(os.Getenv(key)); v != "" {
+		return v
+	}
+	return fallback
 }

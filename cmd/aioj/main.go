@@ -233,17 +233,11 @@ Restore from the pre-deploy dump if the schema is unrecoverable.`, err)
 	remoteLangStore := postgres.NewRemoteLanguageStore(db)
 	vjService := vjudge.NewService(submissionStore, problemStore, botAccountStore, remoteLangStore)
 
-	cfSubmitURL := os.Getenv("CF_SUBMIT_URL")
-	if cfSubmitURL == "" {
-		cfSubmitURL = "http://host.docker.internal:8003"
-	}
-	cfSubmit := vjudge.NewCFSubmitClient(cfSubmitURL)
-
-	atcoderSubmitURL := os.Getenv("ATCODER_SUBMIT_URL")
-	if atcoderSubmitURL == "" {
-		atcoderSubmitURL = "http://host.docker.internal:8004"
-	}
-	atcoderSubmit := vjudge.NewAtCoderSubmitClient(atcoderSubmitURL)
+	// Both addresses come from config, which applies the env override and the
+	// defaults. They were read from the environment here, which meant an operator
+	// could not find them in config.yaml, the example file or Validate.
+	cfSubmit := vjudge.NewCFSubmitClient(cfg.RemoteJudge.CFSubmitURL)
+	atcoderSubmit := vjudge.NewAtCoderSubmitClient(cfg.RemoteJudge.AtCoderSubmitURL)
 
 	// Grants is the password-entitlement store. Every handler that reads or writes
 	// contest data is given it, so an unlocked round is openable on all of them;
@@ -342,7 +336,7 @@ Restore from the pre-deploy dump if the schema is unrecoverable.`, err)
 	contestH.WithNotifier(notifier)
 	// The ICPC-style event feed is opt-in: with no token configured the endpoint
 	// answers 503 rather than exposing every run to anyone who guesses the id.
-	contestH.WithFeed(submissionStore, os.Getenv("FEED_TOKEN"))
+	contestH.WithFeed(submissionStore, cfg.Server.FeedToken)
 	// Webhook delivery: GetByEvent had no caller and webhook_deliveries was never
 	// written, so a registered webhook never fired. Targets are SSRF-guarded.
 	// The dispatcher is attached to the review handlers below, once webhookStore
@@ -620,7 +614,7 @@ Restore from the pre-deploy dump if the schema is unrecoverable.`, err)
 		// JavaScript, so the SPA's client-set title never reaches them — this is
 		// what gives a shared problem link its own title, description and image.
 		Meta: &handler.MetaHandler{
-			Origin: func() string { return os.Getenv("PUBLIC_ORIGIN") },
+			Origin: func() string { return cfg.PublicOrigin() },
 			ProblemCard: func(ctx context.Context, slug string) (*handler.ShareCard, error) {
 				m, err := problemMetaStore.GetBySlug(ctx, slug)
 				if err != nil {
@@ -652,7 +646,7 @@ Restore from the pre-deploy dump if the schema is unrecoverable.`, err)
 		Sitemap: func() func(ctx context.Context) []handler.SitemapSection {
 			cache := &handler.TTLCache[[]handler.SitemapSection]{TTL: time.Hour}
 			return func(ctx context.Context) []handler.SitemapSection {
-				origin := handler.NormalizeOrigin(os.Getenv("PUBLIC_ORIGIN"))
+				origin := handler.NormalizeOrigin(cfg.PublicOrigin())
 				if origin == "" {
 					origin = "http://localhost:8081"
 				}
@@ -697,7 +691,7 @@ Restore from the pre-deploy dump if the schema is unrecoverable.`, err)
 		Feed: func() func(ctx context.Context) ([]handler.FeedItem, error) {
 			cache := &handler.TTLCache[[]handler.FeedItem]{TTL: 10 * time.Minute}
 			return func(ctx context.Context) ([]handler.FeedItem, error) {
-				origin := handler.NormalizeOrigin(os.Getenv("PUBLIC_ORIGIN"))
+				origin := handler.NormalizeOrigin(cfg.PublicOrigin())
 				if origin == "" {
 					origin = "http://localhost:8081"
 				}
@@ -724,7 +718,7 @@ Restore from the pre-deploy dump if the schema is unrecoverable.`, err)
 		CommentFeed: func() func(ctx context.Context) ([]handler.FeedItem, error) {
 			cache := &handler.TTLCache[[]handler.FeedItem]{TTL: 10 * time.Minute}
 			return func(ctx context.Context) ([]handler.FeedItem, error) {
-				origin := handler.NormalizeOrigin(os.Getenv("PUBLIC_ORIGIN"))
+				origin := handler.NormalizeOrigin(cfg.PublicOrigin())
 				if origin == "" {
 					origin = "http://localhost:8081"
 				}
@@ -762,7 +756,7 @@ Restore from the pre-deploy dump if the schema is unrecoverable.`, err)
 		BlogFeed: func() func(ctx context.Context) ([]handler.FeedItem, error) {
 			cache := &handler.TTLCache[[]handler.FeedItem]{TTL: 10 * time.Minute}
 			return func(ctx context.Context) ([]handler.FeedItem, error) {
-				origin := handler.NormalizeOrigin(os.Getenv("PUBLIC_ORIGIN"))
+				origin := handler.NormalizeOrigin(cfg.PublicOrigin())
 				if origin == "" {
 					origin = "http://localhost:8081"
 				}
@@ -789,7 +783,7 @@ Restore from the pre-deploy dump if the schema is unrecoverable.`, err)
 		ContestFeed: func() func(ctx context.Context) ([]handler.FeedItem, error) {
 			cache := &handler.TTLCache[[]handler.FeedItem]{TTL: 10 * time.Minute}
 			return func(ctx context.Context) ([]handler.FeedItem, error) {
-				origin := handler.NormalizeOrigin(os.Getenv("PUBLIC_ORIGIN"))
+				origin := handler.NormalizeOrigin(cfg.PublicOrigin())
 				if origin == "" {
 					origin = "http://localhost:8081"
 				}
