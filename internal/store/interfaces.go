@@ -101,6 +101,11 @@ type ProblemStore interface {
 	AddPermission(ctx context.Context, problemID, userID, accessLevel string) error
 	RemovePermission(ctx context.Context, problemID, userID string) error
 	GetPermissions(ctx context.Context, problemID string) ([]model.ProblemPermission, error)
+	// HasAccess reports whether the user holds one of requiredLevels on this
+	// problem. The bare bool is deliberate and must stay: a store failure is
+	// reported as false, which is the fail-closed answer for a permission check.
+	// Returning (bool, error) would move that decision into every caller, where
+	// the cheap mistake is to allow on error.
 	HasAccess(ctx context.Context, problemID, userID string, requiredLevels ...string) bool
 	// ListAccessLevels returns the user's access level per problem, omitting
 	// problems they have no permission row for. One query for a whole page of
@@ -309,6 +314,10 @@ type ContestStore interface {
 	GetParticipants(ctx context.Context, contestID string) ([]string, error)
 	IsParticipant(ctx context.Context, contestID, userID string) (bool, error)
 	GetUsername(ctx context.Context, userID string) string
+	// GetUsernames resolves many ids to display names in one query. Prefer this
+	// over GetUsername wherever the ids are known up front: a standings page
+	// carries up to 500 entries, and the per-row call was a query each.
+	GetUsernames(ctx context.Context, userIDs []string) (map[string]string, error)
 	// GetDisplayNames maps user id to the name a scoreboard should show. For a
 	// generated contestant account that is the team it was minted for, not the
 	// throwaway username. A missing key means "use the username".
@@ -316,6 +325,9 @@ type ContestStore interface {
 	AddPermission(ctx context.Context, contestID, userID, accessLevel string) error
 	RemovePermission(ctx context.Context, contestID, userID string) error
 	GetPermissions(ctx context.Context, contestID string) ([]model.ContestPermission, error)
+	// HasAccess reports whether the user holds one of requiredLevels on this
+	// contest. Fails closed on a store error, for the reason given on the
+	// problem store's HasAccess.
 	HasAccess(ctx context.Context, contestID, userID string, requiredLevels ...string) bool
 	CheckGroupRestriction(ctx context.Context, contestID, userID string) (bool, error)
 }

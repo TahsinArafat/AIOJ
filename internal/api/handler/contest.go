@@ -1051,6 +1051,18 @@ func (h *ContestHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 	// back to the username below.
 	displayNames, _ := h.store.GetDisplayNames(r.Context(), contest.ID, participants)
 
+	// The other half of that page-wide lookup: the usernames themselves. Read in
+	// one query rather than one per participant, which on a 500-entry board was
+	// 500 round trips for the labels alone. A failed lookup is not fatal here —
+	// the rows still render with the display label and a blank handle, which is
+	// what the single-row call produced anyway — so the error is logged and the
+	// map is left empty.
+	usernames, err := h.store.GetUsernames(r.Context(), participants)
+	if err != nil {
+		slog.Warn("scoreboard usernames", "contest_id", contest.ID, "error", err)
+		usernames = map[string]string{}
+	}
+
 	// Manual corrections, loaded once for the page. They are applied to each
 	// participant's totals BEFORE ranking, so a judge's decision actually moves
 	// the order here and on the full scoreboard — the two read the same function.
@@ -1061,7 +1073,7 @@ func (h *ContestHandler) Scoreboard(w http.ResponseWriter, r *http.Request) {
 	// knows the number they see is not purely the judge's output.
 	adjustedUsers := make(map[string]model.AdjustmentTotals)
 	for _, uid := range participants {
-		uname := h.store.GetUsername(r.Context(), uid)
+		uname := usernames[uid]
 		ps := format.ParticipantScore{
 			UserID:   uid,
 			Username: uname,
@@ -1408,6 +1420,15 @@ func (h *ContestHandler) CalculateRatings(w http.ResponseWriter, r *http.Request
 
 	participants, _ := h.store.GetParticipants(r.Context(), contest.ID)
 
+	// Names resolved once, and a failure here aborts the calculation. Unlike the
+	// scoreboard's display path, this one feeds an irreversible write, so a name
+	// that cannot be read must not become an empty string on a rating record.
+	usernames, err := h.store.GetUsernames(r.Context(), participants)
+	if err != nil {
+		http.Error(w, "failed to resolve participant names", http.StatusInternalServerError)
+		return
+	}
+
 	standings := make([]rating.ContestStanding, 0, len(participants))
 	for i, uid := range participants {
 		latest, _ := h.ratingStore.GetLatestByUser(r.Context(), uid)
@@ -1420,7 +1441,7 @@ func (h *ContestHandler) CalculateRatings(w http.ResponseWriter, r *http.Request
 			UserID:    uid,
 			Rank:      i + 1,
 			OldRating: oldRating,
-			Username:  h.store.GetUsername(r.Context(), uid),
+			Username:  usernames[uid],
 		})
 	}
 

@@ -542,10 +542,45 @@ func (s *ContestStore) GetParticipants(ctx context.Context, contestID string) ([
 	return ids, nil
 }
 
+// GetUsername resolves one user id to a display name, best effort.
+//
+// The error is deliberately not returned: the only callers are display paths
+// that must not fail a whole page because one name could not be read, so a
+// miss and a database fault both yield "". Prefer GetUsernames when the ids are
+// known up front — it is one query and it does report its failure.
 func (s *ContestStore) GetUsername(ctx context.Context, userID string) string {
 	var username string
-	s.db.QueryRowContext(ctx, "SELECT username FROM users WHERE id=$1", userID).Scan(&username)
+	// Reported through the empty string; see the doc comment.
+	_ = s.db.QueryRowContext(ctx, "SELECT username FROM users WHERE id=$1", userID).Scan(&username)
 	return username
+}
+
+// GetUsernames resolves many user ids to display names in one query.
+//
+// Replaces the per-participant GetUsername call the scoreboard and the rating
+// recalculation used to make: a 500-entry standings page issued 500 queries for
+// the names alone, on top of the batch the display labels already use. Ids with
+// no row are simply absent from the result, so a caller falls back to whatever
+// it shows for an unknown user rather than to an empty name.
+func (s *ContestStore) GetUsernames(ctx context.Context, userIDs []string) (map[string]string, error) {
+	out := make(map[string]string, len(userIDs))
+	if len(userIDs) == 0 {
+		return out, nil
+	}
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, username FROM users WHERE id = ANY($1)`, pq.Array(userIDs))
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id, username string
+		if err := rows.Scan(&id, &username); err != nil {
+			return nil, err
+		}
+		out[id] = username
+	}
+	return out, rows.Err()
 }
 
 // GetDisplayNames resolves the team label for generated onsite accounts in this
