@@ -42,8 +42,14 @@ sit on top: every `/api/admin/*` route must carry both `AuthMiddleware` and
 `RequireRole`, and eight critical endpoints must stay mounted.
 
 **Still open:** `Deps` is still a 77-field service locator, and optionality is
-still encoded as `if d.X != nil` across 31 sites rather than in the type.
+still encoded as `if d.X != nil` across **32** sites rather than in the type.
 Grouping `Deps` into required and optional sub-structs remains the fix.
+
+That refactor is now safe to attempt because the contract the guards encode is
+pinned: `TestMissingDepsDoNotPanic` serves a request through a partially-wired
+router and requires a 404, not a panic. Removing any one guard makes it fail with
+the nil dereference. Which fields are nilable is what the refactor changes, so the
+assertion is the thing to keep green while doing it.
 
 ### 2. Handlers depend on the Postgres implementation, not the interfaces — **High**
 
