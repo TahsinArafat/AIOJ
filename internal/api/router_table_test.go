@@ -377,6 +377,16 @@ func TestMissingDepsDoNotPanic(t *testing.T) {
 	if got := collectRoutes(t, mux, newTestJWT(t)); len(got) == 0 {
 		t.Fatal("an empty Deps mounted no routes at all")
 	}
+
+	// Walking proves the chains build; this proves a request is answered. An
+	// unwired optional handler must be absent rather than panic — that is the
+	// contract the 32 `if d.X != nil` guards exist to provide, and it is what lets
+	// the router tests build a Deps by hand.
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/activity", nil))
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("GET /api/activity with no Activity handler = %d, want 404", rec.Code)
+	}
 }
 
 // testDeps is the smallest Deps that exercises the always-registered routes.
