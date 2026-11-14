@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -225,70 +226,51 @@ func (h *AdminBotAccountHandler) TestLogin(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	if req.Platform == "codeforces" {
-		if len(req.SessionData) > 0 {
-			hasLogin := req.SessionData["JSESSIONID"] != "" || req.SessionData["39ce7"] != ""
-			if !hasLogin {
-				respondJSON(w, http.StatusOK, map[string]interface{}{
-					"status":  "error",
-					"message": "Missing login cookies. Need at least JSESSIONID or 39ce7.",
-				})
-				return
-			}
-
-			err := h.vjudgeSvc.ValidateCookies(r.Context(), req.SessionData)
-			if err != nil {
-				respondJSON(w, http.StatusOK, map[string]interface{}{
-					"status":  "error",
-					"message": "Cookies invalid: " + err.Error(),
-				})
-				return
-			}
-
+	// Validate against the platform's own registered bot rather than a ladder of
+	// platform names. The ladder listed Codeforces separately because only it
+	// had a cookie probe and a specific cookie set worth checking, and named the
+	// other four in an || chain — which meant a platform added to the registry
+	// silently fell through to the generic branch with the wrong message.
+	//
+	// The two questions are now asked of the bot: can you validate cookies, and
+	// do these ones work. A platform that cannot validate says so instead of
+	// being told its cookies are fine.
+	if len(req.SessionData) > 0 {
+		err := h.vjudgeSvc.ValidateCookies(r.Context(), req.Platform, req.SessionData)
+		switch {
+		case err == nil:
 			respondJSON(w, http.StatusOK, map[string]interface{}{
 				"status":  "ok",
 				"message": "Login validated successfully! Cookies are valid.",
 				"cookies": len(req.SessionData),
 			})
-			return
-		}
-
-		if req.PlatformUser == "" || req.PlatformPass == "" {
-			http.Error(w, "username and password are required for Codeforces", http.StatusBadRequest)
-			return
-		}
-
-		respondJSON(w, http.StatusOK, map[string]interface{}{
-			"status":  "ok",
-			"message": "Credentials provided. Bot will attempt login via FlareSolverr on first submission.",
-		})
-		return
-	}
-
-	if req.Platform == "atcoder" || req.Platform == "toph" || req.Platform == "qoj" || req.Platform == "cses" {
-		if len(req.SessionData) > 0 {
+		case errors.Is(err, vjudge.ErrCookieValidationUnsupported):
+			// Storing unvalidated cookies is legitimate for a platform with no
+			// probe; it just must not be reported as validated.
 			respondJSON(w, http.StatusOK, map[string]interface{}{
 				"status":  "ok",
-				"message": "Cookies configured successfully.",
+				"message": "Cookies stored. This platform cannot be validated before use.",
 				"cookies": len(req.SessionData),
 			})
-			return
+		default:
+			respondJSON(w, http.StatusOK, map[string]interface{}{
+				"status":  "error",
+				"message": "Cookies invalid: " + err.Error(),
+			})
 		}
-
-		if req.PlatformUser == "" || req.PlatformPass == "" {
-			http.Error(w, "username and password are required", http.StatusBadRequest)
-			return
-		}
-
-		respondJSON(w, http.StatusOK, map[string]interface{}{
-			"status":  "ok",
-			"message": "Credentials configured. Bot will login on first submission.",
-		})
 		return
 	}
 
+	if req.PlatformUser == "" || req.PlatformPass == "" {
+		http.Error(w, "username and password are required", http.StatusBadRequest)
+		return
+	}
+
+	// Whether the credentials need an interactive login on first use is the
+	// platform's own business, and the message says what will actually happen
+	// rather than naming a proxy service.
 	respondJSON(w, http.StatusOK, map[string]interface{}{
 		"status":  "ok",
-		"message": "Bot account configured.",
+		"message": "Credentials configured. Bot will log in on first submission.",
 	})
 }

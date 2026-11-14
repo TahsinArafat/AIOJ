@@ -90,28 +90,53 @@ in-house proof it works — it was split out for exactly this reason.
 still open for `ContestStore` (25), `UserStore`/`ProblemStore`/
 `TrainingPlanStore` (21), `GroupStore` (19) and `AIGenerationStore` (19).
 
-### 4. The remote-judge open/closed design is bypassed where it exists — **High**
+### 4. The remote-judge open/closed design was bypassed where it existed — **High** (fixed, plus a real bug)
 
-`internal/vjudge/bot.go:25` defines a proper 10-method `Bot` interface with
-`RegisterBot`. Then `internal/vjudge/service.go` special-cases one platform
-inline: `service.go:186` (remote URL), `:349` (`ForcePoll` hand-rolls CF
-scraping), `:472` (`if platform == "codeforces" { pollCF } else { pollGeneric }`).
-Because `pollCF` bypasses `Bot`, the one backend that *is* an interface is also
-the one reached without it.
+`internal/vjudge/bot.go` defined a proper `Bot` interface with `RegisterBot`,
+and `service.go` then special-cased one platform inline in three places:
 
-Cost of the same defect elsewhere:
+- `service.go:186` built the remote submission URL behind `if req.RemoteOJ == "codeforces"`, so **every other platform stored an empty `remote_url`** and its submission page offered no link back to the source judge.
+- `service.go:349` `ForcePoll` hand-rolled a Codeforces `user.status` fetch instead of calling `bot.Poll`.
+- `service.go:472` `if platform == "codeforces" { pollCF } else { pollGeneric }`.
 
-- `handler/admin_bot_accounts.go:228,268` — credential validation is an if/else
-  over platform names with different semantics per platform.
-- `cmd/aioj/main.go:304` — `switch platform` with 5 hardcoded constructors;
-  a 6th platform means editing `main.go`.
+Plus `handler/admin_bot_accounts.go:228,268` (a platform ladder for credential
+validation) and `cmd/aioj/main.go:304` (`switch platform` with five hardcoded
+constructors, so a sixth platform meant editing the composition root).
 
-Contrast `internal/contest/format/registry.go`, which is textbook open/closed:
-`Register(name, factory)` plus `init()` self-registration. Adding a scoring
-format touches nothing shared.
+**Fixed.** All three service branches are gone; zero platform-name literals
+remain in `service.go`, `main.go` or `admin_bot_accounts.go`. The seams:
 
-*Direction:* give `Bot` a `RemoteURL`/`Poll` seam to delete the three branches,
-and mirror the format registry for bots.
+| What the service asks | Interface | Why it is a capability, not a branch |
+|---|---|---|
+| "what is this submission's URL?" | `Bot.SubmissionURL` | URL shape is platform knowledge; nothing else has it |
+| "can you report many verdicts at once?" | `BatchPoller` | only Codeforces can, so it is optional — 4 of 5 platforms honestly cannot |
+| "can you validate cookies?" | `CookieValidator` | only Codeforces has a probe; the rest must not be reported as validated |
+
+Registration mirrors `contest/format/registry.go`: `RegisterBotFactory` +
+`init()` per platform, with `RegisteredPlatforms()` driving `main.go`. Adding a
+platform is now one new file in `internal/vjudge` plus a line in
+`model.RemotePlatforms` — which its own comment already documented as the only
+edit.
+
+**A real bug fell out of this.** The verdict mapping lived in four copies (the
+force-poll path, the generic path, and one normalizer each in QOJ and Toph), and
+**none of them knew about `MLE`** — although three bots emit it. A remote
+submission that exceeded its memory limit was recorded as **Wrong Answer** on
+every platform, silently corrupting standings. The two platform normalizers also
+returned `""` for an unlisted verdict, which is indistinguishable from "still
+judging", so such a submission was polled until it timed out.
+
+There is now one mapper, `vjudge.Verdict` / `normalizeVerdict` / `Status()`, and
+one place that writes a remote result back (`Service.finishRemote`). `OLE` and
+`PE` map to WA deliberately — the verdict enum has no slot for either, and the
+raw platform verdict is still logged.
+
+Guarded by `verdict_test.go`: the spellings each platform actually sends, the
+`MLE` regression, a check that every verdict the bots emit survives the round
+trip, a check that every enum slot is reachable, the extracted
+`mapCFSubmissionBatch` (nil-tolerant, matches only requested ids), and a
+registry check that `RegisteredPlatforms()` and `model.RemotePlatforms` agree in
+both directions. Each was confirmed to fail when the fix is reverted.
 
 ### 5. Hand-rolled `fetch` calls in the API client skip auth — **High** (fixed)
 
@@ -384,10 +409,9 @@ failures 12 and postgres failures 40 — both unchanged from baseline.
 
 | Finding | What remains |
 |---|---|
-| 1 | `Deps` is still a 77-field service locator; optionality is still `if d.X != nil` rather than a type. The route split is done. |
+| 1 | Findings 4 and 11 are closed. `Deps` is still a 77-field service locator and optionality is still `if d.X != nil` rather than a type; the route split is done. |
 | 3 | Still owed to `ContestStore`, `UserStore`, `ProblemStore`, `TrainingPlanStore`, `GroupStore`, `AIGenerationStore`. |
-| 4 | The vjudge platform branches still bypass the `Bot` interface next to them. |
-| 6 | `main()` is still 919 lines across four run modes. |
+| 6 | `main()` is still 920 lines across four run modes. |
 | 7 | Business rules still live in the HTTP layer (`Scoreboard`, 320 lines). |
 | 8 | Report logic still lives in the postgres layer (`GetRecommendations`). |
 | 10 | Error response shapes are still four-way inconsistent. |

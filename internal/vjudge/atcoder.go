@@ -468,3 +468,25 @@ func (b *AtCoderBot) FetchLanguages(ctx context.Context) ([]RemoteLanguageItem, 
 	}
 	return nil, nil
 }
+
+// SubmissionURL is the browser-facing page for an AtCoder submission.
+//
+// This bot stores its own remoteID as "contestID/submissionID" (see Submit), so
+// the contest half is already in the id and problemRemoteID is not needed.
+func (b *AtCoderBot) SubmissionURL(_, remoteID string) string {
+	contestID, submissionID, ok := strings.Cut(remoteID, "/")
+	if !ok || contestID == "" || submissionID == "" {
+		return ""
+	}
+	return fmt.Sprintf("%s/contests/%s/submissions/%s", b.baseURL(), contestID, submissionID)
+}
+
+// init registers this platform's factory (see registry.go).
+func init() {
+	RegisterBotFactory("atcoder", func(cfg BotConfig, deps BotDeps) Bot {
+		if deps.AtCoderSubmit != nil {
+			return NewAtCoderBotWithSubmit(cfg, deps.AtCoderSubmit)
+		}
+		return NewAtCoderBot(cfg)
+	})
+}

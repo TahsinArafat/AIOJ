@@ -2,14 +2,9 @@ package vjudge
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
-	"net/http/cookiejar"
-	neturl "net/url"
-	"strings"
 	"sync"
 	"time"
 
@@ -107,27 +102,24 @@ func (s *Service) UpdateCookies(platform string, cookies map[string]string) {
 	s.SetCookies(platform, cookies)
 }
 
-func (s *Service) ValidateCookies(ctx context.Context, cookies map[string]string) error {
-	jar, _ := cookiejar.New(nil)
-	client := &http.Client{Timeout: 15 * time.Second, Jar: jar}
-	cfURL, _ := neturl.Parse("https://codeforces.com")
-	jarCookies := make([]*http.Cookie, 0, len(cookies))
-	for name, value := range cookies {
-		jarCookies = append(jarCookies, &http.Cookie{Name: name, Value: value, Domain: "codeforces.com", Path: "/"})
+// ValidateCookies checks a set of cookies for the bot behind platform.
+//
+// Kept on the service because the admin console reaches it through the service
+// handle, but it no longer carries the Codeforces-specific probe: a bot that can
+// validate implements CookieValidator and is asked, and a bot that cannot is
+// reported as unvalidatable rather than silently accepted.
+func (s *Service) ValidateCookies(ctx context.Context, platform string, cookies map[string]string) error {
+	s.mu.RLock()
+	bot, ok := s.bots[platform]
+	s.mu.RUnlock()
+	if !ok {
+		return fmt.Errorf("no bot for platform: %s", platform)
 	}
-	client.Jar.SetCookies(cfURL, jarCookies)
-	req, _ := http.NewRequestWithContext(ctx, "GET", "https://codeforces.com/problemset/status?my=on", nil)
-	req.Header.Set("User-Agent", "Mozilla/5.0")
-	resp, err := client.Do(req)
-	if err != nil {
-		return fmt.Errorf("request failed: %w", err)
+	v, ok := bot.(CookieValidator)
+	if !ok {
+		return fmt.Errorf("%w: %s", ErrCookieValidationUnsupported, platform)
 	}
-	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
-	if strings.Contains(string(body), "Codeforces: Enter") || strings.Contains(string(body), "handleOrEmail") {
-		return fmt.Errorf("cookies expired or invalid - not logged in")
-	}
-	return nil
+	return v.ValidateCookies(ctx, cookies)
 }
 
 func (s *Service) Submit(ctx context.Context, req SubmitRequest) error {
@@ -191,13 +183,11 @@ func (s *Service) Submit(ctx context.Context, req SubmitRequest) error {
 			continue
 		}
 
-		remoteURL := ""
-		if req.RemoteOJ == "codeforces" {
-			parts := strings.Split(req.ProblemRemoteID, "/")
-			if len(parts) > 0 {
-				remoteURL = fmt.Sprintf("https://codeforces.com/contest/%s/submission/%s", parts[0], remoteID)
-			}
-		}
+		// The link back to the source judge, built by the bot because the URL
+		// shape is platform knowledge. This used to be a Codeforces-only branch,
+		// so every other platform stored an empty remote_url and the submission
+		// page offered no way back to the remote judge.
+		remoteURL := bot.SubmissionURL(req.ProblemRemoteID, remoteID)
 		s.subStore.UpdateRemoteID(ctx, req.ID, remoteID, remoteURL)
 		s.subStore.UpdateBotID(ctx, req.ID, acc.ID, acc.PlatformUser)
 		s.botAccStore.ResetFailures(ctx, acc.ID)
@@ -346,100 +336,56 @@ func (s *Service) processUnsubmitted(ctx context.Context) bool {
 	return true
 }
 
+// ForcePoll asks a remote judge about one submission right now, bypassing the
+// poll worker's backoff. The admin console and the "refresh" button on a
+// submission both call it.
+//
+// Goes through the same Bot seam as the workers. It used to special-case
+// Codeforces with a hand-rolled user.status fetch, which meant the one backend
+// that had a Bot implementation was also the one reached without it.
 func (s *Service) ForcePoll(ctx context.Context, platform, remoteID, submissionID string) {
 	s.mu.RLock()
 	bot, botOK := s.bots[platform]
 	s.mu.RUnlock()
-
 	if !botOK {
 		return
 	}
 
-	if platform == "codeforces" {
-		accounts, _ := s.botAccStore.ListByPlatform(ctx, platform)
-		for _, acc := range accounts {
-			if acc.Status != "active" || acc.PlatformUser == "" {
-				continue
-			}
-			u := fmt.Sprintf("https://codeforces.com/api/user.status?handle=%s&count=20", acc.PlatformUser)
-			resp, err := remoteHTTPClient.Get(u)
-			if err != nil {
-				continue
-			}
-			body, _ := io.ReadAll(resp.Body)
-			resp.Body.Close()
-			var parsed struct {
-				Status string                   `json:"status"`
-				Result []map[string]interface{} `json:"result"`
-			}
-			if json.Unmarshal(body, &parsed) != nil || parsed.Status != "OK" {
-				continue
-			}
-			for _, sub := range parsed.Result {
-				if fmt.Sprintf("%.0f", sub["id"]) == remoteID {
-					verdict := sub["verdict"]
-					if verdict == nil || verdict == "TESTING" {
-						slog.Info("vjudge force poll: still judging", "sub", submissionID)
-						return
-					}
-					var status model.SubmissionStatus
-					switch verdict {
-					case "OK":
-						status = model.StatusAC
-					case "WRONG_ANSWER":
-						status = model.StatusWA
-					case "TIME_LIMIT_EXCEEDED":
-						status = model.StatusTLE
-					case "COMPILATION_ERROR":
-						status = model.StatusCE
-					case "RUNTIME_ERROR":
-						status = model.StatusRE
-					case "MEMORY_LIMIT_EXCEEDED":
-						status = model.StatusMLE
-					default:
-						status = model.StatusWA
-					}
-					timeUsed := 0
-					memUsed := 0
-					if t, ok := sub["timeConsumedMillis"].(float64); ok {
-						timeUsed = int(t)
-					}
-					if m, ok := sub["memoryConsumedBytes"].(float64); ok {
-						memUsed = int(m / 1024)
-					}
-					s.subStore.UpdateResult(ctx, submissionID, status, 0, timeUsed, memUsed, "", nil)
-					slog.Info("vjudge judged", "sub", submissionID, "verdict", verdict, "time", timeUsed, "mem", memUsed)
+	// A batch-capable bot is worth asking even for a single submission: on
+	// Codeforces the batch call is one request against the account list, where
+	// Poll would be one request per account until the right one answers.
+	if batch, ok := bot.(BatchPoller); ok {
+		accounts, err := s.botAccStore.ListByPlatform(ctx, platform)
+		if err == nil {
+			want := []PendingResult{{SubmissionID: submissionID, RemoteID: remoteID}}
+			for _, acc := range accounts {
+				if acc.Status != "active" || acc.PlatformUser == "" {
+					continue
+				}
+				results, err := batch.PollBatch(ctx, acc.PlatformUser, want)
+				if err != nil {
+					continue
+				}
+				if r, ok := results[remoteID]; ok && r != nil && r.Done {
+					s.finishRemote(ctx, submissionID, r)
 					return
 				}
 			}
+			// Nothing settled yet. Still judging is not an error, and the
+			// caller's poll worker will ask again.
+			return
 		}
-		return
 	}
 
 	result, err := bot.Poll(ctx, remoteID)
-	if err != nil || result == nil || !result.Done {
-		if err != nil {
-			slog.Error("vjudge force poll", "err", err)
-		}
+	if err != nil {
+		slog.Error("vjudge force poll", "platform", platform, "err", err)
 		return
 	}
-	var status model.SubmissionStatus
-	switch result.Verdict {
-	case "AC":
-		status = model.StatusAC
-	case "WA":
-		status = model.StatusWA
-	case "TLE":
-		status = model.StatusTLE
-	case "RE":
-		status = model.StatusRE
-	case "CE":
-		status = model.StatusCE
-	default:
-		status = model.StatusWA
+	if result == nil || !result.Done {
+		return
 	}
-	s.subStore.UpdateResult(ctx, submissionID, status, 0, result.TimeUsed, result.MemoryUsed, "", nil)
-	slog.Info("vjudge judged", "sub", submissionID, "verdict", result.Verdict)
+	s.finishRemote(ctx, submissionID, result)
 }
 
 func (s *Service) pollWorker(ctx context.Context, platform string) {
@@ -472,110 +418,107 @@ func (s *Service) pollPlatform(ctx context.Context, platform string) bool {
 	s.mu.RLock()
 	bot, botOK := s.bots[platform]
 	s.mu.RUnlock()
+	if !botOK {
+		return false
+	}
 
 	subs, err := s.subStore.GetPendingRemoteSubmissions(ctx)
 	if err != nil || len(subs) == 0 {
 		return false
 	}
 
-	if platform == "codeforces" {
-		s.pollCF(ctx, subs)
-	} else if botOK {
-		s.pollGeneric(ctx, subs, bot)
+	// Only this platform's own submissions. A batch poller asks one remote
+	// account about its submissions, so handing it another platform's ids would
+	// waste the request and, worse, invite a false match on an id that happens
+	// to collide across judges.
+	mine := make([]model.PendingRemoteSubmission, 0, len(subs))
+	for _, ps := range subs {
+		if ps.Platform == platform {
+			mine = append(mine, ps)
+		}
 	}
+	if len(mine) == 0 {
+		return false
+	}
+
+	// A bot that can report many verdicts per request is asked to; the rest are
+	// polled one at a time. This replaces a test on the platform NAME, which is
+	// why the capability is an interface instead: adding a batch-capable judge
+	// is now implementing BatchPoller, not editing this function.
+	if batch, ok := bot.(BatchPoller); ok {
+		if s.pollBatch(ctx, platform, batch, mine) {
+			return true
+		}
+		// The batch call failed as a whole. Fall through to per-submission
+		// polling rather than reporting no progress: one malformed response
+		// must not stall every pending submission on the platform.
+	}
+	s.pollOneByOne(ctx, bot, mine)
 	return true
 }
 
-func (s *Service) pollCF(ctx context.Context, subs []model.PendingRemoteSubmission) {
-	accounts, err := s.botAccStore.ListByPlatform(ctx, "codeforces")
+// pollBatch asks a BatchPoller about every pending submission, once per active
+// account, and writes back what it learned. Returns false when no account could
+// answer, so the caller can fall back.
+func (s *Service) pollBatch(ctx context.Context, platform string, batch BatchPoller, subs []model.PendingRemoteSubmission) bool {
+	accounts, err := s.botAccStore.ListByPlatform(ctx, platform)
 	if err != nil {
-		return
+		return false
 	}
+
+	want := make([]PendingResult, 0, len(subs))
+	for _, ps := range subs {
+		want = append(want, PendingResult{SubmissionID: ps.ID, RemoteID: ps.RemoteID})
+	}
+	byRemote := make(map[string]model.PendingRemoteSubmission, len(subs))
+	for _, ps := range subs {
+		byRemote[ps.RemoteID] = ps
+	}
+
+	answered := false
 	for _, acc := range accounts {
 		if acc.Status != "active" || acc.PlatformUser == "" {
 			continue
 		}
-		u := fmt.Sprintf("https://codeforces.com/api/user.status?handle=%s&count=20", acc.PlatformUser)
-		resp, err := remoteHTTPClient.Get(u)
+		results, err := batch.PollBatch(ctx, acc.PlatformUser, want)
 		if err != nil {
+			slog.Warn("vjudge batch poll failed", "platform", platform, "handle", acc.PlatformUser, "err", err)
 			continue
 		}
-		body, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
-
-		var parsed struct {
-			Status string                   `json:"status"`
-			Result []map[string]interface{} `json:"result"`
-		}
-		if json.Unmarshal(body, &parsed) != nil || parsed.Status != "OK" {
-			continue
-		}
-		for _, sub := range parsed.Result {
-			id := fmt.Sprintf("%.0f", sub["id"])
-			for _, ps := range subs {
-				if ps.RemoteID == id {
-					verdict := sub["verdict"]
-					if verdict == nil || verdict == "TESTING" {
-						continue
-					}
-					var status model.SubmissionStatus
-					switch verdict {
-					case "OK":
-						status = model.StatusAC
-					case "WRONG_ANSWER":
-						status = model.StatusWA
-					case "TIME_LIMIT_EXCEEDED":
-						status = model.StatusTLE
-					case "COMPILATION_ERROR":
-						status = model.StatusCE
-					case "RUNTIME_ERROR":
-						status = model.StatusRE
-					case "MEMORY_LIMIT_EXCEEDED":
-						status = model.StatusMLE
-					default:
-						status = model.StatusWA
-					}
-					timeUsed := 0
-					memUsed := 0
-					if t, ok := sub["timeConsumedMillis"].(float64); ok {
-						timeUsed = int(t)
-					}
-					if m, ok := sub["memoryConsumedBytes"].(float64); ok {
-						memUsed = int(m / 1024)
-					}
-					s.subStore.UpdateResult(ctx, ps.ID, status, 0, timeUsed, memUsed, "", nil)
-					slog.Info("vjudge judged", "sub", ps.ID, "verdict", verdict, "time", timeUsed, "mem", memUsed)
-				}
+		answered = true
+		for remoteID, r := range results {
+			ps, ok := byRemote[remoteID]
+			if !ok || r == nil || !r.Done {
+				continue
 			}
+			s.finishRemote(ctx, ps.ID, r)
+			// One account reporting a verdict is enough; the others are only
+			// queried because the submission may have been made by any of them.
+			delete(byRemote, remoteID)
 		}
+		if len(byRemote) == 0 {
+			break
+		}
+	}
+	return answered
+}
+
+// pollOneByOne is the generic path: one request per pending submission.
+func (s *Service) pollOneByOne(ctx context.Context, bot Bot, subs []model.PendingRemoteSubmission) {
+	for _, ps := range subs {
+		result, err := bot.Poll(ctx, ps.RemoteID)
+		if err != nil || result == nil || !result.Done {
+			continue
+		}
+		s.finishRemote(ctx, ps.ID, result)
 	}
 }
 
-func (s *Service) pollGeneric(ctx context.Context, subs []model.PendingRemoteSubmission, bot Bot) {
-	for _, ps := range subs {
-		result, err := bot.Poll(ctx, ps.RemoteID)
-		if err != nil {
-			continue
-		}
-		if result == nil || !result.Done {
-			continue
-		}
-		var status model.SubmissionStatus
-		switch result.Verdict {
-		case "AC":
-			status = model.StatusAC
-		case "WA":
-			status = model.StatusWA
-		case "TLE":
-			status = model.StatusTLE
-		case "RE":
-			status = model.StatusRE
-		case "CE":
-			status = model.StatusCE
-		default:
-			status = model.StatusWA
-		}
-		s.subStore.UpdateResult(ctx, ps.ID, status, 0, result.TimeUsed, result.MemoryUsed, "", nil)
-		slog.Info("vjudge judged", "sub", ps.ID, "verdict", result.Verdict)
-	}
+// finishRemote records one remote verdict against a local submission. The only
+// place in this package that turns a verdict into a stored status, so the
+// mapping cannot drift between the batch and one-by-one paths.
+func (s *Service) finishRemote(ctx context.Context, submissionID string, r *RemoteResult) {
+	s.subStore.UpdateResult(ctx, submissionID, r.Verdict.Status(), 0, r.TimeUsed, r.MemoryUsed, "", nil)
+	slog.Info("vjudge judged", "sub", submissionID, "verdict", r.Verdict,
+		"time", r.TimeUsed, "mem", r.MemoryUsed)
 }

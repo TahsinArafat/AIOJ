@@ -370,7 +370,7 @@ func parseQOJStatus(html string, remoteID string) *RemoteResult {
 
 		if strings.Contains(lower, "<td>") {
 			timeVal, memVal, verdict := parseQOJTableRow(line)
-			if verdict != "" {
+			if verdict.IsDone() {
 				result.Done = true
 				result.Verdict = verdict
 				result.TimeUsed = timeVal
@@ -390,16 +390,14 @@ func parseQOJStatus(html string, remoteID string) *RemoteResult {
 }
 
 // parseQOJTableRow parses a table row and extracts verdict, time, memory
-func parseQOJTableRow(row string) (timeMs int, memKB int, verdict string) {
+func parseQOJTableRow(row string) (timeMs int, memKB int, verdict Verdict) {
 	cells := extractTableCells(row)
 	if len(cells) < 3 {
 		return 0, 0, ""
 	}
 
-	verdictStr := strings.TrimSpace(cells[1])
-	verdict = normalizeQOJVerdict(verdictStr)
-
-	if verdict == "" {
+	verdict = normalizeQOJVerdict(strings.TrimSpace(cells[1]))
+	if !verdict.IsDone() {
 		return 0, 0, ""
 	}
 
@@ -457,32 +455,19 @@ func stripHTMLTags(s string) string {
 	return sb.String()
 }
 
-// normalizeQOJVerdict converts QOJ verdict text to standard verdict code
-func normalizeQOJVerdict(verdict string) string {
-	verdict = strings.TrimSpace(verdict)
-	verdictLower := strings.ToLower(verdict)
-
-	switch {
-	case strings.Contains(verdictLower, "accepted") || verdictLower == "ac":
-		return "AC"
-	case strings.Contains(verdictLower, "wrong answer") || verdictLower == "wa":
-		return "WA"
-	case strings.Contains(verdictLower, "time limit") || verdictLower == "tle":
-		return "TLE"
-	case strings.Contains(verdictLower, "runtime error") || verdictLower == "re":
-		return "RE"
-	case strings.Contains(verdictLower, "compilation error") || verdictLower == "ce":
-		return "CE"
-	case strings.Contains(verdictLower, "memory limit") || verdictLower == "mle":
-		return "MLE"
-	case strings.Contains(verdictLower, "presentation error") || verdictLower == "pe":
-		return "PE"
-	case verdictLower == "running" || verdictLower == "pending" || verdictLower == "judging":
-		return ""
-	case verdictLower == "submitted":
-		return ""
+// normalizeQOJVerdict converts QOJ's verdict text to the package's vocabulary.
+//
+// The table that used to live here was one of four copies of the same mapping,
+// and it disagreed with the others about what to do with a verdict nobody had
+// listed. VerdictPending is returned for "still judging" so the caller keeps
+// polling; everything else goes through the shared mapper, which is now the
+// only place that knows the full vocabulary.
+func normalizeQOJVerdict(verdict string) Verdict {
+	v := normalizeVerdict(verdict)
+	if !v.IsDone() {
+		return VerdictPending
 	}
-	return ""
+	return v
 }
 
 // parseQOJTime parses time string like "0.25s" or "250ms" to milliseconds
@@ -545,4 +530,19 @@ func parseQOJMemory(s string) int {
 // QOJBot does not support remote language enumeration.
 func (b *QOJBot) FetchLanguages(ctx context.Context) ([]RemoteLanguageItem, error) {
 	return nil, nil
+}
+
+// SubmissionURL is the browser-facing page for a QOJ submission.
+func (b *QOJBot) SubmissionURL(_, remoteID string) string {
+	if remoteID == "" {
+		return ""
+	}
+	return fmt.Sprintf("%s/submission/%s", b.baseURL(), remoteID)
+}
+
+// init registers this platform's factory (see registry.go).
+func init() {
+	RegisterBotFactory("qoj", func(cfg BotConfig, deps BotDeps) Bot {
+		return NewQOJBot(cfg)
+	})
 }

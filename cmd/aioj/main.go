@@ -290,8 +290,17 @@ Restore from the pre-deploy dump if the schema is unrecoverable.`, err)
 		WithGrants(contestGrantStore)
 	contestUnlockH := handler.NewContestUnlockHandler(contestStore, contestGrantStore)
 
-	platforms := []string{"codeforces", "atcoder", "cses", "toph", "qoj"}
-	for _, platform := range platforms {
+	// Register one bot per platform. The list and the construction both come
+	// from the vjudge registry, so adding a platform is a new file in that
+	// package with an init() that calls RegisterBotFactory — nothing here
+	// changes. This used to be a switch on the platform name, which meant every
+	// new remote judge was also an edit to the composition root.
+	vjDeps := vjudge.BotDeps{
+		CFSubmit:      cfSubmit,
+		AtCoderSubmit: atcoderSubmit,
+		RemoteLang:    remoteLangStore,
+	}
+	for _, platform := range vjudge.RegisteredPlatforms() {
 		accounts, _ := botAccountStore.ListByPlatform(ctx, platform)
 		vjCfg := vjudge.BotConfig{}
 		if len(accounts) > 0 && accounts[0].Status == "active" {
@@ -301,17 +310,8 @@ Restore from the pre-deploy dump if the schema is unrecoverable.`, err)
 			vjCfg.APISecret = accounts[0].APISecret
 			vjCfg.Cookies = accounts[0].SessionData
 		}
-		switch platform {
-		case "codeforces":
-			vjService.RegisterBot(platform, vjudge.NewCodeforcesBotWithSubmit(vjCfg, cfSubmit))
-		case "atcoder":
-			vjService.RegisterBot(platform, vjudge.NewAtCoderBotWithSubmit(vjCfg, atcoderSubmit))
-		case "cses":
-			vjService.RegisterBot(platform, vjudge.NewCSESBotWithStore(vjCfg, remoteLangStore))
-		case "toph":
-			vjService.RegisterBot(platform, vjudge.NewTophBot(vjCfg))
-		case "qoj":
-			vjService.RegisterBot(platform, vjudge.NewQOJBot(vjCfg))
+		if bot, ok := vjudge.NewBot(platform, vjCfg, vjDeps); ok {
+			vjService.RegisterBot(platform, bot)
 		}
 	}
 

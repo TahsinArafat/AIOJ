@@ -386,7 +386,7 @@ func parseTophStatus(html string, remoteID string) *RemoteResult {
 
 	// Look for verdict
 	verdict := extractTophVerdict(html)
-	if verdict == "" {
+	if !verdict.IsDone() {
 		// Check if still running/pending
 		if strings.Contains(strings.ToLower(html), "running") ||
 			strings.Contains(strings.ToLower(html), "pending") ||
@@ -404,14 +404,14 @@ func parseTophStatus(html string, remoteID string) *RemoteResult {
 }
 
 // extractTophVerdict extracts verdict text from HTML
-func extractTophVerdict(html string) string {
+func extractTophVerdict(html string) Verdict {
 	if idx := strings.Index(html, `class="label -verdict-`); idx != -1 {
 		start := idx + len(`class="label -verdict-`)
 		end := strings.IndexAny(html[start:], `" `)
 		if end != -1 {
 			verCode := html[start : start+end]
 			normalized := normalizeTophVerdict(verCode)
-			if normalized != "" {
+			if normalized.IsDone() {
 				return normalized
 			}
 		}
@@ -448,14 +448,14 @@ func extractTophVerdict(html string) string {
 			cells := extractTableCells(line)
 			for _, cell := range cells {
 				normalized := normalizeTophVerdict(cell)
-				if normalized != "" {
+				if normalized.IsDone() {
 					return normalized
 				}
 			}
 		}
 	}
 
-	return ""
+	return VerdictPending
 }
 
 // extractTophTime extracts time from HTML
@@ -536,32 +536,14 @@ func extractTophMemory(html string) int {
 	return 0
 }
 
-// normalizeTophVerdict converts Toph verdict text to standard verdict code
-func normalizeTophVerdict(verdict string) string {
-	verdict = strings.TrimSpace(verdict)
-	verdictLower := strings.ToLower(verdict)
-
-	switch {
-	case strings.Contains(verdictLower, "accepted") || verdictLower == "ac":
-		return "AC"
-	case strings.Contains(verdictLower, "wrong answer") || verdictLower == "wa":
-		return "WA"
-	case strings.Contains(verdictLower, "time limit") || verdictLower == "tle":
-		return "TLE"
-	case strings.Contains(verdictLower, "runtime error") || verdictLower == "re":
-		return "RE"
-	case strings.Contains(verdictLower, "compilation error") || verdictLower == "ce":
-		return "CE"
-	case strings.Contains(verdictLower, "memory limit") || verdictLower == "mle":
-		return "MLE"
-	case strings.Contains(verdictLower, "presentation error") || verdictLower == "pe":
-		return "PE"
-	case verdictLower == "running" || verdictLower == "pending" || verdictLower == "judging":
-		return ""
-	case verdictLower == "submitted":
-		return ""
-	}
-	return ""
+// normalizeTophVerdict converts Toph's verdict text to the package vocabulary.
+//
+// Delegates to the shared mapper, which is the only place that knows the full
+// vocabulary. The copy that lived here listed seven verdicts and returned "" for
+// everything else, so a Toph MLE was indistinguishable from "still judging" and
+// the submission was polled until it timed out.
+func normalizeTophVerdict(verdict string) Verdict {
+	return normalizeVerdict(verdict)
 }
 
 // parseTophTime parses time string like "0.25s" or "250ms" to milliseconds
@@ -624,4 +606,19 @@ func parseTophMemory(s string) int {
 // TophBot does not support remote language enumeration.
 func (b *TophBot) FetchLanguages(ctx context.Context) ([]RemoteLanguageItem, error) {
 	return nil, nil
+}
+
+// SubmissionURL is the browser-facing page for a Toph submission.
+func (b *TophBot) SubmissionURL(_, remoteID string) string {
+	if remoteID == "" {
+		return ""
+	}
+	return fmt.Sprintf("%s/s/%s", b.baseURL(), remoteID)
+}
+
+// init registers this platform's factory (see registry.go).
+func init() {
+	RegisterBotFactory("toph", func(cfg BotConfig, deps BotDeps) Bot {
+		return NewTophBot(cfg)
+	})
 }

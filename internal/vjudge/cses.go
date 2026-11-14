@@ -296,3 +296,21 @@ func (b *CSESBot) SetCookies(cookies map[string]string) {}
 func (b *CSESBot) FetchLanguages(ctx context.Context) ([]RemoteLanguageItem, error) {
 	return nil, nil
 }
+
+// SubmissionURL is the browser-facing page for a CSES submission.
+//
+// CSES addresses a result as /problemset/result/<id>/, which is the same page
+// Poll fetches, so the link and the poll agree on the id's meaning.
+func (b *CSESBot) SubmissionURL(_, remoteID string) string {
+	if remoteID == "" {
+		return ""
+	}
+	return fmt.Sprintf("https://cses.fi/problemset/result/%s/", remoteID)
+}
+
+// init registers this platform's factory (see registry.go).
+func init() {
+	RegisterBotFactory("cses", func(cfg BotConfig, deps BotDeps) Bot {
+		return NewCSESBotWithStore(cfg, deps.RemoteLang)
+	})
+}
