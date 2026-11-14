@@ -312,6 +312,13 @@ export interface Contest {
     is_rated?: boolean
     rated_for_min?: number
     rated_for_max?: number
+    /**
+     * Who runs this round. Present only when the caller may read the round as
+     * content: the server withholds the roster from a caller who may not, so an
+     * absent key and an empty list are different answers and the About tab
+     * renders neither as "no organizers".
+     */
+    judges?: ContestPermission[]
 }
 
 export interface ContestNotice {

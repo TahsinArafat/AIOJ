@@ -5,7 +5,9 @@ import { errorMessage } from '../lib/errors'
 import { useDocumentTitle } from '../lib/documentTitle'
 import DivisionBadge from '../components/DivisionBadge'
 import { ContestStatusBadge, ContestFormatBadge, ContestTypeBadge } from '../components/contest/ContestBadges'
+import { ContestAboutTab } from '../components/contest/ContestAboutTab'
 import type { Division } from '../lib/divisions'
+import type { Contest } from '../types/api'
 import { EmptyState } from '../components/EmptyState'
 import {
     Trophy, FileText, MessageSquare, Users, Zap, FileDown, Pencil, Gamepad2,
@@ -113,27 +115,28 @@ function SidebarBox({ title, icon, children, accent }: {
 // rendering of the same table. The button in the tab strip opens that page.
 type Tab = 'about' | 'problems' | 'submissions' | 'clarifications' | 'announcements'
 
-/** One entry on the round's About tab: who runs it, by username. */
-interface JudgeRow { user_id?: string; username?: string; access_level?: string }
-
-interface ContestInfo {
-    title: string
-    type: string
-    format: string
-    division?: number
-    start_time: string
-    end_time: string
-    freeze_time?: string | null
-    max_participants?: number | null
-    pdf_enabled?: boolean
-    registration_required?: boolean
-    statement_hidden?: boolean
-    upsolving_enabled?: boolean
-    virtual_contest_enabled?: boolean
-    description?: string
-    /** Present when the caller may read the round as content; absent otherwise. */
-    judges?: JudgeRow[]
-}
+// The contest this page renders, derived from the shared Contest rather than
+// restated. The local copy declared pdf_enabled and registration_required as
+// optional when the server always sends them as booleans, which is the drift that
+// stopped an extracted tab from accepting the page's own state.
+type ContestInfo = Pick<
+    Contest,
+    | 'title'
+    | 'type'
+    | 'format'
+    | 'division'
+    | 'start_time'
+    | 'end_time'
+    | 'freeze_time'
+    | 'max_participants'
+    | 'pdf_enabled'
+    | 'registration_required'
+    | 'statement_hidden'
+    | 'upsolving_enabled'
+    | 'virtual_contest_enabled'
+    | 'description'
+    | 'judges'
+>
 interface ProblemRow {
     problem_id?: string; index?: string; title?: string; score?: number;
     /** Round-wide solve count, always present. */
@@ -550,91 +553,7 @@ export default function ContestDetail() {
                         wants — what is this round, and who is running it — had no
                         single place to be read. */}
                     {activeTab === 'about' && (
-                        <div className="space-y-6">
-                            <div>
-                                <h2 className="text-xl font-bold text-ink mb-4">About this round</h2>
-                                {contest.description?.trim() ? (
-                                    <p className="text-sm text-ink-soft whitespace-pre-wrap leading-relaxed">
-                                        {contest.description}
-                                    </p>
-                                ) : (
-                                    <p className="text-sm text-muted-soft">
-                                        The organizer has not added a description.
-                                    </p>
-                                )}
-                            </div>
-
-                            {/* Who runs it. Absent from the payload entirely when the
-                                caller may not read the round as content, which is the
-                                server's call — the page does not decide who may see
-                                the roster. */}
-                            {contest.judges !== undefined && (
-                                <div>
-                                    <h3 className="text-sm font-semibold text-ink uppercase tracking-wide mb-3">
-                                        Organizers
-                                    </h3>
-                                    {contest.judges.length === 0 ? (
-                                        <p className="text-sm text-muted-soft">No organizers are listed.</p>
-                                    ) : (
-                                        <ul className="flex flex-wrap gap-2">
-                                            {contest.judges.map(j => (
-                                                <li
-                                                    key={j.user_id || j.username}
-                                                    className="flex items-center gap-2 rounded-lg border border-hairline bg-surface px-3 py-1.5"
-                                                >
-                                                    <Shield className="w-3.5 h-3.5 text-muted-soft" />
-                                                    {j.username ? (
-                                                        <Link
-                                                            to={`/user/${j.username}`}
-                                                            className="text-sm font-medium text-brand hover:underline"
-                                                        >
-                                                            {j.username}
-                                                        </Link>
-                                                    ) : (
-                                                        <span className="text-sm text-ink-soft">unknown</span>
-                                                    )}
-                                                    <span className="text-[11px] uppercase tracking-wide text-muted-soft">
-                                                        {j.access_level === 'manager' ? 'manager' : 'judge'}
-                                                    </span>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* What the round offers. Not a repeat of the sidebar's
-                                Contest Info box — that one carries the schedule, format
-                                and problem count, and this one names the capabilities,
-                                which had no home anywhere. Only the features that are
-                                ON are listed: a row reading "upsolving disabled" is a
-                                list of everything that is not there. */}
-                            <div>
-                                <h3 className="text-sm font-semibold text-ink uppercase tracking-wide mb-3">
-                                    Features
-                                </h3>
-                                <ul className="flex flex-wrap gap-2">
-                                    {[
-                                        { on: contest.pdf_enabled !== false, label: 'Printable booklet' },
-                                        { on: contest.statement_hidden === true, label: 'Statements hidden (onsite)' },
-                                        { on: contest.upsolving_enabled === true, label: 'Upsolving' },
-                                        { on: contest.virtual_contest_enabled === true, label: 'Virtual participation' },
-                                    ].filter(f => f.on).map(f => (
-                                        <li
-                                            key={f.label}
-                                            className="rounded-full border border-hairline bg-surface px-3 py-1 text-xs text-ink-soft"
-                                        >
-                                            {f.label}
-                                        </li>
-                                    ))}
-                                    {contest.registration_required && (
-                                        <li className="rounded-full border border-hairline bg-surface px-3 py-1 text-xs text-ink-soft">
-                                            Registration required
-                                        </li>
-                                    )}
-                                </ul>
-                            </div>
-                        </div>
+                        <ContestAboutTab contest={contest} />
                     )}
 
                     {activeTab === 'problems' && (
