@@ -595,21 +595,30 @@ export default function ContestProblem() {
     }
 
     return (
-        <div>
+        // `lg:flex-1 lg:min-h-0`: the statement and editor panes are meant to
+        // scroll separately, which needs a bounded height. App.tsx bounds the shell
+        // at `lg`, the width the panes stop stacking (below it they stack and the
+        // document scroll is correct, so nothing applies). Flex-fill rather than a
+        // percentage height, which against an indefinite parent is what collapsed
+        // to `auto` and let the document scroll in the first place.
+        <div className="flex flex-col lg:min-h-0 lg:flex-1">
+            {/* Anything above the panes is `shrink-0`: in the bounded column flex
+                would otherwise squeeze these notices to fit the panes and clip
+                their text. */}
             {isUpcoming && contest?.start_time && (
-                <div className="mb-6">
+                <div className="mb-6 shrink-0">
                     <ContestCountdown target={contest.start_time} label="Starts in" />
                 </div>
             )}
             {isRunning && contest?.start_time && contest?.end_time && (
-                <div className="mb-6">
+                <div className="mb-6 shrink-0">
                     <ContestRunningClock start={contest.start_time} end={contest.end_time} />
                 </div>
             )}
 
             {/* Notices */}
             {upsolvingDisabled && (
-                <div className="mb-6 p-4 bg-warn/10 border border-warn/40 rounded-lg flex items-start gap-3">
+                <div className="mb-6 shrink-0 p-4 bg-warn/10 border border-warn/40 rounded-lg flex items-start gap-3">
                     <span className="text-warn text-lg mt-0.5">⚠</span>
                     <div>
                         <p className="text-warn font-medium text-sm">Upsolving is disabled</p>
@@ -621,7 +630,7 @@ export default function ContestProblem() {
             )}
 
             {statementHidden && (
-                <div className="mb-6 p-4 bg-brand-soft border border-brand/40 rounded-lg flex items-start gap-3">
+                <div className="mb-6 shrink-0 p-4 bg-brand-soft border border-brand/40 rounded-lg flex items-start gap-3">
                     <span className="text-brand mt-0.5"><ClipboardList className="w-5 h-5" /></span>
                     <div>
                         <p className="text-brand font-medium text-sm">Problem statement is hidden</p>
@@ -634,7 +643,7 @@ export default function ContestProblem() {
             )}
 
             {!canSubmit && !upsolvingDisabled && isLoggedIn && (
-                <div className="mb-6 p-4 bg-surface-2/20 border border-hairline-strong rounded-lg flex items-start gap-3">
+                <div className="mb-6 shrink-0 p-4 bg-surface-2/20 border border-hairline-strong rounded-lg flex items-start gap-3">
                     <span className="text-muted text-lg mt-0.5">🚫</span>
                     <div>
                         <p className="text-ink-soft font-medium text-sm">Submissions are closed</p>
@@ -646,7 +655,13 @@ export default function ContestProblem() {
             {/* Main split-pane layout (stacks into one column below `lg`) */}
             <div
                 ref={containerRef}
-                className={`flex h-full select-none ${isNarrow ? 'flex-col gap-6' : ''}`}
+                // The floor is doing double duty: an explicit `min-height` overrides
+                // the flex default of `min-height: auto`, which is what lets the
+                // panes shrink below their content so their own `overflow-y-auto`
+                // works, and it also stops them collapsing to nothing on a viewport
+                // shorter than the notices above them. When the floor bites, `main`
+                // overflows and scrolls.
+                className={`flex select-none ${isNarrow ? 'flex-col gap-6' : 'lg:min-h-[24rem] lg:flex-1'}`}
                 style={{ cursor: dragging ? 'col-resize' : undefined }}
             >
                 {/* LEFT: Problem content (splitPos% width) */}

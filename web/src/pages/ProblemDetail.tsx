@@ -418,7 +418,13 @@ export default function ProblemDetail() {
     }
 
     return (
-        <div ref={containerRef} className="flex flex-col h-full select-none md:flex-row" style={{ cursor: dragging ? 'col-resize' : undefined }}>
+        // `md:flex-1 md:min-h-0` rather than `md:h-full`: the panes below scroll on
+        // their own, which needs a bounded height to scroll inside. App.tsx bounds
+        // the shell at `md`, the width the panes stop stacking; below it the
+        // document scroll is the correct behaviour. Flex-fill is used instead of a
+        // percentage height because `h-full` against an indefinite parent is what
+        // silently collapsed to `auto` and let the document scroll in the first place.
+        <div ref={containerRef} className="flex flex-col select-none md:min-h-0 md:flex-1 md:flex-row" style={{ cursor: dragging ? 'col-resize' : undefined }}>
             {/* Mobile tab bar */}
             <div className="flex md:hidden border-b border-hairline bg-surface flex-shrink-0">
                 <button

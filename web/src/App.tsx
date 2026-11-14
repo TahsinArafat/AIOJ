@@ -343,15 +343,42 @@ function Home() {
 
 function AppShell() {
     const location = useLocation()
-    // Full-height workbench routes (no page chrome/footer so flex height can fill the viewport).
+    // `/ide` is full-bleed and always viewport-height: no page padding, its own
+    // chrome, no footer.
     const isFullscreenRoute = location.pathname === '/ide'
+
+    /**
+     * The two problem pages put a statement pane and an editor pane side by side,
+     * each expected to scroll on its own. `overflow-y-auto` on a pane only takes
+     * effect once it has a bounded height: with an auto-height ancestor the split
+     * container's `h-full` resolves to `auto`, both panes stretch to whichever is
+     * taller, and the *document* scrolls — so scrolling the statement dragged the
+     * editor with it. Bounding the shell is what gives the panes something to
+     * scroll inside.
+     *
+     * Only from the width where the panes actually sit side by side, which is each
+     * page's own breakpoint: ProblemDetail splits at `md`, ContestProblem stacks
+     * until `lg`. Below it the panes stack and the document scroll is correct —
+     * an `overflow-hidden` shell there would clip the lower pane.
+     */
+    const boundsViewportPerPage =
+        /^\/problems\/[^/]+\/?$/.test(location.pathname)
+            ? 'min-h-screen md:h-[100dvh] md:overflow-hidden flex flex-col bg-canvas'
+            : /^\/contests\/[^/]+\/problem\/[^/]+\/?$/.test(location.pathname)
+                ? 'min-h-screen lg:h-[100dvh] lg:overflow-hidden flex flex-col bg-canvas'
+                : null
+
+    // A bounded route gives up the footer at every width: inside a fixed-height
+    // shell it would take a row of the column and squeeze the panes, and the page
+    // reads as a workbench the way `/ide` does.
+    const hidesFooter = isFullscreenRoute || boundsViewportPerPage !== null
 
     return (
         <div
             className={
                 isFullscreenRoute
                     ? 'h-[100dvh] overflow-hidden flex flex-col bg-canvas'
-                    : 'min-h-screen flex flex-col bg-canvas'
+                    : boundsViewportPerPage ?? 'min-h-screen flex flex-col bg-canvas'
             }
         >
             <Navbar />
@@ -369,7 +396,7 @@ function AppShell() {
                 className={
                     isFullscreenRoute
                         ? 'flex-1 min-h-0 flex flex-col max-w-[1400px] mx-auto w-full min-w-0 [&>*]:w-full [&>*]:min-w-0'
-                        : 'max-w-[1400px] mx-auto w-full min-w-0 px-4 sm:px-6 py-6 sm:py-8 flex-1 min-h-0 flex flex-col [&>*]:w-full [&>*]:min-w-0'
+                        : `max-w-[1400px] mx-auto w-full min-w-0 px-4 sm:px-6 py-6 sm:py-8 flex-1 min-h-0 flex flex-col [&>*]:w-full [&>*]:min-w-0${boundsViewportPerPage ? ' overflow-y-auto' : ''}`
                 }
             >
                 <Suspense fallback={<RouteFallback />}>
@@ -456,7 +483,7 @@ function AppShell() {
                 </Routes>
                 </Suspense>
             </main>
-            {!isFullscreenRoute && (
+            {!hidesFooter && (
                 <footer className="border-t border-hairline bg-surface">
                     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-3 px-4 py-5 text-xs text-muted sm:flex-row sm:items-center sm:justify-between sm:px-6">
                         <div className="flex flex-wrap items-center gap-2">

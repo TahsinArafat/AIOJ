@@ -144,6 +144,48 @@ export async function getProblemBySlug(slug: string, token?: string): Promise<Pr
   return r.data;
 }
 
+/**
+ * Create a problem with a statement long enough to overflow a pane.
+ *
+ * `/problems/{slug}` needs a bearer token even for a published problem? No — but
+ * a fresh problem is a draft, and a draft is only readable by its author, so the
+ * caller must pass the same token it created it with.
+ */
+export async function createProblemWithLongStatement(
+  token: string,
+  slug: string,
+  paragraphs = 120,
+): Promise<Problem> {
+  const description = Array.from(
+    { length: paragraphs },
+    (_, i) => `Paragraph ${i + 1}: ${'ipsum dolor sit amet consectetur '.repeat(6)}`,
+  ).join('\n\n');
+
+  const r = await send<Problem>('POST', '/api/problems', {
+    token,
+    body: {
+      slug,
+      title: `Pane scroll ${slug}`,
+      description,
+      input_format: 'The first line contains $n$.',
+      output_format: 'Print the answer.',
+      constraints: '$1 \\le n \\le 2\\cdot10^5$',
+      time_limit: 2000,
+      memory_limit: 262144,
+      difficulty: 'easy',
+      rating: 800,
+      tags: ['implementation'],
+      sample_cases: [{ input: '3', output: '0' }],
+      // Published, so the anonymous practice-page test can read it too.
+      visible: true,
+    },
+  });
+  if (r.status !== 201 && r.status !== 200) {
+    throw new Error(`create problem failed: ${r.status} ${JSON.stringify(r.data)}`);
+  }
+  return r.data;
+}
+
 // --- submissions ----------------------------------------------------------
 
 export interface Submission {
