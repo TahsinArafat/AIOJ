@@ -18,20 +18,32 @@ Severity reflects cost to change and likelihood of causing a bug, not taste.
 
 ## Findings
 
-### 1. `Deps` is a service locator and `NewRouter` is a second program — **High**
+### 1. `Deps` is a service locator and `NewRouter` was a second program — **High** (router split fixed)
 
-`internal/api/deps.go:14`, `internal/api/router.go:16`
+`internal/api/deps.go:14`, `internal/api/router.go`
 
-`Deps` has **77 fields**. `NewRouter` is **893 lines** — longer than any file in
-`internal/store/` — and does four jobs: unpack dependencies (50 `xH := d.X`
-aliases, lines 17–66), build the feature-gate closure, assemble middleware, and
-register all 408 routes.
+`Deps` has **77 fields**. `NewRouter` was **893 lines** — longer than any file in
+`internal/store/` — doing four jobs: unpacking dependencies (46 `xH := d.X`
+aliases), building the feature-gate closure, assembling middleware, and
+registering all 408 routes.
 
-Optionality is encoded as nil rather than in the type: handlers require roughly
-40 of the 77 fields and the rest are guarded by `if d.X != nil` across **31
-sites**. Nothing prevents launching a half-wired server.
+**The route registration is split.** `NewRouter` is now 58 lines: it assembles
+the base chain and calls 16 `mount<Domain>` methods, each in its own
+`router_mount_*.go` file. The shared value they receive is `routerBuilder`
+(`router_builder.go`), which embeds `*Deps` so there is still exactly one place
+listing what the router may depend on.
 
-*Direction:* split route registration into per-domain `func mount<Domain>(r chi.Router, d Deps)` files; group `Deps` into required and optional sub-structs so wiring gaps are type errors.
+The split is verified rather than asserted. `router_table_test.go` walks the real
+chi router and pins all 294 mounted routes **with their middleware chains**, in
+`testdata/route_table.golden`. Middleware is named semantically
+(`AuthMiddleware`, `RequireRole`, …) because the runtime name of a closure
+changes under refactoring while its behaviour does not. Two focused assertions
+sit on top: every `/api/admin/*` route must carry both `AuthMiddleware` and
+`RequireRole`, and eight critical endpoints must stay mounted.
+
+**Still open:** `Deps` is still a 77-field service locator, and optionality is
+still encoded as `if d.X != nil` across 31 sites rather than in the type.
+Grouping `Deps` into required and optional sub-structs remains the fix.
 
 ### 2. Handlers depend on the Postgres implementation, not the interfaces — **High**
 
@@ -145,14 +157,29 @@ re-pagination and serialization. `Create` is 159 lines and `Update` 208.
 banding, weak-tag identification, ordering policy — in the persistence package.
 It is a query object, not a repository method.
 
-### 9. Errorless store contracts fail silently — **Medium**
+### 9. Errorless store contracts — **Low** (partly fixed)
 
-`internal/store/interfaces.go` — `HasAccess(...) bool` (×2, lines 104, 262),
-`GetUsername(...) string` (line 254).
+Original finding covered three contracts. Re-reading them separated one real
+defect from two deliberate choices.
 
-`postgres/contests.go:545` runs `QueryRow(...).Scan(...)` and **discards the
-error**, returning `""` for both "no such user" and "database down". A caller
-cannot tell the two apart.
+`GetUsername(ctx, id) string` **was** a defect: `postgres/contests.go:545` ran
+`QueryRow(...).Scan(...)` and discarded the error, returning `""` for both "no
+such user" and "database down", and it was called once per participant inside
+the scoreboard and rating loops — 500 queries for the names on a 500-entry
+board.
+
+**Fixed**: added `GetUsernames(ctx, ids) (map[string]string, error)`, one query
+for the page and one that reports its failure. The scoreboard falls back to
+blank on a failed lookup (a name must not 500 a standings page); the rating
+recalculation aborts, because it feeds an irreversible write. `GetUsername`
+survives as a documented best-effort single-row helper for the one caller that
+has a bare id.
+
+`HasAccess(...) bool` (×2) is **not** a defect and should stay as it is. It is
+called from 52 sites as a permission check, and returning `false` on a database
+error is the fail-closed answer. Converting it to `(bool, error)` would move the
+error decision into 52 callers, where the cheap mistake is
+`if err != nil { return true }`. The comment there now says so explicitly.
 
 ### 10. Inconsistent response shapes — **Medium**
 
@@ -256,6 +283,53 @@ Verified: `go build ./...` and `go vet ./internal/... ./cmd/...` clean; the
 failing-test set is byte-identical to the pre-change baseline (12 pre-existing
 failures, all `column "access_config" does not exist` against a stale test
 schema).
+
+### Finding 1 — `NewRouter`
+
+Route registration moved out of the 893-line function into 16 `mount<Domain>`
+methods, one file each:
+
+| File | Lines | Domain |
+|---|---|---|
+| `router.go` | 58 | `NewRouter`: base chain + mount order |
+| `router_builder.go` | 57 | `routerBuilder`, `gate`, `base` |
+| `router_mount_public.go` | 112 | metrics, health, status, legal, meta, sitemap, feeds, search |
+| `router_mount_admin.go` | 146 | `/api/admin` (auth + admin role) |
+| `router_mount_problems.go` | 99 | archive, i18n, testcases, import |
+| `router_mount_orgs_training.go` | 83 | organizations, classes, training, plagiarism |
+| `router_mount_social.go` | 82 | notifications, groups, teams, blog |
+| `router_mount_contest_extras.go` | 80 | adjustments, clarifications, notices, register, onsite |
+| `router_mount_contests.go` | 67 | contests, scoreboard, unlock, booklet |
+| `router_mount_auth.go` | 62 | csrf, login, register, 2FA, OAuth |
+| `router_mount_virtual_gym_hacks.go` | 48 | virtual, gym, hacks, stats |
+| `router_mount_ai.go` | 47 | AI jobs |
+| `router_mount_content.go` | 46 | editorials, keys, webhooks, recommendations |
+| `router_mount_users.go` | 37 | public profile, social graph, profile edit |
+| `router_mount_misc_top_level.go` | 31 | remote-languages, setter-apply, ws, rating |
+| `router_mount_submissions.go` | 31 | submissions, run, upsolve |
+| `router_mount_public_apiv1.go` | 30 | `/api/v1` (API-key auth) |
+
+Every registration body moved **verbatim** — comments included — with only the
+alias declarations rewritten (`authH := d.Auth` becomes `authH := b.Auth`).
+
+The harness that proves it: `router_table_test.go` pins all 294 routes with
+their middleware chains in `testdata/route_table.golden`. Middleware is recorded
+by semantic name, not by runtime symbol, because a closure's symbol name changes
+under refactoring while its behaviour does not — a table keyed on symbols fails
+on every move and gets regenerated reflexively, which is how a route table stops
+being a check. On top of the golden file:
+
+- `TestAdminRoutesRequireAuthAndAdminRole` — every `/api/admin/*` route carries
+  both `AuthMiddleware` and `RequireRole`, so relocating the admin block cannot
+  silently drop a privilege check.
+- `TestCriticalRoutesAreMounted` — names eight endpoints whose absence is a
+  security or availability failure, with the reason for each.
+- `TestMissingDepsDoNotPanic` — states the property the router always relied on:
+  a partially-wired `Deps` degrades an endpoint rather than killing startup.
+
+Both the golden diff and the admin assertion were confirmed to fail when
+`RequireRole("admin")` is deleted from the new file, so the harness guards the
+split rather than merely describing it.
 
 ### Finding 3 — `SubmissionStore`
 
