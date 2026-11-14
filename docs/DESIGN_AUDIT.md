@@ -229,14 +229,31 @@ lines) does it properly; `internal/plagiarism/`, `internal/seed/` and
 `cmd/aioj/main.go` (e.g. `FEED_TOKEN`) read the environment directly, bypassing
 validation and defaults.
 
-### 13. God page components — **Medium**
+### 13. God page components — **Medium** (partly fixed; the headline claim corrected)
 
-`web/src/pages/ContestManage.tsx` — **2062 lines, 50 `useState`, 14 `useEffect`**,
-holding 19 stateful sub-components in one file (`SettingsTab` 8 state,
-`ModeratorsTab` 6, `SubmissionsTab`, `OnsiteTeamsTab`, `StandingsTab`,
-`StatisticsTab`, `BalloonsTab`, `AnnouncementsTab`, `PrintsTab`,
-`ParticipantsTab`, `ClarificationsTab`). 18 `await api.*` calls and 41
-`setLoading`/`setError` sites with no shared fetch hook.
+`web/src/pages/ContestManage.tsx` was **2062 lines**. The first pass called it a
+god component on the strength of "50 `useState`", which overstated the case: the
+state is spread across twelve components, and no single function held most of it.
+
+Measuring the functions directly found the real outlier: **`SettingsTab` was 768
+lines** — 37% of the file — a 25-field form with its load, save, publish and eight
+pieces of state, and ~700 lines of JSX in one return. That is the item worth
+splitting, and it has been.
+
+The rest of the file is thirteen tab components of 50–120 lines each, which is a
+long page rather than an incoherent one.
+
+**Fixed:** `SettingsTab`'s two self-contained blocks are now
+`components/ContestManage/AccessTable.tsx` (the per-surface audience table) and
+`FormatSettings.tsx` (the selected format's own numbers, registry-driven),
+following the existing `components/SetterWorkspace/` precedent. State stays in the
+parent because both are one field of a form saved as a single PUT. 2062 → 1893
+lines, `SettingsTab` 768 → ~710, ten new tests.
+
+The other large pages — `ContestDetail.tsx` (1204), `Profile.tsx` (1226),
+`ContestProblem.tsx` (1017), `ProblemDetail.tsx` (853) — are untouched. Also still
+true: 18 `await api.*` calls and 41 `setLoading`/`setError` sites in ContestManage
+with no shared fetch hook, which is the duplication half of this finding.
 
 `ContestDetail.tsx` (1204), `Profile.tsx` (1226), `ContestProblem.tsx` (1017),
 `ProblemDetail.tsx` (853) have the same shape.
@@ -533,13 +550,32 @@ it correctly and watch it be ignored.
 All four now live in `Config`, env as the override, previous defaults preserved.
 `main()` has zero direct env reads.
 
+### Finding 13 — `ContestManage` settings form
+
+Measured rather than assumed: the "50 `useState`" in the first pass is spread
+across twelve components, so the god-component framing was wrong. `SettingsTab`
+alone was 768 lines, and that is what got split.
+
+`AccessTable` and `FormatSettings` are now in `components/ContestManage/`,
+following the `components/SetterWorkspace/` precedent. State stays in the parent —
+both are one field of a form saved as a single PUT, so lifting it would have split
+one save into two.
+
+Ten tests pin the behaviour that has been wrong before: clearing a surface removes
+the key rather than storing a blank audience, submit is not offered "participants
+only" (requiring an entrant to submit deadlocks the first submission), an unknown
+format says its settings are untouched rather than rendering an empty fieldset
+that a save would clear, and a stored value the registry no longer knows is still
+rendered so a save cannot silently drop it.
+
 ## Still open
 
 | Finding | What remains |
 |---|---|
 | 1 | `Deps` is still a 77-field service locator, and optionality is still `if d.X != nil` rather than a type. The route split is done. |
 | 3 | The same carve is still owed to `ContestStore`, `UserStore`, `ProblemStore`, `TrainingPlanStore`, `GroupStore` and `AIGenerationStore`. |
-| 13 | God page components — `ContestManage.tsx` at 2062 lines with 50 `useState` across 19 sub-components in one file. The largest remaining item. |
+| 13 | `ContestManage`'s settings form is split, but the file is still 1893 lines and the other four large pages (`ContestDetail` 1204, `Profile` 1226, `ContestProblem` 1017, `ProblemDetail` 853) are untouched. The missing shared fetch hook — 18 raw `await api.*` and 41 `setLoading`/`setError` sites in one page — is the duplication half. |
+| 3 (web) | The same carve is owed to `ContestStore`, `UserStore`, `ProblemStore`, `TrainingPlanStore`, `GroupStore` and `AIGenerationStore` in the Go store. |
 
 Closed since the first pass: 4 (vjudge), 6 (run modes), 7 (scoreboard), 8
 (recommendations), 9 (the real half), 10 (contest refusal), 11 (test stubs), 12
