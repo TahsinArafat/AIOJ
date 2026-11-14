@@ -21,7 +21,7 @@ import (
 // authenticated request, with ownership enforced by the route's middleware.
 type ProblemI18nHandler struct {
 	i18nStore    store.ProblemI18nStore
-	problemStore store.ProblemStore
+	problemStore problemReadAccess
 }
 
 func NewProblemI18nHandler(i18nStore store.ProblemI18nStore, problemStore store.ProblemStore) *ProblemI18nHandler {

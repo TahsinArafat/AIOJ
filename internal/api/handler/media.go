@@ -48,7 +48,7 @@ type MediaHandler struct {
 	// problems resolves the {slug} the upload route carries, so the write can be
 	// authorized against the problem it is for. Optional: the static serve path
 	// and the handler tests do not need it.
-	problems store.ProblemStore
+	problems problemSlugAccess
 }
 
 func NewMediaHandler(dir string) *MediaHandler {

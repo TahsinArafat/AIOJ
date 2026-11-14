@@ -23,7 +23,7 @@ type ApplyResult struct {
 }
 type ApplyService struct {
 	Jobs         store.AIGenerationStore
-	Problems     store.ProblemStore
+	Problems     generateProblemStore
 	Editorials   store.EditorialStore
 	Assets       GenerationAssetStore
 	Audit        store.AuditStore
@@ -228,4 +228,13 @@ func assignScores(cases []model.TestCaseScore) {
 			cases[i].Score++
 		}
 	}
+}
+
+// generateProblemStore is the problem surface the apply step touches: read the
+// target, check the caller may write it, create it, and update it.
+type generateProblemStore interface {
+	GetByID(ctx context.Context, id string) (*model.Problem, error)
+	Create(ctx context.Context, p *model.Problem) error
+	Update(ctx context.Context, id string, p *model.Problem) error
+	HasAccess(ctx context.Context, problemID, userID string, requiredLevels ...string) bool
 }

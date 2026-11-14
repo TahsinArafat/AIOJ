@@ -62,7 +62,7 @@ type WorkerPool struct {
 	langDir           string
 	sem               chan struct{}
 	subStore          submissionJudgeStore
-	probStore         store.ProblemStore
+	probStore         judgeProblemStore
 	langLimitStore    store.LanguageLimitStore
 	balloonStore      store.BalloonStore
 
@@ -466,4 +466,11 @@ type submissionJudgeStore interface {
 	GetByID(ctx context.Context, id string) (*model.Submission, error)
 	ClaimPending(ctx context.Context, id, claimToken string) (bool, error)
 	UpdateResultClaimed(ctx context.Context, id, claimToken string, status model.SubmissionStatus, score, timeUsed, memoryUsed int, compileOutput string, results []model.TestCaseResult) (bool, error)
+}
+
+// judgeProblemStore is what the worker reads and writes on a problem: the row it
+// judges, and the solve counters it advances when a verdict lands.
+type judgeProblemStore interface {
+	GetByID(ctx context.Context, id string) (*model.Problem, error)
+	UpdateCounts(ctx context.Context, id string, addSubmission, addAccepted int) error
 }

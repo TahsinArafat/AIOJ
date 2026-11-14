@@ -10,11 +10,11 @@ import (
 )
 
 type RecommendationHandler struct {
-	probStore   store.ProblemStore
+	probStore   store.ProblemReviewStore
 	ratingStore store.RatingStore
 }
 
-func NewRecommendationHandler(p store.ProblemStore, r store.RatingStore) *RecommendationHandler {
+func NewRecommendationHandler(p store.ProblemReviewStore, r store.RatingStore) *RecommendationHandler {
 	return &RecommendationHandler{probStore: p, ratingStore: r}
 }
 

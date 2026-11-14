@@ -29,6 +29,11 @@ var (
 	_ store.SubmissionRemoteJudge = (*SubmissionStore)(nil)
 	_ store.SubmissionStats       = (*SubmissionStore)(nil)
 
+	_ store.ProblemReader      = (*ProblemStore)(nil)
+	_ store.ProblemWriter      = (*ProblemStore)(nil)
+	_ store.ProblemAccessStore = (*ProblemStore)(nil)
+	_ store.ProblemReviewStore = (*ProblemStore)(nil)
+
 	_ store.ContestReader       = (*ContestStore)(nil)
 	_ store.ContestWriter       = (*ContestStore)(nil)
 	_ store.ContestProblemStore = (*ContestStore)(nil)

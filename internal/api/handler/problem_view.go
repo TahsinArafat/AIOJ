@@ -5,7 +5,6 @@ import (
 
 	"github.com/tahsinarafat/aioj/internal/auth"
 	"github.com/tahsinarafat/aioj/internal/model"
-	"github.com/tahsinarafat/aioj/internal/store"
 )
 
 /**
@@ -42,14 +41,24 @@ func redactProblem(p *model.Problem) {
 // problemIsLive reports whether the problem belongs to a contest that has not
 // finished yet. A lookup error is treated as "not live" so a database hiccup
 // degrades to today's behaviour rather than hiding every problem.
-func problemIsLive(ctx context.Context, problems store.ProblemStore, p *model.Problem) bool {
+// problemVisibility is what the visibility questions ask of a problem: the three
+// access checks that decide whether a problem's difficulty, spoilers or statement
+// may be shown. Narrower than store.ProblemAccessStore — these are reads, and the
+// permission writes are not needed to answer them.
+type problemVisibility interface {
+	HasAccess(ctx context.Context, problemID, userID string, requiredLevels ...string) bool
+	InUnreleasedContest(ctx context.Context, problemID string) (bool, error)
+	StaffedByContest(ctx context.Context, problemID, userID string) (bool, error)
+}
+
+func problemIsLive(ctx context.Context, problems problemVisibility, p *model.Problem) bool {
 	live, err := problems.InUnreleasedContest(ctx, p.ID)
 	return err == nil && live
 }
 
 // canSeeSpoilers reports whether the viewer authored or tests the problem, and so
 // is not the audience the difficulty is being hidden from.
-func canSeeSpoilers(ctx context.Context, problems store.ProblemStore, p *model.Problem, claims *auth.Claims) bool {
+func canSeeSpoilers(ctx context.Context, problems problemVisibility, p *model.Problem, claims *auth.Claims) bool {
 	if claims == nil {
 		return false
 	}
@@ -100,7 +109,7 @@ func isArchiveBlocked(claims *auth.Claims) bool {
 // canReadProblem reports whether claims may read p at all. It answers only the
 // draft question; whether a *published* problem is currently hidden because its
 // contest is still running is problemIsLive's business, not this one's.
-func canReadProblem(ctx context.Context, problems store.ProblemStore, p *model.Problem, claims *auth.Claims) bool {
+func canReadProblem(ctx context.Context, problems problemVisibility, p *model.Problem, claims *auth.Claims) bool {
 	// A contestant account is scoped to its own round and gets no archive reads,
 	// even for a published problem. Checked before the visible shortcut, which
 	// would otherwise let it through.

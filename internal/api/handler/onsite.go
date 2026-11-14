@@ -11,6 +11,32 @@ import (
 	"github.com/tahsinarafat/aioj/internal/store"
 )
 
+// problemLookup is the one problem query most surfaces make: fetch the problem a
+// request names. Declared here rather than reusing store.ProblemReader because
+// the readers also need HasAccess, and a consumer that only fetches should not
+// acquire the permission methods.
+type problemLookup interface {
+	GetByID(ctx context.Context, id string) (*model.Problem, error)
+}
+
+// problemReadAccess is "fetch this problem, and may this caller read it".
+//
+// Includes the visibility questions because canReadProblem needs them, and every
+// handler that fetches a problem to show it asks the same three.
+type problemReadAccess interface {
+	GetByID(ctx context.Context, id string) (*model.Problem, error)
+	HasAccess(ctx context.Context, problemID, userID string, requiredLevels ...string) bool
+	InUnreleasedContest(ctx context.Context, problemID string) (bool, error)
+	StaffedByContest(ctx context.Context, problemID, userID string) (bool, error)
+}
+
+// problemSlugAccess is the same pair, addressed by slug — the form the import,
+// language-limit and media endpoints receive.
+type problemSlugAccess interface {
+	GetBySlug(ctx context.Context, slug string) (*model.Problem, error)
+	HasAccess(ctx context.Context, problemID, userID string, requiredLevels ...string) bool
+}
+
 type contestLookup interface {
 	GetByID(context.Context, string) (*model.Contest, error)
 	HasAccess(context.Context, string, string, ...string) bool

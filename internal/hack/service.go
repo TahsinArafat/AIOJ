@@ -43,7 +43,7 @@ type Service struct {
 	hackStore    store.HackStore
 	contestStore contestLookup
 	subStore     submissionLookup
-	probStore    store.ProblemStore
+	probStore    problemLookup
 	judge        Runner
 }
 
@@ -134,4 +134,12 @@ func (s *Service) SubmitHack(ctx context.Context, hackerID string, req model.Hac
 		ActualOutput:   verdict.ActualOutput,
 		Message:        verdict.Detail,
 	}, nil
+}
+
+// problemLookup is the one problem query a hack needs: the problem a submission
+// belongs to, so the judge can run it. Already declared in the handler package
+// for the same shape; repeated here because hack is a separate package and the
+// interfaces are deliberately consumer-local.
+type problemLookup interface {
+	GetByID(ctx context.Context, id string) (*model.Problem, error)
 }

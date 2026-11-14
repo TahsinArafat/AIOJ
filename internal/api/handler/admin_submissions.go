@@ -37,12 +37,12 @@ type adminSubmissionStore interface {
 
 type AdminSubmissionHandler struct {
 	subStore  adminSubmissionStore
-	probStore store.ProblemStore
+	probStore store.ProblemReader
 	queue     queue.JudgeQueue
 	vjudgeSvc *vjudge.Service
 }
 
-func NewAdminSubmissionHandler(subStore adminSubmissionStore, probStore store.ProblemStore, vjSvc *vjudge.Service) *AdminSubmissionHandler {
+func NewAdminSubmissionHandler(subStore adminSubmissionStore, probStore store.ProblemReader, vjSvc *vjudge.Service) *AdminSubmissionHandler {
 	return &AdminSubmissionHandler{subStore: subStore, probStore: probStore, vjudgeSvc: vjSvc}
 }
 

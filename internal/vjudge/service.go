@@ -51,7 +51,7 @@ type Service struct {
 	mu              sync.RWMutex
 	bots            map[string]Bot
 	subStore        remoteSubmissionStore
-	probStore       store.ProblemStore
+	probStore       problemLookup
 	botAccStore     store.BotAccountStore
 	remoteLangStore store.RemoteLanguageStore
 	pollCancel      context.CancelFunc
@@ -521,4 +521,10 @@ func (s *Service) finishRemote(ctx context.Context, submissionID string, r *Remo
 	s.subStore.UpdateResult(ctx, submissionID, r.Verdict.Status(), 0, r.TimeUsed, r.MemoryUsed, "", nil)
 	slog.Info("vjudge judged", "sub", submissionID, "verdict", r.Verdict,
 		"time", r.TimeUsed, "mem", r.MemoryUsed)
+}
+
+// problemLookup is the one problem query the remote judge makes: resolve the
+// local problem a remote submission belongs to.
+type problemLookup interface {
+	GetByID(ctx context.Context, id string) (*model.Problem, error)
 }

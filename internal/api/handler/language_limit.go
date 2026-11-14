@@ -12,10 +12,10 @@ import (
 
 type LanguageLimitHandler struct {
 	langLimitStore store.LanguageLimitStore
-	problemStore   store.ProblemStore
+	problemStore   problemSlugAccess
 }
 
-func NewLanguageLimitHandler(langLimitStore store.LanguageLimitStore, problemStore store.ProblemStore) *LanguageLimitHandler {
+func NewLanguageLimitHandler(langLimitStore store.LanguageLimitStore, problemStore problemSlugAccess) *LanguageLimitHandler {
 	return &LanguageLimitHandler{langLimitStore: langLimitStore, problemStore: problemStore}
 }
 

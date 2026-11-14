@@ -12,7 +12,7 @@ import (
 // queries are what a stats page is, and all three are used.
 type StatsHandler struct {
 	subStore     store.SubmissionStats
-	problemStore store.ProblemStore
+	problemStore problemReadAccess
 }
 
 func NewStatsHandler(ss store.SubmissionStats, ps store.ProblemStore) *StatsHandler {

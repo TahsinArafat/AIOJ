@@ -84,7 +84,7 @@ type ContestHandler struct {
 	contestHandlerAccess
 	store        store.ContestStore
 	ratingStore  store.RatingStore
-	problemStore store.ProblemStore
+	problemStore problemReadAccess
 	userStore    contestUserStore
 	teamStore    store.TeamStore
 	cache        *scoreboardCache

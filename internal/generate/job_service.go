@@ -17,7 +17,7 @@ import (
 type JobService struct {
 	Jobs     store.AIGenerationStore
 	Models   store.AIModelStore
-	Problems store.ProblemStore
+	Problems problemReadAccess
 }
 type CreateJobRequest struct {
 	ProblemID    *string
@@ -238,4 +238,11 @@ func (w *JobWorker) processOne(ctx context.Context) bool {
 	proposalJSON, _ := json.Marshal(proposal)
 	_ = w.Jobs.Complete(ctx, job.ID, token, proposalJSON, reportJSON, result.PromptTokens, result.CompletionTokens, int(time.Since(start).Milliseconds()))
 	return true
+}
+
+// problemReadAccess is what the job service asks of a problem: fetch it, and
+// check the caller may read it.
+type problemReadAccess interface {
+	GetByID(ctx context.Context, id string) (*model.Problem, error)
+	HasAccess(ctx context.Context, problemID, userID string, requiredLevels ...string) bool
 }

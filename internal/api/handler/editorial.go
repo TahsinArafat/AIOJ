@@ -16,7 +16,7 @@ type EditorialHandler struct {
 	// handler asks the same object every other surface asks.
 	contestHandlerAccess
 	store        store.EditorialStore
-	problemStore store.ProblemStore
+	problemStore problemReadAccess
 	contestStore contestReadAccess
 }
 

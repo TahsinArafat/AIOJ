@@ -104,8 +104,18 @@ type EmailVerificationTokenStore interface {
 	MarkUsed(ctx context.Context, id string) error
 }
 
+// ProblemStore is the whole problem surface. Prefer one of the roles below: of
+// nineteen consumers, twelve need one to three methods, and only the problem
+// handler spans the set.
 type ProblemStore interface {
-	Create(ctx context.Context, p *model.Problem) error
+	ProblemReader
+	ProblemWriter
+	ProblemAccessStore
+	ProblemReviewStore
+}
+
+// ProblemReader is the archive: the listings and the single-problem lookups.
+type ProblemReader interface {
 	GetByID(ctx context.Context, id string) (*model.Problem, error)
 	GetBySlug(ctx context.Context, slug string) (*model.Problem, error)
 	// List returns the public archive for ordinary callers. admin=true widens
@@ -118,6 +128,34 @@ type ProblemStore interface {
 	// problems this user may attach (created by them, or shared with them).
 	ListSelectable(ctx context.Context, userID string, offset, limit int, search string) ([]model.ProblemListItem, int, error)
 	GetAllTags(ctx context.Context) ([]string, error)
+}
+
+// ProblemWriter is authoring: create, edit, delete, and the counters the judge
+// updates as submissions land.
+type ProblemWriter interface {
+	Create(ctx context.Context, p *model.Problem) error
+	Update(ctx context.Context, id string, p *model.Problem) error
+	Delete(ctx context.Context, id string) error
+	// UpdateCounts adjusts the cached solve and submission totals. Called by the
+	// judge on each verdict rather than recomputing, which is why it is a delta.
+	UpdateCounts(ctx context.Context, id string, addSubmission, addAccepted int) error
+}
+
+// ProblemAccessStore answers "may this caller see or edit this problem".
+//
+// Separate from the reader because these are consulted on every problem surface
+// and are the ones a test double most often needs to control.
+type ProblemAccessStore interface {
+	AddPermission(ctx context.Context, problemID, userID, accessLevel string) error
+	RemovePermission(ctx context.Context, problemID, userID string) error
+	GetPermissions(ctx context.Context, problemID string) ([]model.ProblemPermission, error)
+	// HasAccess reports whether the user holds one of requiredLevels. Fails closed
+	// on a store error, for the reason given on the contest store's HasAccess.
+	HasAccess(ctx context.Context, problemID, userID string, requiredLevels ...string) bool
+	// ListAccessLevels returns the user's access level per problem, omitting
+	// problems they have no permission row for. One query for a whole page of
+	// submissions instead of one HasAccess call per row.
+	ListAccessLevels(ctx context.Context, userID string, problemIDs []string) (map[string]string, error)
 	// InUnreleasedContest reports whether the problem is being used by a contest
 	// that is open right now, so public reads can withhold its difficulty metadata
 	// and keep it out of the archive. An upcoming or unpublished round is false.
@@ -127,28 +165,20 @@ type ProblemStore interface {
 	// problem a different setter attached to the round they both run, without
 	// granting anything on the public archive.
 	StaffedByContest(ctx context.Context, problemID, userID string) (bool, error)
-	UpdateCounts(ctx context.Context, id string, addSubmission, addAccepted int) error
-	Update(ctx context.Context, id string, p *model.Problem) error
-	Delete(ctx context.Context, id string) error
+}
+
+// ProblemReviewStore is the review workflow: the queue, and the verdict that
+// moves a problem into or out of the public archive.
+type ProblemReviewStore interface {
 	// SetReviewState applies an admin verdict. It also derives visible from the
 	// new status, so approval is the only path to a public problem.
 	SetReviewState(ctx context.Context, id, status, note, reviewerID string) error
 	// ListByStatus is the review queue (status = pending) and the setter's
 	// filtered views.
 	ListByStatus(ctx context.Context, status string, offset, limit int) ([]model.ProblemListItem, int, error)
-	AddPermission(ctx context.Context, problemID, userID, accessLevel string) error
-	RemovePermission(ctx context.Context, problemID, userID string) error
-	GetPermissions(ctx context.Context, problemID string) ([]model.ProblemPermission, error)
-	// HasAccess reports whether the user holds one of requiredLevels on this
-	// problem. The bare bool is deliberate and must stay: a store failure is
-	// reported as false, which is the fail-closed answer for a permission check.
-	// Returning (bool, error) would move that decision into every caller, where
-	// the cheap mistake is to allow on error.
-	HasAccess(ctx context.Context, problemID, userID string, requiredLevels ...string) bool
-	// ListAccessLevels returns the user's access level per problem, omitting
-	// problems they have no permission row for. One query for a whole page of
-	// submissions instead of one HasAccess call per row.
-	ListAccessLevels(ctx context.Context, userID string, problemIDs []string) (map[string]string, error)
+	// GetRecommendations is the personalized suggestion list. It lives with the
+	// review role only because it is a report over visible problems; the policy
+	// behind it is internal/recommend.
 	GetRecommendations(ctx context.Context, userID string, currentRating int) (*model.RecommendationsResponse, error)
 }
 
