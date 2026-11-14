@@ -1,12 +1,16 @@
 package api
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"reflect"
 	"regexp"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/tahsinarafat/aioj/internal/model"
 )
 
 /**
@@ -40,17 +44,38 @@ func completeDeps(t *testing.T) Deps {
 		case reflect.Func:
 			f.Set(reflect.MakeFunc(f.Type(), func([]reflect.Value) []reflect.Value { return nil }))
 		case reflect.Interface:
-			// A non-nil interface needs a concrete value implementing it, and there
-			// is no generic one. APIKeyUsers is the only interface field, and its
-			// single method shape is known, so a stub satisfies it.
-			stub := reflect.New(f.Type().Elem())
-			if m, ok := f.Type().MethodByName(""); ok {
-				_ = m
-			}
-			f.Set(stub)
+			// An interface needs a concrete value implementing it, and reflection
+			// cannot invent one — calling Elem on an interface type panics, which
+			// is what the first version of this fixture did. APIKeys and
+			// APIKeyUsers are the only interface fields, and both are set below.
 		}
 	}
+
+	d.APIKeys = stubAPIKeyVerifier{}
+	d.APIKeyUsers = stubAPIKeyUserLookup{}
+
 	return d
+}
+
+// stubAPIKeyVerifier satisfies APIVerifier for the fixture.
+type stubAPIKeyVerifier struct{}
+
+func (stubAPIKeyVerifier) GetByHash(context.Context, string) (*model.APIKey, error) {
+	return &model.APIKey{}, nil
+}
+func (stubAPIKeyVerifier) UpdateLastUsed(context.Context, string) error { return nil }
+func (stubAPIKeyVerifier) IncrementRequestCount(context.Context, string, time.Time) error {
+	return nil
+}
+func (stubAPIKeyVerifier) GetRequestCount(context.Context, string, time.Time) (int, error) {
+	return 0, nil
+}
+
+// stubAPIKeyUserLookup satisfies APIUserLookup for the fixture.
+type stubAPIKeyUserLookup struct{}
+
+func (stubAPIKeyUserLookup) GetByID(context.Context, string) (*model.User, error) {
+	return &model.User{}, nil
 }
 
 func TestValidateWiringAcceptsCompleteDeps(t *testing.T) {
