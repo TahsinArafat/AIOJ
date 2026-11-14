@@ -20,18 +20,20 @@ import (
 // problem share would fail back to the generic site card.
 func TestRouterMountsMetaRoutes(t *testing.T) {
 	mux := NewRouter(Deps{
-		Meta: &handler.MetaHandler{
-			Origin: func() string { return "https://aioj0.cyou" },
-			ProblemCard: func(_ context.Context, slug string) (*handler.ShareCard, error) {
-				if slug != "hello" {
-					return nil, nil
-				}
-				return &handler.ShareCard{
-					Title:       "Hello",
-					Description: "Print hello.",
-					Path:        "/problems/hello",
-					Kind:        "article",
-				}, nil
+		Optional: OptionalDeps{
+			Meta: &handler.MetaHandler{
+				Origin: func() string { return "https://aioj0.cyou" },
+				ProblemCard: func(_ context.Context, slug string) (*handler.ShareCard, error) {
+					if slug != "hello" {
+						return nil, nil
+					}
+					return &handler.ShareCard{
+						Title:       "Hello",
+						Description: "Print hello.",
+						Path:        "/problems/hello",
+						Kind:        "article",
+					}, nil
+				},
 			},
 		},
 	}, nil)

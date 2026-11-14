@@ -50,8 +50,8 @@ func NewRouter(d Deps, jwtManager *auth.JWTManager) http.Handler {
 
 	// Serve uploads through the media handler, not http.FileServer: FileServer
 	// lists the directory for /media/ and serves whatever happens to be in it.
-	if b.Media != nil {
-		r.With(b.gate(feature.KeyMediaUploads)).Handle("/media/*", http.HandlerFunc(b.Media.Serve))
+	if b.Optional.Media != nil {
+		r.With(b.gate(feature.KeyMediaUploads)).Handle("/media/*", http.HandlerFunc(b.Optional.Media.Serve))
 	}
 
 	return r

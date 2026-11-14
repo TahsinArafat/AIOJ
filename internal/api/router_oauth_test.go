@@ -19,10 +19,12 @@ import (
 // stranded on /oauth/complete with a ticket it could never spend.
 func TestRouterMountsOAuthSignupRoutes(t *testing.T) {
 	mux := NewRouter(Deps{
-		OAuthCallback: &handler.OAuthCallbackHandler{
-			StateSecret: []byte("router-test-secret"),
-			StateTTL:    time.Minute,
-			RespondJSON: true,
+		Optional: OptionalDeps{
+			OAuthCallback: &handler.OAuthCallbackHandler{
+				StateSecret: []byte("router-test-secret"),
+				StateTTL:    time.Minute,
+				RespondJSON: true,
+			},
 		},
 	}, nil)
 

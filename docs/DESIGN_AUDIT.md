@@ -58,9 +58,12 @@ into an empty 500 that named nothing. Verified directly:
 at boot with every gap named, and `TestOptionalListMatchesMountGuards` keeps the
 hand-maintained optional list honest against the actual guards in the mount files.
 
-**Still open:** the 77 fields are still one flat struct, so nothing distinguishes
-a required handler from a gated one at the type level. Grouping them into
-required and optional sub-structs is the remaining half.
+**The remaining half is done.** `Deps` now has the 51 required fields at the top
+level and the 27 optional ones in `Deps.Optional`, so "may be unset" is expressed
+by where a field lives. `ValidateWiring` checks only the top level, and
+`TestOptionalFieldsLiveInOptional` parses the mount files to assert every
+nil-guarded field is declared on `OptionalDeps` — the structural version of the
+check that used to keep a hand-written map honest. The map is gone.
 
 ### 2. Handlers depend on the Postgres implementation, not the interfaces — **High**
 
@@ -636,8 +639,8 @@ consumer survey rather than a method count.
 
 | Finding | What remains |
 |---|---|
-| 1 | The route split is done and an unwired required handler now fails at boot rather than per request. Still open: the 77 fields remain one flat struct, so nothing distinguishes required from optional at the type level. |
-| 13 | `ContestManage` is down to 1880 lines with a shared fetch hook, but the other four large pages (`ContestDetail` 1204, `Profile` 1226, `ContestProblem` 1017, `ProblemDetail` 853) are untouched. |
+| 1 | Closed. `NewRouter` is 58 lines plus 16 mount files; `Deps` separates required fields from `Deps.Optional`; and an unwired required handler fails at boot. |
+| 13 | `ContestManage` 1880 and `ContestDetail` 1123, both with the shared fetch hook and an extracted tab. `Profile` (1226), `ContestProblem` (1072) and `ProblemDetail` (877) remain, but each is already built from 12+ shared modules — long because it renders a lot, not because it is tangled. |
 
 Closed since the first pass: 3 (every store that had more than one consumer),
 4 (vjudge), 6 (run

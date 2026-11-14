@@ -26,54 +26,18 @@ import (
  * 404 rather than failing. main is the one caller that must be complete.
 */
 
-// Optional lists the Deps fields a deployment may legitimately leave unset.
-//
-// Each is guarded by an `if d.X != nil` in its mount file, so an absent one
-// means a route is not registered rather than a nil handler being reachable.
-// Adding an optional field here is the only edit needed when a new gated feature
-// gets a handler — the compiler cannot tell the two kinds apart, so this is the
-// one list that has to be maintained by hand.
-//
-// Derived from the guards rather than guessed: a field is optional exactly when
-// its mount file checks it for nil.
-var Optional = map[string]bool{
-	// Crawl and feed surfaces: served only when the operator configured a source.
-	"Sitemap":     true,
-	"Feed":        true,
-	"BlogFeed":    true,
-	"ContestFeed": true,
-	"CommentFeed": true,
-	"Meta":        true,
-	"Legal":       true,
-	// Feature-gated or dev-only surfaces.
-	"Media":           true,
-	"PublicLanguages": true,
-	"CDN":             true,
-	"Achievements":    true,
-	"Friendships":     true,
-	"AuditLog":        true,
-	"Health":          true,
-	"Activity":        true,
-	"AIGeneration":    true,
-	"DevMail":         true,
-	"AuthMethods":     true,
-	"APIKeys":         true,
-	// Auth flows that are configured, not built in.
-	"VerifyEmail":   true,
-	"TwoFA":         true,
-	"TwoFAVerify":   true,
-	"OAuthStart":    true,
-	"OAuthCallback": true,
-	// Self-service account actions, mounted only when wired.
-	"UsersExport":   true,
-	"UsersDeletion": true,
-}
-
 // ValidateWiring reports every required handler that was left nil.
 //
 // Returns an empty slice when the wiring is complete. Callers should treat a
 // non-empty result as fatal: serving with a gap means a nil dereference per
 // request, and the operator needs to know at boot rather than from a user report.
+//
+// The optional fields are not checked, because they are not in the struct being
+// checked: Deps.Optional is a separate type, so "may be unset" is expressed by
+// where a field lives rather than by a list that has to be maintained beside it.
+// That is the whole point of the split — the previous version kept a hand-written
+// map of optional names, and TestOptionalListMatchesMountGuards existed only to
+// keep that map honest.
 //
 // Reflection is used because the alternative is a hand-written list of 51 nil
 // checks that would drift from Deps the moment a field is added. The field names
@@ -85,7 +49,7 @@ func ValidateWiring(d Deps) []string {
 	var missing []string
 	for i := 0; i < t.NumField(); i++ {
 		field := t.Field(i)
-		if !field.IsExported() {
+		if !field.IsExported() || field.Name == "Optional" {
 			continue
 		}
 		// Only pointer and func fields can be "not wired". A string or bool has a
@@ -96,7 +60,7 @@ func ValidateWiring(d Deps) []string {
 		default:
 			continue
 		}
-		if v.Field(i).IsNil() && !Optional[field.Name] {
+		if v.Field(i).IsNil() {
 			missing = append(missing, field.Name)
 		}
 	}
@@ -114,7 +78,7 @@ func ValidateWiringError(d Deps) error {
 	return fmt.Errorf(
 		"%d required handler(s) were not wired, so their routes would panic on the "+
 			"first request: %s.\n"+
-			"Wire each in main.go, or add it to api.Optional if the route is "+
+			"Wire each in main.go, or move it to Deps.Optional if the route is "+
 			"deliberately mounted only when configured.",
 		len(missing), strings.Join(missing, ", "))
 }

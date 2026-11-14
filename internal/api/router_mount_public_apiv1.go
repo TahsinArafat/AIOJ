@@ -16,9 +16,9 @@ func (b *routerBuilder) mountPublicAPIv1(r chi.Router) {
 	// middleware read the header — so the feature was keys-only. A narrow,
 	// obviously-safe surface is the right first step; widening it later is easy
 	// and shrinking a wide one is not.
-	if b.APIKeys != nil && b.APIKeyUsers != nil {
+	if b.Optional.APIKeys != nil && b.Optional.APIKeyUsers != nil {
 		r.Route("/api/v1", func(r chi.Router) {
-			r.Use(middleware.APIKeyAuth(b.APIKeys, b.APIKeyUsers))
+			r.Use(middleware.APIKeyAuth(b.Optional.APIKeys, b.Optional.APIKeyUsers))
 			r.Get("/problems", problemH.List)
 			r.Get("/problems/tags", problemH.ListTags)
 			r.With(middleware.OptionalAuthMiddleware(b.jwt)).Get("/problems/{slug}", problemH.GetBySlug)

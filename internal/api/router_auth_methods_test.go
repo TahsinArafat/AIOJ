@@ -41,7 +41,9 @@ func (r *routeStore) Delete(_ context.Context, _ string) error {
 func TestRouterMountsAuthMethodRoutes(t *testing.T) {
 	methods := authmethod.NewResolver(&routeStore{}, authmethod.Configured{Google: true, GitHub: false})
 	mux := NewRouter(Deps{
-		AuthMethods: &handler.AuthMethodsHandler{Methods: methods},
+		Optional: OptionalDeps{
+			AuthMethods: &handler.AuthMethodsHandler{Methods: methods},
+		},
 	}, nil)
 
 	t.Run("public endpoint is served anonymously", func(t *testing.T) {

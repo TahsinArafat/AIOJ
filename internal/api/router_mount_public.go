@@ -16,14 +16,14 @@ func (b *routerBuilder) mountPublic(r chi.Router) {
 	// Prometheus scrapes with METRICS_TOKEN; an admin access token also works.
 	r.With(middleware.MetricsAuth(b.MetricsToken, b.jwt)).Get("/metrics", promhttp.Handler().ServeHTTP)
 
-	if b.Health != nil {
-		r.Get("/api/health", b.Health.Health)
+	if b.Optional.Health != nil {
+		r.Get("/api/health", b.Optional.Health.Health)
 	} else {
 		r.Get("/api/health", func(w http.ResponseWriter, _ *http.Request) { w.Write([]byte(`{"status":"ok"}`)) })
 	}
 
-	if b.Activity != nil {
-		r.Get("/api/activity", b.Activity.List)
+	if b.Optional.Activity != nil {
+		r.Get("/api/activity", b.Optional.Activity.List)
 	}
 
 	// Feature gate decisions for the caller. Optional auth so a signed-in user
@@ -44,31 +44,31 @@ func (b *routerBuilder) mountPublic(r chi.Router) {
 		_, _ = w.Write(b)
 	})
 
-	if b.Legal != nil {
-		r.Get("/api/legal/{doc}", b.Legal.Serve)
+	if b.Optional.Legal != nil {
+		r.Get("/api/legal/{doc}", b.Optional.Legal.Serve)
 	}
 
 	// Crawler-facing HTML for link previews. nginx rewrites social-network user
 	// agents from /problems/hello to /meta/problems/hello; browsers never reach
 	// these routes. The static "problems" child is registered so it wins over
 	// the catch-all, which serves every other route's site default card.
-	if b.Meta != nil {
-		r.Get("/meta", b.Meta.Page)
-		r.Get("/meta/*", b.Meta.Page)
-		r.Get("/meta/problems/{slug}", b.Meta.Problem)
+	if b.Optional.Meta != nil {
+		r.Get("/meta", b.Optional.Meta.Page)
+		r.Get("/meta/*", b.Optional.Meta.Page)
+		r.Get("/meta/problems/{slug}", b.Optional.Meta.Problem)
 	}
 
 	// Public sitemap for crawlers. Built from the same public-visibility rules
 	// the problem/contest APIs apply, so it never advertises an auth-gated URL.
-	if b.Sitemap != nil {
+	if b.Optional.Sitemap != nil {
 		r.Get("/sitemap.xml", func(w http.ResponseWriter, req *http.Request) {
-			handler.ServeSitemapSections(b.Sitemap(req.Context()), w, req)
+			handler.ServeSitemapSections(b.Optional.Sitemap(req.Context()), w, req)
 		})
 	}
 
-	if b.ContestFeed != nil {
+	if b.Optional.ContestFeed != nil {
 		r.Get("/feed/contests.atom", func(w http.ResponseWriter, req *http.Request) {
-			items, err := b.ContestFeed(req.Context())
+			items, err := b.Optional.ContestFeed(req.Context())
 			handler.ServeAtomFeed(items, err,
 				"AIOJ — Contests", "Recent and upcoming contests on AIOJ",
 				"http://localhost:8081/feed/contests.atom",
@@ -76,9 +76,9 @@ func (b *routerBuilder) mountPublic(r chi.Router) {
 		})
 	}
 
-	if b.CommentFeed != nil {
+	if b.Optional.CommentFeed != nil {
 		r.Get("/feed/comments.atom", func(w http.ResponseWriter, req *http.Request) {
-			items, err := b.CommentFeed(req.Context())
+			items, err := b.Optional.CommentFeed(req.Context())
 			handler.ServeAtomFeed(items, err,
 				"AIOJ — Comments", "The latest comments on AIOJ",
 				"http://localhost:8081/feed/comments.atom",
@@ -86,9 +86,9 @@ func (b *routerBuilder) mountPublic(r chi.Router) {
 		})
 	}
 
-	if b.Feed != nil {
+	if b.Optional.Feed != nil {
 		r.Get("/feed/problems.atom", func(w http.ResponseWriter, req *http.Request) {
-			items, err := b.Feed(req.Context())
+			items, err := b.Optional.Feed(req.Context())
 			handler.ServeAtomFeed(items, err,
 				"AIOJ — New Problems", "The latest problems added to AIOJ",
 				"http://localhost:8081/feed/problems.atom",
@@ -96,9 +96,9 @@ func (b *routerBuilder) mountPublic(r chi.Router) {
 		})
 	}
 
-	if b.BlogFeed != nil {
+	if b.Optional.BlogFeed != nil {
 		r.Get("/feed/blog.atom", func(w http.ResponseWriter, req *http.Request) {
-			items, err := b.BlogFeed(req.Context())
+			items, err := b.Optional.BlogFeed(req.Context())
 			handler.ServeAtomFeed(items, err,
 				"AIOJ — Blog", "The latest posts from AIOJ",
 				"http://localhost:8081/feed/blog.atom",

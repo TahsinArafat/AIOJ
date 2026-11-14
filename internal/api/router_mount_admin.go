@@ -22,8 +22,8 @@ func (b *routerBuilder) mountAdmin(r chi.Router) {
 		// accepts ?token=; everywhere else it would leak into access logs.
 		r.Use(middleware.AuthMiddleware(b.jwt, "/api/admin/backups/"))
 		r.Use(middleware.RequireRole("admin"))
-		if b.AuditLog != nil {
-			am := &middleware.AuditRecorder{Store: b.AuditLog.Audit}
+		if b.Optional.AuditLog != nil {
+			am := &middleware.AuditRecorder{Store: b.Optional.AuditLog.Audit}
 			r.Use(am.Middleware)
 		}
 		r.Get("/users", adminH.ListUsers)
@@ -65,10 +65,10 @@ func (b *routerBuilder) mountAdmin(r chi.Router) {
 			r.Delete("/{key}", settingsH.Delete)
 		})
 
-		if b.AuthMethods != nil {
+		if b.Optional.AuthMethods != nil {
 			r.Route("/auth-methods", func(r chi.Router) {
-				r.Get("/", b.AuthMethods.AdminGet)
-				r.Put("/", b.AuthMethods.AdminSet)
+				r.Get("/", b.Optional.AuthMethods.AdminGet)
+				r.Put("/", b.Optional.AuthMethods.AdminSet)
 			})
 		}
 
@@ -82,13 +82,13 @@ func (b *routerBuilder) mountAdmin(r chi.Router) {
 			})
 		}
 
-		if b.CDN != nil {
-			r.Get("/cdn/status", b.CDN.Status)
-			r.Post("/cdn/purge", b.CDN.Purge)
+		if b.Optional.CDN != nil {
+			r.Get("/cdn/status", b.Optional.CDN.Status)
+			r.Post("/cdn/purge", b.Optional.CDN.Purge)
 		}
 
-		if b.AuditLog != nil {
-			r.Get("/audit-log", b.AuditLog.List)
+		if b.Optional.AuditLog != nil {
+			r.Get("/audit-log", b.Optional.AuditLog.List)
 		}
 
 		r.Route("/languages", func(r chi.Router) {

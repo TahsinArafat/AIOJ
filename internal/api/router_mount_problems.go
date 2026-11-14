@@ -13,7 +13,7 @@ func (b *routerBuilder) mountProblems(r chi.Router) {
 	testcaseH := b.Testcase
 	langLimitH := b.LangLimit
 	importH := b.Import
-	mediaH := b.Media
+	mediaH := b.Optional.Media
 	r.Route("/api/problems", func(r chi.Router) {
 		r.Use(b.gate(feature.KeyProblems))
 		// Optional auth: the archive itself is public, but a generated contestant

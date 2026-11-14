@@ -51,8 +51,8 @@ func completeDeps(t *testing.T) Deps {
 		}
 	}
 
-	d.APIKeys = stubAPIKeyVerifier{}
-	d.APIKeyUsers = stubAPIKeyUserLookup{}
+	d.Optional.APIKeys = stubAPIKeyVerifier{}
+	d.Optional.APIKeyUsers = stubAPIKeyUserLookup{}
 
 	return d
 }
@@ -103,9 +103,9 @@ func TestValidateWiringNamesTheGap(t *testing.T) {
 // leaves a gated feature off would refuse to boot.
 func TestValidateWiringIgnoresOptional(t *testing.T) {
 	d := completeDeps(t)
-	d.Meta = nil
-	d.Health = nil
-	d.Media = nil
+	d.Optional.Meta = nil
+	d.Optional.Health = nil
+	d.Optional.Media = nil
 
 	if missing := ValidateWiring(d); len(missing) != 0 {
 		t.Errorf("optional fields were reported as missing: %v", missing)
@@ -125,11 +125,14 @@ func TestValidateWiringIgnoresScalars(t *testing.T) {
 	}
 }
 
-// The optional list is maintained by hand, so it can drift from the guards in
-// the mount files. A field guarded in a mount but missing from Optional would
-// make a legitimate deployment refuse to boot; an entry no longer guarded would
-// let a required handler through. Both are checked against the source.
-func TestOptionalListMatchesMountGuards(t *testing.T) {
+// The required and optional sets are now types, not lists, so the property to
+// pin is structural: every nil-guarded field lives in Deps.Optional, and no field
+// in Deps (outside Optional) is guarded.
+//
+// This replaces a test that checked a hand-written map against the guards. The map
+// is gone, so there is nothing to keep in sync — but the *placement* can still be
+// wrong, and this is what says so.
+func TestOptionalFieldsLiveInOptional(t *testing.T) {
 	guarded := map[string]bool{}
 
 	files, err := filepath.Glob("router*.go")
@@ -140,7 +143,8 @@ func TestOptionalListMatchesMountGuards(t *testing.T) {
 		t.Fatal("found no router files; the test cannot see the mounts")
 	}
 
-	guard := regexp.MustCompile(`if\s+(?:b\.|d\.)?([A-Z][A-Za-z]*)\s*!=\s*nil`)
+	// Matches both `b.Optional.X != nil` and a bare `b.X != nil`.
+	guard := regexp.MustCompile(`if\s+b\.(?:Optional\.)?([A-Z][A-Za-z]*)\s*!=\s*nil`)
 	for _, f := range files {
 		if strings.HasSuffix(f, "_test.go") {
 			continue
@@ -154,16 +158,30 @@ func TestOptionalListMatchesMountGuards(t *testing.T) {
 		}
 	}
 
+	if len(guarded) == 0 {
+		t.Fatal("found no nil guards; the test cannot see the mounts")
+	}
+
+	// Every guarded field must be declared on OptionalDeps. A guarded field left
+	// on Deps means the guard is dead code and the field is really required —
+	// ValidateWiring would refuse to boot without it while the mount file says it
+	// may be absent.
+	optType := reflect.TypeOf(OptionalDeps{})
 	for name := range guarded {
-		if !Optional[name] {
-			t.Errorf("%s is nil-guarded in a mount file but missing from Optional, "+
-				"so a deployment that leaves it unset would refuse to boot", name)
+		if _, ok := optType.FieldByName(name); !ok {
+			t.Errorf("%s is nil-guarded in a mount file but is not a field of "+
+				"OptionalDeps, so the guard is unreachable", name)
 		}
 	}
-	for name := range Optional {
-		if !guarded[name] {
-			t.Errorf("Optional lists %s but no mount file guards it, so a nil %s "+
-				"would be reachable and panic on the first request", name, name)
+
+	// And nothing in OptionalDeps may be guarded at the top level.
+	depsType := reflect.TypeOf(Deps{})
+	optField, _ := depsType.FieldByName("Optional")
+	for i := 0; i < optType.NumField(); i++ {
+		name := optType.Field(i).Name
+		if _, ok := depsType.FieldByName(name); ok {
+			t.Errorf("%s is declared on both Deps and OptionalDeps", name)
 		}
 	}
+	_ = optField
 }

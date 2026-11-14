@@ -608,217 +608,13 @@ Restore from the pre-deploy dump if the schema is unrecoverable.`, err)
 	submissionH.WithAudit(auditH)
 
 	deps := api.Deps{
-		Auth:          authH,
-		VerifyEmail:   verifyH,
-		TwoFA:         twoFAH,
-		TwoFAVerify:   twoFAVerifyH,
-		OAuthStart:    oauthStartH,
-		OAuthCallback: oauthCallbackH,
-		AuthMethods:   authMethodsH,
-		Legal:         &handler.LegalHandler{},
-		UsersExport:   &handler.UsersExportHandler{Data: handler.NewUserDataAggregator(userStore, submissionStore)},
-		UsersDeletion: &handler.UsersDeletionHandler{Users: userStore, Deleter: handler.NewUserCascadeDeleter(db)},
-		CSRFSecret:    cfg.Auth.CSRFSecret,
-		DevMail:       devMailH,
-		Problem:       problemH,
-		ProblemI18n:   problemI18nH,
+		Auth:        authH,
+		CSRFSecret:  cfg.Auth.CSRFSecret,
+		Problem:     problemH,
+		ProblemI18n: problemI18nH,
 		// Link-preview cards for /meta/<path>. Social crawlers do not run
 		// JavaScript, so the SPA's client-set title never reaches them — this is
 		// what gives a shared problem link its own title, description and image.
-		Meta: &handler.MetaHandler{
-			Origin: func() string { return cfg.PublicOrigin() },
-			ProblemCard: func(ctx context.Context, slug string) (*handler.ShareCard, error) {
-				m, err := problemMetaStore.GetBySlug(ctx, slug)
-				if err != nil {
-					return nil, err
-				}
-				// Private problems stay invisible to crawlers: a nil card makes
-				// the handler answer 404 rather than leak the title.
-				if m == nil || !m.Visible {
-					return nil, nil
-				}
-				return &handler.ShareCard{
-					Title:       m.Title,
-					Description: m.Description,
-					Path:        "/problems/" + m.Slug,
-					Kind:        "article",
-					Facts:       shareCardFacts(m),
-				}, nil
-			},
-		},
-		// Each section is gathered independently, and the error is carried out
-		// in the SitemapSection rather than logged and dropped. Dropping it is
-		// what previously turned a query against a non-existent column into a
-		// clean-looking empty sitemap.
-		//
-		// The sitemap is cached in-process for 1 hour: crawlers hit /sitemap.xml
-		// frequently and the content changes at most a few times per day.  A
-		// transient DB error returns the stale cached copy (if any) instead of
-		// serving a 500 to the crawler.
-		Sitemap: func() func(ctx context.Context) []handler.SitemapSection {
-			cache := &handler.TTLCache[[]handler.SitemapSection]{TTL: time.Hour}
-			return func(ctx context.Context) []handler.SitemapSection {
-				origin := handler.NormalizeOrigin(cfg.PublicOrigin())
-				if origin == "" {
-					origin = "http://localhost:8081"
-				}
-				toURLs := func(entries []postgres.SitemapEntry) []handler.SitemapURL {
-					out := make([]handler.SitemapURL, 0, len(entries))
-					for _, e := range entries {
-						out = append(out, handler.SitemapURL{
-							Location:   e.Location,
-							LastMod:    e.LastMod,
-							ChangeFreq: e.ChangeFreq,
-							Priority:   e.Priority,
-						})
-					}
-					return out
-				}
-				sections, _ := cache.Get(func() ([]handler.SitemapSection, error) {
-					problems, errProblems := sitemapStore.PublicProblems(ctx, origin)
-					contests, errContests := sitemapStore.PublicContests(ctx, origin)
-					users, errUsers := sitemapStore.PublicUsers(ctx, origin)
-					// If any section errored, propagate so the caller can 500
-					// rather than serve a silently incomplete sitemap.
-					for _, e := range []error{errProblems, errContests, errUsers} {
-						if e != nil {
-							return nil, e
-						}
-					}
-					return []handler.SitemapSection{
-						{Name: "problems", URLs: toURLs(problems)},
-						{Name: "contests", URLs: toURLs(contests)},
-						{Name: "users", URLs: toURLs(users)},
-						// Static pages: always present, no store to fail.
-						{Name: "legal", URLs: handler.LegalSitemapURLs(origin)},
-					}, nil
-				})
-				return sections
-			}
-		}(),
-		// Feed items for /feed/problems.atom. The error is returned, not logged,
-		// so a failed query surfaces as a 500 instead of a valid-looking empty
-		// feed -- the mistake that hid the first sitemap's broken query.
-		// Cached for 10 minutes: feeds are polled by RSS readers frequently.
-		Feed: func() func(ctx context.Context) ([]handler.FeedItem, error) {
-			cache := &handler.TTLCache[[]handler.FeedItem]{TTL: 10 * time.Minute}
-			return func(ctx context.Context) ([]handler.FeedItem, error) {
-				origin := handler.NormalizeOrigin(cfg.PublicOrigin())
-				if origin == "" {
-					origin = "http://localhost:8081"
-				}
-				return cache.Get(func() ([]handler.FeedItem, error) {
-					entries, err := feedStore.RecentProblems(ctx, 25)
-					if err != nil {
-						return nil, err
-					}
-					items := make([]handler.FeedItem, 0, len(entries))
-					for _, e := range entries {
-						url := origin + "/problems/" + e.Slug
-						items = append(items, handler.FeedItem{
-							Title:   e.Title,
-							Link:    url,
-							ID:      url,
-							Summary: truncateForFeed(e.Summary, 500),
-							Updated: toTime(e.Created),
-						})
-					}
-					return items, nil
-				})
-			}
-		}(),
-		CommentFeed: func() func(ctx context.Context) ([]handler.FeedItem, error) {
-			cache := &handler.TTLCache[[]handler.FeedItem]{TTL: 10 * time.Minute}
-			return func(ctx context.Context) ([]handler.FeedItem, error) {
-				origin := handler.NormalizeOrigin(cfg.PublicOrigin())
-				if origin == "" {
-					origin = "http://localhost:8081"
-				}
-				return cache.Get(func() ([]handler.FeedItem, error) {
-					entries, err := feedStore.RecentComments(ctx, 25)
-					if err != nil {
-						return nil, err
-					}
-					items := make([]handler.FeedItem, 0, len(entries))
-					for _, e := range entries {
-						// Link to the thread the comment belongs to, not the bare id.
-						var link string
-						switch e.ParentType {
-						case "problem":
-							link = origin + "/problems/" + strconv.FormatInt(e.ParentID, 10)
-						case "contest":
-							link = origin + "/contests/" + strconv.FormatInt(e.ParentID, 10)
-						case "blog":
-							link = origin + "/blog/" + strconv.FormatInt(e.ParentID, 10)
-						default:
-							link = origin + "/"
-						}
-						items = append(items, handler.FeedItem{
-							Title:   e.Username + " commented",
-							Link:    link,
-							ID:      origin + "/comments/" + strconv.FormatInt(e.ID, 10),
-							Summary: truncateForFeed(e.Content, 500),
-							Updated: toTime(e.Created),
-						})
-					}
-					return items, nil
-				})
-			}
-		}(),
-		BlogFeed: func() func(ctx context.Context) ([]handler.FeedItem, error) {
-			cache := &handler.TTLCache[[]handler.FeedItem]{TTL: 10 * time.Minute}
-			return func(ctx context.Context) ([]handler.FeedItem, error) {
-				origin := handler.NormalizeOrigin(cfg.PublicOrigin())
-				if origin == "" {
-					origin = "http://localhost:8081"
-				}
-				return cache.Get(func() ([]handler.FeedItem, error) {
-					entries, err := feedStore.RecentBlogPosts(ctx, 25)
-					if err != nil {
-						return nil, err
-					}
-					items := make([]handler.FeedItem, 0, len(entries))
-					for _, e := range entries {
-						url := origin + "/blog/" + strconv.FormatInt(e.ID, 10)
-						items = append(items, handler.FeedItem{
-							Title:   e.Title,
-							Link:    url,
-							ID:      url,
-							Summary: truncateForFeed(e.Content, 500),
-							Updated: toTime(e.Created),
-						})
-					}
-					return items, nil
-				})
-			}
-		}(),
-		ContestFeed: func() func(ctx context.Context) ([]handler.FeedItem, error) {
-			cache := &handler.TTLCache[[]handler.FeedItem]{TTL: 10 * time.Minute}
-			return func(ctx context.Context) ([]handler.FeedItem, error) {
-				origin := handler.NormalizeOrigin(cfg.PublicOrigin())
-				if origin == "" {
-					origin = "http://localhost:8081"
-				}
-				return cache.Get(func() ([]handler.FeedItem, error) {
-					entries, err := feedStore.RecentContests(ctx, 25)
-					if err != nil {
-						return nil, err
-					}
-					items := make([]handler.FeedItem, 0, len(entries))
-					for _, e := range entries {
-						url := origin + "/contests/" + e.Slug
-						items = append(items, handler.FeedItem{
-							Title:   e.Title,
-							Link:    url,
-							ID:      url,
-							Summary: truncateForFeed(e.Summary, 500),
-							Updated: toTime(e.Created),
-						})
-					}
-					return items, nil
-				})
-			}
-		}(),
 		Submission:        submissionH,
 		Contest:           contestH,
 		ContestUnlock:     contestUnlockH,
@@ -840,8 +636,6 @@ Restore from the pre-deploy dump if the schema is unrecoverable.`, err)
 		Blog:              blogH,
 		Editorial:         editorialH,
 		APIKey:            apiKeyH,
-		APIKeys:           apiKeyStore,
-		APIKeyUsers:       userStore,
 		Webhook:           webhookH,
 		Recommendation:    recommendationH,
 		Rankings:          rankingsH,
@@ -853,7 +647,6 @@ Restore from the pre-deploy dump if the schema is unrecoverable.`, err)
 		Class:             classH,
 		Training:          trainingH,
 		Plagiarism:        plagiarismH,
-		Media:             mediaH,
 		Onsite:            onsiteH,
 		OnsiteBatch:       onsiteBatchH,
 		Clarification:     clarificationH,
@@ -861,22 +654,231 @@ Restore from the pre-deploy dump if the schema is unrecoverable.`, err)
 		BotAccount:        botAccountH,
 		Settings:          settingsH,
 		LangAdmin:         langAdminH,
-		PublicLanguages:   handler.NewPublicLanguageHandler(cfg.LangDir),
 		RemoteLang:        remoteLangH,
 		AdminSub:          adminSubH,
 		Backup:            backupH,
-		CDN:               handler.NewCDNHandler(handler.CDNConfig{}),
-		Achievements:      handler.NewAchievementHandler(postgres.NewAchievementStore(db)),
-		Friendships:       handler.NewFriendshipHandler(postgres.NewFriendshipStore(db), userStore),
-		AuditLog:          auditH,
-		Health:            healthH,
-		Activity:          handler.NewActivityHandler(submissionStore, ratingStore, feedStore),
 		AIModel:           aiModelH,
-		AIGeneration:      aiGenerationH,
 		Features:          featuresH,
 		FeatureResolver:   featureResolver,
 		AIEnabled:         cfg.AI.Enabled,
 		MetricsToken:      cfg.Server.MetricsToken,
+		Optional: api.OptionalDeps{
+			APIKeyUsers:   userStore,
+			VerifyEmail:   verifyH,
+			TwoFA:         twoFAH,
+			TwoFAVerify:   twoFAVerifyH,
+			OAuthStart:    oauthStartH,
+			OAuthCallback: oauthCallbackH,
+			AuthMethods:   authMethodsH,
+			Legal:         &handler.LegalHandler{},
+			UsersExport:   &handler.UsersExportHandler{Data: handler.NewUserDataAggregator(userStore, submissionStore)},
+			UsersDeletion: &handler.UsersDeletionHandler{Users: userStore, Deleter: handler.NewUserCascadeDeleter(db)},
+			DevMail:       devMailH,
+			Meta: &handler.MetaHandler{
+				Origin: func() string { return cfg.PublicOrigin() },
+				ProblemCard: func(ctx context.Context, slug string) (*handler.ShareCard, error) {
+					m, err := problemMetaStore.GetBySlug(ctx, slug)
+					if err != nil {
+						return nil, err
+					}
+					// Private problems stay invisible to crawlers: a nil card makes
+					// the handler answer 404 rather than leak the title.
+					if m == nil || !m.Visible {
+						return nil, nil
+					}
+					return &handler.ShareCard{
+						Title:       m.Title,
+						Description: m.Description,
+						Path:        "/problems/" + m.Slug,
+						Kind:        "article",
+						Facts:       shareCardFacts(m),
+					}, nil
+				},
+			},
+			// Each section is gathered independently, and the error is carried out
+			// in the SitemapSection rather than logged and dropped. Dropping it is
+			// what previously turned a query against a non-existent column into a
+			// clean-looking empty sitemap.
+			//
+			// The sitemap is cached in-process for 1 hour: crawlers hit /sitemap.xml
+			// frequently and the content changes at most a few times per day.  A
+			// transient DB error returns the stale cached copy (if any) instead of
+			// serving a 500 to the crawler.
+			Sitemap: func() func(ctx context.Context) []handler.SitemapSection {
+				cache := &handler.TTLCache[[]handler.SitemapSection]{TTL: time.Hour}
+				return func(ctx context.Context) []handler.SitemapSection {
+					origin := handler.NormalizeOrigin(cfg.PublicOrigin())
+					if origin == "" {
+						origin = "http://localhost:8081"
+					}
+					toURLs := func(entries []postgres.SitemapEntry) []handler.SitemapURL {
+						out := make([]handler.SitemapURL, 0, len(entries))
+						for _, e := range entries {
+							out = append(out, handler.SitemapURL{
+								Location:   e.Location,
+								LastMod:    e.LastMod,
+								ChangeFreq: e.ChangeFreq,
+								Priority:   e.Priority,
+							})
+						}
+						return out
+					}
+					sections, _ := cache.Get(func() ([]handler.SitemapSection, error) {
+						problems, errProblems := sitemapStore.PublicProblems(ctx, origin)
+						contests, errContests := sitemapStore.PublicContests(ctx, origin)
+						users, errUsers := sitemapStore.PublicUsers(ctx, origin)
+						// If any section errored, propagate so the caller can 500
+						// rather than serve a silently incomplete sitemap.
+						for _, e := range []error{errProblems, errContests, errUsers} {
+							if e != nil {
+								return nil, e
+							}
+						}
+						return []handler.SitemapSection{
+							{Name: "problems", URLs: toURLs(problems)},
+							{Name: "contests", URLs: toURLs(contests)},
+							{Name: "users", URLs: toURLs(users)},
+							// Static pages: always present, no store to fail.
+							{Name: "legal", URLs: handler.LegalSitemapURLs(origin)},
+						}, nil
+					})
+					return sections
+				}
+			}(),
+			// Feed items for /feed/problems.atom. The error is returned, not logged,
+			// so a failed query surfaces as a 500 instead of a valid-looking empty
+			// feed -- the mistake that hid the first sitemap's broken query.
+			// Cached for 10 minutes: feeds are polled by RSS readers frequently.
+			Feed: func() func(ctx context.Context) ([]handler.FeedItem, error) {
+				cache := &handler.TTLCache[[]handler.FeedItem]{TTL: 10 * time.Minute}
+				return func(ctx context.Context) ([]handler.FeedItem, error) {
+					origin := handler.NormalizeOrigin(cfg.PublicOrigin())
+					if origin == "" {
+						origin = "http://localhost:8081"
+					}
+					return cache.Get(func() ([]handler.FeedItem, error) {
+						entries, err := feedStore.RecentProblems(ctx, 25)
+						if err != nil {
+							return nil, err
+						}
+						items := make([]handler.FeedItem, 0, len(entries))
+						for _, e := range entries {
+							url := origin + "/problems/" + e.Slug
+							items = append(items, handler.FeedItem{
+								Title:   e.Title,
+								Link:    url,
+								ID:      url,
+								Summary: truncateForFeed(e.Summary, 500),
+								Updated: toTime(e.Created),
+							})
+						}
+						return items, nil
+					})
+				}
+			}(),
+			CommentFeed: func() func(ctx context.Context) ([]handler.FeedItem, error) {
+				cache := &handler.TTLCache[[]handler.FeedItem]{TTL: 10 * time.Minute}
+				return func(ctx context.Context) ([]handler.FeedItem, error) {
+					origin := handler.NormalizeOrigin(cfg.PublicOrigin())
+					if origin == "" {
+						origin = "http://localhost:8081"
+					}
+					return cache.Get(func() ([]handler.FeedItem, error) {
+						entries, err := feedStore.RecentComments(ctx, 25)
+						if err != nil {
+							return nil, err
+						}
+						items := make([]handler.FeedItem, 0, len(entries))
+						for _, e := range entries {
+							// Link to the thread the comment belongs to, not the bare id.
+							var link string
+							switch e.ParentType {
+							case "problem":
+								link = origin + "/problems/" + strconv.FormatInt(e.ParentID, 10)
+							case "contest":
+								link = origin + "/contests/" + strconv.FormatInt(e.ParentID, 10)
+							case "blog":
+								link = origin + "/blog/" + strconv.FormatInt(e.ParentID, 10)
+							default:
+								link = origin + "/"
+							}
+							items = append(items, handler.FeedItem{
+								Title:   e.Username + " commented",
+								Link:    link,
+								ID:      origin + "/comments/" + strconv.FormatInt(e.ID, 10),
+								Summary: truncateForFeed(e.Content, 500),
+								Updated: toTime(e.Created),
+							})
+						}
+						return items, nil
+					})
+				}
+			}(),
+			BlogFeed: func() func(ctx context.Context) ([]handler.FeedItem, error) {
+				cache := &handler.TTLCache[[]handler.FeedItem]{TTL: 10 * time.Minute}
+				return func(ctx context.Context) ([]handler.FeedItem, error) {
+					origin := handler.NormalizeOrigin(cfg.PublicOrigin())
+					if origin == "" {
+						origin = "http://localhost:8081"
+					}
+					return cache.Get(func() ([]handler.FeedItem, error) {
+						entries, err := feedStore.RecentBlogPosts(ctx, 25)
+						if err != nil {
+							return nil, err
+						}
+						items := make([]handler.FeedItem, 0, len(entries))
+						for _, e := range entries {
+							url := origin + "/blog/" + strconv.FormatInt(e.ID, 10)
+							items = append(items, handler.FeedItem{
+								Title:   e.Title,
+								Link:    url,
+								ID:      url,
+								Summary: truncateForFeed(e.Content, 500),
+								Updated: toTime(e.Created),
+							})
+						}
+						return items, nil
+					})
+				}
+			}(),
+			ContestFeed: func() func(ctx context.Context) ([]handler.FeedItem, error) {
+				cache := &handler.TTLCache[[]handler.FeedItem]{TTL: 10 * time.Minute}
+				return func(ctx context.Context) ([]handler.FeedItem, error) {
+					origin := handler.NormalizeOrigin(cfg.PublicOrigin())
+					if origin == "" {
+						origin = "http://localhost:8081"
+					}
+					return cache.Get(func() ([]handler.FeedItem, error) {
+						entries, err := feedStore.RecentContests(ctx, 25)
+						if err != nil {
+							return nil, err
+						}
+						items := make([]handler.FeedItem, 0, len(entries))
+						for _, e := range entries {
+							url := origin + "/contests/" + e.Slug
+							items = append(items, handler.FeedItem{
+								Title:   e.Title,
+								Link:    url,
+								ID:      url,
+								Summary: truncateForFeed(e.Summary, 500),
+								Updated: toTime(e.Created),
+							})
+						}
+						return items, nil
+					})
+				}
+			}(),
+			APIKeys:         apiKeyStore,
+			Media:           mediaH,
+			PublicLanguages: handler.NewPublicLanguageHandler(cfg.LangDir),
+			CDN:             handler.NewCDNHandler(handler.CDNConfig{}),
+			Achievements:    handler.NewAchievementHandler(postgres.NewAchievementStore(db)),
+			Friendships:     handler.NewFriendshipHandler(postgres.NewFriendshipStore(db), userStore),
+			AuditLog:        auditH,
+			Health:          healthH,
+			Activity:        handler.NewActivityHandler(submissionStore, ratingStore, feedStore),
+			AIGeneration:    aiGenerationH,
+		},
 	}
 
 	// Refuse to serve with a required handler unwired. A nil handler is a valid

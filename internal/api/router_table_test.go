@@ -394,10 +394,6 @@ func TestMissingDepsDoNotPanic(t *testing.T) {
 // handlers, and a zero handler still registers a path.
 func testDeps() Deps {
 	return Deps{
-		Health:      &handler.HealthChecker{},
-		Activity:    &handler.ActivityHandler{},
-		Legal:       &handler.LegalHandler{},
-		Meta:        &handler.MetaHandler{},
 		Auth:        &handler.AuthHandler{},
 		Users:       &handler.UsersHandler{},
 		Submission:  &handler.SubmissionHandler{},
@@ -405,6 +401,12 @@ func testDeps() Deps {
 		ProblemI18n: &handler.ProblemI18nHandler{},
 		Rankings:    &handler.RankingsHandler{},
 		Search:      &handler.SearchHandler{},
+		Optional: OptionalDeps{
+			Health:   &handler.HealthChecker{},
+			Activity: &handler.ActivityHandler{},
+			Legal:    &handler.LegalHandler{},
+			Meta:     &handler.MetaHandler{},
+		},
 	}
 }
 
