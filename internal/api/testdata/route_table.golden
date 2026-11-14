@@ -126,6 +126,11 @@ DELETE /api/contests/{id}/permissions/{userId}              security-headers pas
 POST   /api/contests/{id}/problems                          security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required pass-through
 DELETE /api/contests/{id}/problems/{problemId}              security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required pass-through
 PUT    /api/contests/{id}/problems/{problemId}              security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required pass-through
+GET    /api/contests/{id}/rating-exclusions                 security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required pass-through
+POST   /api/contests/{id}/rating-exclusions                 security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required pass-through
+DELETE /api/contests/{id}/rating-exclusions/{userId}        security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required pass-through
+GET    /api/contests/{id}/rating-runs                       security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required pass-through
+POST   /api/contests/{id}/recalculate-ratings               security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required pass-through
 POST   /api/contests/{id}/register-team                     security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
 DELETE /api/contests/{id}/register/                         security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
 GET    /api/contests/{id}/register/                         security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
@@ -138,6 +143,8 @@ POST   /api/contests/{id}/submissions/{submissionId}/skip   security-headers pas
 POST   /api/contests/{id}/submit                            security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required pass-through
 GET    /api/contests/{id}/team-registrations                security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
 POST   /api/contests/{id}/unlock                            security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required pass-through
+DELETE /api/contests/{id}/void-ratings                      security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required pass-through
+POST   /api/contests/{id}/void-ratings                      security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required pass-through
 GET    /api/editorials/                                     security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
 POST   /api/editorials/                                     security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
 GET    /api/editorials/problem/{problemId}                  security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through

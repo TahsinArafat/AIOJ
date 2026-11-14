@@ -433,6 +433,13 @@ type ContestResultStore interface {
 	// GetScoreboardRows is the judged rows the standings are computed from.
 	// beforeTime, when set, applies the freeze cutoff.
 	GetScoreboardRows(ctx context.Context, contestID string, beforeTime *time.Time) ([]model.ScoreboardRow, error)
+	// RatedContestsFrom lists the rated, published rounds from the given one
+	// onward in round chronology — the order a rating replay must walk, since each
+	// round's base is the previous round's result.
+	RatedContestsFrom(ctx context.Context, contestID string) ([]string, error)
+	// HasRatingHistory reports whether a round has any ledger rows, which is what
+	// stops a delete from taking them and orphaning the profiles they fed.
+	HasRatingHistory(ctx context.Context, contestID string) (bool, error)
 	// GetContestStats is the jury's statistics tab: participant, submission and
 	// per-problem aggregates in one round trip.
 	GetContestStats(ctx context.Context, contestID string) (*model.ContestStats, error)
@@ -457,11 +464,41 @@ type ContestGrantStore interface {
 	RevokeAll(ctx context.Context, contestID string) error
 }
 
+// RatingStore is the rating ledger: an append-only record of what each round did
+// to each rating, plus the runs that produced it.
+//
+// A recalculation never rewrites a row. It marks the rows it replaces with
+// superseded_by and inserts replacements, so a row is in force exactly when
+// superseded_by IS NULL and the history of a dispute stays readable after it is
+// resolved. Every reader below returns only rows in force.
 type RatingStore interface {
 	CreateHistory(ctx context.Context, h *model.RatingHistory) error
 	GetByUser(ctx context.Context, userID string, limit int) ([]model.RatingHistory, error)
 	GetByContest(ctx context.Context, contestID string) ([]model.RatingHistory, error)
 	GetLatestByUser(ctx context.Context, userID string) (*model.RatingHistory, error)
+
+	// BaseRatings is each user's rating as of just before the given round, which
+	// is where a suffix replay starts from.
+	BaseRatings(ctx context.Context, contestID string) (map[string]int, error)
+
+	// ApplyRun writes one payout: it supersedes every row in force for the rounds
+	// in scope, inserts the replacements, and rebuilds the touched profiles from
+	// what remains in force. One transaction, because a half-applied payout is the
+	// worst state available.
+	ApplyRun(ctx context.Context, run *model.RatingRun, scope []string, rows []model.RatingHistory) error
+	// GetRunsByContest lists the payouts that touched a round, newest first.
+	GetRunsByContest(ctx context.Context, contestID string) ([]model.RatingRun, error)
+
+	// ListExclusions returns the entrants disqualified from a round.
+	ListExclusions(ctx context.Context, contestID string) ([]model.RatingExclusion, error)
+	// AddExclusion disqualifies one entrant from one round. Idempotent.
+	AddExclusion(ctx context.Context, e *model.RatingExclusion) error
+	// RemoveExclusion reinstates an entrant. Idempotent.
+	RemoveExclusion(ctx context.Context, contestID, userID string) error
+
+	// SetContestVoided flips whether a round's ratings count. The round keeps its
+	// standings; only its effect on the ledger is withdrawn.
+	SetContestVoided(ctx context.Context, contestID string, voided bool) error
 }
 
 type RegistrationStore interface {

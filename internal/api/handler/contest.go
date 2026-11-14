@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -15,6 +16,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
+	"github.com/tahsinarafat/aioj/internal/auth"
 	"github.com/tahsinarafat/aioj/internal/contest/format"
 	_ "github.com/tahsinarafat/aioj/internal/contest/format/acm"
 	_ "github.com/tahsinarafat/aioj/internal/contest/format/atcoder"
@@ -95,6 +97,9 @@ type ContestHandler struct {
 	// notify and hooks are optional; nil instances are no-ops.
 	notify *notify.Notifier
 	hooks  *webhook.Dispatcher
+	// audit records who moved ratings. Optional: a nil recorder is a no-op, which
+	// is the pre-feature behaviour.
+	audit *AuditLogHandler
 	// feedStore and feedToken back the ICPC-style event feed. Both are optional:
 	// with no token the endpoint answers 503 rather than exposing the feed.
 	feedStore feedLister
@@ -142,6 +147,12 @@ func (h *ContestHandler) WithFeed(store feedLister, token string) *ContestHandle
 // WithWebhooks attaches a webhook dispatcher and returns the handler.
 func (h *ContestHandler) WithWebhooks(d *webhook.Dispatcher) *ContestHandler {
 	h.hooks = d
+	return h
+}
+
+// WithAudit attaches the audit recorder, for call-site chaining.
+func (h *ContestHandler) WithAudit(a *AuditLogHandler) *ContestHandler {
+	h.audit = a
 	return h
 }
 
@@ -820,6 +831,17 @@ func (h *ContestHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		respondContestLookupError(w, err)
 		return
 	}
+	// Deleting a round with rating history would take the ledger rows with it and
+	// leave the profiles they fed describing a round that no longer exists. The
+	// reference is RESTRICT, so the delete would fail anyway; answering 409 here
+	// names the reason and points at the operation that is actually wanted.
+	if has, err := h.store.HasRatingHistory(r.Context(), contest.ID); err != nil {
+		http.Error(w, "delete failed", http.StatusInternalServerError)
+		return
+	} else if has {
+		http.Error(w, "this contest has rating history; void its ratings instead of deleting it", http.StatusConflict)
+		return
+	}
 	if err := h.store.Delete(r.Context(), contest.ID); err != nil {
 		http.Error(w, "delete failed", http.StatusInternalServerError)
 		return
@@ -1169,14 +1191,16 @@ func (h *ContestHandler) resolveUserRef(ctx context.Context, ref string) (string
 }
 
 // contestUserStore is the user-store surface ContestHandler performs: resolve a
-// user by id or handle for the permission roster, read a profile, and write the
-// rating a rated round produces. Four operations, where the field declared all
-// 21 and the handler called four.
+// user by id or handle for the permission roster, and read a profile. Three
+// operations, where the field declared all 21 and the handler called three.
+//
+// Writing a rating is deliberately not here. A payout no longer increments the
+// profile; it appends to the ledger and the store rebuilds the profiles it
+// touched, so an increment is the one write that could reintroduce the drift.
 type contestUserStore interface {
 	GetByID(ctx context.Context, id string) (*model.User, error)
 	GetByUsername(ctx context.Context, username string) (*model.User, error)
 	GetProfile(ctx context.Context, userID string) (*model.UserProfile, error)
-	UpdateRating(ctx context.Context, userID string, rating, maxRating, contestCount int) error
 }
 
 // userRefLookup is the slice of the user store this resolution needs, declared on
@@ -1282,10 +1306,9 @@ func (h *ContestHandler) CalculateRatings(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Ratings are the one irreversible effect of a round: they rewrite every
-	// participant's profile. Refuse an unapproved or explicitly unrated contest
-	// so a draft can never move the leaderboard, and so is_rated finally means
-	// something instead of being a column nobody read.
+	// Ratings rewrite every participant's profile. Refuse an unapproved or
+	// explicitly unrated contest so a draft can never move the leaderboard, and so
+	// is_rated means something instead of being a column nobody read.
 	if contest.Status != model.ContestStatusPublished {
 		http.Error(w, "contest is not published", http.StatusConflict)
 		return
@@ -1294,107 +1317,490 @@ func (h *ContestHandler) CalculateRatings(w http.ResponseWriter, r *http.Request
 		http.Error(w, "contest is not rated", http.StatusConflict)
 		return
 	}
+	if contest.RatingVoided {
+		http.Error(w, "ratings for this contest are voided; unvoid them instead", http.StatusConflict)
+		return
+	}
 
-	// A second run is not a recalculation, it is a second payout: every
-	// participant would get another history row and another delta on top of the
-	// rating the first run gave them.
-	applied, err := h.ratingStore.GetByContest(r.Context(), contest.ID)
+	// A second apply is not a recalculation, it is a second payout: every
+	// participant would get another delta on top of the rating the first run gave
+	// them. Recalculation is its own endpoint, and it supersedes rather than
+	// doubling.
+	live, err := h.ratingStore.GetByContest(r.Context(), contest.ID)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	if len(applied) > 0 {
-		http.Error(w, "ratings already applied to this contest", http.StatusConflict)
+	if len(live) > 0 {
+		http.Error(w, "ratings already applied to this contest; recalculate instead", http.StatusConflict)
 		return
 	}
 
-	// The board, not the submissions table, is what decides the order: a rating
-	// change is a function of the rank a participant finished on.
-	board, _, err := h.contestBoard(r, contest, true)
+	out, err := h.replayRatings(r, contest, []*model.Contest{contest}, claims,
+		model.RatingRunApply, "")
 	if err != nil {
-		http.Error(w, "invalid contest format: "+err.Error(), http.StatusInternalServerError)
+		respondRatingError(w, err)
 		return
 	}
 
-	// Names resolved once, and a blank one aborts the calculation. Unlike the
-	// scoreboard's display path, this one feeds an irreversible write, so a name
-	// that cannot be read must not become an empty string on a rating record.
-	oldRatings := make(map[string]int, len(board.Entries))
-	for _, entry := range board.Entries {
-		if entry.Username == "" {
-			http.Error(w, "failed to resolve participant names", http.StatusInternalServerError)
-			return
-		}
-		if latest, _ := h.ratingStore.GetLatestByUser(r.Context(), entry.UserID); latest != nil {
-			oldRatings[entry.UserID] = latest.NewRating
-		}
-	}
-
-	// The round is rated for a rating window, its standings are not: everyone who
-	// submitted appears on the board. RatedField narrows the field to the entrants
-	// the round counts for, and re-ranks it so the survivors are not scored as
-	// though the ineligible rows had beaten them.
-	field := rating.RatedField(standingsFromBoard(board.Entries, oldRatings), contest.RatedForMin, contest.RatedForMax)
-	if len(field) == 0 {
-		http.Error(w, fmt.Sprintf("no participant is inside the rated window %d-%d", contest.RatedForMin, contest.RatedForMax), http.StatusConflict)
-		return
-	}
-
-	ratingService := rating.NewService(h.ratingStore, h.userStore).WithNotifier(h.notify)
-	changes := ratingService.CalculateContestRatings(field)
-
-	if err := ratingService.ApplyContestRatings(r.Context(), contest.ID, changes); err != nil {
-		http.Error(w, "failed to apply ratings", http.StatusInternalServerError)
-		return
-	}
-
-	// Team ratings never moved: UpdateRating existed with no caller, so a team's
-	// rating stayed 0 forever and team rankings sorted a constant. Recalculated
-	// here, after the member ratings are applied, so it reflects this round.
-	var teamErr string
-	if err := ratingService.RecalculateTeamRatings(r.Context(), contest.ID, h.teamStore, h.store, h.userStore); err != nil {
-		// The individual ratings are already committed; report the partial failure
-		// rather than failing the whole request and implying nothing was applied.
-		teamErr = err.Error()
-		slog.Error("team rating recalculation failed", "contest_id", contest.ID, "error", err)
-	}
-
-	// The standings are cached for 30s and that response carries both the rating
-	// column and rating_calculated, so without this the page would keep serving
-	// the pre-rating board to everyone, including the operator who just applied
-	// the ratings.
-	h.cache.invalidate(contest.ID)
-
-	resp := map[string]interface{}{
-		"changes": changes,
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"run": out.run,
 		// Both counts, because the gap between them is the rating window doing its
 		// job: a round that rated 0 of 25 entrants has to look like that in the
 		// response rather than like a successful run.
-		"participants": len(board.Entries),
-		"rated":        len(changes),
-	}
-	if teamErr != "" {
-		resp["team_rating_error"] = teamErr
-	}
-	respondJSON(w, http.StatusOK, resp)
+		"participants":      out.participants,
+		"rated":             len(out.changes),
+		"changes":           out.changes,
+		"team_rating_error": out.teamError,
+	})
 }
 
-// standingsFromBoard projects a ranked board onto the rating job's input.
+// RecalculateRatings recomputes the ratings of a round and every rated round after
+// it, in calendar order.
 //
-// The order is the board's, because the board is what ranked the field. Reading
-// participants straight out of the submissions table and numbering them 1..n is
-// what made a rating change depend on row order instead of placement.
-func standingsFromBoard(entries []format.Entry, oldRatings map[string]int) []rating.ContestStanding {
-	standings := make([]rating.ContestStanding, 0, len(entries))
-	for _, entry := range entries {
-		standings = append(standings, rating.ContestStanding{
-			UserID:    entry.UserID,
-			Rank:      entry.Rank,
-			OldRating: oldRatings[entry.UserID],
-			Username:  entry.Username,
+// A single round cannot be recomputed in isolation: the algorithm folds, so every
+// later round was computed on top of this one. Replaying the suffix is the only
+// way to answer "what if this round had gone differently" without leaving the
+// following rounds describing ratings that no longer exist.
+func (h *ContestHandler) RecalculateRatings(w http.ResponseWriter, r *http.Request) {
+	contest, claims, ok := h.ratingTarget(w, r)
+	if !ok {
+		return
+	}
+	h.recalculateFrom(w, r, contest, claims, "recalculated on request")
+}
+
+// VoidRatings withdraws a round's ratings and replays everything after it.
+//
+// The round is not deleted and its standings are not touched: a disputed round
+// keeps its results for everyone to read, and only its effect on ratings goes
+// away. That is the difference between "this round was wrong" and "this round
+// never happened".
+func (h *ContestHandler) VoidRatings(w http.ResponseWriter, r *http.Request) {
+	contest, claims, ok := h.ratingTarget(w, r)
+	if !ok {
+		return
+	}
+	if err := h.ratingStore.SetContestVoided(r.Context(), contest.ID, true); err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	contest.RatingVoided = true
+	h.recalculateFrom(w, r, contest, claims, "round ratings voided")
+}
+
+// UnvoidRatings reinstates a withdrawn round and replays everything after it.
+func (h *ContestHandler) UnvoidRatings(w http.ResponseWriter, r *http.Request) {
+	contest, claims, ok := h.ratingTarget(w, r)
+	if !ok {
+		return
+	}
+	if err := h.ratingStore.SetContestVoided(r.Context(), contest.ID, false); err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	contest.RatingVoided = false
+	h.recalculateFrom(w, r, contest, claims, "round ratings reinstated")
+}
+
+// ListRatingRuns is the audit view of a round's ratings: every payout, every
+// withdrawal, and the operator behind each.
+//
+// This is the question a dispute actually asks — "who changed this, and when" —
+// and the answer has to outlive the session that made the change, which is why it
+// is a table rather than a log line.
+func (h *ContestHandler) ListRatingRuns(w http.ResponseWriter, r *http.Request) {
+	contest, _, ok := h.ratingTarget(w, r)
+	if !ok {
+		return
+	}
+	runs, err := h.ratingStore.GetRunsByContest(r.Context(), contest.ID)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	respondJSON(w, http.StatusOK, map[string]interface{}{"data": runs})
+}
+
+// ListRatingExclusions returns the entrants disqualified from a round.
+func (h *ContestHandler) ListRatingExclusions(w http.ResponseWriter, r *http.Request) {
+	contest, _, ok := h.ratingTarget(w, r)
+	if !ok {
+		return
+	}
+	exclusions, err := h.ratingStore.ListExclusions(r.Context(), contest.ID)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	respondJSON(w, http.StatusOK, map[string]interface{}{"data": exclusions})
+}
+
+// AddRatingExclusion disqualifies one entrant from one round and replays from
+// there.
+//
+// A disqualification is not the same as a voided round: the round still counts for
+// everyone else, but the field loses a member, so the field size and every other
+// entrant's rank move. That is why it cannot be expressed by editing one row — the
+// whole round is recomputed with the entrant removed.
+func (h *ContestHandler) AddRatingExclusion(w http.ResponseWriter, r *http.Request) {
+	contest, claims, ok := h.ratingTarget(w, r)
+	if !ok {
+		return
+	}
+
+	var req struct {
+		UserID string `json:"user_id"`
+		Reason string `json:"reason"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	userID, err := h.resolveUserRef(r.Context(), req.UserID)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if userID == "" {
+		http.Error(w, "user not found", http.StatusNotFound)
+		return
+	}
+
+	if err := h.ratingStore.AddExclusion(r.Context(), &model.RatingExclusion{
+		UserID:    userID,
+		ContestID: contest.ID,
+		Reason:    req.Reason,
+		CreatedBy: claims.UserID,
+	}); err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	h.recalculateFrom(w, r, contest, claims, "entrant disqualified: "+req.Reason)
+}
+
+// RemoveRatingExclusion reinstates an entrant and replays from that round.
+func (h *ContestHandler) RemoveRatingExclusion(w http.ResponseWriter, r *http.Request) {
+	contest, claims, ok := h.ratingTarget(w, r)
+	if !ok {
+		return
+	}
+	userID := chi.URLParam(r, "userId")
+	// A delete is idempotent, so a value that cannot name a row is already the
+	// desired end state rather than a 500 from the uuid column.
+	if _, err := uuid.Parse(userID); err != nil {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	if err := h.ratingStore.RemoveExclusion(r.Context(), contest.ID, userID); err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	h.recalculateFrom(w, r, contest, claims, "entrant reinstated")
+}
+
+// ratingTarget loads a contest for a rating operation and checks the caller may
+// perform one. Every rating endpoint needs the same three answers, and repeating
+// them per handler is how one of them ends up missing a check.
+func (h *ContestHandler) ratingTarget(w http.ResponseWriter, r *http.Request) (*model.Contest, *auth.Claims, bool) {
+	claims := middleware.GetUserClaims(r)
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return nil, nil, false
+	}
+	if claims.Role != "admin" {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return nil, nil, false
+	}
+
+	contest, err := resolveContest(r.Context(), chi.URLParam(r, "id"), h.store)
+	if err != nil {
+		respondContestLookupError(w, err)
+		return nil, nil, false
+	}
+	if contest == nil {
+		http.Error(w, "contest not found", http.StatusNotFound)
+		return nil, nil, false
+	}
+	if contest.Status != model.ContestStatusPublished {
+		http.Error(w, "contest is not published", http.StatusConflict)
+		return nil, nil, false
+	}
+	if !contest.IsRated {
+		http.Error(w, "contest is not rated", http.StatusConflict)
+		return nil, nil, false
+	}
+	return contest, claims, true
+}
+
+// recalculateFrom replays every rated round from the given one onward.
+func (h *ContestHandler) recalculateFrom(w http.ResponseWriter, r *http.Request, from *model.Contest, claims *auth.Claims, reason string) {
+	hasHistory, err := h.store.HasRatingHistory(r.Context(), from.ID)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if !hasHistory {
+		http.Error(w, "this contest has no ratings to recalculate", http.StatusConflict)
+		return
+	}
+
+	ids, err := h.store.RatedContestsFrom(r.Context(), from.ID)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	rounds := make([]*model.Contest, 0, len(ids))
+	for _, id := range ids {
+		c, err := h.store.GetByID(r.Context(), id)
+		if err != nil || c == nil {
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		rounds = append(rounds, c)
+	}
+	if len(rounds) == 0 {
+		rounds = append(rounds, from)
+	}
+
+	out, err := h.replayRatings(r, from, rounds, claims, model.RatingRunRecalc, reason)
+	if err != nil {
+		respondRatingError(w, err)
+		return
+	}
+
+	respondJSON(w, http.StatusOK, map[string]interface{}{
+		"run":               out.run,
+		"contests":          len(rounds),
+		"changes":           out.changes,
+		"team_rating_error": out.teamError,
+	})
+}
+
+// replayError is a rating failure with the status the caller should answer with.
+// The replay refuses in several places that are all the operator's mistake rather
+// than the server's, and collapsing them to 500 told them nothing.
+type replayError struct {
+	status int
+	msg    string
+}
+
+func (e *replayError) Error() string { return e.msg }
+
+func respondRatingError(w http.ResponseWriter, err error) {
+	var re *replayError
+	if errors.As(err, &re) {
+		http.Error(w, re.msg, re.status)
+		return
+	}
+	slog.Error("rating replay failed", "error", err)
+	http.Error(w, "failed to apply ratings", http.StatusInternalServerError)
+}
+
+// replayOutcome is what one payout produced.
+type replayOutcome struct {
+	run          *model.RatingRun
+	changes      []model.RatingChange
+	participants int
+	teamError    string
+}
+
+// replayRatings computes and commits one payout over a suffix of rounds.
+//
+// It is the only writer of the ledger, so the guards that make a payout safe live
+// here rather than per endpoint: names resolve before anything is written, the
+// round's rating window and its exclusions are applied to the field, and the rows
+// and the profiles they feed are written in one transaction by the store.
+func (h *ContestHandler) replayRatings(r *http.Request, from *model.Contest, rounds []*model.Contest, claims *auth.Claims, kind, reason string) (*replayOutcome, error) {
+	ctx := r.Context()
+
+	base, err := h.ratingStore.BaseRatings(ctx, from.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	plan := make([]rating.Round, 0, len(rounds))
+	participants := 0
+	for _, c := range rounds {
+		board, _, err := h.contestBoard(r, c, true)
+		if err != nil {
+			return nil, &replayError{http.StatusInternalServerError, "invalid contest format: " + err.Error()}
+		}
+		participants += len(board.Entries)
+
+		excluded := map[string]bool{}
+		exclusions, err := h.ratingStore.ListExclusions(ctx, c.ID)
+		if err != nil {
+			return nil, err
+		}
+		for _, e := range exclusions {
+			excluded[e.UserID] = true
+		}
+
+		roster := make([]rating.RosterEntry, 0, len(board.Entries))
+		for _, entry := range board.Entries {
+			if excluded[entry.UserID] {
+				continue
+			}
+			// A name that cannot be read aborts the payout: unlike the standings,
+			// this feeds a permanent record, and a blank handle there is a hole
+			// nobody can fill later.
+			if entry.Username == "" {
+				return nil, &replayError{http.StatusInternalServerError, "failed to resolve participant names"}
+			}
+			roster = append(roster, rating.RosterEntry{
+				UserID:   entry.UserID,
+				Username: entry.Username,
+				Rank:     entry.Rank,
+			})
+		}
+
+		plan = append(plan, rating.Round{
+			ContestID: c.ID,
+			Roster:    roster,
+			Voided:    c.RatingVoided,
+			Min:       c.RatedForMin,
+			Max:       c.RatedForMax,
 		})
 	}
-	return standings
+
+	// Profile ratings before the payout, so a recalculation only tells the people
+	// whose number actually moved. Re-rating a whole suffix would otherwise send
+	// every participant of every replayed round a notification saying their rating
+	// was unchanged.
+	previous := map[string]int{}
+	for _, round := range plan {
+		for _, entry := range round.Roster {
+			if _, seen := previous[entry.UserID]; seen {
+				continue
+			}
+			if profile, err := h.userStore.GetProfile(ctx, entry.UserID); err == nil && profile != nil {
+				previous[entry.UserID] = profile.Rating
+			}
+		}
+	}
+
+	// The profiles themselves are rebuilt by the store from the rows that end up in
+	// force, so final is not written anywhere. It is read once, below, to notice the
+	// people a withdrawal removed from the ledger entirely — they have no change row
+	// to notify from, and they are exactly the ones who most need telling.
+	outcomes, final := rating.Replay(plan, base)
+
+	rows := make([]model.RatingHistory, 0)
+	changes := make([]model.RatingChange, 0)
+	latest := map[string]model.RatingChange{}
+	for _, outcome := range outcomes {
+		for _, change := range outcome.Changes {
+			rows = append(rows, model.RatingHistory{
+				UserID:       change.UserID,
+				ContestID:    outcome.ContestID,
+				OldRating:    change.OldRating,
+				NewRating:    change.NewRating,
+				Rank:         change.Rank,
+				RatingChange: change.RatingChange,
+			})
+			changes = append(changes, change)
+			latest[change.UserID] = change
+		}
+	}
+
+	if kind == model.RatingRunApply && len(rows) == 0 {
+		return nil, &replayError{http.StatusConflict,
+			fmt.Sprintf("no participant is inside the rated window %d-%d", from.RatedForMin, from.RatedForMax)}
+	}
+
+	scope := make([]string, len(plan))
+	for i, round := range plan {
+		scope[i] = round.ContestID
+	}
+
+	run := &model.RatingRun{
+		ContestID: from.ID,
+		Kind:      kind,
+		ActorID:   claims.UserID,
+		ActorName: claims.Username,
+		Reason:    reason,
+	}
+	if err := h.ratingStore.ApplyRun(ctx, run, scope, rows); err != nil {
+		return nil, err
+	}
+
+	// One notification per user whose rating actually moved, at its final value —
+	// not one per replayed round, which would send a suffix of rounds as a burst of
+	// contradictory messages.
+	//
+	// The loop is over the people whose rating we knew before the payout, not over
+	// the changes, because withdrawing a round removes rows: a user who was only
+	// ever rated by the voided round has no change row at all, and skipping them
+	// would take their rating away in silence.
+	moved := make([]model.RatingChange, 0, len(previous))
+	for userID, before := range previous {
+		after := final[userID]
+		if after == before {
+			continue
+		}
+		if change, ok := latest[userID]; ok && change.NewRating == after {
+			moved = append(moved, change)
+			continue
+		}
+		moved = append(moved, model.RatingChange{
+			UserID:       userID,
+			OldRating:    before,
+			NewRating:    after,
+			RatingChange: after - before,
+			Color:        model.GetColor(after),
+		})
+	}
+	rating.NewService().WithNotifier(h.notify).NotifyChanges(ctx, moved, kind == model.RatingRunRecalc)
+
+	// The standings are cached for 30s and carry both the rating column and
+	// rating_calculated, so every replayed round has to be dropped or its viewers
+	// keep the pre-payout board.
+	for _, contestID := range scope {
+		h.cache.invalidate(contestID)
+	}
+
+	out := &replayOutcome{run: run, changes: changes, participants: participants}
+
+	// Team ratings never moved before: UpdateRating existed with no caller, so a
+	// team's rating stayed 0 and team rankings sorted a constant. Recomputed after
+	// the member ratings are written, because it is the mean of what they now hold.
+	for _, contestID := range scope {
+		if err := rating.NewService().RecalculateTeamRatings(ctx, contestID, h.teamStore, h.store, h.userStore); err != nil {
+			// The individual ratings are already committed; report the partial
+			// failure rather than implying nothing was applied.
+			out.teamError = err.Error()
+			slog.Error("team rating recalculation failed", "contest_id", contestID, "error", err)
+		}
+	}
+
+	h.auditRating(r, claims, kind, from, scope, reason, len(rows))
+	return out, nil
+}
+
+// auditRating records who moved which ratings. The admin audit middleware is
+// mounted on /api/admin only, and the rating endpoints live under /api/contests,
+// so without this the most irreversible action on the site had no actor.
+func (h *ContestHandler) auditRating(r *http.Request, claims *auth.Claims, kind string, from *model.Contest, scope []string, reason string, rows int) {
+	if h.audit == nil {
+		return
+	}
+	detail, _ := json.Marshal(map[string]any{
+		"contest_id": from.ID,
+		"scope":      scope,
+		"reason":     reason,
+		"rows":       rows,
+	})
+	h.audit.Record(&model.AuditEntry{
+		ActorID:    claims.UserID,
+		ActorName:  claims.Username,
+		Action:     "ratings." + kind,
+		TargetType: "contest",
+		TargetID:   from.ID,
+		Detail:     detail,
+	})
 }
 
 func (h *ContestHandler) CreateEducational(w http.ResponseWriter, r *http.Request) {

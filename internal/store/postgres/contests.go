@@ -116,7 +116,7 @@ func (s *ContestStore) getByWhere(ctx context.Context, where string, args ...int
 		        upsolving_enabled,virtual_contest_enabled,pdf_enabled,statement_hidden,created_by,created_at,
 		        COALESCE(status,'draft'), COALESCE(review_note,''),
 		        COALESCE(is_rated,true), COALESCE(rated_for_min,0), COALESCE(rated_for_max,9999),
-		        access_config, listed,
+		        access_config, listed, COALESCE(rating_voided,false),
 		        (SELECT group_id::text FROM group_contests WHERE contest_id = id LIMIT 1) AS group_id
 		 FROM contests WHERE `+where, args...).Scan(
 		&c.ID, &c.DisplayID, &slug, &c.Title, &c.Type, &c.Format, &formatConfigJSON, &c.StartTime, &c.EndTime, &c.FreezeTime,
@@ -125,7 +125,7 @@ func (s *ContestStore) getByWhere(ctx context.Context, where string, args ...int
 		&c.Division, &configJSON,
 		&c.UpsolvingEnabled, &c.VirtualContestEnabled, &c.PDFEnabled, &c.StatementHidden,
 		&c.CreatedBy, &c.CreatedAt, &c.Status, &c.ReviewNote,
-		&c.IsRated, &c.RatedForMin, &c.RatedForMax, &accessConfigJSON, &c.Listed, &groupID)
+		&c.IsRated, &c.RatedForMin, &c.RatedForMax, &accessConfigJSON, &c.Listed, &c.RatingVoided, &groupID)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -332,7 +332,7 @@ func (s *ContestStore) ListByStatus(ctx context.Context, status string, offset, 
 		        upsolving_enabled,virtual_contest_enabled,pdf_enabled,statement_hidden,created_by,created_at,
 		        COALESCE(status,'draft'), COALESCE(review_note,''),
 		        COALESCE(is_rated,true), COALESCE(rated_for_min,0), COALESCE(rated_for_max,9999),
-		        access_config, listed
+		        access_config, listed, COALESCE(rating_voided,false)
 		   FROM contests WHERE status=$1 ORDER BY created_at ASC OFFSET $2 LIMIT $3`, status, offset, limit)
 	if err != nil {
 		return nil, 0, err
@@ -349,7 +349,7 @@ func (s *ContestStore) ListByStatus(ctx context.Context, status string, offset, 
 			&c.RegistrationRequired, &c.RegistrationDeadline, &c.MaxParticipants, &c.Division, &configJSON,
 			&c.UpsolvingEnabled, &c.VirtualContestEnabled, &c.PDFEnabled, &c.StatementHidden,
 			&c.CreatedBy, &c.CreatedAt, &c.Status, &c.ReviewNote,
-			&c.IsRated, &c.RatedForMin, &c.RatedForMax, &accessConfigJSON, &c.Listed)
+			&c.IsRated, &c.RatedForMin, &c.RatedForMax, &accessConfigJSON, &c.Listed, &c.RatingVoided)
 		c.AccessConfig = decodeAccessConfig(accessConfigJSON)
 		items = append(items, c)
 	}

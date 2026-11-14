@@ -606,6 +606,9 @@ Restore from the pre-deploy dump if the schema is unrecoverable.`, err)
 	// Setters can rejudge their own problem's submissions, so those actions
 	// have to land in the same audit trail as the admin endpoints.
 	submissionH.WithAudit(auditH)
+	// Rating changes are the most irreversible admin action on the site and they
+	// live under /api/contests, which the /api/admin audit middleware never sees.
+	contestH.WithAudit(auditH)
 
 	deps := api.Deps{
 		Auth:        authH,

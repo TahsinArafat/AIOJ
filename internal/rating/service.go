@@ -6,7 +6,6 @@ import (
 
 	"github.com/tahsinarafat/aioj/internal/model"
 	"github.com/tahsinarafat/aioj/internal/notify"
-	"github.com/tahsinarafat/aioj/internal/store"
 )
 
 type ContestStanding struct {
@@ -16,26 +15,16 @@ type ContestStanding struct {
 	Username  string
 }
 
-// userRatingStore is the pair of user operations the rating job performs: read
-// the current rating from the profile, write the new one back. Narrower than
-// store.UserStore so the job cannot reach the ban, role or password fields.
-type userRatingStore interface {
-	GetProfile(ctx context.Context, userID string) (*model.UserProfile, error)
-	UpdateRating(ctx context.Context, userID string, rating, maxRating, contestCount int) error
-}
-
+// Service is the rating policy: what a round does to a rating, and what a user is
+// told about it. Persistence is the store's job — a payout is one transaction
+// there, because a half-applied one is the worst state available.
 type Service struct {
-	ratingStore store.RatingStore
-	userStore   userRatingStore
 	// notify is optional; a nil notifier is a no-op.
 	notify *notify.Notifier
 }
 
-func NewService(rs store.RatingStore, us userRatingStore) *Service {
-	return &Service{
-		ratingStore: rs,
-		userStore:   us,
-	}
+func NewService() *Service {
+	return &Service{}
 }
 
 // WithNotifier attaches a notifier and returns the service, for call-site chaining.
@@ -112,49 +101,29 @@ func (s *Service) CalculateContestRatings(standings []ContestStanding) []model.R
 	return changes
 }
 
-// ApplyContestRatings saves rating changes to database
-func (s *Service) ApplyContestRatings(ctx context.Context, contestID string, changes []model.RatingChange) error {
+// NotifyChanges tells each participant what the round did to their rating.
+//
+// A rating change is the one event every competitor wants told about, and it is
+// low volume: once per contest per user, not once per submission. Notification
+// preferences gate it (CategoryRating). Sending is deliberately not part of the
+// payout transaction: a notification that fails must not undo a committed rating.
+func (s *Service) NotifyChanges(ctx context.Context, changes []model.RatingChange, recalculated bool) {
 	for _, change := range changes {
-		h := &model.RatingHistory{
-			UserID:       change.UserID,
-			ContestID:    contestID,
-			OldRating:    change.OldRating,
-			NewRating:    change.NewRating,
-			Rank:         change.Rank,
-			RatingChange: change.RatingChange,
+		title := fmt.Sprintf("Rating %+d → %d", change.RatingChange, change.NewRating)
+		// A zero rank means the change did not come from a round the user placed
+		// in: withdrawing a round removes their result, and telling them they placed
+		// #0 would be worse than saying nothing about placement.
+		body := fmt.Sprintf("Your rating is now %d.", change.NewRating)
+		switch {
+		case change.Rank == 0:
+		case recalculated:
+			body = fmt.Sprintf("A round you contested was re-rated. You placed #%d, and your rating is now %d.",
+				change.Rank, change.NewRating)
+		default:
+			body = fmt.Sprintf("You placed #%d. Your rating is now %d.", change.Rank, change.NewRating)
 		}
-
-		if err := s.ratingStore.CreateHistory(ctx, h); err != nil {
-			return err
-		}
-
-		if s.userStore != nil {
-			profile, err := s.userStore.GetProfile(ctx, change.UserID)
-			if err != nil {
-				return err
-			}
-			if profile != nil {
-				profile.Rating = change.NewRating
-				if change.NewRating > profile.MaxRating {
-					profile.MaxRating = change.NewRating
-				}
-				profile.ContestCount++
-				if err := s.userStore.UpdateRating(ctx, change.UserID, profile.Rating, profile.MaxRating, profile.ContestCount); err != nil {
-					return err
-				}
-			}
-		}
-
-		// A rating change is the one event every competitor wants told about, and
-		// it is low volume: once per contest per user, not once per submission.
-		// Notification preferences gate it (CategoryRating).
-		s.notify.Notify(ctx, change.UserID, "rating_change",
-			fmt.Sprintf("Rating %+d → %d", change.RatingChange, change.NewRating),
-			fmt.Sprintf("You placed #%d. Your rating is now %d.", change.Rank, change.NewRating),
-			"/rating-history", notify.CategoryRating)
+		s.notify.Notify(ctx, change.UserID, "rating_change", title, body, "/rating-history", notify.CategoryRating)
 	}
-
-	return nil
 }
 
 // TeamRater is the slice of the team store team ratings need.

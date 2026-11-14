@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { api, getAccessToken } from '../lib/api';
 import { errorMessage } from '../lib/errors';
+import ContestRatingLedger from '../components/ContestRatingLedger';
 import RatingBadge from '../components/RatingBadge';
 import { AlertTriangle, Eye, EyeOff, ChevronLeft, ChevronRight } from 'lucide-react';
 import { EmptyState } from '../components/EmptyState';
@@ -54,6 +55,7 @@ interface ContestInfo {
   end_time?: string;
   is_rated?: boolean;
   rating_calculated?: boolean;
+  rating_voided?: boolean;
   is_team_contest?: boolean;
 }
 
@@ -107,8 +109,6 @@ export default function ContestScoreboard() {
   const [ratings, setRatings] = useState<Map<string, RatingDelta>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [ratingLoading, setRatingLoading] = useState(false);
-  const [ratingMsg, setRatingMsg] = useState('');
   const [viewMode, setViewMode] = useState<'judge' | 'public'>('public');
   const [canSeeJudge, setCanSeeJudge] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -179,6 +179,12 @@ export default function ContestScoreboard() {
     });
   }, [fetchScoreboard, fetchRatings, viewMode, currentPage]);
 
+  // A rating operation rewrites the rating column and can shrink the field, so the
+  // panel refreshes the board rather than patching it in place.
+  const refreshBoard = useCallback(async () => {
+    await Promise.all([fetchScoreboard(viewMode, currentPage), fetchRatings()]);
+  }, [fetchScoreboard, fetchRatings, viewMode, currentPage]);
+
   // Auto-refresh every 30s while the round is still running
   useEffect(() => {
     if (!data?.contest || hasEnded(data.contest.end_time)) return;
@@ -207,41 +213,6 @@ export default function ContestScoreboard() {
     }
     return set;
   }, [data]);
-
-  const handleRateContest = async () => {
-    if (!id) return;
-    setRatingLoading(true);
-    setRatingMsg('');
-    try {
-      const token = getAccessToken();
-      const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/contests/${id}/calculate-ratings`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-      });
-      if (!res.ok) {
-        // The endpoint answers plain text, not JSON: the status line is the only
-        // place the reason appears, so read it instead of reporting "HTTP 409".
-        const text = await res.text().catch(() => '');
-        throw new Error(text.trim() || `HTTP ${res.status}`);
-      }
-      // The counts are the operator's only evidence that the rating window did
-      // something: "rated 22 of 25" is the distribution, "done" is not.
-      const body = (await res.json().catch(() => null)) as { participants?: number; rated?: number } | null;
-      setRatingMsg(
-        body && typeof body.rated === 'number' && typeof body.participants === 'number'
-          ? `Rated ${body.rated} of ${body.participants} entrants.`
-          : 'Ratings applied.',
-      );
-      await Promise.all([fetchScoreboard(viewMode, currentPage), fetchRatings()]);
-    } catch (e) {
-      setRatingMsg(errorMessage(e) || 'Failed to trigger rating');
-    } finally {
-      setRatingLoading(false);
-    }
-  };
 
   // ── Render ───────────────────────────────────────────────────────────────
 
@@ -347,26 +318,17 @@ export default function ContestScoreboard() {
         </div>
       )}
 
-      {/* Admin rating controls. Hidden once the ratings are applied: the endpoint
-          refuses a second run, so offering "Recalculate" would only produce an
-          error for a button that looks like it should work. */}
+      {/* Rating ledger. Admin-only: it writes to the ledger, and every operation
+          on it is a decision about people's ratings rather than a display
+          preference. */}
       {isAdmin && contest.is_rated && ended && (
-        <div className="mb-3 flex items-center gap-3">
-          {contest.rating_calculated ? (
-            <span className="text-sm text-muted">Ratings have been applied for this round.</span>
-          ) : (
-            <button
-              onClick={handleRateContest}
-              disabled={ratingLoading}
-              className="px-4 py-1.5 text-sm font-medium rounded bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50 transition-colors"
-            >
-              {ratingLoading ? 'Applying...' : 'Rate This Contest'}
-            </button>
-          )}
-          {ratingMsg && (
-            <span className="text-sm text-muted">{ratingMsg}</span>
-          )}
-        </div>
+        <ContestRatingLedger
+          contestId={contest.id}
+          applied={!!contest.rating_calculated}
+          voided={!!contest.rating_voided}
+          participantCount={pagination?.total ?? entries.length}
+          onChanged={refreshBoard}
+        />
       )}
 
       {/* Scoreboard table */}

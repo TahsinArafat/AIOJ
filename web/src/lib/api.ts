@@ -367,7 +367,7 @@ async function requestBlob(path: string, opts: RequestInit = {}): Promise<Blob> 
     return res.blob()
 }
 
-import type { AIBrief, ContestAdjustment, AIBriefPreset, AIGenerationJob, AIModel, APIKey, ActivityItem, AdminBulkAction, AdminBulkResponse, AdminFeature, AdminUserDetail, AdminUserQuery, AdminAuthMethods, AdminUserRow, AuthMethods, AuthResponse, AuthSessionResponse, BackupFile, BlogListItem, BlogPost, BotAccount, Clarification, Class, ClassListItem, ClassMember, Comment, Contest, ContestDetailResponse, ContestNotice, ContestPermission, ContestProblem, ContestRegistration, ContestSubmissionsResponse, DetectedTool, Editorial, FeaturePolicy, Group, GroupListItem, GroupMember, GroupPendingInvite, GymContest, GymData, Hack, HackResult, HackSubmission, LanguageConfig, Notification, NotificationPreferences, OAuthUsernameCheck, OnsiteBatchUser, Organization, OrganizationListItem, OrganizationMember, PendingInvite, PendingRemoteSubmission, PlagiarismPairDetail, PlagiarismReport, Problem, ProblemI18n, ProblemListItem, ProblemPermission, ProblemStats, PublicLanguage, PublicProfile, RankingEntry, RatingHistoryEntry, RemoteLanguage, ResolvedFeature, ScoreboardData, SetterApplication, Submission, Team, TeamListItem, TeamMember, TestcaseFile, TestcaseFileContent, TestResult, TrainingPlan, TrainingPlanDetail, TrainingPlanEnrollment, TrainingPlanProblem, TrainingPlanProgress, TrainingPlanSection, User, UserAchievement, UserProblemStats, UserProfile, VirtualContest, VirtualStatusResponse, WeakTagsRecommendations, Webhook } from '../types/api'
+import type { AIBrief, ContestAdjustment, AIBriefPreset, AIGenerationJob, AIModel, APIKey, ActivityItem, AdminBulkAction, AdminBulkResponse, AdminFeature, AdminUserDetail, AdminUserQuery, AdminAuthMethods, AdminUserRow, AuthMethods, AuthResponse, AuthSessionResponse, BackupFile, BlogListItem, BlogPost, BotAccount, Clarification, Class, ClassListItem, ClassMember, Comment, Contest, ContestDetailResponse, ContestNotice, ContestPermission, ContestProblem, ContestRegistration, ContestSubmissionsResponse, DetectedTool, Editorial, FeaturePolicy, Group, GroupListItem, GroupMember, GroupPendingInvite, GymContest, GymData, Hack, HackResult, HackSubmission, LanguageConfig, Notification, NotificationPreferences, OAuthUsernameCheck, OnsiteBatchUser, Organization, OrganizationListItem, OrganizationMember, PendingInvite, PendingRemoteSubmission, PlagiarismPairDetail, PlagiarismReport, Problem, ProblemI18n, ProblemListItem, ProblemPermission, ProblemStats, PublicLanguage, PublicProfile, RankingEntry, RatingExclusion, RatingHistoryEntry, RatingRunEntry, RatingRunResponse, RemoteLanguage, ResolvedFeature, ScoreboardData, SetterApplication, Submission, Team, TeamListItem, TeamMember, TestcaseFile, TestcaseFileContent, TestResult, TrainingPlan, TrainingPlanDetail, TrainingPlanEnrollment, TrainingPlanProblem, TrainingPlanProgress, TrainingPlanSection, User, UserAchievement, UserProblemStats, UserProfile, VirtualContest, VirtualStatusResponse, WeakTagsRecommendations, Webhook } from '../types/api'
 
 export const api = {
     auth: {
@@ -899,16 +899,37 @@ export const api = {
             request(`/contests/${id}/unlock`, { method: 'POST', body: JSON.stringify({ password }) }),
         create: (d: unknown) => request<Contest>('/contests', { method: 'POST', body: JSON.stringify(d) }),
         getFormats: () => request<{ formats: string[] }>('/contests/formats'),
-        scoreboard: (id: string, view?: string, page?: number) => {
+        scoreboard: (id: string, view?: string, page?: number, limit?: number) => {
             const params = new URLSearchParams();
             if (view) params.set('view', view);
             if (page && page > 1) params.set('page', String(page));
+            if (limit) params.set('limit', String(limit));
             const qs = params.toString();
             return request<ScoreboardData>(`/contests/${id}/scoreboard${qs ? '?' + qs : ''}`);
         },
+        /**
+         * Rating operations. `calculate` pays a round out once; everything else is a
+         * ledger operation on a round that has already been rated. `recalculate`
+         * and the void pair replay every rated round after the one named, because
+         * each round's rating is folded onto the previous one.
+         */
+        calculateRatings: (id: string) =>
+            request<RatingRunResponse>(`/contests/${id}/calculate-ratings`, { method: 'POST' }),
+        recalculateRatings: (id: string) =>
+            request<RatingRunResponse>(`/contests/${id}/recalculate-ratings`, { method: 'POST' }),
+        voidRatings: (id: string) =>
+            request<RatingRunResponse>(`/contests/${id}/void-ratings`, { method: 'POST' }),
+        unvoidRatings: (id: string) =>
+            request<RatingRunResponse>(`/contests/${id}/void-ratings`, { method: 'DELETE' }),
         register: (id: string) => request(`/contests/${id}/register`, { method: 'POST' }),
         unregister: (id: string) => request(`/contests/${id}/register`, { method: 'DELETE' }),
         checkRegistration: (id: string) => request<{ registered: boolean }>(`/contests/${id}/register`),
+        ratingRuns: (id: string) => request<{ data: RatingRunEntry[] }>(`/contests/${id}/rating-runs`),
+        ratingExclusions: (id: string) => request<{ data: RatingExclusion[] }>(`/contests/${id}/rating-exclusions`),
+        addRatingExclusion: (id: string, d: { user_id: string; reason: string }) =>
+            request<RatingRunResponse>(`/contests/${id}/rating-exclusions`, { method: 'POST', body: JSON.stringify(d) }),
+        removeRatingExclusion: (id: string, userId: string) =>
+            request<RatingRunResponse>(`/contests/${id}/rating-exclusions/${encodeURIComponent(userId)}`, { method: 'DELETE' }),
         listRegistrations: (id: string) => request<{ data: ContestRegistration[]; count: number }>(`/contests/${id}/registrations`),
         getProblemByIndex: (contestId: string, index: string) =>
             request<{ problem: Problem; contest: Contest; can_submit?: boolean; upsolving_disabled?: boolean; statement_hidden?: boolean; is_judge?: boolean; spoilers_hidden?: boolean }>(`/contests/${contestId}/problems/${index}`),

@@ -88,6 +88,12 @@ type Contest struct {
 	IsRated     bool `json:"is_rated"`
 	RatedForMin int  `json:"rated_for_min"`
 	RatedForMax int  `json:"rated_for_max"`
+	// RatingVoided reports that this round's ratings no longer count. The round
+	// keeps its standings and stays published; only its effect on the rating
+	// ledger is withdrawn, which is what a disputed round needs. Distinct from an
+	// exclusion, which withdraws one entrant's result while the round still counts
+	// for everyone else.
+	RatingVoided bool `json:"rating_voided"`
 }
 
 // Contest review states. A setter proposes a round; an admin publishes it. Only

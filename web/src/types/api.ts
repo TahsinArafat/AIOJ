@@ -1641,6 +1641,39 @@ export interface ContestSubmissionsResponse {
 }
 
 /** Rating change rows returned by /api/rating/user/{id} and /api/rating/contest/{id}. */
+/**
+ * What a rating operation did. `contests` is how many rounds were replayed, which
+ * is the number an operator needs after a dispute: the answer is rarely "one",
+ * because each round's rating is folded onto the previous one.
+ */
+export interface RatingRunResponse {
+    run?: { id: string; kind: string; created_at: string }
+    contests?: number
+    participants?: number
+    rated?: number
+    changes?: unknown[]
+    team_rating_error?: string
+}
+
+/** One entrant disqualified from one round. The round still counts for the rest. */
+export interface RatingExclusion {
+    user_id: string
+    contest_id: string
+    reason: string
+    created_at: string
+}
+
+/** One payout: which round, who ran it, what kind, and why. */
+export interface RatingRunEntry {
+    id: string
+    contest_id: string
+    actor_id?: string
+    actor_name: string
+    kind: string
+    reason: string
+    created_at: string
+}
+
 export interface RatingHistoryEntry {
     id: string
     user_id: string

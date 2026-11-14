@@ -58,7 +58,18 @@ func (b *routerBuilder) mountContests(r chi.Router) {
 			// made in — see submission_skip.go. The role policy is the same gate
 			// the problem-scoped route uses.
 			r.With(b.gate(feature.KeySkipSubmission)).Post("/{id}/submissions/{submissionId}/skip", submissionH.SkipContestSubmission)
+			// Ratings are a ledger, so the endpoints are the ledger's operations
+			// rather than one button: apply once, then recalculate or withdraw.
+			// Recalculation replays every rated round after the one named, because
+			// the algorithm folds — a single round cannot be recomputed alone.
 			r.Post("/{id}/calculate-ratings", contestH.CalculateRatings)
+			r.Post("/{id}/recalculate-ratings", contestH.RecalculateRatings)
+			r.Post("/{id}/void-ratings", contestH.VoidRatings)
+			r.Delete("/{id}/void-ratings", contestH.UnvoidRatings)
+			r.Get("/{id}/rating-runs", contestH.ListRatingRuns)
+			r.Get("/{id}/rating-exclusions", contestH.ListRatingExclusions)
+			r.Post("/{id}/rating-exclusions", contestH.AddRatingExclusion)
+			r.Delete("/{id}/rating-exclusions/{userId}", contestH.RemoveRatingExclusion)
 		})
 		r.With(middleware.AuthMiddleware(b.jwt)).Post("/{id}/register-team", contestH.RegisterTeam)
 		// The roster is organizer information; the handler checks manager/judge.

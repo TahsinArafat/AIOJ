@@ -50,6 +50,9 @@ func TestRatingStore_GetByContestAcceptsDisplayID(t *testing.T) {
 	if err := contestStore.Create(ctx, contest); err != nil {
 		t.Fatalf("create contest: %v", err)
 	}
+	// The ledger row outlives the round by design (the reference is RESTRICT), so
+	// the round cannot be deleted until its rows are.
+	defer db.ExecContext(ctx, "DELETE FROM rating_history WHERE contest_id = $1", contestID)
 	defer db.ExecContext(ctx, "DELETE FROM contests WHERE id = $1", contestID)
 
 	// Pin a high display_id so the numeric form of the URL is unambiguous.
@@ -58,9 +61,16 @@ func TestRatingStore_GetByContestAcceptsDisplayID(t *testing.T) {
 		t.Fatalf("set display_id: %v", err)
 	}
 
+	// Every ledger row names the payout that wrote it, so a run has to exist first.
+	run := &model.RatingRun{ContestID: contestID, Kind: model.RatingRunApply}
+	if err := ratingStore.CreateRun(ctx, run); err != nil {
+		t.Fatalf("create rating run: %v", err)
+	}
+
 	history := &model.RatingHistory{
 		UserID:       userID,
 		ContestID:    contestID,
+		RunID:        run.ID,
 		OldRating:    1200,
 		NewRating:    1250,
 		Rank:         1,

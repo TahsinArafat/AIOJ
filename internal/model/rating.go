@@ -16,15 +16,59 @@ const (
 	ColorApex        = "apex"        // 2900+
 )
 
+// RatingHistory is one participant's result in one round, as the ledger records
+// it. It is not a log of edits: a recalculation supersedes these rows and writes
+// new ones, so a row is in force exactly when SupersededBy is empty.
 type RatingHistory struct {
-	ID           string    `json:"id"`
-	UserID       string    `json:"user_id"`
-	ContestID    string    `json:"contest_id"`
+	ID        string `json:"id"`
+	UserID    string `json:"user_id"`
+	ContestID string `json:"contest_id"`
+	// RunID is the payout that produced this row. One run covers every
+	// participant of a round, so reversing a round is one run to undo rather than
+	// N rows to find.
+	RunID string `json:"run_id"`
+	// SupersededBy is the run that replaced this row. Empty means in force.
+	SupersededBy string `json:"superseded_by,omitempty"`
+	// Seq orders rows by insertion. created_at cannot: two runs in the same
+	// millisecond tie, and replaying a suffix depends on a total order.
+	Seq          int64     `json:"seq"`
 	OldRating    int       `json:"old_rating"`
 	NewRating    int       `json:"new_rating"`
 	Rank         int       `json:"rank"`
 	RatingChange int       `json:"rating_change"`
 	CreatedAt    time.Time `json:"created_at"`
+}
+
+// RatingRun is one payout: the round it was for, who ran it, and why.
+type RatingRun struct {
+	ID         string    `json:"id"`
+	ContestID  string    `json:"contest_id"`
+	ActorID    string    `json:"actor_id,omitempty"`
+	ActorName  string    `json:"actor_name"`
+	Kind       string    `json:"kind"`
+	Reason     string    `json:"reason"`
+	ReplacesID string    `json:"replaces_run_id,omitempty"`
+	CreatedAt  time.Time `json:"created_at"`
+}
+
+// Rating run kinds.
+const (
+	// RatingRunApply is the first payout of a round.
+	RatingRunApply = "apply"
+	// RatingRunRecalc replaces an earlier payout: a disputed round voided, an
+	// entrant disqualified, or a suffix replayed after either.
+	RatingRunRecalc = "recalc"
+)
+
+// RatingExclusion is one entrant disqualified from one round. The round still
+// counts for everyone else; this entrant's result in it does not, which removes
+// them from the field and re-ranks the rest.
+type RatingExclusion struct {
+	UserID    string    `json:"user_id"`
+	ContestID string    `json:"contest_id"`
+	Reason    string    `json:"reason"`
+	CreatedBy string    `json:"created_by,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 type RatingChange struct {
