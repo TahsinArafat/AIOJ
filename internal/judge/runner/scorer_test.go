@@ -110,6 +110,50 @@ func TestScorer_Standard_FirstFailureWins(t *testing.T) {
 	}
 }
 
+// A fail-fast run hands over only the cases up to the first rejection, so the
+// results are a prefix of the problem's cases. The score must still be measured
+// against the whole problem: dividing by the prefix would report the points that
+// were never attempted as earned.
+func TestScorer_Standard_FailFastPrefixIsNotTheDenominator(t *testing.T) {
+	prob := &model.Problem{
+		ScoringMode: "complete",
+		TestCaseScore: []model.TestCaseScore{
+			{InputName: "1.in", Score: 10},
+			{InputName: "2.in", Score: 10},
+			{InputName: "3.in", Score: 10},
+		},
+	}
+	// The run stopped at case 2, so case 3 has no result at all.
+	results := []model.TestCaseResult{
+		{Index: 1, CaseName: "1.in", Status: model.StatusAC, Score: 10},
+		{Index: 2, CaseName: "2.in", Status: model.StatusWA, Score: 0},
+	}
+	out := NewScorer().Aggregate(prob, results)
+
+	if out.Score != 33 {
+		t.Errorf("score = %d, want 33: 10 of the problem's 30 points, not 10 of the 20 that ran", out.Score)
+	}
+	if out.FinalStatus != model.StatusWA {
+		t.Errorf("status = %s, want WA", out.FinalStatus)
+	}
+}
+
+// The same rule without weights: the unrun cases still count as cases.
+func TestScorer_Standard_FailFastCountsUnrunCasesUnweighted(t *testing.T) {
+	prob := &model.Problem{ScoringMode: "complete"}
+	prob.TestCaseScore = []model.TestCaseScore{
+		{InputName: "1.in"}, {InputName: "2.in"}, {InputName: "3.in"}, {InputName: "4.in"},
+	}
+	results := []model.TestCaseResult{
+		{Index: 1, CaseName: "1.in", Status: model.StatusAC},
+		{Index: 2, CaseName: "2.in", Status: model.StatusWA},
+	}
+
+	if out := NewScorer().Aggregate(prob, results); out.Score != 25 {
+		t.Errorf("score = %d, want 25: 1 of 4 cases, not 1 of the 2 that ran", out.Score)
+	}
+}
+
 func TestScorer_Subtask_MinAggregation_OneFails(t *testing.T) {
 	prob := &model.Problem{
 		ScoringMode:        "partial",

@@ -88,6 +88,64 @@ test('renders judge cases in the fallback (non-subtask) view', async () => {
     expect(screen.getByText('wrong answer on line 3')).toBeInTheDocument()
 })
 
+// Judging stops at the first rejection, so the report holds only the cases that
+// ran. The verdict has to name the case that failed rather than count passes
+// against a total that was never attempted.
+test('names the failing test case instead of counting passes', async () => {
+    vi.mocked(api.submissions.get).mockResolvedValue(
+        baseSubmission({
+            status: 'wa',
+            score: 33,
+            judge_result: [
+                { index: 1, case_name: '1.in', status: 'ac', time: 5, memory: 1024, score: 33 },
+                { index: 2, case_name: '2.in', status: 'wa', time: 9, memory: 2048, score: 0, detail: 'output mismatch' },
+            ],
+        }) as never
+    )
+
+    renderPage()
+
+    await waitFor(() => expect(screen.getByText('Wrong Answer on Test Case 2')).toBeInTheDocument())
+    expect(screen.getByRole('tab', { name: 'Test cases (2)' })).toBeInTheDocument()
+    expect(screen.queryByRole('tab', { name: /\(1\/2\)/ })).not.toBeInTheDocument()
+})
+
+// Any non-AC verdict stops the run, not just a wrong answer.
+test('names the limit verdict on the case it hit', async () => {
+    vi.mocked(api.submissions.get).mockResolvedValue(
+        baseSubmission({
+            status: 'tle',
+            judge_result: [
+                { index: 1, case_name: '1.in', status: 'ac', time: 5, memory: 1024, score: 20 },
+                { index: 2, case_name: '2.in', status: 'ac', time: 6, memory: 1024, score: 20 },
+                { index: 3, case_name: '3.in', status: 'tle', time: 2000, memory: 1024, score: 0 },
+            ],
+        }) as never
+    )
+
+    renderPage()
+
+    await waitFor(() => expect(screen.getByText('Time Limit Exceeded on Test Case 3')).toBeInTheDocument())
+})
+
+// Rows judged before the judge stored an index have none; the position in the
+// report is the same number, because the run stopped at its last case.
+test('falls back to the report position when a row carries no index', async () => {
+    vi.mocked(api.submissions.get).mockResolvedValue(
+        baseSubmission({
+            status: 'wa',
+            judge_result: [
+                { case_name: '1.in', status: 'ac', time: 5, memory: 1024, score: 50 },
+                { case_name: '2.in', status: 'wa', time: 9, memory: 2048, score: 0 },
+            ],
+        }) as never
+    )
+
+    renderPage()
+
+    await waitFor(() => expect(screen.getByText('Wrong Answer on Test Case 2')).toBeInTheDocument())
+})
+
 test('groups cases by subtask when subtask ids are present', async () => {
     vi.mocked(api.submissions.get).mockResolvedValue(
         baseSubmission({

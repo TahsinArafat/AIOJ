@@ -34,7 +34,12 @@ function formatTime(ms?: number | null): string {
     return ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(2)} s`
 }
 
-interface JudgeCase { status: string; case_name?: string; subtask_id?: number; time?: number; memory?: number; score?: number; detail?: string }
+/** A limit verdict is a warning; anything else that stops the run is a fault. */
+function failedCaseTone(status: string): string {
+    return status === 'tle' || status === 'mle' ? 'text-warn' : 'text-bad'
+}
+
+interface JudgeCase { index?: number; status: string; case_name?: string; subtask_id?: number; time?: number; memory?: number; score?: number; detail?: string }
 interface SubmissionRecord {
     id: string; problem_id: string; user_id?: string; username?: string; language: string; status: string;
     score?: number; time_used: number; memory_used: number; code_size?: number;
@@ -138,14 +143,25 @@ export default function SubmissionDetail() {
     const mine = viewer !== null && sub.user_id === viewer.id
     const judgeResult = sub.judge_result || []
     const totalCases = judgeResult.length
-    const passedCases = judgeResult.filter(r => r.status === 'ac').length
     const pending = isPendingVerdict(sub.status)
     const meta = verdictMeta(sub.status)
+
+    /* Judging stops at the first rejection, so for a complete-scored problem the
+       stored cases are exactly the ones that ran. Naming the case that failed is
+       the verdict — a "2 of 3 passed" count would describe tests that were never
+       run. A subtask-scored problem runs every case, and its first failure is
+       still the case worth naming. Older rows carry no index, so fall back to
+       the position in the report, which is the same number for a run that
+       stopped at its last case. */
+    const failedCase = judgeResult.find(r => r.status !== 'ac')
+    const failedCaseNumber = failedCase === undefined
+        ? null
+        : (failedCase.index && failedCase.index > 0 ? failedCase.index : judgeResult.indexOf(failedCase) + 1)
 
     const tabs = [
         { key: 'overview' as const, label: 'Overview' },
         { key: 'code' as const, label: 'Source' },
-        { key: 'tests' as const, label: totalCases > 0 ? `Test cases (${passedCases}/${totalCases})` : 'Test cases' },
+        { key: 'tests' as const, label: totalCases > 0 ? `Test cases (${totalCases})` : 'Test cases' },
     ]
 
     return (
@@ -214,6 +230,11 @@ export default function SubmissionDetail() {
 
                     <div className="flex shrink-0 flex-col items-start gap-2 sm:items-end">
                         <VerdictBadge status={sub.status} className="px-3 py-1 text-xs" />
+                        {!pending && failedCaseNumber !== null && failedCase && (
+                            <p className={`text-sm font-medium ${failedCaseTone(failedCase.status)}`}>
+                                {verdictMeta(failedCase.status).label} on Test Case {failedCaseNumber}
+                            </p>
+                        )}
                         {sub.is_remote && (
                             <div className="flex flex-wrap gap-2">
                                 {sub.status === 'se' && (

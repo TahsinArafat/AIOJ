@@ -37,6 +37,11 @@ const StatusCompileError = StatusCE
 const StatusJudgeError = StatusSE
 
 type TestCaseResult struct {
+	// Index is the 1-based position of the case in the order the judge ran it.
+	// It is the number a verdict names ("Wrong Answer on Test Case 3"): CaseName
+	// is the testdata filename, which is opaque to a contestant and does not
+	// survive a reorder of the case list.
+	Index    int              `json:"index,omitempty"`
 	CaseName string           `json:"case_name"`
 	Status   SubmissionStatus `json:"status"`
 	Time     int              `json:"time"`

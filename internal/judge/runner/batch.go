@@ -43,10 +43,23 @@ func (b *BatchRunner) Run(ctx context.Context, in RunInput) (RunOutput, error) {
 		orderedCases = prob.TestCaseScore
 	}
 
+	// Fail fast on a complete-scored problem: competitive judging stops at the
+	// first rejection and never runs the rest. Partial scoring is the one case
+	// that cannot stop — a subtask's credit is computed from every case in it,
+	// so a submission that failed case 2 still has to run case 3 for its own
+	// subtask. It is the same condition Scorer.Aggregate branches on.
+	failFast := !(prob.HasSubtasks() && prob.ScoringMode == "partial")
+
 	results := make([]model.TestCaseResult, 0, len(orderedCases))
-	for _, tc := range orderedCases {
+	for i, tc := range orderedCases {
 		r := b.runOne(ctx, prob, cfg, tc, copyIn, in)
+		// 1-based position in run order, which is what the verdict names. The
+		// testdata filename is not a case number a contestant can act on.
+		r.Index = i + 1
 		results = append(results, r)
+		if failFast && r.Status != model.StatusAC {
+			break
+		}
 	}
 
 	out := b.scorer.Aggregate(prob, results)

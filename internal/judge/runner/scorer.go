@@ -30,38 +30,44 @@ func (s *Scorer) Aggregate(prob *model.Problem, results []model.TestCaseResult) 
 	if prob.HasSubtasks() && prob.ScoringMode == "partial" {
 		return s.aggregateSubtasks(prob, results)
 	}
-	// The runner executes cases in TestCaseScore order, so the weights line up
-	// index-for-index with the results it produced.
 	weights := make([]int, len(prob.TestCaseScore))
 	for i, tc := range prob.TestCaseScore {
 		weights[i] = tc.Score
 	}
-	return s.aggregateStandard(weights, results)
+	return s.aggregateStandard(weights, len(prob.TestCaseScore), results)
 }
 
 // aggregateStandard: first non-AC status wins; score = points earned as a
 // percentage of points available.
 //
 // Each case carries its own weight in TestCaseScore, so the denominator is the
-// sum of those weights, not a flat per-case count. Every result the runner
-// produced counts toward that denominator, so a case that reported SE still
+// sum of those weights, not a flat per-case count. A case that reported SE still
 // contributes its weight — a submission is not credited for a case the judge
 // failed to run.
+//
+// The denominator is the whole problem, not just the cases that ran. A fail-fast
+// run stops at the first rejection, so results is a prefix of the problem's
+// cases; dividing by that prefix would award a submission that failed late a
+// higher score than one that failed early on the same number of passes, and
+// would make "stopped at case 3" report 100% of the points it never attempted.
 //
 // An unweighted test set (every case worth 0) falls back to counting cases, one
 // point each. That is the only sensible reading of "how much of this problem did
 // you solve", and it keeps a problem created before scores were assigned from
 // reporting 0% on a full solve.
-func (s *Scorer) aggregateStandard(weights []int, results []model.TestCaseResult) RunOutput {
+func (s *Scorer) aggregateStandard(weights []int, totalCases int, results []model.TestCaseResult) RunOutput {
 	finalStatus := model.StatusAC
 	totalScore, available, maxTime, maxMem := 0, 0, 0, 0
 
-	for i, r := range results {
+	for _, w := range weights {
+		available += w
+	}
+
+	for _, r := range results {
 		if r.Status != model.StatusAC && finalStatus == model.StatusAC {
 			finalStatus = r.Status
 		}
 		totalScore += r.Score
-		available += weightAt(weights, i)
 		if r.Time > maxTime {
 			maxTime = r.Time
 		}
@@ -71,14 +77,16 @@ func (s *Scorer) aggregateStandard(weights []int, results []model.TestCaseResult
 	}
 
 	if available <= 0 {
-		// Unweighted: one point per case, and credit only for AC.
+		// Unweighted: one point per case, and credit only for AC. A caller that
+		// hands over more results than the problem declares still counts them,
+		// so a synthetic problem with no weights is not scored as 0 of 0.
 		totalScore = 0
 		for _, r := range results {
 			if r.Status == model.StatusAC {
 				totalScore += 1
 			}
 		}
-		available = len(results)
+		available = max(totalCases, len(results))
 	}
 
 	return RunOutput{
@@ -88,16 +96,6 @@ func (s *Scorer) aggregateStandard(weights []int, results []model.TestCaseResult
 		MaxTime:     maxTime,
 		MaxMem:      maxMem,
 	}
-}
-
-// weightAt reads a case weight without panicking on a short slice, so a caller
-// that hands over fewer weights than results degrades to the unweighted fallback
-// instead of mis-indexing.
-func weightAt(weights []int, i int) int {
-	if i < 0 || i >= len(weights) {
-		return 0
-	}
-	return weights[i]
 }
 
 // percentage turns earned/available points into a 0-100 score, rounded to

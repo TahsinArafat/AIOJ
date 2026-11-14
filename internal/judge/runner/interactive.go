@@ -39,22 +39,37 @@ func (ir *InteractiveRunner) Run(ctx context.Context, in RunInput) (RunOutput, e
 
 	interactorFile := in.InteractorFile
 
+	// Fail fast on a complete-scored problem, for the same reason BatchRunner
+	// does: the remaining cases cannot change the verdict. Partial scoring still
+	// needs every case, because subtask credit is computed from all of them.
+	failFast := !(prob.HasSubtasks() && prob.ScoringMode == "partial")
+
+	// Every case the problem defines counts toward the denominator, including
+	// the ones a fail-fast run never reached — a case the judge skipped is not
+	// credit, and dividing by the cases that happened to run would inflate the
+	// score of a submission that failed late.
+	maxScore := 0
+	for _, tc := range prob.TestCaseScore {
+		maxScore += tc.Score
+	}
+
 	results := make([]model.TestCaseResult, 0, len(prob.TestCaseScore))
 	finalStatus := model.StatusAC
-	maxTime, maxMem, totalScore, maxScore := 0, 0, 0, 0
+	maxTime, maxMem, totalScore := 0, 0, 0
 
-	for _, tc := range prob.TestCaseScore {
-		// Every case this runner attempts counts toward the denominator, whether
-		// or not it passes: a case the judge failed to run is not credit.
-		maxScore += tc.Score
+	for i, tc := range prob.TestCaseScore {
 		inputContent, loadErr := loadFile(filepath.Join(prob.TestdataPath, tc.InputName))
 		if loadErr != nil {
 			results = append(results, model.TestCaseResult{
+				Index:    i + 1,
 				CaseName: tc.InputName,
 				Status:   model.StatusSE,
 				Detail:   "failed to load input: " + loadErr.Error(),
 			})
 			finalStatus = model.StatusSE
+			if failFast {
+				break
+			}
 			continue
 		}
 
@@ -87,6 +102,7 @@ func (ir *InteractiveRunner) Run(ctx context.Context, in RunInput) (RunOutput, e
 			in.CPULimitNs, in.MemLimitBytes)
 		if err != nil {
 			results = append(results, model.TestCaseResult{
+				Index:    i + 1,
 				CaseName: tc.InputName,
 				Status:   model.StatusSE,
 				Detail:   err.Error(),
@@ -94,10 +110,14 @@ func (ir *InteractiveRunner) Run(ctx context.Context, in RunInput) (RunOutput, e
 			if finalStatus == model.StatusAC {
 				finalStatus = model.StatusSE
 			}
+			if failFast {
+				break
+			}
 			continue
 		}
 
 		r := model.TestCaseResult{
+			Index:    i + 1,
 			CaseName: tc.InputName,
 			Time:     int(iResult.Time / 1_000_000), // ns → ms
 			Memory:   int(iResult.Memory / 1024),    // bytes → KB
@@ -132,6 +152,9 @@ func (ir *InteractiveRunner) Run(ctx context.Context, in RunInput) (RunOutput, e
 		if r.Status != model.StatusAC && finalStatus == model.StatusAC {
 			finalStatus = r.Status
 		}
+		if failFast && r.Status != model.StatusAC {
+			break
+		}
 	}
 
 	avgScore := percentage(totalScore, maxScore)
@@ -165,12 +188,13 @@ func (or *OutputOnlyRunner) Run(ctx context.Context, in RunInput) (RunOutput, er
 	totalScore, maxScore := 0, 0
 	allPassed := true
 
-	for _, tc := range prob.TestCaseScore {
+	for i, tc := range prob.TestCaseScore {
 		maxScore += tc.Score
 
 		expectedOutput, err := os.ReadFile(filepath.Join(prob.TestdataPath, tc.OutputName))
 		if err != nil {
 			results = append(results, model.TestCaseResult{
+				Index:    i + 1,
 				CaseName: tc.InputName,
 				Status:   model.StatusSE,
 				Detail:   "failed to load expected output: " + err.Error(),
@@ -191,6 +215,7 @@ func (or *OutputOnlyRunner) Run(ctx context.Context, in RunInput) (RunOutput, er
 		totalScore += score
 
 		results = append(results, model.TestCaseResult{
+			Index:    i + 1,
 			CaseName: tc.InputName,
 			Status:   status,
 			Score:    score,
