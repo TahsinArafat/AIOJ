@@ -19,6 +19,7 @@ func (b *routerBuilder) mountAI(r chi.Router) {
 			r.Use(middleware.RequireRole("admin", "setter"))
 			r.Use(b.gate(feature.KeyAIGeneration))
 			r.Get("/connections", b.Optional.AIGeneration.Connections)
+			r.Get("/artifacts", b.Optional.AIGeneration.Artifacts)
 			r.Get("/brief-presets", b.Optional.AIGeneration.Presets)
 			r.Get("/jobs", b.Optional.AIGeneration.ListActor)
 			r.Post("/jobs", b.Optional.AIGeneration.Create)

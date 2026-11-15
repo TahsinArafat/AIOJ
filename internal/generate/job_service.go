@@ -40,17 +40,15 @@ const (
 )
 
 func (s *JobService) Create(ctx context.Context, actorID string, req CreateJobRequest) (*model.AIGenerationJob, error) {
-	normalized, err := req.Brief.Normalize()
+	// Normalize is artifact-aware and rejects an artifact type it does not know,
+	// so the whitelist that used to sit here is gone: two lists of the same thing
+	// is how one of them comes to be missing a case.
+	normalized, err := req.Brief.Normalize(req.ArtifactType)
 	if err != nil {
 		return nil, err
 	}
 	if normalized.ProblemType != "standard" {
 		return nil, fmt.Errorf("v1 supports standard batch problems only")
-	}
-	switch req.ArtifactType {
-	case "full_problem", "statement", "tests", "solution", "editorial":
-	default:
-		return nil, fmt.Errorf("unsupported artifact_type")
 	}
 	running, queued, err := s.Jobs.CountActiveByActor(ctx, actorID)
 	if err != nil {

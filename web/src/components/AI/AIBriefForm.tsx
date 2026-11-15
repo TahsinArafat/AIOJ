@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import type { AIBrief } from '../../types/api'
+import type { AIBrief, AIBriefField } from '../../types/api'
 import { ratingColor, ratingLabel, withRange, withRating } from '../../lib/aiBrief'
+import { ArtifactScope } from '../../lib/aiArtifacts'
 
 /**
  * The authoring brief shared by every AI generation surface.
@@ -159,29 +160,83 @@ function RatingSlider({ value, onChange, disabled }: { value: number; onChange: 
 
 const field = 'mt-1 min-h-11 w-full rounded-lg border border-hairline-strong bg-surface px-3 py-2 text-sm text-ink'
 
+/**
+ * A brief fieldset, shown only when the artifact uses something inside it.
+ *
+ * The gating is by group rather than per control: a section is what the setter
+ * reads, so it appears when any of its fields is used and its own controls
+ * decide which of them render. Composing sections this way means adding a field
+ * to the catalog never changes a condition here.
+ */
+function Section({
+    scope,
+    fields,
+    title,
+    hint,
+    required,
+    stacked,
+    children,
+}: {
+    scope: ArtifactScope
+    /** The fields inside. The section appears when the artifact uses any. */
+    fields: AIBriefField[]
+    title: string
+    hint?: string
+    /** Show the required marker, for the one section that has a required field. */
+    required?: boolean
+    /** Space the children apart, for sections that hold a grid of controls. */
+    stacked?: boolean
+    children: React.ReactNode
+}) {
+    if (!scope.acceptsAny(...fields)) return null
+    return (
+        <fieldset className={`${stacked ? 'space-y-3 ' : ''}rounded-xl border border-hairline bg-surface p-4 shadow-sm`}>
+            <legend className="px-2 text-sm font-semibold text-ink-soft">
+                {title} {required && <span className="text-bad">*</span>}
+            </legend>
+            {hint && <p className="mb-3 text-xs text-muted">{hint}</p>}
+            {children}
+        </fieldset>
+    )
+}
+
 export function AIBriefForm({
     brief,
     onChange,
     disabled,
+    scope,
 }: {
     brief: AIBrief
     onChange: (patch: Partial<AIBrief>) => void
     disabled?: boolean
+    /**
+     * What the selected artifact accepts. Defaults to the full set, which is
+     * what the new-problem form and a not-yet-loaded catalog both want.
+     */
+    scope?: ArtifactScope
 }) {
+    const s = scope ?? new ArtifactScope(undefined)
     const profile = brief.format_profile ?? 'general'
     // The backend rejects ICPC + subtasks ("ICPC profile does not support
     // subtasks") and forces team/onsite for ICPC and solo for CF/OI, so the
     // dependent controls reflect what will actually be sent.
     const icpc = profile === 'icpc'
     const soloForced = profile === 'codeforces' || profile === 'oi'
+    // Profile-dependent controls only matter where the profile is asked for; an
+    // artifact that takes difficulty from the existing problem has no profile.
+    const hasProfile = s.accepts('format_profile')
 
     return (
         <div className="space-y-5">
-            <fieldset className="rounded-xl border border-hairline bg-surface p-4 shadow-sm">
-                <legend className="px-2 text-sm font-semibold text-ink-soft">
-                    Algorithmic topics <span className="text-bad">*</span>
-                </legend>
-                <p className="mb-3 text-xs text-muted">Required. Pick chips or type your own; the model builds the problem around them.</p>
+            <Section
+                scope={s}
+                fields={['topics', 'primary_topics']}
+                title="Algorithmic topics"
+                hint={s.requires('topics')
+                    ? 'Required. Pick chips or type your own; the model builds the problem around them.'
+                    : 'Optional. The existing problem’s topics are authoritative; these steer the model further.'}
+                required={s.requires('topics')}
+            >
                 <TagInput
                     tags={brief.tags}
                     onChange={tags => onChange({ tags })}
@@ -189,109 +244,132 @@ export function AIBriefForm({
                     label="Add a topic tag"
                     placeholder="Type a topic and press Enter…"
                 />
-            </fieldset>
+            </Section>
 
-            <fieldset className="rounded-xl border border-hairline bg-surface p-4 shadow-sm">
-                <legend className="px-2 text-sm font-semibold text-ink-soft">Difficulty rating</legend>
-                <p className="mb-3 text-xs text-muted">Codeforces-style rating. Calibrates algorithmic depth and the expected solution complexity.</p>
+            <Section
+                scope={s}
+                fields={['rating', 'rating_range']}
+                title="Difficulty rating"
+                hint="Codeforces-style rating. Calibrates algorithmic depth and the expected solution complexity."
+            >
                 <RatingSlider value={brief.rating} onChange={v => onChange(withRating(brief, v))} disabled={disabled} />
-                <div className="mt-4 grid grid-cols-2 gap-3">
-                    <label className="text-xs text-muted">
-                        Minimum acceptable
-                        <input
-                            type="number" min={800} max={3500} step={100}
-                            value={brief.rating_min ?? brief.rating - 100}
-                            disabled={disabled}
-                            onChange={e => onChange(withRange(brief, 'min', Number(e.target.value)))}
-                            className={field}
-                        />
-                    </label>
-                    <label className="text-xs text-muted">
-                        Maximum acceptable
-                        <input
-                            type="number" min={800} max={3500} step={100}
-                            value={brief.rating_max ?? brief.rating + 100}
-                            disabled={disabled}
-                            onChange={e => onChange(withRange(brief, 'max', Number(e.target.value)))}
-                            className={field}
-                        />
-                    </label>
-                </div>
-            </fieldset>
+                {s.accepts('rating_range') && (
+                    <div className="mt-4 grid grid-cols-2 gap-3">
+                        <label className="text-xs text-muted">
+                            Minimum acceptable
+                            <input
+                                type="number" min={800} max={3500} step={100}
+                                value={brief.rating_min ?? brief.rating - 100}
+                                disabled={disabled}
+                                onChange={e => onChange(withRange(brief, 'min', Number(e.target.value)))}
+                                className={field}
+                            />
+                        </label>
+                        <label className="text-xs text-muted">
+                            Maximum acceptable
+                            <input
+                                type="number" min={800} max={3500} step={100}
+                                value={brief.rating_max ?? brief.rating + 100}
+                                disabled={disabled}
+                                onChange={e => onChange(withRange(brief, 'max', Number(e.target.value)))}
+                                className={field}
+                            />
+                        </label>
+                    </div>
+                )}
+            </Section>
 
-            <fieldset className="space-y-3 rounded-xl border border-hairline bg-surface p-4 shadow-sm">
-                <legend className="px-2 text-sm font-semibold text-ink-soft">Authoring profile</legend>
+            <Section
+                scope={s}
+                fields={['format_profile', 'solver_mode', 'event_context', 'expected_solve_minutes', 'insight_emphasis', 'audience_level', 'story_tone']}
+                title="Authoring profile"
+                stacked
+            >
                 <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="text-xs text-muted">
-                        Format profile
-                        <select value={profile} disabled={disabled} onChange={e => onChange({ format_profile: e.target.value as AIBrief['format_profile'] })} className={field}>
-                            <option value="general">General practice</option>
-                            <option value="codeforces">Codeforces round</option>
-                            <option value="icpc">ICPC onsite</option>
-                            <option value="oi">OI / IOI style</option>
-                        </select>
-                    </label>
-                    <label className="text-xs text-muted">
-                        Event context
-                        <select
-                            value={icpc ? 'onsite' : (brief.event_context ?? 'practice')}
-                            disabled={disabled || icpc}
-                            onChange={e => onChange({ event_context: e.target.value as AIBrief['event_context'] })}
-                            className={field}
-                        >
-                            <option value="practice">Practice</option>
-                            <option value="online">Online contest</option>
-                            <option value="onsite">Onsite contest</option>
-                        </select>
-                    </label>
-                    <label className="text-xs text-muted">
-                        Solver mode
-                        <select
-                            value={icpc ? 'team' : soloForced ? 'solo' : (brief.solver_mode ?? 'solo')}
-                            disabled={disabled || icpc || soloForced}
-                            onChange={e => onChange({ solver_mode: e.target.value as AIBrief['solver_mode'] })}
-                            className={field}
-                        >
-                            <option value="solo">Solo</option>
-                            <option value="team">Team</option>
-                        </select>
-                    </label>
-                    <label className="text-xs text-muted">
-                        Expected solve minutes
-                        <input
-                            type="number" min={1} max={360}
-                            value={brief.expected_solve_minutes ?? 45}
-                            disabled={disabled}
-                            onChange={e => onChange({ expected_solve_minutes: Number(e.target.value) })}
-                            className={field}
-                        />
-                    </label>
-                    <label className="text-xs text-muted">
-                        Audience level
-                        <select value={brief.audience_level ?? 'intermediate'} disabled={disabled} onChange={e => onChange({ audience_level: e.target.value })} className={field}>
-                            <option value="beginner">Beginner</option>
-                            <option value="intermediate">Intermediate</option>
-                            <option value="advanced">Advanced</option>
-                        </select>
-                    </label>
-                    <label className="text-xs text-muted">
-                        Insight / implementation emphasis
-                        <select
-                            value={brief.insight_emphasis ?? 'balanced'}
-                            disabled={disabled}
-                            onChange={e => onChange({ insight_emphasis: e.target.value as AIBrief['insight_emphasis'] })}
-                            className={field}
-                        >
-                            <option value="balanced">Balanced</option>
-                            <option value="insight">Insight-heavy</option>
-                            <option value="implementation">Implementation-heavy</option>
-                        </select>
-                    </label>
-                    <label className="text-xs text-muted">
-                        Story tone
-                        <input value={brief.story_tone ?? 'neutral'} disabled={disabled} onChange={e => onChange({ story_tone: e.target.value })} className={field} />
-                    </label>
-                    {(icpc || brief.solver_mode === 'team') && !soloForced && (
+                    {hasProfile && (
+                        <label className="text-xs text-muted">
+                            Format profile
+                            <select value={profile} disabled={disabled} onChange={e => onChange({ format_profile: e.target.value as AIBrief['format_profile'] })} className={field}>
+                                <option value="general">General practice</option>
+                                <option value="codeforces">Codeforces round</option>
+                                <option value="icpc">ICPC onsite</option>
+                                <option value="oi">OI / IOI style</option>
+                            </select>
+                        </label>
+                    )}
+                    {s.accepts('event_context') && (
+                        <label className="text-xs text-muted">
+                            Event context
+                            <select
+                                value={icpc ? 'onsite' : (brief.event_context ?? 'practice')}
+                                disabled={disabled || icpc}
+                                onChange={e => onChange({ event_context: e.target.value as AIBrief['event_context'] })}
+                                className={field}
+                            >
+                                <option value="practice">Practice</option>
+                                <option value="online">Online contest</option>
+                                <option value="onsite">Onsite contest</option>
+                            </select>
+                        </label>
+                    )}
+                    {s.accepts('solver_mode') && (
+                        <label className="text-xs text-muted">
+                            Solver mode
+                            <select
+                                value={icpc ? 'team' : soloForced ? 'solo' : (brief.solver_mode ?? 'solo')}
+                                disabled={disabled || icpc || soloForced}
+                                onChange={e => onChange({ solver_mode: e.target.value as AIBrief['solver_mode'] })}
+                                className={field}
+                            >
+                                <option value="solo">Solo</option>
+                                <option value="team">Team</option>
+                            </select>
+                        </label>
+                    )}
+                    {s.accepts('expected_solve_minutes') && (
+                        <label className="text-xs text-muted">
+                            Expected solve minutes
+                            <input
+                                type="number" min={1} max={360}
+                                value={brief.expected_solve_minutes ?? 45}
+                                disabled={disabled}
+                                onChange={e => onChange({ expected_solve_minutes: Number(e.target.value) })}
+                                className={field}
+                            />
+                        </label>
+                    )}
+                    {s.accepts('audience_level') && (
+                        <label className="text-xs text-muted">
+                            Audience level
+                            <select value={brief.audience_level ?? 'intermediate'} disabled={disabled} onChange={e => onChange({ audience_level: e.target.value })} className={field}>
+                                <option value="beginner">Beginner</option>
+                                <option value="intermediate">Intermediate</option>
+                                <option value="advanced">Advanced</option>
+                            </select>
+                        </label>
+                    )}
+                    {s.accepts('insight_emphasis') && (
+                        <label className="text-xs text-muted">
+                            Insight / implementation emphasis
+                            <select
+                                value={brief.insight_emphasis ?? 'balanced'}
+                                disabled={disabled}
+                                onChange={e => onChange({ insight_emphasis: e.target.value as AIBrief['insight_emphasis'] })}
+                                className={field}
+                            >
+                                <option value="balanced">Balanced</option>
+                                <option value="insight">Insight-heavy</option>
+                                <option value="implementation">Implementation-heavy</option>
+                            </select>
+                        </label>
+                    )}
+                    {s.accepts('story_tone') && (
+                        <label className="text-xs text-muted">
+                            Story tone
+                            <input value={brief.story_tone ?? 'neutral'} disabled={disabled} onChange={e => onChange({ story_tone: e.target.value })} className={field} />
+                        </label>
+                    )}
+                    {s.accepts('solver_mode') && (icpc || brief.solver_mode === 'team') && !soloForced && (
                         <label className="text-xs text-muted">
                             Team size
                             <input
@@ -304,100 +382,129 @@ export function AIBriefForm({
                         </label>
                     )}
                 </div>
-                <p className="text-xs text-muted-soft">
-                    Target {brief.rating} within {brief.rating_min ?? brief.rating - 100}–{brief.rating_max ?? brief.rating + 100};{' '}
-                    {icpc ? 'team of 3 / onsite / icpc' : `${soloForced ? 'solo' : (brief.solver_mode ?? 'solo')} / ${brief.event_context ?? 'practice'} / ${profile}`}.
-                </p>
-            </fieldset>
+                {/* The summary restates the calibration, so it is only honest where
+                    the calibration is the artifact's own input. */}
+                {(s.accepts('rating') || hasProfile) && (
+                    <p className="text-xs text-muted-soft">
+                        {s.accepts('rating') && (
+                            <>Target {brief.rating} within {brief.rating_min ?? brief.rating - 100}–{brief.rating_max ?? brief.rating + 100};{' '}</>
+                        )}
+                        {hasProfile
+                            ? icpc ? 'team of 3 / onsite / icpc' : `${soloForced ? 'solo' : (brief.solver_mode ?? 'solo')} / ${brief.event_context ?? 'practice'} / ${profile}`
+                            : 'difficulty taken from the existing problem'}.
+                    </p>
+                )}
+            </Section>
 
-            <fieldset className="space-y-3 rounded-xl border border-hairline bg-surface p-4 shadow-sm">
-                <legend className="px-2 text-sm font-semibold text-ink-soft">Technique constraints</legend>
+            <Section
+                scope={s}
+                fields={['secondary_topics', 'required_techniques', 'forbidden_techniques', 'constraint_guidance']}
+                title="Technique constraints"
+                stacked
+            >
                 <div className="grid gap-3 sm:grid-cols-3">
-                    <label className="text-xs text-muted">
-                        Secondary topics
-                        <input
-                            value={(brief.secondary_topics ?? []).join(', ')}
-                            disabled={disabled}
-                            onChange={e => onChange({ secondary_topics: e.target.value.split(',').map(v => v.trim()).filter(Boolean) })}
-                            placeholder="arrays, math"
-                            className={field}
-                        />
-                    </label>
-                    <label className="text-xs text-muted">
-                        Required techniques
-                        <input
-                            value={(brief.required_techniques ?? []).join(', ')}
-                            disabled={disabled}
-                            onChange={e => onChange({ required_techniques: e.target.value.split(',').map(v => v.trim()).filter(Boolean) })}
-                            placeholder="binary search"
-                            className={field}
-                        />
-                    </label>
-                    <label className="text-xs text-muted">
-                        Forbidden techniques
-                        <input
-                            value={(brief.forbidden_techniques ?? []).join(', ')}
-                            disabled={disabled}
-                            onChange={e => onChange({ forbidden_techniques: e.target.value.split(',').map(v => v.trim()).filter(Boolean) })}
-                            placeholder="brute force"
-                            className={field}
-                        />
-                    </label>
+                    {s.accepts('secondary_topics') && (
+                        <label className="text-xs text-muted">
+                            Secondary topics
+                            <input
+                                value={(brief.secondary_topics ?? []).join(', ')}
+                                disabled={disabled}
+                                onChange={e => onChange({ secondary_topics: e.target.value.split(',').map(v => v.trim()).filter(Boolean) })}
+                                placeholder="arrays, math"
+                                className={field}
+                            />
+                        </label>
+                    )}
+                    {s.accepts('required_techniques') && (
+                        <label className="text-xs text-muted">
+                            Required techniques
+                            <input
+                                value={(brief.required_techniques ?? []).join(', ')}
+                                disabled={disabled}
+                                onChange={e => onChange({ required_techniques: e.target.value.split(',').map(v => v.trim()).filter(Boolean) })}
+                                placeholder="binary search"
+                                className={field}
+                            />
+                        </label>
+                    )}
+                    {s.accepts('forbidden_techniques') && (
+                        <label className="text-xs text-muted">
+                            Forbidden techniques
+                            <input
+                                value={(brief.forbidden_techniques ?? []).join(', ')}
+                                disabled={disabled}
+                                onChange={e => onChange({ forbidden_techniques: e.target.value.split(',').map(v => v.trim()).filter(Boolean) })}
+                                placeholder="brute force"
+                                className={field}
+                            />
+                        </label>
+                    )}
                 </div>
-                <label className="block text-xs text-muted">
-                    Constraint guidance
-                    {/* Prose that lands in the generator prompt: one bound or
-                        caution per line has to survive as separate lines. */}
-                    <textarea
-                        value={brief.constraint_guidance ?? ''}
-                        disabled={disabled}
-                        onChange={e => onChange({ constraint_guidance: e.target.value })}
-                        rows={2}
-                        placeholder="e.g. N up to 2e5; avoid constraints that let brute force pass"
-                        className={field}
-                    />
-                </label>
-            </fieldset>
-
-            <fieldset className="space-y-3 rounded-xl border border-hairline bg-surface p-4 shadow-sm">
-                <legend className="px-2 text-sm font-semibold text-ink-soft">Test cases &amp; scoring</legend>
-                <div className="grid gap-3 sm:grid-cols-2">
-                    <label className="text-xs text-muted">
-                        Test case count (1–100)
-                        <input
-                            type="number" min={1} max={100}
-                            aria-label="Test case count"
-                            value={brief.testcase_count}
+                {s.accepts('constraint_guidance') && (
+                    <label className="block text-xs text-muted">
+                        Constraint guidance
+                        {/* Prose that lands in the generator prompt: one bound or
+                            caution per line has to survive as separate lines. */}
+                        <textarea
+                            value={brief.constraint_guidance ?? ''}
                             disabled={disabled}
-                            onChange={e => onChange({ testcase_count: Math.min(100, Math.max(1, Number(e.target.value))) })}
+                            onChange={e => onChange({ constraint_guidance: e.target.value })}
+                            rows={2}
+                            placeholder="e.g. N up to 2e5; avoid constraints that let brute force pass"
                             className={field}
                         />
                     </label>
-                    <label className="flex items-start gap-2 self-end pb-2 text-xs text-ink-soft">
-                        <input
-                            type="checkbox"
-                            checked={brief.has_subtasks}
-                            disabled={disabled || icpc}
-                            onChange={e => onChange({ has_subtasks: e.target.checked })}
-                            className="mt-0.5 accent-[var(--primary)]"
-                        />
-                        <span>
-                            Subtask scoring (partial credit)
-                            {icpc && <span className="block text-muted-soft">Not available for the ICPC profile.</span>}
-                        </span>
-                    </label>
+                )}
+            </Section>
+
+            <Section
+                scope={s}
+                fields={['testcase_count', 'has_subtasks']}
+                title="Test cases & scoring"
+                stacked
+            >
+                <div className="grid gap-3 sm:grid-cols-2">
+                    {s.accepts('testcase_count') && (
+                        <label className="text-xs text-muted">
+                            Test case count (1–100)
+                            <input
+                                type="number" min={1} max={100}
+                                aria-label="Test case count"
+                                value={brief.testcase_count}
+                                disabled={disabled}
+                                onChange={e => onChange({ testcase_count: Math.min(100, Math.max(1, Number(e.target.value))) })}
+                                className={field}
+                            />
+                        </label>
+                    )}
+                    {s.accepts('has_subtasks') && (
+                        <label className="flex items-start gap-2 self-end pb-2 text-xs text-ink-soft">
+                            <input
+                                type="checkbox"
+                                checked={brief.has_subtasks}
+                                disabled={disabled || icpc}
+                                onChange={e => onChange({ has_subtasks: e.target.checked })}
+                                className="mt-0.5 accent-[var(--primary)]"
+                            />
+                            <span>
+                                Subtask scoring (partial credit)
+                                {icpc && <span className="block text-muted-soft">Not available for the ICPC profile.</span>}
+                            </span>
+                        </label>
+                    )}
                 </div>
                 <p className="text-xs text-muted-soft">
                     The harness materialises the hidden cases from the generator it writes, so this number steers statement examples and curated edge cases.
                 </p>
-            </fieldset>
+            </Section>
 
-            <fieldset className="rounded-xl border border-hairline bg-surface p-4 shadow-sm">
-                <legend className="px-2 text-sm font-semibold text-ink-soft">
-                    Additional guidance <span className="font-normal text-muted-soft">(optional)</span>
-                </legend>
+            <Section
+                scope={s}
+                fields={['additional_prompt']}
+                title="Additional guidance"
+            >
                 <p className="mb-2 text-xs text-muted">
-                    Free-form steer, e.g. &ldquo;grid DP on an N×M array&rdquo;, &ldquo;the key insight is modular inverses&rdquo;, &ldquo;avoid trivial brute force&rdquo;.
+                    Optional. Free-form steer, e.g. &ldquo;grid DP on an N×M array&rdquo;, &ldquo;the key insight is modular inverses&rdquo;, &ldquo;avoid trivial brute force&rdquo;.
                 </p>
                 <textarea
                     aria-label="Additional instructions for the model"
@@ -408,7 +515,7 @@ export function AIBriefForm({
                     placeholder="Describe any scenario, constraint, or insight you want the model to incorporate…"
                     className="w-full resize-none rounded-lg border border-hairline-strong bg-surface px-3 py-2 text-sm text-ink focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)]"
                 />
-            </fieldset>
+            </Section>
         </div>
     )
 }

@@ -29,7 +29,7 @@ func TestRenderForCarriesTheExistingProblem(t *testing.T) {
 		},
 	}
 
-	out := Brief{Tags: []string{"dp"}, Rating: 1400}.RenderFor("statement", existing)
+	out := Brief{Tags: []string{"dp"}, Rating: 1400, AdditionalPrompt: "keep the story about echoes"}.RenderFor("statement", existing)
 
 	for _, want := range []string{
 		"Echo",
@@ -39,12 +39,83 @@ func TestRenderForCarriesTheExistingProblem(t *testing.T) {
 		"262144",
 		"implementation",
 		"3 1 2 3",
-		// The operator's brief must survive alongside the context.
-		"dp",
-		"1400",
+		// The operator's brief must survive alongside the context — as long as it
+		// is a field this artifact uses. Guidance is accepted by every scope.
+		"keep the story about echoes",
 	} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("prompt missing %q:\n%s", want, out)
+		}
+	}
+}
+
+// The per-artifact input split. Every field used to be rendered for every
+// artifact, so a statement rewrite was told "Topics: dp, Target rating: 1400"
+// beside "Existing problem … Tags: implementation" — an instruction to rebuild
+// the problem around inputs the operator was never asked for, contradicting the
+// problem it was supposed to be rewriting.
+func TestRenderForRendersOnlyFieldsTheArtifactUses(t *testing.T) {
+	// Everything set, so any rendered line is the artifact's own doing.
+	full := Brief{
+		Tags: []string{"dp"}, Rating: 1400, RatingMin: 1300, RatingMax: 1500,
+		FormatProfile: "codeforces", SolverMode: "solo", EventContext: "practice",
+		TestCaseCount: 20, HasSubtasks: true, AudienceLevel: "advanced",
+		StoryTone: "playful", ConstraintGuidance: "N up to 2e5",
+		ForbiddenTechniques: []string{"flows"}, AdditionalPrompt: "extra steer",
+	}
+
+	cases := map[string]struct {
+		want    []string
+		notWant []string
+	}{
+		// The artifact that invents a problem needs the inputs that define one.
+		"full_problem": {
+			want: []string{"Topics: dp", "Target rating: 1400", "test-set size", "Subtask scoring", "Audience: advanced"},
+		},
+		// A statement rewrite works from the existing problem, so the defining
+		// inputs are neither asked for nor rendered; register is.
+		"statement": {
+			want:    []string{"Audience: advanced", "Story tone: playful", "Must not require: flows"},
+			notWant: []string{"Target rating", "Format profile", "test-set size", "Subtask scoring"},
+		},
+		"tests": {
+			want:    []string{"test-set size", "Subtask scoring", "Must not require: flows"},
+			notWant: []string{"Target rating", "Audience:", "Story tone"},
+		},
+		"solution": {
+			want:    []string{"Must not require: flows", "Constraint guidance"},
+			notWant: []string{"Target rating", "test-set size", "Audience:", "Story tone"},
+		},
+		// An editorial explains a problem that already exists: no topic, no
+		// rating, no test count — this is the case the report named.
+		"editorial": {
+			want:    []string{"Audience: advanced", "Story tone: playful"},
+			notWant: []string{"Topics: dp", "Target rating", "test-set size", "Format profile", "Must not require"},
+		},
+	}
+
+	for artifact, tc := range cases {
+		out := full.RenderFor(artifact, nil)
+		for _, want := range tc.want {
+			if !strings.Contains(out, want) {
+				t.Fatalf("%s: prompt missing %q:\n%s", artifact, want, out)
+			}
+		}
+		for _, notWant := range tc.notWant {
+			if strings.Contains(out, notWant) {
+				t.Fatalf("%s: prompt must not contain %q:\n%s", artifact, notWant, out)
+			}
+		}
+	}
+}
+
+// AdditionalPrompt is the one field every artifact takes: it is the escape hatch
+// for steering a run, so it must never be gated away.
+func TestAdditionalPromptSurvivesEveryArtifact(t *testing.T) {
+	for _, a := range model.ArtifactIDs() {
+		out := Brief{Tags: []string{"dp"}, AdditionalPrompt: "unique steer"}.RenderFor(a, nil)
+		if !strings.Contains(out, "unique steer") {
+			t.Fatalf("artifact %q dropped the additional prompt:\n%s", a, out)
 		}
 	}
 }

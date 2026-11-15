@@ -59,7 +59,7 @@ func (b Brief) RenderFor(artifact string, existing *model.Problem) string {
 	}
 
 	sb.WriteString("\n\n## Operator brief\n")
-	sb.WriteString(b.renderIntent())
+	sb.WriteString(b.renderIntent(artifact))
 	sb.WriteString("\nNothing is published until a human reviews the result.\n")
 	return sb.String()
 }

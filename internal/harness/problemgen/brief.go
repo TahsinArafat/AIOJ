@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+
+	"github.com/tahsinarafat/aioj/internal/model"
 )
 
 // Brief is the operator's request, as stored on the job.
@@ -52,72 +54,87 @@ func ParseBrief(raw json.RawMessage) (Brief, error) {
 // that must be true of the output (tiers, determinism, limits), so the brief
 // cannot weaken the gates by asking for them to be skipped.
 //
+// It renders only the fields the artifact can use. Every field was rendered for
+// every artifact before, so an editorial — which takes no topics, rating or test
+// count — was sent a brief reading "Topics: dp, Target rating: 1400, Target
+// test-set size: about 10 cases", instructing the model to build a problem
+// around inputs the setter had never been asked for and the artifact does not
+// produce.
+//
 // Split out from the message as a whole so the same intent can be embedded in a
 // larger one (see RenderFor) without carrying a header that contradicts it.
-func (b Brief) renderIntent() string {
+func (b Brief) renderIntent(artifact string) string {
+	spec, ok := model.LookupArtifact(artifact)
+	if !ok {
+		// An unknown artifact is a caller error, but a brief that renders is
+		// still more useful than a panic or an empty prompt; the widest scope
+		// matches what ArtifactFields would fall back to.
+		spec, _ = model.LookupArtifact(string(model.ArtifactFullProblem))
+	}
+
 	var sb strings.Builder
-	if len(b.Tags) > 0 {
+	if spec.Accepts(model.FieldTopics) && len(b.Tags) > 0 {
 		fmt.Fprintf(&sb, "- Topics: %s\n", strings.Join(b.Tags, ", "))
 	}
-	if b.Rating > 0 {
+	if spec.Accepts(model.FieldRating) && b.Rating > 0 {
 		fmt.Fprintf(&sb, "- Target rating: %d (Codeforces scale)\n", b.Rating)
 	}
-	if b.RatingMin > 0 || b.RatingMax > 0 {
+	if spec.Accepts(model.FieldRatingRange) && (b.RatingMin > 0 || b.RatingMax > 0) {
 		fmt.Fprintf(&sb, "- Acceptable rating range: %d-%d\n", b.RatingMin, b.RatingMax)
 	}
-	if b.FormatProfile != "" {
+	if spec.Accepts(model.FieldFormatProfile) && b.FormatProfile != "" {
 		fmt.Fprintf(&sb, "- Format profile: %s\n", b.FormatProfile)
 	}
-	if b.SolverMode != "" {
+	if spec.Accepts(model.FieldSolverMode) && b.SolverMode != "" {
 		fmt.Fprintf(&sb, "- Solver mode: %s", b.SolverMode)
 		if b.TeamSize > 0 {
 			fmt.Fprintf(&sb, " (team of %d)", b.TeamSize)
 		}
 		sb.WriteString("\n")
 	}
-	if b.EventContext != "" {
+	if spec.Accepts(model.FieldEventContext) && b.EventContext != "" {
 		fmt.Fprintf(&sb, "- Event context: %s\n", b.EventContext)
 	}
-	if b.AudienceLevel != "" {
+	if spec.Accepts(model.FieldAudienceLevel) && b.AudienceLevel != "" {
 		fmt.Fprintf(&sb, "- Audience: %s\n", b.AudienceLevel)
 	}
-	if b.ExpectedSolveMinutes > 0 {
+	if spec.Accepts(model.FieldExpectedSolveTime) && b.ExpectedSolveMinutes > 0 {
 		fmt.Fprintf(&sb, "- Expected solve time: %d minutes\n", b.ExpectedSolveMinutes)
 	}
-	if len(b.PrimaryTopics) > 0 {
+	if spec.Accepts(model.FieldPrimaryTopics) && len(b.PrimaryTopics) > 0 {
 		fmt.Fprintf(&sb, "- Primary topics: %s\n", strings.Join(b.PrimaryTopics, ", "))
 	}
-	if len(b.SecondaryTopics) > 0 {
+	if spec.Accepts(model.FieldSecondaryTopics) && len(b.SecondaryTopics) > 0 {
 		fmt.Fprintf(&sb, "- Secondary topics: %s\n", strings.Join(b.SecondaryTopics, ", "))
 	}
-	if len(b.RequiredTechniques) > 0 {
+	if spec.Accepts(model.FieldRequiredTechniques) && len(b.RequiredTechniques) > 0 {
 		fmt.Fprintf(&sb, "- Must require: %s\n", strings.Join(b.RequiredTechniques, ", "))
 	}
-	if len(b.ForbiddenTechniques) > 0 {
+	if spec.Accepts(model.FieldForbiddenTechniques) && len(b.ForbiddenTechniques) > 0 {
 		fmt.Fprintf(&sb, "- Must not require: %s\n", strings.Join(b.ForbiddenTechniques, ", "))
 	}
-	if b.InsightEmphasis != "" {
+	if spec.Accepts(model.FieldInsightEmphasis) && b.InsightEmphasis != "" {
 		fmt.Fprintf(&sb, "- Emphasis: %s\n", b.InsightEmphasis)
 	}
-	if b.StoryTone != "" {
+	if spec.Accepts(model.FieldStoryTone) && b.StoryTone != "" {
 		fmt.Fprintf(&sb, "- Story tone: %s\n", b.StoryTone)
 	}
-	if b.ConstraintGuidance != "" {
+	if spec.Accepts(model.FieldConstraintGuidance) && b.ConstraintGuidance != "" {
 		fmt.Fprintf(&sb, "- Constraint guidance: %s\n", b.ConstraintGuidance)
 	}
 	// TestCaseCount was collected by the brief form, validated to 1-100, and
 	// then never rendered — the harness silently ignored the requested size.
 	// The matrix is tiers x shapes x seeds_per_cell, so state both the target
 	// and how to reach it.
-	if b.TestCaseCount > 0 {
+	if spec.Accepts(model.FieldTestCaseCount) && b.TestCaseCount > 0 {
 		fmt.Fprintf(&sb, "- Target test-set size: about %d cases. materialize_matrix produces one case per "+
 			"(tier, shape) cell, so set seeds_per_cell to roughly %d to reach this count.\n",
 			b.TestCaseCount, seedsPerCellFor(b.TestCaseCount))
 	}
-	if b.HasSubtasks {
+	if spec.Accepts(model.FieldHasSubtasks) && b.HasSubtasks {
 		sb.WriteString("- Subtask scoring with partial credit.\n")
 	}
-	if b.AdditionalPrompt != "" {
+	if spec.Accepts(model.FieldAdditionalPrompt) && b.AdditionalPrompt != "" {
 		fmt.Fprintf(&sb, "- Additional guidance: %s\n", b.AdditionalPrompt)
 	}
 	return sb.String()

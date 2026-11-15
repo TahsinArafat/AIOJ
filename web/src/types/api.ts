@@ -76,6 +76,37 @@ export interface AIGenerationJob {
 }
 export interface AIBriefPreset { id: string; name: string; description: string; values: Partial<AIBrief> }
 
+/**
+ * One brief input a setter can steer a generation with.
+ *
+ * These are conceptual names, not the JSON keys they land on, so the catalog
+ * below reads without holding the wire format in mind. Mirrors the Go constants
+ * in internal/model/ai_artifact.go (BriefField).
+ */
+export type AIBriefField =
+    | 'topics' | 'rating' | 'rating_range' | 'format_profile' | 'solver_mode'
+    | 'event_context' | 'insight_emphasis' | 'expected_solve_minutes'
+    | 'primary_topics' | 'secondary_topics' | 'required_techniques'
+    | 'forbidden_techniques' | 'constraint_guidance' | 'audience_level'
+    | 'story_tone' | 'testcase_count' | 'has_subtasks' | 'additional_prompt'
+
+/**
+ * One artifact scope, as served by GET /api/ai/artifacts.
+ *
+ * The catalog is served rather than restated in the frontend on purpose: the
+ * same table drives the server's validation and the prompt it builds, so a
+ * second copy here would be a list that can disagree with the one that decides.
+ */
+export interface AIArtifactSpec {
+    id: string
+    label: string
+    description: string
+    /** False for the whole-package scope, which only authors a new problem. */
+    offered_for_existing: boolean
+    /** The inputs this artifact accepts, in the order the form asks for them. */
+    fields: AIBriefField[]
+}
+
 export interface APIKey {
     id: string
     user_id: string

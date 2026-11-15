@@ -42,6 +42,12 @@ export default function SetterProblemWorkspace() {
     status?: string
     review_note?: string
     visible?: boolean
+    /**
+     * When the row was last written. The apply endpoint refuses a write when the
+     * problem has changed since the proposal was generated, so the AI tab is
+     * given this to pass along — without it that guard could never fire.
+     */
+    updated_at?: string
 }
 
 const [problem, setProblem] = useState<LoadedProblem | null>(null)
@@ -775,6 +781,11 @@ useDocumentTitle(problem ? `${problem.title} — setter` : null)
           {activeTab === 'ai' && (
             <AIStudioTab
               problemId={problem.id}
+              /* What the loaded problem looked like. The apply endpoint refuses a
+                 write when the problem has changed since — without this the guard
+                 was unreachable, so applying a proposal built against a statement
+                 that had since been edited silently overwrote the newer text. */
+              problemUpdatedAt={problem.updated_at}
               onApplied={() => loadProblem()}
             />
           )}

@@ -5,6 +5,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
 	"github.com/tahsinarafat/aioj/internal/generate"
+	"github.com/tahsinarafat/aioj/internal/model"
 	"github.com/tahsinarafat/aioj/internal/store"
 	"net/http"
 	"strconv"
@@ -38,6 +39,17 @@ func (h *AIGenerationHandler) Connections(w http.ResponseWriter, r *http.Request
 }
 func (h *AIGenerationHandler) Presets(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, 200, map[string]any{"version": "problem-brief-v1", "data": generate.BriefPresets()})
+}
+
+// Artifacts serves the artifact catalog: each scope's label, whether it applies
+// to an existing problem, and the brief inputs it accepts.
+//
+// The scopes are policy that lives in one place server-side, and the brief form
+// has to agree with it. Serving the catalog means the form renders the fields the
+// server will actually read, instead of carrying a second copy of the rules that
+// can disagree with the one that validates and renders the prompt.
+func (h *AIGenerationHandler) Artifacts(w http.ResponseWriter, r *http.Request) {
+	respondJSON(w, 200, map[string]any{"data": model.ArtifactSpecs()})
 }
 func (h *AIGenerationHandler) Create(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetUserClaims(r)

@@ -3,6 +3,8 @@ import { api } from '../../lib/api'
 import type { AIBrief, AIGenerationJob, AIModel } from '../../types/api'
 import { AIBriefForm } from '../AI/AIBriefForm'
 import { DEFAULT_BRIEF } from '../../lib/aiBrief'
+import { offeredForExisting, pruneBrief } from '../../lib/aiArtifacts'
+import { useArtifactScope, useArtifacts } from '../../hooks/useArtifacts'
 import { isJobActive, statusLabel } from '../../lib/aiJobs'
 import AIJobStatusBadge from '../AI/AIJobStatusBadge'
 import AIValidationList from '../AI/AIValidationList'
@@ -32,17 +34,6 @@ type Props = {
     isAdmin?: boolean
 }
 
-// Artifact types with labels and what sections they produce.
-const ARTIFACTS = [
-    { id: 'full_problem',  label: 'Full package',         desc: 'Statement, tests, generator & reference solution', sections: ['statement', 'solution', 'tests'] },
-    { id: 'statement',     label: 'Statement & samples',  desc: 'Rewrites the problem statement only', sections: ['statement'] },
-    { id: 'tests',         label: 'Tests & generator',    desc: 'Generates a new test suite and generator', sections: ['tests'] },
-    { id: 'solution',      label: 'Reference solution',   desc: 'Writes or replaces the reference solution', sections: ['solution'] },
-    { id: 'editorial',     label: 'Editorial',            desc: 'Authors an editorial for this problem', sections: ['editorial'] },
-] as const
-
-type ArtifactId = typeof ARTIFACTS[number]['id']
-
 export default function AIStudioTab({
     problemId,
     problemUpdatedAt,
@@ -54,9 +45,20 @@ export default function AIStudioTab({
     const isNew = !problemId
     const [connections, setConnections] = useState<AIModel[]>([])
     const [modelId, setModelId] = useState<string>('')
-    // A new problem must be generated as a whole package.
-    // For existing problems default to nothing selected so the user has to actively choose the scope.
-    const [artifact, setArtifact] = useState<ArtifactId>(isNew ? 'full_problem' : 'statement')
+    // The artifact scopes come from the server (GET /api/ai/artifacts), which is
+    // the same table that validates a brief and builds the prompt. The picker,
+    // the brief form's controls and the summary below all read from it, so the
+    // client cannot offer something the server would ignore or reject.
+    const artifacts = useArtifacts()
+    const specs = artifacts.data?.data ?? []
+    const choosable = offeredForExisting(specs)
+    // A new problem must be generated as a whole package. For an existing problem
+    // the default is the statement, the narrowest useful scope.
+    const [artifact, setArtifact] = useState<string>(isNew ? 'full_problem' : 'statement')
+    // The scope questions the form asks. Undefined until the catalog lands, which
+    // the scope answers as "accepts everything" — so a slow fetch shows the full
+    // form briefly rather than an empty one, and the server is still the judge.
+    const scope = useArtifactScope(specs.find(s => s.id === artifact))
     const [brief, setBrief] = useState<AIBrief>({ ...DEFAULT_BRIEF })
     const [job, setJob] = useState<AIGenerationJob | null>(null)
     const [error, setError] = useState('')
@@ -74,18 +76,22 @@ export default function AIStudioTab({
             .catch(e => setError(String(e)))
     }, [])
 
-    // Resume the newest unfinished/reviewable job for this problem.
+    // Resume a job that is genuinely still in flight, or a finished proposal
+    // nobody has looked at yet. Deliberately NOT every job that is not
+    // discarded or cancelled: that test matched `applied` too, so once a job had
+    // been applied the form below could never render again and the tab offered no
+    // way to start another run — the "only usable once" report. A finished job is
+    // now reached through Job history, and `New run` is always available.
     useEffect(() => {
         if (!problemId) return
         queueMicrotask(() => {
             api.ai.problemJobs(problemId)
                 .then(r => {
-                    const latest = (r.data || []).find(j => !['discarded', 'cancelled'].includes(j.status))
+                    const latest = (r.data || []).find(j => isJobActive(j) || j.status === 'ready')
                     if (latest) {
                         setJob(latest)
                         // Restore artifact picker to match the resumed job
-                        const art = latest.artifact_type as ArtifactId
-                        if (ARTIFACTS.some(a => a.id === art)) setArtifact(art)
+                        setArtifact(latest.artifact_type)
                     }
                 })
                 .catch(() => {})
@@ -127,7 +133,12 @@ export default function AIStudioTab({
                 problem_id: problemId,
                 ai_model_id: modelId || undefined,
                 artifact_type: isNew ? 'full_problem' : artifact,
-                brief,
+                // Only the fields this scope uses. The form stops editing the
+                // others, but the brief carries whatever an earlier scope
+                // collected — and the job record renders the brief it was given,
+                // so sending a stale rating with an editorial would record an
+                // instruction the setter never made.
+                brief: pruneBrief(brief, scope),
             })
             setJob(newJob)
             refreshActive()
@@ -168,19 +179,22 @@ export default function AIStudioTab({
         }
     }
 
-    // Gate the button on the same rule the server enforces, so the click cannot
-    // walk into a limit error. The form stays editable; only starting a run is
-    // blocked.
+    // Gate the button on the same rules the server enforces, so the click cannot
+    // walk into a rejection. The form stays editable; only starting a run is
+    // blocked. "Topics required" is the scope's own answer, so an editorial —
+    // which takes no topics — is not blocked for lacking them.
     const blocking = activeJobs[0] ?? null
     const runningCount = activeJobs.filter(j => j.status === 'running').length
     const queuedCount = activeJobs.length - runningCount
-    const canStart = connections.length > 0 && brief.tags.length > 0 && !blocking
+    const needsTopics = scope.requires('topics') && brief.tags.length === 0
+    const canStart = connections.length > 0 && !needsTopics && !blocking
     const blockedReason = blocking
         ? `A generation is already ${blocking.status} (${statusLabel(blocking.stage)}). Cancel it from the job list below to start another.`
-        : brief.tags.length === 0
+        : needsTopics
             ? 'Pick at least one topic.'
             : 'Connect an AI model first.'
-    const artifactDef = ARTIFACTS.find(a => a.id === artifact)!
+    const artifactDef = specs.find(a => a.id === artifact)
+    const artifactLabel = artifactDef?.label ?? statusLabel(artifact)
     // A resumed or just-created job. job.status==='ready' renders the review panel;
     // every other state is the progress card.
     const jobActive = job ? isJobActive(job) : false
@@ -208,36 +222,69 @@ export default function AIStudioTab({
 
             {!job && (
                 <div className="space-y-4">
-                    {/* Artifact scope picker — only shown for existing problems */}
+                    {/* Artifact scope picker — only shown for existing problems.
+                        The options are what the server offers for a problem that
+                        already exists, so the whole-package scope (which authors
+                        a new one) is absent without a second filter here. */}
                     {!isNew && (
                         <fieldset className="rounded-xl border border-hairline bg-surface p-4">
                             <legend className="px-2 text-sm font-semibold text-ink-soft">What do you want to generate?</legend>
-                            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                                {ARTIFACTS.filter(a => a.id !== 'full_problem').map(a => (
-                                    <label
-                                        key={a.id}
-                                        className={`flex cursor-pointer flex-col rounded-lg border p-3 transition-colors ${
-                                            artifact === a.id
-                                                ? 'border-brand bg-brand-soft'
-                                                : 'border-hairline-strong hover:border-muted-soft'
-                                        }`}
-                                    >
-                                        <input
-                                            type="radio"
-                                            name="artifact"
-                                            value={a.id}
-                                            checked={artifact === a.id}
-                                            onChange={() => setArtifact(a.id)}
-                                            className="sr-only"
-                                        />
-                                        <span className={`text-sm font-medium ${artifact === a.id ? 'text-brand' : 'text-ink'}`}>
-                                            {a.label}
-                                        </span>
-                                        <span className="mt-0.5 text-xs text-muted">{a.desc}</span>
-                                    </label>
-                                ))}
-                            </div>
+                            {artifacts.error ? (
+                                <p className="mt-2 text-sm text-bad">
+                                    Could not load the generation scopes: {artifacts.error}
+                                </p>
+                            ) : artifacts.loading ? (
+                                <p className="mt-2 text-sm text-muted">Loading scopes…</p>
+                            ) : (
+                                <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                                    {choosable.map(a => (
+                                        <label
+                                            key={a.id}
+                                            className={`flex cursor-pointer flex-col rounded-lg border p-3 transition-colors ${
+                                                artifact === a.id
+                                                    ? 'border-brand bg-brand-soft'
+                                                    : 'border-hairline-strong hover:border-muted-soft'
+                                            }`}
+                                        >
+                                            <input
+                                                type="radio"
+                                                name="artifact"
+                                                value={a.id}
+                                                checked={artifact === a.id}
+                                                onChange={() => setArtifact(a.id)}
+                                                className="sr-only"
+                                            />
+                                            <span className={`text-sm font-medium ${artifact === a.id ? 'text-brand' : 'text-ink'}`}>
+                                                {a.label}
+                                            </span>
+                                            <span className="mt-0.5 text-xs text-muted">{a.description}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            )}
                         </fieldset>
+                    )}
+
+                    {/* What the run builds on. Every scope except the full package
+                        reads the existing problem — the harness passes it to the
+                        model as authoritative context — so the setter should be
+                        able to see that, and see that it is the version on screen
+                        rather than a stale one. The apply step refuses a write if
+                        the problem changed in between, which is why the timestamp
+                        being shown is not just a reassurance. */}
+                    {!isNew && (
+                        <p className="text-xs text-muted">
+                            <span className="font-medium text-ink-soft">Based on</span>{' '}
+                            {problemUpdatedAt ? (
+                                <>this problem as of {new Date(problemUpdatedAt).toLocaleString()}</>
+                            ) : (
+                                <>the problem as it is saved now</>
+                            )}
+                            {'. '}
+                            {scope.accepts('topics')
+                                ? 'Its statement, limits and samples are passed to the model, and your brief below builds a new one around them.'
+                                : 'Its statement, constraints, limits and samples are passed to the model as authoritative — this run rewrites only the part you selected, reusing them verbatim.'}
+                        </p>
                     )}
 
                     <label className="block text-sm">
@@ -258,7 +305,10 @@ export default function AIStudioTab({
                         )}
                     </label>
 
-                    <AIBriefForm brief={brief} onChange={updateBrief} />
+                    {/* The form asks only what this scope can use: an editorial
+                        needs no topic, rating or test count, and the server would
+                        ignore them if it sent them. */}
+                    <AIBriefForm brief={brief} onChange={updateBrief} scope={scope} />
 
                     <div className="flex flex-wrap items-center gap-3">
                         <button
@@ -267,7 +317,7 @@ export default function AIStudioTab({
                             onClick={start}
                             className="min-h-11 cursor-pointer rounded bg-brand px-5 text-on-brand disabled:opacity-50"
                         >
-                            {isNew ? 'Generate problem' : `Generate ${artifactDef.label}`}
+                            {isNew ? 'Generate problem' : `Generate ${artifactLabel}`}
                         </button>
                         {!canStart && (
                             <span className="text-xs text-muted">{blockedReason}</span>
@@ -285,6 +335,21 @@ export default function AIStudioTab({
                 <div className="space-y-4">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                         <AIJobStatusBadge status={job.status} />
+                        {/* Shown whenever this job is not still working. The form
+                            above is hidden while a job is in view, so without this
+                            an `applied` job — which has no Discard and no Start
+                            again — left the setter with no way to run anything
+                            else on this problem. Leaving the view never discards
+                            the job; it stays in Job history. */}
+                        {!jobActive && (
+                            <button
+                                type="button"
+                                onClick={() => setJob(null)}
+                                className="cursor-pointer text-sm font-medium text-brand hover:underline"
+                            >
+                                Start a new run
+                            </button>
+                        )}
                     </div>
 
                     {/* Progress card */}
@@ -368,13 +433,6 @@ export default function AIStudioTab({
                                     className="min-h-11 cursor-pointer rounded bg-brand px-4 text-on-brand"
                                 >
                                     Retry
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setJob(null)}
-                                    className="min-h-11 cursor-pointer rounded border border-hairline-strong px-4"
-                                >
-                                    Start again
                                 </button>
                             </div>
                         </div>

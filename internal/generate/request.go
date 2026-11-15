@@ -1,6 +1,10 @@
 package generate
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/tahsinarafat/aioj/internal/model"
+)
 
 // Request specifies what kind of problem to generate.
 type Request struct {
@@ -48,23 +52,36 @@ const (
 	ProfileOI         = "oi"
 )
 
-// Normalize validates the request and fills defaults, returning a mutated
-// copy. It is the single source of truth for brief rules so the HTTP handler
-// and any future caller (the jobs API) share one implementation.
+// Normalize validates the request and fills defaults, returning a mutated copy.
+//
+// It takes the artifact the request is for, because which brief inputs are
+// required and which are validated depends on it. Before this it took no
+// artifact and enforced the full ruleset on every request, so an editorial job
+// had to carry a topic, a rating and a test-case count that the run then ignored
+// — and the prompt it built claimed the model should build a problem around
+// them.
 //
 // Cross-field rules enforced here:
 //   - the target rating must fall inside [rating_min, rating_max] and the
 //     whole range must sit within the Codeforces 800–3500 scale;
 //   - the ICPC profile is standard batch and therefore rejects subtasks;
 //   - a team solver defaults to a team of three when the size is unspecified.
-func (r Request) Normalize() (Request, error) {
-	if len(r.Tags) == 0 {
+//
+// Each rule is applied only where the artifact accepts the field it constrains,
+// so a profile the artifact never sends cannot reject the request.
+func (r Request) Normalize(artifact string) (Request, error) {
+	spec, known := model.LookupArtifact(artifact)
+	if !known {
+		return r, fmt.Errorf("unsupported artifact_type")
+	}
+
+	if spec.Requires(model.FieldTopics) && len(r.Tags) == 0 {
 		return r, fmt.Errorf("at least one tag is required")
 	}
-	if r.Rating < 800 || r.Rating > 3500 {
+	if spec.Accepts(model.FieldRating) && (r.Rating < 800 || r.Rating > 3500) {
 		return r, fmt.Errorf("rating must be between 800 and 3500")
 	}
-	if r.TestCaseCount < 1 || r.TestCaseCount > 100 {
+	if spec.Accepts(model.FieldTestCaseCount) && (r.TestCaseCount < 1 || r.TestCaseCount > 100) {
 		return r, fmt.Errorf("testcase_count must be between 1 and 100")
 	}
 	if r.ProblemType == "" {
@@ -74,14 +91,19 @@ func (r Request) Normalize() (Request, error) {
 		return r, fmt.Errorf("v1 supports standard batch problems only")
 	}
 
-	if r.RatingMin == 0 {
-		r.RatingMin = r.Rating - 100
-	}
-	if r.RatingMax == 0 {
-		r.RatingMax = r.Rating + 100
-	}
-	if r.RatingMin < 800 || r.RatingMax > 3500 || r.RatingMin > r.Rating || r.RatingMax < r.Rating {
-		return r, fmt.Errorf("rating range must contain rating and stay between 800 and 3500")
+	// The rating range is only meaningful where the rating is: an artifact that
+	// takes the difficulty from the existing problem has no range to keep the
+	// target inside, so it is neither defaulted nor checked.
+	if spec.Accepts(model.FieldRatingRange) {
+		if r.RatingMin == 0 {
+			r.RatingMin = r.Rating - 100
+		}
+		if r.RatingMax == 0 {
+			r.RatingMax = r.Rating + 100
+		}
+		if r.RatingMin < 800 || r.RatingMax > 3500 || r.RatingMin > r.Rating || r.RatingMax < r.Rating {
+			return r, fmt.Errorf("rating range must contain rating and stay between 800 and 3500")
+		}
 	}
 
 	if r.SolverMode == "" {
@@ -106,7 +128,11 @@ func (r Request) Normalize() (Request, error) {
 	default:
 		return r, fmt.Errorf("unsupported format_profile")
 	}
-	if r.FormatProfile == ProfileICPC && r.HasSubtasks {
+	// Subtask scoring and the ICPC profile are only in conflict where the
+	// artifact can ask for subtasks at all; an editorial carries neither, so the
+	// stored defaults must not veto it.
+	if spec.AcceptsAny(model.FieldHasSubtasks, model.FieldFormatProfile) &&
+		r.FormatProfile == ProfileICPC && r.HasSubtasks {
 		return r, fmt.Errorf("ICPC profile does not support subtasks")
 	}
 	if r.FormatProfile == ProfileICPC {
