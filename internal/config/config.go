@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -85,6 +86,18 @@ func (c *Config) Validate() (warnings []string, err error) {
 		warnings = append(warnings, "mail.driver=catcher in production: outbound mail is "+
 			"captured in memory and never delivered")
 	}
+	// A production box that silently drops verification and password-reset mail
+	// is indistinguishable from a broken one, so every dead-end driver is called
+	// out at boot.
+	if !c.IsDevelopment() && (c.Mail.Driver == "" || strings.EqualFold(c.Mail.Driver, "noop")) {
+		warnings = append(warnings, "mail.driver="+c.Mail.Driver+" in production: outbound mail "+
+			"is discarded, so email verification and password reset links never arrive — "+
+			"set MAIL_DRIVER=smtp with MAIL_HOST/MAIL_PORT/MAIL_USERNAME/MAIL_PASSWORD")
+	}
+	if strings.EqualFold(c.Mail.Driver, "smtp") && strings.TrimSpace(c.Mail.Host) == "" {
+		warnings = append(warnings, "mail.driver=smtp but mail.host is empty: every send will "+
+			"fail — set MAIL_HOST (e.g. smtp-relay.brevo.com)")
+	}
 	return warnings, nil
 }
 
@@ -118,13 +131,14 @@ type FeaturesConfig struct {
 
 // MailConfig selects the transactional mail backend and builds absolute links.
 type MailConfig struct {
-	Driver    string `yaml:"driver"` // "smtp" | "catcher" | "noop"
-	Host      string `yaml:"host"`
-	Port      int    `yaml:"port"`
-	Username  string `yaml:"username"`
-	Password  string `yaml:"password"`
-	From      string `yaml:"from"`
-	PublicURL string `yaml:"public_url"` // e.g. https://aioj.com (used in email links)
+	Driver    string        `yaml:"driver"` // "smtp" | "catcher" | "noop"
+	Host      string        `yaml:"host"`
+	Port      int           `yaml:"port"`
+	Username  string        `yaml:"username"`
+	Password  string        `yaml:"password"`
+	From      string        `yaml:"from"`
+	PublicURL string        `yaml:"public_url"` // e.g. https://aioj.com (used in email links)
+	Timeout   time.Duration `yaml:"timeout"`    // smtp exchange deadline; 0 = 10s
 }
 
 type ServerConfig struct {
@@ -493,6 +507,11 @@ func Load(path string) (*Config, error) {
 	}
 	if v := os.Getenv("MAIL_PUBLIC_URL"); v != "" {
 		cfg.Mail.PublicURL = v
+	}
+	if v := os.Getenv("MAIL_TIMEOUT"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil && d > 0 {
+			cfg.Mail.Timeout = d
+		}
 	}
 	if v := os.Getenv("PUBLIC_ORIGIN"); v != "" && cfg.Mail.PublicURL == "" {
 		cfg.Mail.PublicURL = v

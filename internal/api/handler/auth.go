@@ -168,10 +168,12 @@ func (h *AuthHandler) sendVerificationEmail(ctx context.Context, user *model.Use
 	if from == "" {
 		from = "noreply@aioj.com"
 	}
-	_ = h.mail.Send(ctx, &mail.Message{
+	if err := h.mail.Send(ctx, &mail.Message{
 		From: from, To: []string{user.Email},
 		Subject: "Verify your AIOJ email", Body: body.String(),
-	})
+	}); err != nil {
+		slog.Error("send verification email failed", "user_id", user.ID, "err", err)
+	}
 }
 
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
@@ -456,10 +458,14 @@ func (h *AuthHandler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
 			if from == "" {
 				from = "noreply@aioj.com"
 			}
-			_ = h.mail.Send(r.Context(), &mail.Message{
+			if err := h.mail.Send(r.Context(), &mail.Message{
 				From: from, To: []string{user.Email},
 				Subject: "Reset your AIOJ password", Body: body.String(),
-			})
+			}); err != nil {
+				// The response below stays deliberately vague, so this log line
+				// is the only place a failed reset send becomes visible.
+				slog.Error("send password reset email failed", "user_id", user.ID, "err", err)
+			}
 		}
 	}
 

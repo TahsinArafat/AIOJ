@@ -31,6 +31,10 @@ func TestValidate_JWTSecret(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := &Config{Environment: tt.env}
 			cfg.Auth.JWTSecret = tt.secret
+			// Configure a live relay so this test isolates the JWT-secret rules
+			// from the mail warnings, which are covered separately below.
+			cfg.Mail.Driver = "smtp"
+			cfg.Mail.Host = "smtp-relay.brevo.com"
 
 			warnings, err := cfg.Validate()
 			if tt.wantErr && err == nil {
@@ -60,6 +64,74 @@ func TestValidate_ProductionCatcherWarns(t *testing.T) {
 	}
 	if len(warnings) == 0 {
 		t.Fatal("expected a warning about mail.driver=catcher in production")
+	}
+}
+
+// A production box that discards mail looks exactly like a broken one to the
+// user, because the reset response is enumeration-safe. The driver must be
+// called out at boot.
+func TestValidate_ProductionDeadEndMailDriversWarn(t *testing.T) {
+	for _, driver := range []string{"noop", "", "NOOP"} {
+		t.Run("driver="+driver, func(t *testing.T) {
+			cfg := &Config{Environment: EnvProduction}
+			cfg.Auth.JWTSecret = "8f2c1a7d4b6e9f0a3c5d7e1b2a4c6d8e"
+			cfg.Mail.Driver = driver
+
+			warnings, err := cfg.Validate()
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if len(warnings) == 0 {
+				t.Fatalf("expected a warning for driver=%q in production", driver)
+			}
+		})
+	}
+}
+
+func TestValidate_DevelopmentDeadEndMailDriverIsQuiet(t *testing.T) {
+	cfg := &Config{Environment: EnvDevelopment}
+	cfg.Auth.JWTSecret = "8f2c1a7d4b6e9f0a3c5d7e1b2a4c6d8e"
+	cfg.Mail.Driver = "noop"
+
+	warnings, err := cfg.Validate()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(warnings) != 0 {
+		t.Fatalf("development should not warn about noop, got: %v", warnings)
+	}
+}
+
+func TestValidate_SMTPWithoutHostWarns(t *testing.T) {
+	cfg := &Config{Environment: EnvProduction}
+	cfg.Auth.JWTSecret = "8f2c1a7d4b6e9f0a3c5d7e1b2a4c6d8e"
+	cfg.Mail.Driver = "smtp"
+	cfg.Mail.Host = ""
+
+	warnings, err := cfg.Validate()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(warnings) == 0 {
+		t.Fatal("expected a warning about smtp with no host")
+	}
+	if !strings.Contains(strings.Join(warnings, " "), "mail.host") {
+		t.Fatalf("warning should name mail.host, got: %v", warnings)
+	}
+}
+
+func TestValidate_SMTPWithHostDoesNotWarnAboutMail(t *testing.T) {
+	cfg := &Config{Environment: EnvProduction}
+	cfg.Auth.JWTSecret = "8f2c1a7d4b6e9f0a3c5d7e1b2a4c6d8e"
+	cfg.Mail.Driver = "smtp"
+	cfg.Mail.Host = "smtp-relay.brevo.com"
+
+	warnings, err := cfg.Validate()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(warnings) != 0 {
+		t.Fatalf("a fully configured relay should not warn, got: %v", warnings)
 	}
 }
 

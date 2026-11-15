@@ -278,7 +278,8 @@ Configuration is layered: **`config.yaml`** provides defaults, and environment v
 | `JUDGE_CONCURRENCY` | Parallel judge workers | `4` |
 | `REDIS_URL` | Redis address; empty → in-memory queue | → queue |
 | `LANG_DIR` | Directory of `lang/*.yaml` | `./lang` |
-| `MAIL_DRIVER` | `smtp` \| `catcher` \| `noop` | `catcher` |
+| `MAIL_DRIVER` | `smtp` \| `catcher` \| `noop`. `catcher`/`noop` never deliver — verification and reset links silently vanish | `catcher` |
+| `MAIL_HOST` / `MAIL_PORT` / `MAIL_USERNAME` / `MAIL_PASSWORD` / `MAIL_FROM` | Transactional SMTP relay. Brevo: `smtp-relay.brevo.com`, port 587 or 465, password = an SMTP key | none |
 | `MAIL_PUBLIC_URL` / `PUBLIC_ORIGIN` | Public base URL for links, sitemap, feeds | `http://localhost:8081` |
 | `GITHUB_CLIENT_ID` / `GOOGLE_CLIENT_ID` (+ secrets) | Enable OAuth providers | disabled |
 | `CF_SUBMIT_URL` | Codeforces submit service | `http://host.docker.internal:8003` |

@@ -217,12 +217,19 @@ Restore from the pre-deploy dump if the schema is unrecoverable.`, err)
 		mailSender = mail.NewSMTPSender(mail.SMTPConfig{
 			Host: cfg.Mail.Host, Port: cfg.Mail.Port,
 			Username: cfg.Mail.Username, Password: cfg.Mail.Password,
-			From: cfg.Mail.From,
+			From: cfg.Mail.From, Timeout: cfg.Mail.Timeout,
 		})
+		slog.Info("mail driver configured", "driver", "smtp",
+			"host", cfg.Mail.Host, "port", cfg.Mail.Port, "from", cfg.Mail.From)
 	case "catcher":
 		mailSender = mail.NewMailCatcher()
+		slog.Warn("mail driver configured", "driver", "catcher",
+			"detail", "messages are captured in memory and never delivered")
 	default:
 		mailSender = mail.NoopSender{}
+		slog.Warn("mail driver configured", "driver", "noop",
+			"detail", "outbound mail is discarded — verification and password "+
+				"reset links will never arrive")
 	}
 	mailTpl, err := mail.LoadTemplates()
 	if err != nil {

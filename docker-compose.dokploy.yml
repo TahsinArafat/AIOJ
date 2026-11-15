@@ -41,7 +41,17 @@
 #                          hash is repaired on deploy. false = never rewrite.
 #   PUBLIC_ORIGIN          https://<DOMAIN>
 #   MAIL_PUBLIC_URL        https://<DOMAIN>
-#   MAIL_DRIVER/MAIL_HOST/MAIL_PORT/MAIL_USERNAME/MAIL_PASSWORD/MAIL_FROM
+#   MAIL_DRIVER            smtp | catcher | noop. Defaults to noop, which
+#                          DISCARDS all mail — with it, email verification and
+#                          password reset silently never arrive. Set to smtp and
+#                          fill the vars below before anyone needs to reset a
+#                          password.
+#   MAIL_HOST/MAIL_PORT/MAIL_USERNAME/MAIL_PASSWORD/MAIL_FROM
+#                          For Brevo: smtp-relay.brevo.com, port 587 (or 465 for
+#                          implicit TLS), username = account login, password = an
+#                          SMTP key (Brevo → SMTP & API → SMTP keys, not the
+#                          account password). MAIL_FROM must be on a domain
+#                          authenticated in Brevo with SPF + DKIM.
 #   PAPER_CERT_EMAIL       Let's Encrypt email for Traefik (if not set globally)
 #
 # Deploy:
