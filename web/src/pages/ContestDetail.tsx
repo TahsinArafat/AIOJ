@@ -542,10 +542,14 @@ export default function ContestDetail() {
                 </nav>
             </div>
 
-            {/* ── Main Layout: Content + Sidebar ───────────────────────────── */}
-            <div className={`items-start ${activeTab === 'submissions' ? '' : 'flex gap-6'}`}>
+            {/* ── Main Layout: Content + Sidebar ─────────────────────────────
+                One column below `lg`, two above it. The sidebar is a real part
+                of the page on a phone — the round's schedule, its registration
+                state and the Quick Links live there — so it stacks under the
+                content rather than disappearing. */}
+            <div className={activeTab === 'submissions' ? '' : 'flex flex-col gap-6 lg:flex-row lg:items-start'}>
                 {/* Left: Main Content */}
-                <div className={activeTab === 'submissions' ? '' : 'flex-1 min-w-0'}>
+                <div className={activeTab === 'submissions' ? '' : 'w-full min-w-0 lg:flex-1'}>
                     {/* About. Everything here is already on the page or in the
                         payload: the round's description, its format and schedule, and
                         who runs it. It exists because those facts were spread across
@@ -938,9 +942,12 @@ export default function ContestDetail() {
                     )}
                 </div>
 
-                {/* Right: Sidebar — hidden on standings/submissions tab to maximize table width */}
+                {/* Right: Sidebar — dropped on the submissions tab, which wants
+                    the full width for its table. Below `lg` it stacks under the
+                    content instead of vanishing; a phone still needs the
+                    schedule, the registration button and the Quick Links. */}
                 {activeTab !== 'submissions' && (
-                    <div className="w-80 flex-shrink-0 space-y-4 hidden lg:block">
+                    <div className="w-full space-y-4 lg:w-80 lg:flex-shrink-0">
                         {/* Contest Info */}
                         <SidebarBox title="Contest Info" icon="info">
                             <dl className="space-y-2.5 text-sm">
@@ -1090,9 +1097,8 @@ export default function ContestDetail() {
             </div>
 
             {/* Staff shortcut, fixed to the bottom-right corner.
-                The sidebar above is `hidden lg:block`, and it is also dropped
-                entirely on the standings and submissions tabs — so on a phone, or
-                while reading those two tables, a judge had no visible way into the
+                The sidebar above is dropped entirely on the submissions tab —
+                so while reading that table a judge had no visible way into the
                 panel. This stays reachable from every tab and every viewport. */}
             {isStaff && (
                 <Link
