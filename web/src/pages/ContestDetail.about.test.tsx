@@ -50,7 +50,15 @@ vi.mock('../lib/api', async () => {
     }
 })
 
+/**
+ * Build a detail response. `judges`, when given, belongs at the TOP LEVEL of the
+ * response — a sibling of `contest`, which is where the handler writes it. The
+ * helper hoists it so a test cannot accidentally assert the shape the page used
+ * to (wrongly) read, which is how this bug survived: the fixture agreed with the
+ * bug instead of with the server.
+ */
 function roundWith(extra: Record<string, unknown> = {}) {
+    const { judges, ...contestFields } = extra
     return {
         contest: {
             id: 'c1',
@@ -62,9 +70,10 @@ function roundWith(extra: Record<string, unknown> = {}) {
             registration_required: true,
             max_participants: 200,
             description: '',
-            ...extra,
+            ...contestFields,
         },
         problems: [],
+        ...(judges !== undefined ? { judges } : {}),
     }
 }
 
@@ -145,6 +154,32 @@ test('the About tab lists the organizers by username', async () => {
     // The role is labelled, so two judges are distinguishable from a manager.
     expect(screen.getByText('manager')).toBeInTheDocument()
     expect(screen.getByText('judge')).toBeInTheDocument()
+})
+
+test('the roster is read from the response top level, not from the contest row', async () => {
+    // The reported bug. The handler writes "judges" as a SIBLING of "contest", but
+    // the page read `contest.judges`, found undefined, and rendered no Organizers
+    // section on any round — including one with four organizers. Built by hand
+    // rather than through roundWith, because the helper hoists the roster and
+    // would hide a page that had started reading inside the row again.
+    mocks.get.mockResolvedValue({
+        contest: {
+            id: 'c1',
+            title: 'Test Round',
+            start_time: '2026-11-13T03:50:00Z',
+            end_time: '2026-11-13T06:40:00Z',
+            format: 'acm',
+            type: 'acm',
+            description: '',
+        },
+        problems: [],
+        judges: [{ user_id: 'u1', username: 'tahsin_arafat', access_level: 'manager' }],
+    })
+
+    renderAt('#about')
+
+    expect(await screen.findByText('Organizers')).toBeInTheDocument()
+    expect(screen.getByText('tahsin_arafat')).toBeInTheDocument()
 })
 
 test('testers are not named on the About tab', async () => {

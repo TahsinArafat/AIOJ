@@ -7,7 +7,7 @@ import DivisionBadge from '../components/DivisionBadge'
 import { ContestStatusBadge, ContestFormatBadge, ContestTypeBadge } from '../components/contest/ContestBadges'
 import { ContestAboutTab } from '../components/contest/ContestAboutTab'
 import type { Division } from '../lib/divisions'
-import type { Contest } from '../types/api'
+import type { Contest, ContestPermission } from '../types/api'
 import { EmptyState } from '../components/EmptyState'
 import {
     Trophy, FileText, MessageSquare, Users, Zap, FileDown, Pencil, Gamepad2,
@@ -135,7 +135,6 @@ type ContestInfo = Pick<
     | 'upsolving_enabled'
     | 'virtual_contest_enabled'
     | 'description'
-    | 'judges'
 >
 interface ProblemRow {
     problem_id?: string; index?: string; title?: string; score?: number;
@@ -154,6 +153,11 @@ export default function ContestDetail() {
     const isAdmin = role === 'admin' || role === 'owner'
 
     const [contest, setContest] = useState<ContestInfo | null>(null)
+    // Who runs the round, for the About tab. It is a sibling of `contest` in the
+    // detail response, not a field on it, so it is held beside the row rather
+    // than inside it. `undefined` means the server withheld the roster, which
+    // the tab renders differently from an empty one.
+    const [judges, setJudges] = useState<ContestPermission[] | undefined>(undefined)
     // Why the contest failed to load, when it did, tagged with the id it belongs
     // to. Kept separate from `contest` because "we could not ask" and "it is not
     // there" are different messages and used to be the same one; tagged because
@@ -245,6 +249,7 @@ export default function ContestDetail() {
             const c = res.contest
             setContest(c)
             setProblems(res.problems || [])
+            setJudges(res.judges)
             setRegistered(c.is_registered ?? false)
             setRegistrationCount(c.registration_count ?? 0)
             setIsStaff(res.is_staff ?? false)
@@ -557,7 +562,7 @@ export default function ContestDetail() {
                         wants — what is this round, and who is running it — had no
                         single place to be read. */}
                     {activeTab === 'about' && (
-                        <ContestAboutTab contest={contest} />
+                        <ContestAboutTab contest={contest} judges={judges} />
                     )}
 
                     {activeTab === 'problems' && (

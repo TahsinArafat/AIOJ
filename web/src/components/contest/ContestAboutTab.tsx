@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { Shield } from 'lucide-react'
-import type { Contest } from '../../types/api'
+import type { Contest, ContestPermission } from '../../types/api'
 
 /**
  * The About tab: what this round is, who runs it, and what it offers.
@@ -27,10 +27,18 @@ export type ContestAbout = Pick<
     | 'statement_hidden'
     | 'upsolving_enabled'
     | 'virtual_contest_enabled'
-    | 'judges'
 >
 
-export function ContestAboutTab({ contest }: { contest: ContestAbout }) {
+export function ContestAboutTab({ contest, judges }: {
+    contest: ContestAbout
+    /**
+     * The round's organizers. NOT a field on `contest`: the handler writes it at
+     * the top level of the detail response, so it arrives beside the row rather
+     * than inside it. `undefined` means the server withheld it, which is a
+     * different answer from an empty list.
+     */
+    judges?: ContestPermission[]
+}) {
     return (
         <div className="space-y-6">
             <div>
@@ -49,16 +57,16 @@ export function ContestAboutTab({ contest }: { contest: ContestAbout }) {
             {/* Who runs it. Absent from the payload entirely when the caller may
                 not read the round as content, which is the server's call — the
                 page does not decide who may see the roster. */}
-            {contest.judges !== undefined && (
+            {judges !== undefined && (
                 <div>
                     <h3 className="text-sm font-semibold text-ink uppercase tracking-wide mb-3">
                         Organizers
                     </h3>
-                    {contest.judges.length === 0 ? (
+                    {judges.length === 0 ? (
                         <p className="text-sm text-muted-soft">No organizers are listed.</p>
                     ) : (
                         <ul className="flex flex-wrap gap-2">
-                            {contest.judges.map(j => (
+                            {judges.map(j => (
                                 <li
                                     key={j.user_id || j.username}
                                     className="flex items-center gap-2 rounded-lg border border-hairline bg-surface px-3 py-1.5"

@@ -312,13 +312,6 @@ export interface Contest {
     is_rated?: boolean
     rated_for_min?: number
     rated_for_max?: number
-    /**
-     * Who runs this round. Present only when the caller may read the round as
-     * content: the server withholds the roster from a caller who may not, so an
-     * absent key and an empty list are different answers and the About tab
-     * renders neither as "no organizers".
-     */
-    judges?: ContestPermission[]
 }
 
 export interface ContestNotice {
@@ -1567,6 +1560,17 @@ export interface ActivityItem {
 export interface ContestDetailResponse {
     contest: Contest & { is_registered?: boolean; registration_count?: number }
     problems: ContestProblem[]
+    /**
+     * Who runs this round, for the About tab. A SIBLING of `contest`, not a field
+     * on it — the handler writes it at the top level of its response map. It was
+     * declared on `Contest`, which is why nothing caught the page reading
+     * `contest.judges` and rendering "no organizers" on every round.
+     *
+     * Present only when the caller may read the round as content: the server
+     * withholds the roster from a caller who may not, so an absent key and an
+     * empty list are different answers.
+     */
+    judges?: ContestPermission[]
     /** True when the viewer runs this round: admin, creator, manager, judge or
      * tester. A judge of one contest is an ordinary user elsewhere, so this
      * cannot be derived from the session role. */
