@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/tahsinarafat/aioj/internal/model"
+	"github.com/tahsinarafat/aioj/internal/testdb"
 )
 
 // A contest's problem letters are a function of position, not a fact stored once
@@ -21,8 +22,7 @@ import (
 // that matter: the letters come out gapless, and the order they are assigned in
 // is the order a reader sees.
 func TestRenumberProblemsClosesTheGap(t *testing.T) {
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 	ctx := context.Background()
 
 	users := NewUserStore(db)
@@ -119,8 +119,7 @@ func TestRenumberProblemsClosesTheGap(t *testing.T) {
 // sensible order: the existing index is the tie-break, so the result is
 // deterministic rather than whatever the table scan produced.
 func TestRenumberProblemsBreaksTiesOnExistingIndex(t *testing.T) {
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 	ctx := context.Background()
 
 	users := NewUserStore(db)

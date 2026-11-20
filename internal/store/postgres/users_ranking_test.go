@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/tahsinarafat/aioj/internal/model"
+	"github.com/tahsinarafat/aioj/internal/testdb"
 )
 
 // TestUserStore_CreateMakesProfile is the regression test for the permanently
@@ -18,8 +19,7 @@ import (
 // /api/stats still reported every user, and the home page's "Top Rated Users"
 // widget was always empty.
 func TestUserStore_CreateMakesProfile(t *testing.T) {
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 
 	ctx := context.Background()
 	store := NewUserStore(db)
@@ -55,8 +55,7 @@ func TestUserStore_CreateMakesProfile(t *testing.T) {
 // a user row without its profile row is exactly the broken state this fixes, so
 // a failed profile insert must not leave a half-created user behind.
 func TestUserStore_CreateRollsBackOnProfileFailure(t *testing.T) {
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 
 	ctx := context.Background()
 	store := NewUserStore(db)
@@ -115,8 +114,7 @@ func TestUserStore_CreateRollsBackOnProfileFailure(t *testing.T) {
 // rather than dropping them — an INNER JOIN silently returned an empty list,
 // which is indistinguishable from "nobody has a rating yet".
 func TestUserStore_ListUsersByRatingIncludesUsersWithoutProfile(t *testing.T) {
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 
 	ctx := context.Background()
 	store := NewUserStore(db)
@@ -183,8 +181,7 @@ func TestUserStore_ListUsersByRatingIncludesUsersWithoutProfile(t *testing.T) {
 // WHERE clause while the join was being widened, so the fix cannot regress into
 // showing admin accounts on the public leaderboard.
 func TestUserStore_ListUsersByRatingExcludesAdmins(t *testing.T) {
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 
 	ctx := context.Background()
 	store := NewUserStore(db)

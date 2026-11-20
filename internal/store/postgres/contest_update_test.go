@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/tahsinarafat/aioj/internal/model"
+	"github.com/tahsinarafat/aioj/internal/testdb"
 )
 
 // TestContestStore_UpdateSettings is the regression test for a settings save
@@ -18,8 +19,7 @@ import (
 // "could not determine data type of parameter $10" and the handler answered
 // 500 "update failed" — for every contest, on every save.
 func TestContestStore_UpdateSettings(t *testing.T) {
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 
 	ctx := context.Background()
 	userStore := NewUserStore(db)
@@ -107,8 +107,7 @@ func TestContestStore_UpdateSettings(t *testing.T) {
 // to work in both directions, or the review workflow would leave published
 // contests hidden.
 func TestContestStore_UpdatePublishesWithStatus(t *testing.T) {
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 
 	ctx := context.Background()
 	userStore := NewUserStore(db)
@@ -166,8 +165,7 @@ func TestContestStore_UpdatePublishesWithStatus(t *testing.T) {
 // next page load showed the old value. Nothing in the response said the write had
 // been dropped.
 func TestContestStore_UpdatePersistsRegistrationAndDivision(t *testing.T) {
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 
 	ctx := context.Background()
 	userStore := NewUserStore(db)

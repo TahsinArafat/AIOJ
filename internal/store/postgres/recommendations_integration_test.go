@@ -6,12 +6,12 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/tahsinarafat/aioj/internal/model"
+	"github.com/tahsinarafat/aioj/internal/testdb"
 )
 
 func TestGetRecommendationsDB(t *testing.T) {
 	// Connect to test database
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 
 	ctx := context.Background()
 

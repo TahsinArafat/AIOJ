@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/tahsinarafat/aioj/internal/model"
+	"github.com/tahsinarafat/aioj/internal/testdb"
 )
 
 // The API-key flow end to end against a real database.
@@ -14,8 +15,7 @@ import (
 // walks — issue, hash, resolve, owner lookup — plus the ownership scoping that
 // stops one user deleting another's key.
 func TestAPIKeyLifecycleDB(t *testing.T) {
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 	ctx := context.Background()
 
 	users := NewUserStore(db)

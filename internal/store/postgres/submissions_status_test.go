@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/tahsinarafat/aioj/internal/model"
+	"github.com/tahsinarafat/aioj/internal/testdb"
 )
 
 // statusFixture builds one owner user, one visible problem, one hidden problem
@@ -27,7 +28,7 @@ type statusFixture struct {
 
 func newStatusFixture(t *testing.T, ctx context.Context) (*statusFixture, func()) {
 	t.Helper()
-	db := openTestDB(t)
+	db := testdb.Require(t)
 
 	users := NewUserStore(db)
 	problems := NewProblemStore(db)

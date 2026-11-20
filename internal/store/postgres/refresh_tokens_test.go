@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/tahsinarafat/aioj/internal/testdb"
 )
 
 // TestRefreshTokenStore_ConsumeDistinguishesMissFromFailure pins the contract
@@ -17,8 +18,7 @@ import (
 // expired session: the client cleared the tokens and signed the user out even
 // though the token was still valid and could simply have been retried.
 func TestRefreshTokenStore_ConsumeDistinguishesMissFromFailure(t *testing.T) {
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 	s := NewRefreshTokenStore(db)
 	ctx := context.Background()
 

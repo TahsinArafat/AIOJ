@@ -14,7 +14,34 @@ jobs:
   test:
     name: go test + build
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
+
+    # The store layer is the largest block of production code in this repo, and
+    # until this service existed none of it ran in CI: every test opened a real
+    # Postgres, found none, and called t.Skipf, which reports as `ok`. Green CI
+    # said nothing about `internal/store/postgres` — including the access-control
+    # tests for the contest roster. AIOJ_TEST_DB_REQUIRED=true below turns a
+    # missing database into a failure so this cannot silently regress.
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: aioj
+          POSTGRES_USER: aioj
+          POSTGRES_PASSWORD: aioj_secret
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U aioj"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # Matches the compose development password, which is also testdb's default.
+      AIOJ_TEST_DSN: postgres://aioj:aioj_secret@localhost:5432/aioj?sslmode=disable
+      AIOJ_TEST_DB_REQUIRED: "true"
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -34,7 +61,22 @@ jobs:
       - name: Build
         run: go build ./...
 
+      # Tests assume a migrated schema: several of them read tables by name and
+      # the rating ledger test skips unless migration 000094 has been applied.
+      - name: Migrate
+        run: go run ./cmd/migrate -dir internal/store/migrations up
+
       # Scoped to first-party packages: the module root also contains
       # web/node_modules, and ./... walks into third-party Go files there.
       - name: Test
         run: go test ./cmd/... ./internal/... -count=1
+
+      # Fail the job if the test framework leaks back into a production build.
+      # It did once: internal/store/postgres/testing.go imported `testing` from a
+      # non-test file, so every deploy shipped a test framework it never used.
+      - name: Guard against the test framework in production builds
+        run: |
+          if go list -deps ./cmd/aioj | grep -qx 'testing'; then
+            echo "::error::the 'testing' package is linked into cmd/aioj; a non-test file imports it"
+            exit 1
+          fi

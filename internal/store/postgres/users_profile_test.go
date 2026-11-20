@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/tahsinarafat/aioj/internal/model"
+	"github.com/tahsinarafat/aioj/internal/testdb"
 )
 
 // TestUserStore_GetProfileReturnsIdentityAndLiveStats is the regression test for
@@ -21,8 +22,7 @@ import (
 //     codebase ever writes, so they were permanently 0. They are now counted
 //     from `submissions` instead.
 func TestUserStore_GetProfileReturnsIdentityAndLiveStats(t *testing.T) {
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 
 	ctx := context.Background()
 	store := NewUserStore(db)

@@ -14,6 +14,7 @@ import (
 	"github.com/tahsinarafat/aioj/internal/auth"
 	"github.com/tahsinarafat/aioj/internal/model"
 	"github.com/tahsinarafat/aioj/internal/store/postgres"
+	"github.com/tahsinarafat/aioj/internal/testdb"
 )
 
 /**
@@ -34,8 +35,7 @@ import (
  * echoes whatever was stored and would agree with either outcome.
  */
 func TestContestCreateDefaultsAnUnscheduledRound(t *testing.T) {
-	db := openHandlerTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 
 	ctx := context.Background()
 	userStore := postgres.NewUserStore(db)

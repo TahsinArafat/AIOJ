@@ -8,6 +8,7 @@ import (
 	"github.com/tahsinarafat/aioj/internal/contest/format"
 	_ "github.com/tahsinarafat/aioj/internal/contest/format/acm"
 	"github.com/tahsinarafat/aioj/internal/model"
+	"github.com/tahsinarafat/aioj/internal/testdb"
 )
 
 // Manual corrections are a delta layered over the computed standings, never a
@@ -15,8 +16,7 @@ import (
 // participant and that the submission the round was actually scored on is left
 // untouched.
 func TestContestAdjustmentsSumPerUser(t *testing.T) {
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 	ctx := context.Background()
 
 	users := NewUserStore(db)
@@ -106,8 +106,7 @@ func TestContestAdjustmentsSumPerUser(t *testing.T) {
 // The history has to be readable months later: it names the person, the team
 // they competed as, and the problem letter they are about.
 func TestContestAdjustmentHistoryNamesThePerson(t *testing.T) {
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 	ctx := context.Background()
 
 	users := NewUserStore(db)
@@ -198,8 +197,7 @@ func TestContestAdjustmentHistoryNamesThePerson(t *testing.T) {
 // A zero adjustment is a no-op that would sit in the history looking like work.
 // The schema refuses it, which is what keeps the ledger honest.
 func TestContestAdjustmentRejectsNoOp(t *testing.T) {
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 	ctx := context.Background()
 
 	users := NewUserStore(db)
@@ -240,8 +238,7 @@ func TestContestAdjustmentRejectsNoOp(t *testing.T) {
 // the deltas, and rank the result. Applying deltas after ranking would leave the
 // order untouched and the correction cosmetic.
 func TestAdjustmentChangesRankOrder(t *testing.T) {
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 	ctx := context.Background()
 
 	users := NewUserStore(db)

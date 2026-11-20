@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/tahsinarafat/aioj/internal/model"
+	"github.com/tahsinarafat/aioj/internal/testdb"
 )
 
 // TestRatingStore_GetByContestAcceptsDisplayID is the regression test for the
@@ -16,8 +17,7 @@ import (
 // scoreboard 500'd on every load. Callers must resolve through ContestStore
 // first — this test pins both halves of that contract.
 func TestRatingStore_GetByContestAcceptsDisplayID(t *testing.T) {
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 
 	ctx := context.Background()
 	userStore := NewUserStore(db)

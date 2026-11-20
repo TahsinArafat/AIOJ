@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/tahsinarafat/aioj/internal/model"
+	"github.com/tahsinarafat/aioj/internal/testdb"
 )
 
 // The review workflow end to end against a real database: a setter's problem is
@@ -15,8 +16,7 @@ import (
 // are supposed to guarantee together, and only a real Postgres can prove the two
 // agree.
 func TestProblemReviewWorkflowDB(t *testing.T) {
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 	ctx := context.Background()
 
 	userStore := NewUserStore(db)

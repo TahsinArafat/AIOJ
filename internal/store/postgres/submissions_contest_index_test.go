@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/tahsinarafat/aioj/internal/model"
+	"github.com/tahsinarafat/aioj/internal/testdb"
 )
 
 // The round's letter is how a problem is identified inside a contest, and the
@@ -16,8 +17,7 @@ import (
 // the join must not be allowed to drop the row.
 func TestListByContestResolvesTheProblemLetter(t *testing.T) {
 	ctx := context.Background()
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 
 	users := NewUserStore(db)
 	problems := NewProblemStore(db)

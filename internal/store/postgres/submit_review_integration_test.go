@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/tahsinarafat/aioj/internal/model"
+	"github.com/tahsinarafat/aioj/internal/testdb"
 )
 
 // The setter workspace's Settings tab used to send `visible`, which the API
@@ -14,8 +15,7 @@ import (
 // actually lands in the database and that the problem stays private until an
 // admin publishes it.
 func TestSubmitForReviewThenPublishDB(t *testing.T) {
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 	ctx := context.Background()
 
 	problems := NewProblemStore(db)

@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/tahsinarafat/aioj/internal/model"
+	"github.com/tahsinarafat/aioj/internal/testdb"
 )
 
 // makeQueuedJob inserts one job for actorID and returns its id.
@@ -55,8 +56,7 @@ func newTestActor(t *testing.T, ctx context.Context, db *sql.DB) string {
 // successful cancel — the error appeared to be about nothing.
 func TestCountActiveByActorIgnoresCancelledJobs(t *testing.T) {
 	ctx := context.Background()
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 
 	store := NewAIGenerationStore(db)
 	actorID := newTestActor(t, ctx, db)
@@ -92,8 +92,7 @@ func TestCountActiveByActorIgnoresCancelledJobs(t *testing.T) {
 // one rather than an older queued job.
 func TestActiveJobByActorPrefersTheRunningJob(t *testing.T) {
 	ctx := context.Background()
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 
 	store := NewAIGenerationStore(db)
 	actorID := newTestActor(t, ctx, db)

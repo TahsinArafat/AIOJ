@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/tahsinarafat/aioj/internal/model"
+	"github.com/tahsinarafat/aioj/internal/testdb"
 )
 
 // TestBalloonListLabelsOnsiteAccounts is the regression test for a runner
@@ -16,8 +17,7 @@ import (
 // the team name exists only in onsite_batch_users, which this list never
 // joined.
 func TestBalloonListLabelsOnsiteAccounts(t *testing.T) {
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 
 	ctx := context.Background()
 	userStore := NewUserStore(db)

@@ -15,6 +15,7 @@ import (
 	"github.com/tahsinarafat/aioj/internal/auth"
 	"github.com/tahsinarafat/aioj/internal/model"
 	"github.com/tahsinarafat/aioj/internal/store/postgres"
+	"github.com/tahsinarafat/aioj/internal/testdb"
 )
 
 /**
@@ -41,8 +42,7 @@ import (
  *     failing, and the page's fallback already handles a zero.
  */
 func TestContestGetByIDReportsRegistration(t *testing.T) {
-	db := openHandlerTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 
 	ctx := context.Background()
 	userStore := postgres.NewUserStore(db)
@@ -228,8 +228,7 @@ func TestContestGetByIDReportsRegistration(t *testing.T) {
  *     is the same inference accessNotStarted exists to prevent.
  */
 func TestContestGetByIDWithholdsJudgesFromNonReaders(t *testing.T) {
-	db := openHandlerTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 
 	ctx := context.Background()
 	userStore := postgres.NewUserStore(db)

@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/tahsinarafat/aioj/internal/model"
+	"github.com/tahsinarafat/aioj/internal/testdb"
 )
 
 // TestStaffedByContest is the store half of "a judge may open a problem attached
@@ -21,8 +22,7 @@ import (
 // that matter: a staff row on a *different* contest must not open this problem, and
 // being the problem's author is not what this answers.
 func TestStaffedByContest(t *testing.T) {
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 
 	ctx := context.Background()
 	users := NewUserStore(db)

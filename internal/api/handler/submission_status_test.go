@@ -14,6 +14,7 @@ import (
 	"github.com/tahsinarafat/aioj/internal/model"
 	"github.com/tahsinarafat/aioj/internal/store"
 	"github.com/tahsinarafat/aioj/internal/store/postgres"
+	"github.com/tahsinarafat/aioj/internal/testdb"
 )
 
 // withURLParam attaches a chi URL parameter, which chi.URLParam reads back.
@@ -140,8 +141,7 @@ func TestPageParams(t *testing.T) {
 // A rejudge request must be rejected before it reaches the queue when the
 // caller answers for neither the submission nor the scope it names.
 func TestRejudgeForbiddenForStranger(t *testing.T) {
-	db := openRosterTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 
 	ctx := context.Background()
 	users := postgres.NewUserStore(db)

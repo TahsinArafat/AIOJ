@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/tahsinarafat/aioj/internal/model"
+	"github.com/tahsinarafat/aioj/internal/testdb"
 )
 
 // An AI-generated problem is judged locally.
@@ -18,8 +19,7 @@ import (
 // came back broken.
 func TestAIProblemIsJudgedLocally(t *testing.T) {
 	ctx := context.Background()
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 
 	users := NewUserStore(db)
 	problems := NewProblemStore(db)
@@ -114,8 +114,7 @@ func TestAIProblemIsJudgedLocally(t *testing.T) {
 // rejudged locally, so they must be included.
 func TestProblemRejudgeIncludesAISource(t *testing.T) {
 	ctx := context.Background()
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 
 	users := NewUserStore(db)
 	problems := NewProblemStore(db)

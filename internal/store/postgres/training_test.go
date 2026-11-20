@@ -6,11 +6,11 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/tahsinarafat/aioj/internal/model"
+	"github.com/tahsinarafat/aioj/internal/testdb"
 )
 
 func TestTrainingPlanStore_LifeCycle(t *testing.T) {
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 
 	ctx := context.Background()
 	userStore := NewUserStore(db)
@@ -114,8 +114,7 @@ func TestTrainingPlanStore_LifeCycle(t *testing.T) {
 }
 
 func TestTrainingPlanStore_AutoCompleteOnAC(t *testing.T) {
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 
 	ctx := context.Background()
 	userStore := NewUserStore(db)

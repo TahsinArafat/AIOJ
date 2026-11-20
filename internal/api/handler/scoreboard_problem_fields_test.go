@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/tahsinarafat/aioj/internal/model"
 	"github.com/tahsinarafat/aioj/internal/store/postgres"
+	"github.com/tahsinarafat/aioj/internal/testdb"
 )
 
 /**
@@ -36,8 +37,7 @@ import (
  * future `source_url` — fails here rather than in production.
  */
 func TestScoreboardProblemPayloadCarriesNoName(t *testing.T) {
-	db := openHandlerTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 
 	ctx := context.Background()
 	userStore := postgres.NewUserStore(db)

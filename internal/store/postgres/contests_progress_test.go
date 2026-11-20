@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/tahsinarafat/aioj/internal/model"
+	"github.com/tahsinarafat/aioj/internal/testdb"
 )
 
 // TestGetProblemProgress is the regression test for a contest problem list that
@@ -17,8 +18,7 @@ import (
 // separate my_* fields: anonymous (counts only), solved, and attempted-but-not-
 // solved.
 func TestGetProblemProgress(t *testing.T) {
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 	ctx := context.Background()
 
 	userStore := NewUserStore(db)
@@ -113,8 +113,7 @@ func TestGetProblemProgress(t *testing.T) {
 // after the freeze instant, or the number gives away exactly what the frozen
 // board is hiding.
 func TestGetProblemProgressFreezeCutoff(t *testing.T) {
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 	ctx := context.Background()
 
 	userStore := NewUserStore(db)

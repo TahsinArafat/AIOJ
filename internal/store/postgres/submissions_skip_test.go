@@ -6,12 +6,13 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/tahsinarafat/aioj/internal/model"
+	"github.com/tahsinarafat/aioj/internal/testdb"
 )
 
 // voidFixture builds one judged submission to void.
 func voidFixture(t *testing.T, ctx context.Context) (subs *SubmissionStore, userID, problemID, subID string, cleanup func()) {
 	t.Helper()
-	db := openTestDB(t)
+	db := testdb.Require(t)
 
 	users := NewUserStore(db)
 	problems := NewProblemStore(db)

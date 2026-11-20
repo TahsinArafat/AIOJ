@@ -15,6 +15,7 @@ import (
 	"github.com/tahsinarafat/aioj/internal/auth"
 	"github.com/tahsinarafat/aioj/internal/model"
 	"github.com/tahsinarafat/aioj/internal/store/postgres"
+	"github.com/tahsinarafat/aioj/internal/testdb"
 )
 
 /**
@@ -35,8 +36,7 @@ import (
  * deliberately NOT exercised here — this test is about half 2 of the check.
  */
 func TestSkipSubmissionAuthorization(t *testing.T) {
-	db := openRosterTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 
 	ctx := context.Background()
 	userStore := postgres.NewUserStore(db)

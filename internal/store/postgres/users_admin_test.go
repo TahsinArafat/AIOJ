@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/tahsinarafat/aioj/internal/model"
+	"github.com/tahsinarafat/aioj/internal/testdb"
 )
 
 // newAdminTestUser inserts a user through the store (which also creates the
@@ -33,8 +34,7 @@ func newAdminTestUser(t *testing.T, s *UserStore, role string) *model.User {
 // administrator identifies an account. The id branch matters because pasting an
 // id into the search box is the fastest route to a specific complaint.
 func TestListAdminUsers_searchMatchesUsernameEmailAndID(t *testing.T) {
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 	s := NewUserStore(db)
 	ctx := context.Background()
 
@@ -60,8 +60,7 @@ func TestListAdminUsers_searchMatchesUsernameEmailAndID(t *testing.T) {
 // TestListAdminUsers_roleAndStatusFilters: the total must describe the same set
 // as the page, or the pagination controls lie about how many pages exist.
 func TestListAdminUsers_roleAndStatusFilters(t *testing.T) {
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 	s := NewUserStore(db)
 	ctx := context.Background()
 
@@ -97,8 +96,7 @@ func TestListAdminUsers_roleAndStatusFilters(t *testing.T) {
 // TestListAdminUsers_unverifiedAndMustChangeFilters exercises the two support
 // queues the panel exposes.
 func TestListAdminUsers_unverifiedAndMustChangeFilters(t *testing.T) {
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 	s := NewUserStore(db)
 	ctx := context.Background()
 
@@ -139,8 +137,7 @@ func TestListAdminUsers_unverifiedAndMustChangeFilters(t *testing.T) {
 // TestListAdminUsers_sortsAndPaginates pins the ordering contract the panel's
 // sort dropdown relies on, including "never signed in sorts last".
 func TestListAdminUsers_sortsAndPaginates(t *testing.T) {
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 	s := NewUserStore(db)
 	ctx := context.Background()
 
@@ -208,8 +205,7 @@ func TestListAdminUsers_sortsAndPaginates(t *testing.T) {
 // TestGetAdminUser_returnsCountsAndSessionFacts: the detail drawer has to answer
 // "what has this account done" and "is anyone signed in as it".
 func TestGetAdminUser_returnsCountsAndSessionFacts(t *testing.T) {
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 	s := NewUserStore(db)
 	ctx := context.Background()
 
@@ -242,8 +238,7 @@ func TestGetAdminUser_returnsCountsAndSessionFacts(t *testing.T) {
 }
 
 func TestGetAdminUser_unknownIsNil(t *testing.T) {
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 
 	d, err := NewUserStore(db).GetAdminUser(context.Background(), uuid.New().String())
 	if err != nil {
@@ -257,8 +252,7 @@ func TestGetAdminUser_unknownIsNil(t *testing.T) {
 // TestCountAdmins_ignoresBanned keeps the last-admin guard honest: a banned
 // administrator cannot sign in, so it must not count as a remaining one.
 func TestCountAdmins_ignoresBanned(t *testing.T) {
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 	s := NewUserStore(db)
 	ctx := context.Background()
 
@@ -281,8 +275,7 @@ func TestCountAdmins_ignoresBanned(t *testing.T) {
 }
 
 func TestSetUserBan_unbanClearsReason(t *testing.T) {
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 	s := NewUserStore(db)
 	ctx := context.Background()
 

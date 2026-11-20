@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/tahsinarafat/aioj/internal/model"
+	"github.com/tahsinarafat/aioj/internal/testdb"
 )
 
 // TestGetDisplayNamesLabelsOnsiteAccounts is the regression test for standings
@@ -15,8 +16,7 @@ import (
 // panel, which lives only in onsite_batch_users. The scoreboard resolved names
 // from users.username alone, so a generated account had no way to show its team.
 func TestGetDisplayNamesLabelsOnsiteAccounts(t *testing.T) {
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 
 	ctx := context.Background()
 	contestStore := NewContestStore(db)
@@ -101,8 +101,7 @@ func TestGetDisplayNamesLabelsOnsiteAccounts(t *testing.T) {
 
 // An empty page must not open a connection or build an empty IN list.
 func TestGetDisplayNamesWithNoUsers(t *testing.T) {
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 
 	names, err := NewContestStore(db).GetDisplayNames(context.Background(), uuid.New().String(), nil)
 	if err != nil {

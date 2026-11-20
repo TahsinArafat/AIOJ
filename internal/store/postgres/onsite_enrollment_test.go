@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/tahsinarafat/aioj/internal/model"
+	"github.com/tahsinarafat/aioj/internal/testdb"
 )
 
 /**
@@ -24,8 +25,7 @@ import (
  * type a password nobody gave it.
  */
 func TestOnsiteAutoRegisterWritesGrant(t *testing.T) {
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 
 	ctx := context.Background()
 	userStore := NewUserStore(db)
@@ -99,8 +99,7 @@ func TestOnsiteAutoRegisterWritesGrant(t *testing.T) {
  * generated credentials is on that list by construction.
  */
 func TestOnsiteAutoRegisterJoinsRestrictedGroup(t *testing.T) {
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 
 	ctx := context.Background()
 	userStore := NewUserStore(db)

@@ -1,4 +1,4 @@
-.PHONY: build run test openapi cli test-frontend lint fmt fmt-check build-image migrate-up migrate-down migrate-status migrate-version migrate-force rust-build rust-test rust-fmt rust-lint test-parity
+.PHONY: build run test test-require-db openapi cli test-frontend lint fmt fmt-check build-image migrate-up migrate-down migrate-status migrate-version migrate-force rust-build rust-test rust-fmt rust-lint test-parity
 
 MIGRATE_DSN ?= postgres://aioj:aioj_dev@localhost:5432/aioj?sslmode=disable
 TEST_DSN    ?= $(MIGRATE_DSN)
@@ -12,6 +12,13 @@ run:
 
 test:
 	AIOJ_TEST_DSN="$${AIOJ_TEST_DSN:-$(TEST_DSN)}" go test ./cmd/... ./internal/... -count=1
+
+# Same as `test`, but an unreachable database is a failure instead of a skip.
+# This is what CI runs; use it locally to catch the case where the store layer
+# silently skipped because Postgres was not up.
+test-require-db:
+	AIOJ_TEST_DSN="$${AIOJ_TEST_DSN:-$(TEST_DSN)}" AIOJ_TEST_DB_REQUIRED=true \
+		go test ./cmd/... ./internal/... -count=1
 
 # --- Rust similarity engine ------------------------------------------------
 # The plagiarism scan is the platform's only CPU-bound job, so it has a Rust

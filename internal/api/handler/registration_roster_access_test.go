@@ -2,11 +2,9 @@ package handler
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 	"time"
 
@@ -16,6 +14,7 @@ import (
 	"github.com/tahsinarafat/aioj/internal/auth"
 	"github.com/tahsinarafat/aioj/internal/model"
 	"github.com/tahsinarafat/aioj/internal/store/postgres"
+	"github.com/tahsinarafat/aioj/internal/testdb"
 )
 
 /**
@@ -32,8 +31,7 @@ import (
  * cases below.
  */
 func TestListRegistrationsRefusesNonStaff(t *testing.T) {
-	db := openRosterTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 
 	ctx := context.Background()
 	userStore := postgres.NewUserStore(db)
@@ -153,25 +151,4 @@ func usernamesIn(body []byte) []string {
 		}
 	}
 	return out
-}
-
-// openRosterTestDB mirrors openTestDB in package postgres, which is not visible
-// from here. Same DSN contract, same skip semantics when no database is running.
-func openRosterTestDB(t *testing.T) *sql.DB {
-	t.Helper()
-	dsn := os.Getenv("AIOJ_TEST_DSN")
-	if dsn == "" {
-		dsn = "postgres://aioj:aioj_secret@localhost:5432/aioj?sslmode=disable"
-	}
-	db, err := sql.Open("postgres", dsn)
-	if err != nil {
-		t.Skipf("postgres unavailable: %v", err)
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	if err := db.PingContext(ctx); err != nil {
-		db.Close()
-		t.Skipf("postgres unavailable (set AIOJ_TEST_DSN or start docker): %v", err)
-	}
-	return db
 }

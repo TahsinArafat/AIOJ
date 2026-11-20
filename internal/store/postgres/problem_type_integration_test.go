@@ -6,14 +6,14 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/tahsinarafat/aioj/internal/model"
+	"github.com/tahsinarafat/aioj/internal/testdb"
 )
 
 // A problem's type must survive a create/read round trip, because the submission
 // path keys off it: get it wrong and an output-only problem would demand a
 // language, or a coded problem would be judged as literal stdout with no compile.
 func TestProblemTypeRoundTripsDB(t *testing.T) {
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 	ctx := context.Background()
 
 	problems := NewProblemStore(db)
@@ -47,8 +47,7 @@ func TestProblemTypeRoundTripsDB(t *testing.T) {
 // An empty type must default rather than violate the CHECK constraint: the AI
 // apply path and the seeder predate this column.
 func TestProblemTypeDefaultsToStandardDB(t *testing.T) {
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 	ctx := context.Background()
 
 	problems := NewProblemStore(db)

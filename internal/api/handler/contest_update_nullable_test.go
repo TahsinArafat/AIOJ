@@ -3,10 +3,8 @@ package handler
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 	"time"
 
@@ -16,6 +14,7 @@ import (
 	"github.com/tahsinarafat/aioj/internal/auth"
 	"github.com/tahsinarafat/aioj/internal/model"
 	"github.com/tahsinarafat/aioj/internal/store/postgres"
+	"github.com/tahsinarafat/aioj/internal/testdb"
 )
 
 /**
@@ -32,8 +31,7 @@ import (
  * went unnoticed.
  */
 func TestContestUpdateClearsNullableFieldsWhenSentAsNull(t *testing.T) {
-	db := openHandlerTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 
 	ctx := context.Background()
 	userStore := postgres.NewUserStore(db)
@@ -117,23 +115,4 @@ func putContest(t *testing.T, h *ContestHandler, contestID, ownerID, body string
 	rec := httptest.NewRecorder()
 	h.Update(rec, req)
 	return rec
-}
-
-func openHandlerTestDB(t *testing.T) *sql.DB {
-	t.Helper()
-	dsn := os.Getenv("AIOJ_TEST_DSN")
-	if dsn == "" {
-		dsn = "postgres://aioj:aioj_secret@localhost:5432/aioj?sslmode=disable"
-	}
-	db, err := sql.Open("postgres", dsn)
-	if err != nil {
-		t.Skipf("postgres unavailable: %v", err)
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	if err := db.PingContext(ctx); err != nil {
-		db.Close()
-		t.Skipf("postgres unavailable (set AIOJ_TEST_DSN or start docker): %v", err)
-	}
-	return db
 }

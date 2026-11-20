@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/tahsinarafat/aioj/internal/model"
+	"github.com/tahsinarafat/aioj/internal/testdb"
 )
 
 // TestProblemStore_UpdateStatement is the regression test for a problem save
@@ -17,8 +18,7 @@ import (
 // "could not determine data type of parameter $14" and the statement editor
 // answered 500 on every save.
 func TestProblemStore_UpdateStatement(t *testing.T) {
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 	ctx := context.Background()
 	problems := NewProblemStore(db)
 
@@ -99,8 +99,7 @@ func TestProblemStore_UpdateStatement(t *testing.T) {
 // what makes a problem public, so deriving visible from status has to work
 // when the status actually changes.
 func TestProblemStore_UpdatePublishesWithStatus(t *testing.T) {
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 	ctx := context.Background()
 	problems := NewProblemStore(db)
 

@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/tahsinarafat/aioj/internal/model"
+	"github.com/tahsinarafat/aioj/internal/testdb"
 )
 
 /**
@@ -30,7 +31,7 @@ type archiveRoundFixture struct {
 
 func newArchiveRoundFixture(t *testing.T, ctx context.Context) (*archiveRoundFixture, func()) {
 	t.Helper()
-	db := openTestDB(t)
+	db := testdb.Require(t)
 
 	users := NewUserStore(db)
 	problems := NewProblemStore(db)

@@ -7,14 +7,14 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/tahsinarafat/aioj/internal/model"
+	"github.com/tahsinarafat/aioj/internal/testdb"
 )
 
 // The feed query joins contest_problems and onsite_batch_users, either of which
 // can silently break it. A mock cannot catch that, and the handler tests use a
 // fake lister, so this runs the real SQL.
 func TestListFeedRunsAgainstRealDB(t *testing.T) {
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 	ctx := context.Background()
 
 	subs := NewSubmissionStore(db)

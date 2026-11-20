@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lib/pq"
 	"github.com/tahsinarafat/aioj/internal/model"
+	"github.com/tahsinarafat/aioj/internal/testdb"
 )
 
 // A round's clarification queue is the jury's work list. Two things it has to get
@@ -18,8 +19,7 @@ import (
 //     round by index (A, B, C…), which only exists on contest_problems. The join
 //     is what lets the UI print "A — Sum problem".
 func TestClarificationQueue(t *testing.T) {
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 	ctx := context.Background()
 
 	users := NewUserStore(db)

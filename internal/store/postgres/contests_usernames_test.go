@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/tahsinarafat/aioj/internal/model"
+	"github.com/tahsinarafat/aioj/internal/testdb"
 )
 
 // TestGetUsernamesResolvesManyIds covers the batch lookup that replaced the
@@ -16,8 +17,7 @@ import (
 // labels alone. The batch form must return the same names in one query, and it
 // must report a failure the single-row form could only swallow.
 func TestGetUsernamesResolvesManyIds(t *testing.T) {
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 
 	ctx := context.Background()
 	store := NewContestStore(db)
@@ -66,8 +66,7 @@ func TestGetUsernamesResolvesManyIds(t *testing.T) {
 // An id with no row is absent rather than empty, so a caller can tell "unknown
 // user" from "a user whose name is blank" and fall back deliberately.
 func TestGetUsernamesOmitsUnknownIds(t *testing.T) {
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 
 	ctx := context.Background()
 	store := NewContestStore(db)
@@ -99,8 +98,7 @@ func TestGetUsernamesOmitsUnknownIds(t *testing.T) {
 
 // An empty page must not issue a query with an empty ANY() list.
 func TestGetUsernamesWithNoIds(t *testing.T) {
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 
 	names, err := NewContestStore(db).GetUsernames(context.Background(), nil)
 	if err != nil {

@@ -7,14 +7,14 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/tahsinarafat/aioj/internal/model"
+	"github.com/tahsinarafat/aioj/internal/testdb"
 )
 
 // TestSubmissionClaimFencesStaleWorker proves the public store contract used
 // by multiple judge workers: only one worker owns a pending submission, a
 // stale owner can be reclaimed, and only the current claim may write a verdict.
 func TestSubmissionClaimFencesStaleWorker(t *testing.T) {
-	db := openTestDB(t)
-	defer db.Close()
+	db := testdb.Require(t)
 
 	ctx := context.Background()
 	users := NewUserStore(db)
