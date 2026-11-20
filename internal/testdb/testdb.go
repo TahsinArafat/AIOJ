@@ -25,10 +25,15 @@ import (
 	_ "github.com/lib/pq" // registers the "postgres" driver
 )
 
-// DefaultDSN is what the openers fall back to when AIOJ_TEST_DSN is unset. It
-// matches the compose development password, so a local run against
-// `docker compose up -d postgres` needs no environment at all.
-const DefaultDSN = "postgres://aioj:aioj_secret@localhost:5432/aioj?sslmode=disable"
+// DefaultDSN is what the openers fall back to when AIOJ_TEST_DSN is unset.
+//
+// It uses aioj_dev, the same password config.yaml and the Makefile's
+// MIGRATE_DSN use, so `docker compose up -d postgres` plus a bare `go test`
+// works with no environment at all. It used to say aioj_secret, which matched
+// nothing else in the repo: `cmd/migrate` would migrate one database while the
+// tests read another, and the mismatch only surfaced in CI, where the two
+// tools finally pointed at the same host.
+const DefaultDSN = "postgres://aioj:aioj_dev@localhost:5432/aioj?sslmode=disable"
 
 // requiredEnv is set to "true" by CI. When it is set, an unreachable database is
 // a test failure rather than a skip: the whole point of the workflow adding a

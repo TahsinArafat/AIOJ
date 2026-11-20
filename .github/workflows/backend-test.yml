@@ -63,8 +63,14 @@ jobs:
 
       # Tests assume a migrated schema: several of them read tables by name and
       # the rating ledger test skips unless migration 000094 has been applied.
+      #
+      # DB_DSN, not AIOJ_TEST_DSN: cmd/migrate reads DB_DSN (the same variable
+      # `make migrate-up` sets) and falls back to a hardcoded aioj_dev password,
+      # which does not match this service's aioj_secret. Passing it explicitly
+      # here keeps the migration and the tests pointed at the same database
+      # rather than relying on two defaults agreeing.
       - name: Migrate
-        run: go run ./cmd/migrate -dir internal/store/migrations up
+        run: DB_DSN="$AIOJ_TEST_DSN" go run ./cmd/migrate -dir internal/store/migrations up
 
       # Scoped to first-party packages: the module root also contains
       # web/node_modules, and ./... walks into third-party Go files there.
