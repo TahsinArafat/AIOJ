@@ -10,6 +10,27 @@ concurrency:
   group: lint-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # MEASURED, not estimated: the number of findings on main at the commit that
+  # introduced this ratchet (Go 1.26.2, golangci-lint v2.1.6).
+  #
+  # It exists because the linters were, in practice, never run against main:
+  # .golangci.yml scoped issues to `new-from-merge-base: main`, and on a push to
+  # main that merge base is HEAD, so the diff is empty and the job reported
+  # "0 issues" by construction. Without the filter main reported 417 at the
+  # commit before this one — errcheck 383, staticcheck 17, unused 12,
+  # ineffassign 5 — of which the staticcheck one in admin_bot_accounts.go is
+  # fixed here, leaving 416.
+  #
+  # Most of errcheck is the `defer rows.Close()` class (126 rows.Close, 46
+  # resp.Body.Close, 18 tx.Rollback), which is debt in the sense that matters
+  # least. The worthwhile targets are the 24 Scan and 31 fmt.Sscanf findings,
+  # where an error genuinely goes missing.
+  #
+  # Lower this as the debt is paid. It must never rise: a commit that adds a
+  # finding fails the job even though the pre-existing debt is tolerated.
+  LINT_BASELINE: "416"
+
 jobs:
   golangci:
     name: golangci-lint
@@ -18,6 +39,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          # On main the linter needs history only for its own bookkeeping; on a
+          # pull request the `new-from-merge-base` filter needs the base commit.
+          fetch-depth: 0
 
       - name: Set up Go
         uses: actions/setup-go@v6
@@ -27,12 +52,51 @@ jobs:
 
       # Prebuilt binaries for v2.1.6 are still built with go1.24 and refuse to
       # lint a go 1.26 module (exit 3). Build the same version with setup-go.
+      # Building with the module's own toolchain also matters for the baseline:
+      # a newer Go yields ~50 false `typecheck` errors that would inflate it.
+      #
+      # The action fails the step on any finding, which is what we want on a
+      # pull request. On main the debt is expected, so the count is judged
+      # against the baseline in the next step instead.
       - name: golangci-lint
+        id: lint
         uses: golangci/golangci-lint-action@v8
+        continue-on-error: true
         with:
           version: v2.1.6
           install-mode: goinstall
-          args: --timeout=10m
+          args: --timeout=10m --output.text.path=lint-report.txt
+
+      - name: Check findings against the baseline
+        run: |
+          # One line per finding, e.g. "path/file.go:12:5: message (linter)".
+          count=$(grep -cE '^[a-z][^:]*\.go:[0-9]+' lint-report.txt || true)
+          echo "findings on this commit: ${count} (baseline ${LINT_BASELINE})"
+
+          if [ -f lint-report.txt ]; then
+            {
+              echo "### golangci-lint"
+              echo "${count} finding(s); baseline ${LINT_BASELINE}."
+              echo
+              echo "<details><summary>Report</summary>"
+              echo
+              echo '```'
+              head -200 lint-report.txt
+              echo '```'
+              echo "</details>"
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          if [ "${count}" -gt "${LINT_BASELINE}" ]; then
+            echo "::error::${count} lint findings, above the baseline of ${LINT_BASELINE}."
+            echo "This commit added findings. The pre-existing debt is tolerated, new debt is not."
+            echo "Fix them, or if a finding is wrong, exclude it in .golangci.yml with a reason."
+            exit 1
+          fi
+
+          if [ "${count}" -lt "${LINT_BASELINE}" ]; then
+            echo "::notice::Findings dropped to ${count} from ${LINT_BASELINE}. Lower LINT_BASELINE in .github/workflows/lint.yml to lock the improvement in."
+          fi
 
   eslint:
     name: eslint

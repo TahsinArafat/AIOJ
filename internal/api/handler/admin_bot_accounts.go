@@ -239,7 +239,8 @@ func (h *AdminBotAccountHandler) Update(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if h.vjudgeSvc != nil {
-		if req.SessionData != nil && len(req.SessionData) > 0 {
+		// len() on a nil map is 0, so the nil check was redundant (S1009).
+		if len(req.SessionData) > 0 {
 			h.vjudgeSvc.SetCookies(existing.Platform, req.SessionData)
 			slog.Info("bot cookies updated from session_data", "platform", existing.Platform)
 		} else if req.PlatformUser != nil || req.PlatformPass != nil {
