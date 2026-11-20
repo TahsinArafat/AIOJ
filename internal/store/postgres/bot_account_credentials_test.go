@@ -224,3 +224,102 @@ func TestBotAccountWrongKeyFailsLoudly(t *testing.T) {
 		t.Fatal("expected a decryption error with the wrong key, got nil")
 	}
 }
+
+// TestBotAccountUpdateReEncrypts covers the write path the admin console uses
+// most. Create was tested; Update was not, and it is the one that would
+// silently overwrite ciphertext with plaintext — a rotated password would land
+// in the clear while every read continued to work.
+func TestBotAccountUpdateReEncrypts(t *testing.T) {
+	db := testdb.Require(t)
+	ctx := context.Background()
+	user := newAdminTestUser(t, NewUserStore(db), "user")
+	store := NewBotAccountStore(db, testCredentialBox(t))
+
+	ba := newTestBot(t, db, user.ID, true)
+	if err := store.Create(ctx, ba); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM bot_accounts WHERE id = $1", ba.ID)
+	})
+
+	// Rotate every credential through Update, the way the console does.
+	ba.PlatformPass = "rotated-pass"
+	ba.APIKey = "rotated-key"
+	ba.APISecret = "rotated-secret"
+	ba.SessionData = map[string]string{"cf_clearance": "rotated-cookie"}
+	if err := store.Update(ctx, ba.ID, ba); err != nil {
+		t.Fatalf("update: %v", err)
+	}
+
+	var pass, key, secret, session string
+	if err := db.QueryRowContext(ctx,
+		`SELECT platform_pass, api_key, api_secret, session_data::text FROM bot_accounts WHERE id=$1`,
+		ba.ID).Scan(&pass, &key, &secret, &session); err != nil {
+		t.Fatalf("read raw row: %v", err)
+	}
+	for name, got := range map[string]string{
+		"platform_pass": pass, "api_key": key, "api_secret": secret,
+	} {
+		if !strings.HasPrefix(got, "enc:v1:") {
+			t.Errorf("%s was written back as plaintext by Update: %q", name, got)
+		}
+	}
+	if strings.Contains(pass, "rotated-pass") || strings.Contains(key, "rotated-key") {
+		t.Error("Update wrote the rotated plaintext into the column")
+	}
+	if !strings.HasPrefix(session, `"enc:v1:`) {
+		t.Errorf("session_data was written back unencrypted by Update: %q", session)
+	}
+
+	got, err := store.GetByID(ctx, ba.ID)
+	if err != nil {
+		t.Fatalf("get after update: %v", err)
+	}
+	if got.PlatformPass != "rotated-pass" || got.APIKey != "rotated-key" ||
+		got.APISecret != "rotated-secret" || got.SessionData["cf_clearance"] != "rotated-cookie" {
+		t.Errorf("rotated credentials did not round-trip: %+v", got)
+	}
+}
+
+// TestBotAccountPresenceFlags pins what the admin console is allowed to know:
+// that a secret exists, never its value. The flags are derived in the store so
+// no handler has to read a secret to answer the question.
+func TestBotAccountPresenceFlags(t *testing.T) {
+	db := testdb.Require(t)
+	ctx := context.Background()
+	user := newAdminTestUser(t, NewUserStore(db), "user")
+	store := NewBotAccountStore(db, testCredentialBox(t))
+
+	withSecrets := newTestBot(t, db, user.ID, true)
+	if err := store.Create(ctx, withSecrets); err != nil {
+		t.Fatalf("create with secrets: %v", err)
+	}
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM bot_accounts WHERE id = $1", withSecrets.ID)
+	})
+
+	got, err := store.GetByID(ctx, withSecrets.ID)
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if !got.HasAPIKey || !got.HasAPISecret {
+		t.Errorf("presence flags not set for an account with secrets: %+v", got)
+	}
+
+	bare := newTestBot(t, db, user.ID, false)
+	bare.PlatformUser = "bare_" + uuid.New().String()[:8]
+	if err := store.Create(ctx, bare); err != nil {
+		t.Fatalf("create without secrets: %v", err)
+	}
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(context.Background(), "DELETE FROM bot_accounts WHERE id = $1", bare.ID)
+	})
+	gotBare, err := store.GetByID(ctx, bare.ID)
+	if err != nil {
+		t.Fatalf("get bare: %v", err)
+	}
+	if gotBare.HasAPIKey || gotBare.HasAPISecret {
+		t.Errorf("presence flags set for an account with no secrets: %+v", gotBare)
+	}
+}

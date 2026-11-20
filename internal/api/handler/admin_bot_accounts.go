@@ -1,11 +1,13 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/tahsinarafat/aioj/internal/ai"
@@ -35,6 +37,52 @@ func writeBotStoreError(w http.ResponseWriter, action string, err error) {
 		return
 	}
 	http.Error(w, "failed to "+action+" bot account", http.StatusInternalServerError)
+}
+
+// autoLoginTimeout bounds the background login. It is generous because it
+// covers a full round trip to a remote judge through whatever proxy the bot is
+// configured with; it exists so the goroutine cannot live forever.
+const autoLoginTimeout = 2 * time.Minute
+
+// autoLogin signs a bot in after it is created or edited and persists the
+// cookies that result.
+//
+// It re-reads the row before writing instead of saving the copy it was handed:
+// an admin may edit the account again while the login is in flight, and writing
+// the older copy would silently revert those edits. A deleted account is not an
+// error worth retrying — GetByID returns nil and the login is dropped.
+func (h *AdminBotAccountHandler) autoLogin(base context.Context, acct model.BotAccount, id string) {
+	ctx, cancel := context.WithTimeout(base, autoLoginTimeout)
+	defer cancel()
+
+	cookies, err := h.vjudgeSvc.Login(ctx, acct.Platform)
+	if err != nil {
+		slog.Error("bot auto-login failed", "platform", acct.Platform, "account", id, "err", err)
+		return
+	}
+	if len(cookies) == 0 {
+		slog.Warn("bot auto-login returned no cookies", "platform", acct.Platform, "account", id)
+		return
+	}
+
+	fresh, err := h.store.GetByID(ctx, id)
+	if err != nil {
+		slog.Error("bot auto-login could not reload account", "account", id, "err", err)
+		return
+	}
+	if fresh == nil {
+		slog.Info("bot deleted while auto-login was in flight", "account", id)
+		return
+	}
+	fresh.SessionData = cookies
+	if err := h.store.Update(ctx, id, fresh); err != nil {
+		// The cookies are live but not durable; say so rather than claim success.
+		slog.Error("bot auto-login obtained cookies but could not save them",
+			"platform", acct.Platform, "account", id, "err", err)
+		return
+	}
+	h.vjudgeSvc.UpdateCookies(acct.Platform, cookies)
+	slog.Info("bot auto-login succeeded, cookies saved", "platform", acct.Platform, "account", id)
 }
 
 func (h *AdminBotAccountHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -112,19 +160,12 @@ func (h *AdminBotAccountHandler) Create(w http.ResponseWriter, r *http.Request) 
 			h.vjudgeSvc.SetCookies(ba.Platform, ba.SessionData)
 			slog.Info("bot cookies loaded from session_data", "platform", ba.Platform)
 		} else if ba.PlatformUser != "" && ba.PlatformPass != "" {
-			go func() {
-				cookies, err := h.vjudgeSvc.Login(r.Context(), ba.Platform)
-				if err != nil {
-					slog.Error("bot auto-login failed", "platform", ba.Platform, "err", err)
-					return
-				}
-				if len(cookies) > 0 {
-					ba.SessionData = cookies
-					h.store.Update(r.Context(), ba.ID, ba)
-					h.vjudgeSvc.UpdateCookies(ba.Platform, cookies)
-					slog.Info("bot auto-login succeeded, cookies saved", "platform", ba.Platform)
-				}
-			}()
+			// WithoutCancel: the login outlives the request. The context it used
+			// to capture was cancelled the moment this handler returned, so the
+			// remote call and the write that persists the cookies both raced a
+			// dead context — and the write's error was discarded, so the only
+			// symptom was cookies silently never being saved.
+			go h.autoLogin(context.WithoutCancel(r.Context()), *ba, ba.ID)
 		}
 	}
 
@@ -143,8 +184,13 @@ func (h *AdminBotAccountHandler) Update(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	var req struct {
-		PlatformUser *string           `json:"platform_user"`
-		PlatformPass *string           `json:"platform_pass"`
+		PlatformUser *string `json:"platform_user"`
+		PlatformPass *string `json:"platform_pass"`
+		// APIKey and APISecret are accepted here because the console has always
+		// offered to change them. It sent them and the server ignored them, so the
+		// edit silently did nothing. Omitted (or empty) keeps the existing value.
+		APIKey       *string           `json:"api_key"`
+		APISecret    *string           `json:"api_secret"`
 		Status       *string           `json:"status"`
 		RateLimitRPS *float32          `json:"rate_limit_rps"`
 		SessionData  map[string]string `json:"session_data"`
@@ -158,8 +204,14 @@ func (h *AdminBotAccountHandler) Update(w http.ResponseWriter, r *http.Request) 
 	if req.PlatformUser != nil {
 		existing.PlatformUser = *req.PlatformUser
 	}
-	if req.PlatformPass != nil {
+	if req.PlatformPass != nil && *req.PlatformPass != "" {
 		existing.PlatformPass = *req.PlatformPass
+	}
+	if req.APIKey != nil && *req.APIKey != "" {
+		existing.APIKey = *req.APIKey
+	}
+	if req.APISecret != nil && *req.APISecret != "" {
+		existing.APISecret = *req.APISecret
 	}
 	if req.Status != nil {
 		validStatuses := map[string]bool{"active": true, "expired": true, "error": true, "banned": true}
@@ -191,19 +243,7 @@ func (h *AdminBotAccountHandler) Update(w http.ResponseWriter, r *http.Request) 
 			h.vjudgeSvc.SetCookies(existing.Platform, req.SessionData)
 			slog.Info("bot cookies updated from session_data", "platform", existing.Platform)
 		} else if req.PlatformUser != nil || req.PlatformPass != nil {
-			go func() {
-				cookies, err := h.vjudgeSvc.Login(r.Context(), existing.Platform)
-				if err != nil {
-					slog.Error("bot auto-login failed after update", "platform", existing.Platform, "err", err)
-					return
-				}
-				if len(cookies) > 0 {
-					existing.SessionData = cookies
-					h.store.Update(r.Context(), id, existing)
-					h.vjudgeSvc.UpdateCookies(existing.Platform, cookies)
-					slog.Info("bot auto-login succeeded after update, cookies saved", "platform", existing.Platform)
-				}
-			}()
+			go h.autoLogin(context.WithoutCancel(r.Context()), *existing, id)
 		}
 	}
 

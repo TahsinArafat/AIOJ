@@ -216,9 +216,12 @@ export interface BotAccount {
     user_id: string
     platform: string
     platform_user: string
-    api_key?: string
-    api_secret?: string
-    session_data?: Record<string, string>
+    // Credentials never come back from the API. has_* says whether one is
+    // configured, so the edit form can offer "leave blank to keep" without
+    // ever receiving the secret.
+    has_api_key: boolean
+    has_api_secret: boolean
+    has_session_data: boolean
     status: string
     rate_limit_rps: number
     last_used_at?: string | null

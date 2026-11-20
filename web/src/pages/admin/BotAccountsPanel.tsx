@@ -10,10 +10,10 @@ interface BotAccount {
     user_id: string
     platform: string
     platform_user: string
-    platform_pass?: string
-    api_key?: string
-    api_secret?: string
-    session_data?: Record<string, string>
+    // Credentials are write-only: the server returns has_* flags instead.
+    has_api_key?: boolean
+    has_api_secret?: boolean
+    has_session_data?: boolean
     status: string
     rate_limit_rps: number
     proxy_url: string
@@ -118,11 +118,17 @@ export default function BotAccountsPanel() {
             user_id: bot.user_id,
             platform: bot.platform,
             platform_user: bot.platform_user || '',
+            // Never pre-fill a credential. The API no longer sends one — the
+            // form used to render the decrypted key straight into the page —
+            // and the placeholders below say what "blank" means.
             platform_pass: '',
-            api_key: bot.api_key || '',
+            api_key: '',
             api_secret: '',
             rate_limit_rps: String(bot.rate_limit_rps),
-            session_data: bot.session_data ? JSON.stringify(bot.session_data) : '',
+            // Blank, not pre-filled: the cookie jar is a live session credential
+            // and the API no longer returns it. The row below tells the admin
+            // whether one is already stored.
+            session_data: '',
             proxy_url: bot.proxy_url || '',
             proxy_enabled: bot.proxy_enabled || false,
         })

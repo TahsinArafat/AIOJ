@@ -296,6 +296,11 @@ func (s *BotAccountStore) scanBot(sc scanner) (model.BotAccount, error) {
 	if ba.SessionData, err = s.openSessionJSON(sd); err != nil {
 		return ba, err
 	}
+	// Presence flags are derived here, where the plaintext is in hand, so no
+	// handler has to know how to ask "is a secret set" without reading it.
+	ba.HasAPIKey = ba.APIKey != ""
+	ba.HasAPISecret = ba.APISecret != ""
+	ba.HasSessionData = len(ba.SessionData) > 0
 	return ba, nil
 }
 
