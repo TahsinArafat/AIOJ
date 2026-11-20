@@ -160,13 +160,23 @@ Change the values to **strong, random secrets**:
 ```env
 DB_PASSWORD=use-a-very-long-random-password-here-64-chars
 JWT_SECRET=another-very-long-random-string-different-from-above
+AI_CREDENTIAL_MASTER_KEY=a-base64-encoded-32-byte-key
 JUDGE_CONCURRENCY=4
 ```
 
 > **How to generate random secrets:**
 > ```bash
-> openssl rand -hex 32   # Generates a 64-character random hex string
+> openssl rand -hex 32      # JWT/CSRF/Metrics/DB/Redis (64 hex characters)
+> openssl rand -base64 32   # AI_CREDENTIAL_MASTER_KEY (exactly 32 bytes once decoded)
 > ```
+
+> **`AI_CREDENTIAL_MASTER_KEY` encrypts credentials at rest:** AI provider API
+> keys, and virtual-judge bot accounts (remote-platform passwords, API keys and
+> session cookies). It is required once any of those holds a secret — saving one
+> without it fails with 422, and the server refuses to start while plaintext
+> credentials are still in the database. **Back the key up with the database**:
+> losing it makes the stored ciphertext unreadable, and rotating it requires
+> re-entering every bot password.
 
 #### 5b. Update config.yaml
 

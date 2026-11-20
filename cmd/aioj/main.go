@@ -248,7 +248,28 @@ Restore from the pre-deploy dump if the schema is unrecoverable.`, err)
 	problemH := handler.NewProblemHandler(problemStore).WithUsers(userStore)
 	problemI18nH := handler.NewProblemI18nHandler(problemI18nStore, problemStore)
 
-	botAccountStore := postgres.NewBotAccountStore(db)
+	// Credential encryption is not AI-only: bot accounts hold third-party
+	// logins and API keys, and their store encrypts those on write. Parsing the
+	// key once, here, keeps the AI store and the bot store on the same box.
+	credentialKey, err := ai.ParseCredentialKey(cfg.AI.CredentialMasterKey)
+	if err != nil {
+		log.Fatalf("credential master key: %v", err)
+	}
+	var credentialBox *ai.CredentialBox
+	if len(credentialKey) > 0 {
+		credentialBox, err = ai.NewCredentialBox(credentialKey)
+		if err != nil {
+			log.Fatalf("credential encryption: %v", err)
+		}
+	}
+
+	botAccountStore := postgres.NewBotAccountStore(db, credentialBox)
+	// Rewrite rows written before this encryption existed. It fails closed: if
+	// plaintext credentials remain and no key is configured, startup aborts
+	// rather than keep serving secrets in the clear.
+	if err := botAccountStore.EncryptLegacyCredentials(ctx); err != nil {
+		log.Fatalf("bot credential migration: %v", err)
+	}
 	remoteLangStore := postgres.NewRemoteLanguageStore(db)
 	vjService := vjudge.NewService(submissionStore, problemStore, botAccountStore, remoteLangStore)
 
@@ -438,17 +459,8 @@ Restore from the pre-deploy dump if the schema is unrecoverable.`, err)
 		WithQueue(judgeQueue)
 	backupH := handler.NewAdminBackupHandler(userStore, cfg.Database, "./backups")
 
-	credentialKey, err := ai.ParseCredentialKey(cfg.AI.CredentialMasterKey)
-	if err != nil {
-		log.Fatalf("AI credential key: %v", err)
-	}
-	var credentialBox *ai.CredentialBox
-	if len(credentialKey) > 0 {
-		credentialBox, err = ai.NewCredentialBox(credentialKey)
-		if err != nil {
-			log.Fatalf("AI credential encryption: %v", err)
-		}
-	}
+	// credentialKey and credentialBox are built once near the bot-account store,
+	// which shares them.
 	aiModelStore := postgres.NewAIModelStore(db, credentialBox)
 	if cfg.AI.Enabled && len(credentialKey) == 0 {
 		log.Fatal("AI is enabled but AI_CREDENTIAL_MASTER_KEY is not configured")

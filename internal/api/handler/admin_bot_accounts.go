@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/tahsinarafat/aioj/internal/ai"
 	"github.com/tahsinarafat/aioj/internal/model"
 	"github.com/tahsinarafat/aioj/internal/store"
 	"github.com/tahsinarafat/aioj/internal/vjudge"
@@ -20,6 +21,20 @@ type AdminBotAccountHandler struct {
 
 func NewAdminBotAccountHandler(s store.BotAccountStore, vjSvc *vjudge.Service) *AdminBotAccountHandler {
 	return &AdminBotAccountHandler{store: s, vjudgeSvc: vjSvc}
+}
+
+// writeBotStoreError turns a store failure into a response.
+//
+// The one error worth distinguishing is the missing credential key: it is a
+// deployment mistake, not a server fault, and telling the admin to set
+// AI_CREDENTIAL_MASTER_KEY is more useful than a bare 500. Every other failure
+// stays opaque so a database error cannot leak schema details to the caller.
+func writeBotStoreError(w http.ResponseWriter, action string, err error) {
+	if errors.Is(err, ai.ErrEncryptionNotConfigured) {
+		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		return
+	}
+	http.Error(w, "failed to "+action+" bot account", http.StatusInternalServerError)
 }
 
 func (h *AdminBotAccountHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -88,7 +103,7 @@ func (h *AdminBotAccountHandler) Create(w http.ResponseWriter, r *http.Request) 
 		ProxyEnabled: req.ProxyEnabled,
 	}
 	if err := h.store.Create(r.Context(), ba); err != nil {
-		http.Error(w, "failed to create bot account: "+err.Error(), http.StatusInternalServerError)
+		writeBotStoreError(w, "create", err)
 		return
 	}
 
@@ -167,7 +182,7 @@ func (h *AdminBotAccountHandler) Update(w http.ResponseWriter, r *http.Request) 
 		existing.ProxyEnabled = *req.ProxyEnabled
 	}
 	if err := h.store.Update(r.Context(), id, existing); err != nil {
-		http.Error(w, "failed to update bot account", http.StatusInternalServerError)
+		writeBotStoreError(w, "update", err)
 		return
 	}
 
