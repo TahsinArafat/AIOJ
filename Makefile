@@ -134,9 +134,16 @@ e2e:
 
 
 # --- OpenAPI / CLI (Phase D) -----------------------------------------------
+#
+# Docs only. This target used to claim it generated web/src/lib/api-types.ts;
+# it never did (the file does not exist and nothing imports it), and the spec
+# covers 5 of 234 paths, so generated types would describe a fraction of the
+# client anyway. web/src/types/api.ts is the SPA's real contract and is
+# maintained by hand, deliberately.
 openapi:
 	@test -f docs/openapi/openapi.yaml
-	@command -v oapi-codegen >/dev/null 2>&1 && oapi-codegen -generate types -package apitypes docs/openapi/openapi.yaml > web/src/lib/api-types.ts || echo "spec ready: docs/openapi/openapi.yaml (install oapi-codegen for types)"
+	@echo "spec: docs/openapi/openapi.yaml (partial; coverage pinned by TestOpenAPICoversTheRouter)"
+	@echo "client types: web/src/types/api.ts (hand-maintained)"
 
 cli:
 	go build -o bin/aioj-cli ./cmd/aioj-cli

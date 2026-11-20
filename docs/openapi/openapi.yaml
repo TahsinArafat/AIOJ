@@ -3,8 +3,20 @@ info:
   title: AIOJ API
   version: 0.1.0
   description: |
-    AIOJ public HTTP API. This is a starter OpenAPI document for codegen
-    (`make openapi`) and client stubs — routes are extended as handlers land.
+    AIOJ public HTTP API.
+
+    PARTIAL BY DESIGN, AND HONESTLY SO. This document describes 5 of the 234
+    paths the server mounts. It is not the source of truth for the API: the
+    router (`internal/api/router_mount_*.go`) and the handlers are, and the
+    TypeScript shapes the SPA uses live in `web/src/types/api.ts`.
+
+    The gap is a ratchet, not an oversight. `TestOpenAPICoversTheRouter` in
+    `internal/api/` counts the mounted paths this document does not describe
+    and fails when that number grows, so an endpoint cannot be added without
+    someone deciding whether it belongs here. It can only shrink.
+
+    Client stubs generated from this file cover the documented subset only.
+    Treat anything absent as unspecified rather than as unavailable.
 servers:
   - url: http://localhost:8081
     description: local dev

@@ -1,6 +1,14 @@
-/** API response shapes generated from internal/model structs (JSON tags are the source
- * of truth; embedded structs are flattened as Go JSON does). Hand-maintained types for
- * responses not backed by internal/model structs follow the generated section.
+/** API response shapes for the SPA.
+ *
+ * HAND-MAINTAINED, not generated. It used to say "generated from internal/model
+ * structs", but no generator exists: there is no go:generate directive, no
+ * script, and `make openapi` writes to a file this one does not replace. The Go
+ * structs' JSON tags are the source of truth; keeping this file in step with
+ * them is a review responsibility, and nothing fails the build when they drift.
+ *
+ * Drift is the price of the shape being hand-written, so prefer deriving types
+ * from a single definition here (re-exports, shared unions) over restating a
+ * field in a second interface — a duplicate is what silently goes stale.
  */
 
 /**
@@ -67,7 +75,7 @@ export interface AIProposal {
 }
 export interface AIGenerationJob {
     id: string; actor_id: string; problem_id?: string; ai_model_id?: string; artifact_type: string
-    status: 'queued'|'running'|'ready'|'validation_failed'|'failed'|'cancelled'|'applied'|'discarded'
+    status: 'queued' | 'running' | 'ready' | 'validation_failed' | 'failed' | 'cancelled' | 'applied' | 'discarded'
     stage: string; progress: number; submitted_brief: AIBrief; normalized_brief: AIBrief
     proposal?: AIProposal; validation_report?: AIValidationReport; error_code?: string; error_message?: string
     prompt_tokens: number; completion_tokens: number; latency_ms: number
