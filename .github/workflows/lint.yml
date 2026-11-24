@@ -17,10 +17,19 @@ env:
   # It exists because the linters were, in practice, never run against main:
   # .golangci.yml scoped issues to `new-from-merge-base: main`, and on a push to
   # main that merge base is HEAD, so the diff is empty and the job reported
-  # "0 issues" by construction. Without the filter main reported 417 at the
-  # commit before this one — errcheck 383, staticcheck 17, unused 12,
-  # ineffassign 5 — of which the staticcheck one in admin_bot_accounts.go is
-  # fixed here, leaving 416.
+  # "0 issues" by construction. Without the filter the commit before this one
+  # reported 417 — errcheck 383, staticcheck 17, unused 12, ineffassign 5 — of
+  # which the staticcheck one in admin_bot_accounts.go is fixed here, leaving
+  # 416. That figure is darwin/arm64; see the GOOS note below.
+  #
+  # MEASURE WITH GOOS=linux. The count is not the same on every platform, because
+  # //go:build files differ: internal/judge/pressure/sampler_linux.go exists only
+  # on Linux, and its `defer f.Close()` was the 417th finding here while a darwin
+  # run reported 416 and could never see it. Measuring on the laptop therefore
+  # under-reports by however much platform-specific code adds, and the ratchet
+  # fails on the next commit that touches nothing at all:
+  #
+  #   GOOS=linux GOARCH=amd64 golangci-lint run --timeout=10m
   #
   # Most of errcheck is the `defer rows.Close()` class (126 rows.Close, 46
   # resp.Body.Close, 18 tx.Rollback), which is debt in the sense that matters

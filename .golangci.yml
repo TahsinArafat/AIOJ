@@ -44,11 +44,14 @@ issues:
   # baseline instead of failing outright. Both figures are measured with the
   # versions CI pins — Go 1.26.2, golangci-lint v2.1.6 — via:
   #
-  #   golangci-lint run --timeout=10m
+  #   GOOS=linux GOARCH=amd64 golangci-lint run --timeout=10m
+  #
+  # GOOS matters: //go:build files differ by platform, so a darwin run cannot
+  # see findings in Linux-only files and under-reports the count CI judges.
   #
   #   with the filter:     0 issues (by construction)
   #   without it:        417 issues
-  #                        errcheck 383, staticcheck 17, unused 12, ineffassign 5
+  #                        errcheck 384, staticcheck 16, unused 12, ineffassign 5
   #
   # The toolchain matters more than it looks. A linter built with a newer Go
   # than the module declares reports ~50 bogus `typecheck` errors about stdlib
