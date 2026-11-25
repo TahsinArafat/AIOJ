@@ -96,20 +96,32 @@ func main() {
 			// process exits, so the message has to say what to do rather than
 			// only what broke. Reverting the image does not help: the failure
 			// lives in the schema, not the binary.
+			//
+			// The repair step is a real command rather than "resolve it by hand":
+			// `migrate force N` is the documented remedy, but N is the one value
+			// an operator cannot derive, and a wrong N writes a version row that
+			// makes every later deploy look migrated when it is not. Editing
+			// schema_migrations directly is the last resort, so it is labelled
+			// that way.
 			log.Fatalf(`failed to apply migrations: %v
 
 The service will not start against this schema. To recover:
 
-  1. Inspect:   SELECT version, dirty FROM schema_migrations;
-  2. If dirty:  resolve the named migration by hand, then
-                  DELETE FROM schema_migrations;
-                  INSERT INTO schema_migrations (version, dirty) VALUES (<last good>, false);
-                (golang-migrate has no repair CLI here; this is the equivalent.)
-  3. Or set database.migrate_auto_recover: true to let startup retry a migration
-     that failed at the newest version — it is safe because a failed migration
-     rolls back atomically. A dirty version *below* the newest is always refused.
+  1. Inspect:  go run ./cmd/migrate status        (or: make migrate-status)
+  2. If it says DIRTY, run: go run ./cmd/migrate repair
+     Repair only clears a version that is provably safe to clear — the newest
+     migration on disk, or one that no longer exists. Anything else is refused
+     with the reason, because a dirty version in the middle of the sequence
+     means the schema's real shape is unknown.
+  3. Then redeploy, or: go run ./cmd/migrate up
+  4. To let startup do this itself, set database.migrate_auto_recover: true.
+     Leave it false to keep inspecting failures by hand.
 
-Restore from the pre-deploy dump if the schema is unrecoverable.`, err)
+Last resort, only if repair refused and you have read the schema yourself:
+  DELETE FROM schema_migrations;
+  INSERT INTO schema_migrations (version, dirty) VALUES (<last good>, false);
+That asserts a version you chose. Restore from the pre-deploy dump if the
+schema is unrecoverable.`, err)
 		}
 		if res.Applied > 0 || res.Recovered {
 			slog.Info("database migrations applied",

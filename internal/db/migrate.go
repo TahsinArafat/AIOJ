@@ -73,7 +73,7 @@ func Migrate(m *migrate.Migrate, dir string, autoRecover bool) (Result, error) {
 				"database is dirty at version %d: a migration failed partway and must be "+
 					"resolved by hand, or set database.migrate_auto_recover to retry it", version)
 		}
-		if repairErr := repairDirty(m, dir, version); repairErr != nil {
+		if repairErr := RepairDirty(m, dir, version); repairErr != nil {
 			return res, repairErr
 		}
 		res.Recovered = true
@@ -107,9 +107,15 @@ func Migrate(m *migrate.Migrate, dir string, autoRecover bool) (Result, error) {
 	return res, nil
 }
 
-// repairDirty clears a dirty flag, but only for the two shapes that are known to
+// RepairDirty clears a dirty flag, but only for the two shapes that are known to
 // be safe. See Migrate.
-func repairDirty(m *migrate.Migrate, dir string, version uint) error {
+//
+// Exported because cmd/migrate needs the same refusal rule: `migrate force N` is
+// the documented remedy for a dirty schema, but N is exactly what an operator
+// does not know, and a wrong N writes a version row that lies about the schema.
+// Keeping one implementation means the CLI and the startup path cannot disagree
+// about which repairs are safe.
+func RepairDirty(m *migrate.Migrate, dir string, version uint) error {
 	latest, ok := latestVersion(dir)
 	if !ok {
 		// Without knowing the newest migration there is no way to tell a safe

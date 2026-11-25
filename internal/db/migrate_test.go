@@ -5,6 +5,11 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/golang-migrate/migrate/v4"
+	dbstub "github.com/golang-migrate/migrate/v4/database/stub"
+	"github.com/golang-migrate/migrate/v4/source"
+	"github.com/golang-migrate/migrate/v4/source/stub"
 )
 
 // writeMigrations lays out a source directory with n versioned migrations.
@@ -97,5 +102,89 @@ func TestLatestVersionHandlesGaps(t *testing.T) {
 	got, ok := latestVersion(dir)
 	if !ok || got != 42 {
 		t.Fatalf("latestVersion = %d (ok=%v), want 42", got, ok)
+	}
+}
+
+// stubMigrate builds a Migrate over the in-memory stub drivers, so the repair
+// rules can be asserted without a database.
+//
+// Two sources have to agree, because RepairDirty consults both: the stub source
+// drives Force, and the on-disk directory is what latestVersion reads to decide
+// whether a version is the newest. Seeding only one of them makes the refusal
+// fire for the wrong reason — "the migration set could not be read" instead of
+// the rule under test.
+func stubMigrate(t *testing.T, onDisk []uint, recorded int, dirty bool) (*migrate.Migrate, string) {
+	t.Helper()
+
+	dir := t.TempDir()
+	if n := len(onDisk); n > 0 {
+		// writeMigrations lays out 1..n, so the versions must be contiguous —
+		// which every case here uses.
+		writeMigrations(t, dir, n)
+	}
+
+	src := &stub.Stub{Migrations: source.NewMigrations()}
+	for _, v := range onDisk {
+		src.Migrations.Append(&source.Migration{Version: v, Identifier: fmt.Sprintf("m%d", v)})
+	}
+	drv := &dbstub.Stub{}
+	if err := drv.SetVersion(recorded, dirty); err != nil {
+		t.Fatalf("seed recorded version: %v", err)
+	}
+
+	m, err := migrate.NewWithInstance("stub", src, "stub", drv)
+	if err != nil {
+		t.Fatalf("new migrate: %v", err)
+	}
+	t.Cleanup(func() { _, _ = m.Close() })
+	return m, dir
+}
+
+// A dirty version below the newest is the dangerous case: the migrations after
+// it may or may not have run, so clearing the flag asserts a schema shape nobody
+// checked. It must be refused.
+func TestRepairDirtyRefusesVersionBelowNewest(t *testing.T) {
+	m, dir := stubMigrate(t, []uint{1, 2, 3}, 2, true)
+	err := RepairDirty(m, dir, 2)
+	if err == nil {
+		t.Fatal("RepairDirty accepted a dirty version below the newest")
+	}
+}
+
+// The newest version is the interrupted-migration case: it rolled back, so the
+// schema sits at version-1 and the migration can run again.
+func TestRepairDirtyRetriesNewestVersion(t *testing.T) {
+	m, dir := stubMigrate(t, []uint{1, 2, 3}, 3, true)
+	if err := RepairDirty(m, dir, 3); err != nil {
+		t.Fatalf("RepairDirty(newest) = %v, want nil", err)
+	}
+	v, dirty, err := m.Version()
+	if err != nil {
+		t.Fatalf("version after repair: %v", err)
+	}
+	if dirty {
+		t.Error("still dirty after repairing the newest version")
+	}
+	if v != 2 {
+		t.Errorf("version = %d, want 2 (one below the interrupted migration)", v)
+	}
+}
+
+// A version with no migration on disk was renumbered or deleted. Nothing to
+// retry, so it clears to the newest.
+func TestRepairDirtyClearsVersionNotOnDisk(t *testing.T) {
+	m, dir := stubMigrate(t, []uint{1, 2, 3}, 99, true)
+	if err := RepairDirty(m, dir, 99); err != nil {
+		t.Fatalf("RepairDirty(unknown) = %v, want nil", err)
+	}
+	v, dirty, err := m.Version()
+	if err != nil {
+		t.Fatalf("version after repair: %v", err)
+	}
+	if dirty {
+		t.Error("still dirty after clearing a version that no longer exists")
+	}
+	if v != 3 {
+		t.Errorf("version = %d, want 3 (the newest on disk)", v)
 	}
 }

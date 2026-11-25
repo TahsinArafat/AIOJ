@@ -10,6 +10,8 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
+
+	schemadb "github.com/tahsinarafat/aioj/internal/db"
 )
 
 func main() {
@@ -22,7 +24,7 @@ func main() {
 
 	cmd := flag.Arg(0)
 	if cmd == "" {
-		log.Fatal("usage: migrate [-dir <path>] <up|down|steps N|version|status|force N>")
+		log.Fatal("usage: migrate [-dir <path>] <up|down|steps N|version|status|force N|repair>")
 	}
 
 	m, err := migrate.New("file://"+*dir, dsn)
@@ -106,7 +108,41 @@ func main() {
 		}
 		log.Printf("forced version to %d", n)
 
+	case "repair":
+		// The startup path repairs a dirty version before failing, but only when
+		// the operator has opted in; a deployment that has not is left with a
+		// fatal error and no command to run. `migrate force N` is the documented
+		// remedy in the usage string, but N is the one thing an operator does not
+		// know — and guessing it wrong writes a false version row.
+		//
+		// This applies the same two provably-safe cases as the startup repair,
+		// in the same order, and refuses everything else. The refusal is the
+		// feature: it is the only thing standing between a guess and a schema
+		// whose real shape nobody checked.
+		if !dirtyAt(m) {
+			log.Fatal("repair: schema is not dirty; nothing to do")
+		}
+		v, _, err := m.Version()
+		if err != nil {
+			log.Fatalf("repair: read version: %v", err)
+		}
+		if err := schemadb.RepairDirty(m, *dir, v); err != nil {
+			log.Fatalf("repair: %v", err)
+		}
+		log.Printf("repaired dirty version %d; run 'up' next", v)
+
 	default:
-		log.Fatalf("unknown command: %q\nUsage: migrate [-dir path] <up|down|steps N|version|status|force N>", cmd)
+		log.Fatalf("unknown command: %q\nUsage: migrate [-dir path] <up|down|steps N|version|status|force N|repair>", cmd)
 	}
+}
+
+// dirtyAt reports the dirty flag without treating "no version yet" as an error:
+// a database with no migrations applied is clean, and repair has nothing to do
+// there.
+func dirtyAt(m *migrate.Migrate) bool {
+	_, dirty, err := m.Version()
+	if err != nil {
+		return false
+	}
+	return dirty
 }
