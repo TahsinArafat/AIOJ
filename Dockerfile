@@ -1,3 +1,19 @@
+# Full-toolchain image (g++, java, rustc, node, python3 in the runtime stage).
+# 2.03 GB vs 146 MB for Dockerfile.api — measured 2026-11-25.
+#
+# NOTHING in docker-compose.yml / .dokploy.yml / .sim.yml builds this any more,
+# and nothing should: no AIOJ process compiles locally. `internal/judge/compiler`
+# posts the lang/*.yaml `compile` argv to go-judge, which runs it against
+# Dockerfile.judge's filesystem, and `grep -rn exec.Command internal/judge/`
+# finds nothing. Every service that used to build this now uses Dockerfile.api.
+#
+# It is also a strict subset of Dockerfile.judge: it ships no mono, no pypy3 and
+# no clang, so C# / PyPy / C++-Clang could never have worked from here anyway.
+#
+# Dead configuration. Kept only because an external deploy may name this path
+# directly; deleting it is the cleanup, but confirm nothing outside the repo
+# (Dokploy UI, a CI job) still points at it first.
+#
 # Stage 1: Build the backend
 FROM golang:1.26-alpine AS builder
 RUN apk add --no-cache git

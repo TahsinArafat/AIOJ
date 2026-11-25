@@ -115,7 +115,7 @@ AIOJ is a monolith with a clear separation between the API server and dedicated 
 | Decision | Why |
 |----------|-----|
 | **Monolith + separate worker mode** | One binary, `--mode=server\|judge-worker`. Only workers consume the judge queue, so the API never silently becomes a second decider. |
-| **Compilers in the backend image** | `go-judge` is distroless and only executes; compilation (g++, python3, java, rustc, node) happens in the backend/judge-worker image. |
+| **Toolchain lives only in the judge image** | `go-judge` is not distroless — `Dockerfile.judge` installs g++, python3, java, rustc, node and the `/lib32` mount, because the sandbox is what runs the compile argv. No AIOJ process compiles locally (`internal/judge/compiler` only POSTs to `JUDGE_ENDPOINT`), so backend, `judge-worker` and `ai-harness` all run the lean `Dockerfile.api`. |
 | **Redis-backed queue** | Enables multiple `judge-worker` replicas. Includes claim-token fencing and a reclaimer for stale claims. |
 | **Pluggable contest formats** | `internal/contest/format/` registry — adding a scoring rule means adding one package, not editing the core. |
 | **Store interfaces** | `internal/store/interfaces.go` defines contracts; `internal/store/postgres/` implements them, keeping handlers testable. |
@@ -207,8 +207,13 @@ Wait a few seconds for PostgreSQL and the judge sandbox to initialize. The backe
 |---------|------|---------|
 | Frontend (nginx) | 80 | React SPA |
 | Backend (Go) | 8080 | REST API + WebSocket |
-| Prometheus | 127.0.0.1:9090 | Query UI (scrapes `/metrics` with `METRICS_TOKEN`) |
-| Grafana | 127.0.0.1:3000 | Dashboards (login required) |
+| Prometheus | 127.0.0.1:9090 | Query UI (scrapes `/metrics` with `METRICS_TOKEN`) — `--profile monitor` only |
+| Grafana | 127.0.0.1:3000 | Dashboards (login required) — `--profile monitor` only |
+
+The monitoring pair is opt-in: `docker compose --profile monitor up -d`. Without
+the profile they simply do not start (two containers and their idle RSS, and two
+images to pull and patch, saved); `/metrics` on the backend is unaffected either
+way.
 
 PostgreSQL (5432), Redis (6379) and go-judge (5050) are **not published** by
 `docker-compose.yml`: they are reachable only from other containers on the
@@ -373,7 +378,7 @@ POST /api/submissions
 
 1. The submission is stored with `status = pending` and pushed onto the judge queue.
 2. A **judge worker** claims it with a fencing token. Only `--mode=judge-worker` processes consume the queue.
-3. The worker **compiles** the source in the backend image (compilers are *not* in the distroless judge container).
+3. The worker **compiles** by posting the language's `compile` argv to `go-judge`, which runs it inside the judge image (the only image with a toolchain — workers ship none).
 4. Each test case is executed in the **go-judge sandbox** with input piped and limits enforced by cgroup.
 5. Output is verified by the configured **checker** (exact, lines, float, sorted, unordered, …).
 6. The verdict is persisted and pushed to the client over **WebSocket** in real time.
@@ -500,7 +505,7 @@ The full, beginner-friendly VPS guide (VPS + domain + HTTPS with Caddy or Nginx,
 | `502 Bad Gateway` | Backend container down | `docker compose ps` — all services should be `Up`. |
 | Migrations fail on boot | DB not ready | Wait longer; check `docker compose logs postgres`. |
 | Migration stuck **dirty** | A failed migration left partial state | `docker compose exec postgres psql -U aioj -d aioj -c "UPDATE schema_migrations SET version=<n>, dirty=false"`. |
-| Judge always `CE` | Compiler missing in backend image | Compilers live in the **backend** image, not distroless go-judge. Rebuild `backend`. |
+| Judge always `CE` | Compiler missing in the **judge** image | The toolchain lives in `Dockerfile.judge`, not in backend/worker. Rebuild `judge`; `lang_image_test.go` checks `lang/*.yaml` paths against that Dockerfile. |
 | Submissions stuck `pending` | No judge worker consuming the queue | Ensure a `judge-worker` (or `--mode=judge-worker`) process is running and shares `REDIS_URL`. |
 | CF submission → `SE` / `System Error` | cf-submit unreachable, bot locked, or Cloudflare blocked | Check `curl localhost:8003/health` → `"proxy":true`. Reset a locked bot: `UPDATE bot_accounts SET consecutive_failures=0, status='active'`. |
 | `dial tcp ...:8003: i/o timeout` | UFW blocking Docker→host traffic | `sudo ufw allow from 172.16.0.0/12 to any port 8003 proto tcp && sudo ufw reload`. |

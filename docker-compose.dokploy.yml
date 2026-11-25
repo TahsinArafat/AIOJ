@@ -247,7 +247,9 @@ services:
   judge-worker:
     build:
       context: .
-      dockerfile: Dockerfile
+      # Lean image: this process never compiles. Compiles are argv posted to
+      # go-judge (JUDGE_ENDPOINT), whose image holds the only toolchain.
+      dockerfile: Dockerfile.api
     extra_hosts:
       - "host.docker.internal:host-gateway"
     command: /app/aioj --mode=judge-worker
@@ -391,7 +393,8 @@ services:
   seeder:
     build:
       context: .
-      dockerfile: Dockerfile
+      # Lean image: cmd/seed is a DB writer, it never compiles.
+      dockerfile: Dockerfile.api
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
@@ -427,7 +430,8 @@ services:
     profiles: ["ai"]
     build:
       context: .
-      dockerfile: Dockerfile
+      # Lean image: the harness dispatches to go-judge, it does not compile.
+      dockerfile: Dockerfile.api
     extra_hosts:
       - "host.docker.internal:host-gateway"
     command: /app/aioj --mode=ai-harness

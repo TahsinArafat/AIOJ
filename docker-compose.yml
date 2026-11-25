@@ -114,9 +114,10 @@ services:
     build:
       context: .
       # Lean image: Go binary + PostgreSQL client only. No compilers (g++,
-      # java, rust, node) because --mode=server never compiles code — only
-      # judge-worker containers do. Saves ~600–900 MB RSS vs the full
-      # Dockerfile while keeping the full image available for workers.
+      # java, rust, node) because no AIOJ process ever compiles locally — every
+      # compile is an argv POST to go-judge, which runs it against the judge
+      # image's toolchain. Image 146 MB vs 2.03 GB for the full Dockerfile
+      # (both measured); the saving is on disk and pull time, not RSS.
       dockerfile: Dockerfile.api
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -199,7 +200,9 @@ services:
     profiles: ["ai"]
     build:
       context: .
-      dockerfile: Dockerfile
+      # Lean image for the same reason as judge-worker: the harness composes
+      # and posts jobs, it does not compile. Compiles reach go-judge as argv.
+      dockerfile: Dockerfile.api
     extra_hosts:
       - "host.docker.internal:host-gateway"
     command: /app/aioj --mode=ai-harness
@@ -234,7 +237,13 @@ services:
   judge-worker:
     build:
       context: .
-      dockerfile: Dockerfile
+      # Lean image, same reason as backend. The worker never runs a compiler:
+      # compiler.Compiler posts the lang/*.yaml `compile` argv to go-judge over
+      # JUDGE_ENDPOINT, and nothing under internal/judge/ calls exec.Command, so
+      # g++/java/rustc/node/python3 in this container could never be invoked.
+      # The toolchain lives in exactly one image — Dockerfile.judge, whose
+      # filesystem is what the sandbox command actually runs against.
+      dockerfile: Dockerfile.api
     extra_hosts:
       - "host.docker.internal:host-gateway"
     command: /app/aioj --mode=judge-worker
@@ -325,7 +334,12 @@ services:
       - backend
     restart: unless-stopped
 
+  # Monitoring stack — opt-in via `docker compose --profile monitor up -d`.
+  # Both were un-gated, so every deployment pulled and ran two extra images for
+  # zero platform function. The in-process /metrics endpoint stays either way;
+  # this only gates the scrapers and the dashboards UI.
   prometheus:
+    profiles: ["monitor"]
     image: prom/prometheus:latest
     volumes:
       - ./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
@@ -344,6 +358,7 @@ services:
     restart: unless-stopped
 
   grafana:
+    profiles: ["monitor"]
     image: grafana/grafana:latest
     volumes:
       - ./deploy/grafana/datasources:/etc/grafana/provisioning/datasources:ro

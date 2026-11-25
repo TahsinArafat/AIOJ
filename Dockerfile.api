@@ -1,8 +1,13 @@
-# Lean API image — for the backend service only (--mode=server).
+# Lean runtime image — used by every AIOJ process that does not execute a
+# sandbox command: backend (--mode=server), --mode=judge-worker and
+# --mode=ai-harness.
 #
-# The API server never compiles code: compilation happens in judge-worker
-# containers that use the full Dockerfile. Keeping compilers out of this image
-# saves ~600–900 MB of RSS per backend replica and shrinks the attack surface.
+# None of them compiles code. `internal/judge/compiler` posts the language's
+# `compile` argv to go-judge over JUDGE_ENDPOINT and the sandbox runs it against
+# the judge image's filesystem; nothing under internal/judge/ calls exec.Command.
+# So compilers belong in Dockerfile.judge alone. Image is 146 MB vs 2.03 GB for
+# the full Dockerfile (both measured) — that is a disk/pull-time saving, not an
+# RSS one: an idle Go process does not care which packages are installed.
 #
 # Build stages reuse the same builder and rustengine layers as Dockerfile so
 # Docker layer-caches them across both images when built together.
@@ -40,12 +45,12 @@ RUN touch src/*.rs && \
 #   postgresql18-client — pg_dump for the backup handler
 #   bash             — startup script compatibility
 #
-# What is NOT included (vs full Dockerfile):
-#   g++ gcc make musl-dev  — C/C++ compilation (judge-worker only)
-#   python3                — Python execution (judge-worker only)
-#   openjdk21-jdk          — Java compilation/execution (judge-worker only)
-#   rust cargo             — Rust compilation (judge-worker only)
-#   nodejs npm             — JS execution (judge-worker only)
+# What is NOT included (vs Dockerfile.judge, the only toolchain-bearing image):
+#   g++ gcc make musl-dev  — C/C++ compilation (judge sandbox only)
+#   python3                — Python execution (judge sandbox only)
+#   openjdk21-jdk          — Java compilation/execution (judge sandbox only)
+#   rust cargo             — Rust compilation (judge sandbox only)
+#   nodejs npm             — JS execution (judge sandbox only)
 FROM alpine:3.19
 RUN apk add --no-cache ca-certificates tzdata bash
 RUN apk add --no-cache --repository=https://dl-cdn.alpinelinux.org/alpine/edge/main postgresql18-client

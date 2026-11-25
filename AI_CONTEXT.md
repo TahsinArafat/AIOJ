@@ -224,7 +224,7 @@ docker compose exec postgres psql -U aioj -d aioj \
 
 4. **`virtual.GetStatus()`**: Was using `time.Until()` ignoring the `now` parameter. Fixed to use `endsAt.Sub(now)`.
 
-5. **Compiler not found**: go-judge container is distroless. Compilers MUST be installed in the backend container (Dockerfile line 12).
+5. **Compiler not found**: the toolchain lives in the **judge** image (`Dockerfile.judge`), not the backend or worker. `internal/judge/compiler` never calls `exec.Command` — it POSTs the `lang/*.yaml` `compile` argv to `JUDGE_ENDPOINT`, and go-judge runs it against the judge container's filesystem. Installing compilers anywhere else is dead weight (`Dockerfile.api` is deliberately compiler-free and is used by backend, `judge-worker` and `ai-harness`).
 
 6. **Sample cases**: The API accepts `sample_cases: null` — this is fine. The problem store stores them as JSONB.
 
@@ -268,7 +268,9 @@ web/src/i18n/                    i18n config + EN/BN locales
 
 ### Infrastructure
 ```
-Dockerfile                       Backend build + run
+Dockerfile                       Full-toolchain build — unused by compose (see header)
+Dockerfile.api                   Lean image: backend, judge-worker, ai-harness, seeder
+Dockerfile.judge                 go-judge + the only compiler toolchain
 web/Dockerfile                   Frontend build
 docker-compose.yml               All services
 deploy/prometheus/               Monitoring config

@@ -55,7 +55,8 @@ services:
   seeder:
     build:
       context: .
-      dockerfile: Dockerfile
+      # Lean image: cmd/seed is a DB writer, it never compiles.
+      dockerfile: Dockerfile.api
     entrypoint: [ "/app/seed" ]
     command: []
     dns:
