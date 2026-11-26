@@ -90,6 +90,10 @@ func (ir *InteractiveRunner) Run(ctx context.Context, in RunInput) (RunOutput, e
 			contestantArgs = []string{compiler.SandboxWorkDir + "/Main"}
 			contestantRunCopyIn["Main"] = compiledBin
 		}
+		// Interactive problems recurse just like batch ones, so the contestant's
+		// stack cap is raised here too. The pair runs as one sandbox request, so
+		// this wraps only the contestant's argv, never the interactor's.
+		contestantArgs = withStackLimit(contestantArgs, cfg)
 
 		interArgs := []string{compiler.SandboxWorkDir + "/interactor"}
 		if inputContent != "" {

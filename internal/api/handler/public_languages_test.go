@@ -105,7 +105,7 @@ func TestPublicLanguagesOmitSandboxPaths(t *testing.T) {
 	for _, lang := range raw.Data {
 		for _, leaked := range []string{"compile", "runtime", "copy_in", "seccomp_rule"} {
 			if _, ok := lang[leaked]; ok {
-				t.Errorf("response exposes %q; only key/name/extensions belong on the public list", leaked)
+				t.Errorf("response exposes %q; only key/name/extensions and the resource limits belong on the public list", leaked)
 			}
 		}
 	}
@@ -147,5 +147,53 @@ func TestPublicLanguagesFailLoudlyOnMissingDirectory(t *testing.T) {
 
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("status = %d, want 500 for a missing lang directory", rec.Code)
+	}
+}
+
+// The problem page has to show the limit a submission is really judged under,
+// and that is the problem's own limit scaled by the language's multipliers. The
+// endpoint used to publish key/name/extensions only, so the page could only
+// render the raw problem row — which is not what the sandbox enforces.
+func TestPublicLanguagesPublishTheMultipliers(t *testing.T) {
+	dir := t.TempDir()
+	body := "name: Java\nkey: java\ncompile: /usr/bin/javac -d {{dir}} {{src}}\n" +
+		"runtime: /usr/bin/java -cp {{dir}} Main\ntime_limit_multiplier: 2\n" +
+		"memory_limit_multiplier: 2.5\nstack_limit_kb: 262144\nextensions: [.java]\n"
+	if err := os.WriteFile(filepath.Join(dir, "java.yaml"), []byte(body), 0644); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	got := listPublicLanguages(t, dir)
+	if len(got) != 1 {
+		t.Fatalf("got %d languages, want 1", len(got))
+	}
+	if got[0].TimeLimitMultiplier != 2 {
+		t.Errorf("time_limit_multiplier = %v, want 2", got[0].TimeLimitMultiplier)
+	}
+	if got[0].MemoryLimitMultiplier != 2.5 {
+		t.Errorf("memory_limit_multiplier = %v, want 2.5", got[0].MemoryLimitMultiplier)
+	}
+	if got[0].StackLimitKB != 262144 {
+		t.Errorf("stack_limit_kb = %v, want 262144", got[0].StackLimitKB)
+	}
+}
+
+// A config saved before the multipliers existed leaves them at 0, and a 0×
+// multiplier would render as "0 s" on every problem page. 1.0 is the honest
+// reading of "unset" and matches what the admin handlers store.
+func TestPublicLanguagesDefaultUnsetMultipliersToOne(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "weird.yaml"),
+		[]byte("name: Weird\nkey: weird\n"), 0644); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	got := listPublicLanguages(t, dir)
+	if got[0].TimeLimitMultiplier != 1 || got[0].MemoryLimitMultiplier != 1 {
+		t.Errorf("multipliers = %v/%v, want 1/1 for a config that sets neither",
+			got[0].TimeLimitMultiplier, got[0].MemoryLimitMultiplier)
+	}
+	if got[0].StackLimitKB != 0 {
+		t.Errorf("stack_limit_kb = %v, want 0 (sandbox default) when unset", got[0].StackLimitKB)
 	}
 }

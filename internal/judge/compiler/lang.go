@@ -28,6 +28,11 @@ type LangConfig struct {
 	Extensions            []string          `yaml:"extensions" json:"extensions"`
 	Mono                  bool              `yaml:"mono,omitempty" json:"mono"`
 	Runtime               string            `yaml:"runtime,omitempty" json:"runtime"`
+	// StackLimitKB caps the contestant process's call stack, in kilobytes. 0
+	// means "leave the sandbox default alone" — go-judge inherits its own
+	// rlimit, which is far smaller than any competitive-programming stack, so a
+	// deep recursion segfaults at a few MB regardless of the memory limit.
+	StackLimitKB int `yaml:"stack_limit_kb,omitempty" json:"stack_limit_kb,omitempty"`
 }
 
 func LoadLanguages(dir string) (map[string]*LangConfig, error) {

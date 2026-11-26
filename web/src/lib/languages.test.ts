@@ -2,6 +2,7 @@ import { expect, test } from 'vitest'
 import {
   FALLBACK_LANGUAGES,
   LANGUAGE_OPTIONS,
+  effectiveLimits,
   languageName,
   languageOptions,
   languageTemplate,
@@ -132,4 +133,74 @@ test('a name omitted by the server degrades to the key rather than an empty labe
 test('languageName accepts an explicit list, so pages that fetched can resolve renamed keys', () => {
   const langs = toLanguages([{ key: 'python', name: 'Python 3.12', extensions: ['.py'] }])
   expect(languageName('python', langs)).toBe('Python 3.12')
+})
+
+// --- Effective limits -------------------------------------------------------
+//
+// The problem page showed the problem's own row while the judge enforced that
+// row scaled by the language's multipliers, so a Java submission to a "256 MB"
+// problem was killed at 512 MB with the page still claiming 256. These pin the
+// arithmetic to judge.WorkerPool.getEffectiveLimits.
+
+const java = toLanguages([{
+  key: 'java',
+  name: 'Java',
+  extensions: ['.java'],
+  time_limit_multiplier: 2,
+  memory_limit_multiplier: 2,
+  stack_limit_kb: 262144,
+}])[0]
+
+test('a language multiplier scales the problem limits', () => {
+  const got = effectiveLimits({ time_limit: 1000, memory_limit: 262144 }, 'java', [java])
+
+  expect(got.timeLimitMs).toBe(2000)
+  expect(got.memoryLimitKB).toBe(524288)
+  expect(got.stackLimitKB).toBe(262144)
+})
+
+test('C++ gets exactly what the problem says', () => {
+  const cpp = toLanguages([{
+    key: 'cpp-gpp-64', name: 'C++', extensions: ['.cpp'],
+    time_limit_multiplier: 1, memory_limit_multiplier: 1, stack_limit_kb: 0,
+  }])[0]
+
+  const got = effectiveLimits({ time_limit: 1500, memory_limit: 262144 }, 'cpp-gpp-64', [cpp])
+
+  expect(got.timeLimitMs).toBe(1500)
+  expect(got.memoryLimitKB).toBe(262144)
+  // 0 means the sandbox default applies, and the page must not advertise a
+  // stack limit the platform never promised.
+  expect(got.stackLimitKB).toBe(0)
+})
+
+test('a per-problem override replaces the base before the multiplier', () => {
+  const got = effectiveLimits(
+    { time_limit: 2000, memory_limit: 2097152 },
+    'java',
+    [java],
+    [{ language_id: 'java', memory_limit_kb: 1048576 }],
+  )
+
+  // 1048576 × 2.0, not 2097152 × 2.0: the override is the new base.
+  expect(got.memoryLimitKB).toBe(2097152)
+  expect(got.timeLimitMs).toBe(4000)
+})
+
+test('an unknown language leaves the problem limits as they are', () => {
+  const got = effectiveLimits({ time_limit: 1000, memory_limit: 262144 }, 'brainfuck', [java])
+
+  expect(got).toEqual({ timeLimitMs: 1000, memoryLimitKB: 262144, stackLimitKB: 0 })
+})
+
+test('rows without multipliers do not render a zero limit', () => {
+  // An older backend omits the fields; a 0× multiplier would show "0 s".
+  const [lang] = toLanguages([{ key: 'rust', name: 'Rust', extensions: ['.rs'] }])
+
+  expect(lang.limits).toEqual({
+    time_limit_multiplier: 1,
+    memory_limit_multiplier: 1,
+    stack_limit_kb: 0,
+  })
+  expect(effectiveLimits({ time_limit: 1000, memory_limit: 262144 }, 'rust', [lang]).timeLimitMs).toBe(1000)
 })

@@ -80,6 +80,43 @@ func TestRunShellCommandCapturesCompilerStderr(t *testing.T) {
 	}
 }
 
+// The scratchpad must judge under the same stack cap a submission gets, or it
+// disagrees with the judge on exactly the deep-recursion cases a contestant is
+// using it to debug.
+func TestRunShellCommandAppliesTheStackLimit(t *testing.T) {
+	cfg := &compiler.LangConfig{
+		CompileCmd:   "/usr/bin/g++ -O2 -o {{exe}} {{src}}",
+		Extensions:   []string{".cpp"},
+		StackLimitKB: 262144,
+	}
+
+	got := runShellCommand(cfg, "Main.cpp")
+
+	if !strings.Contains(got, "ulimit -s 262144") {
+		t.Fatalf("stack limit missing:\n%s", got)
+	}
+	// The cap must apply to the program only. A limit set before the compile
+	// would also be inherited by g++, which needs a normal stack to run at all.
+	if at := strings.Index(got, "ulimit -s"); at > strings.Index(got, "g++") {
+		t.Errorf("stack limit is set before the compile runs:\n%s", got)
+	}
+	// Ungrouped, the `;` would also apply the limit to anything the caller
+	// appends after the program.
+	if !strings.Contains(got, "{ ulimit -s 262144; ") {
+		t.Errorf("stack limit is not scoped to the run:\n%s", got)
+	}
+}
+
+// A language with no stack_limit_kb keeps the sandbox default; the command must
+// be byte-identical to what it was before the knob existed.
+func TestRunShellCommandLeavesTheCommandAloneWithoutAStackLimit(t *testing.T) {
+	cfg := &compiler.LangConfig{Runtime: "/usr/bin/python3", Extensions: []string{".py"}}
+
+	if got := runShellCommand(cfg, "Main.py"); got != "/usr/bin/python3 Main.py < input.txt > output.txt 2> error.txt" {
+		t.Fatalf("command = %q, want it untouched when stack_limit_kb is unset", got)
+	}
+}
+
 // The placeholders in lang/*.yaml are what make the command runnable; an
 // unreplaced one reaches the shell as literal text.
 func TestRunShellCommandFillsPlaceholders(t *testing.T) {

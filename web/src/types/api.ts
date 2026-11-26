@@ -1762,6 +1762,15 @@ export interface PublicLanguage {
     key: string
     name: string
     extensions: string[]
+    /**
+     * Resource multipliers the judge applies to the problem's own limits. The
+     * problem page needs these to show the limit a submission is really judged
+     * under; compile/runtime commands are deliberately not published.
+     */
+    time_limit_multiplier: number
+    memory_limit_multiplier: number
+    /** Call-stack cap in KB; 0 means the sandbox default. */
+    stack_limit_kb: number
 }
 
 /** Admin language config rows (YAML-backed, not DB models). */
@@ -1773,6 +1782,7 @@ export interface LanguageConfig {
     copy_in: Record<string, string>
     time_limit_multiplier: number
     memory_limit_multiplier: number
+    stack_limit_kb: number
     seccomp_rule: string
     extensions: string[]
     mono: boolean

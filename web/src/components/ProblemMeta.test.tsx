@@ -34,3 +34,18 @@ test('a rated problem shows its rating and tags', () => {
     expect(screen.getByText('dp')).toBeInTheDocument()
     expect(screen.getByText('hard')).toBeInTheDocument()
 })
+
+test('a stack limit the language actually grants is shown', () => {
+    render(<ProblemMeta timeLimit={1000} memoryLimit={262144} stackLimit={524288} />)
+
+    const stack = screen.getByText('Stack').parentElement
+    expect(stack).toHaveTextContent('512 MB')
+})
+
+test('the sandbox default stack is not advertised', () => {
+    // Every language without stack_limit_kb runs under the same 8 MB default,
+    // which is not a promise the platform makes — naming it would be noise.
+    render(<ProblemMeta timeLimit={1000} memoryLimit={262144} stackLimit={0} />)
+
+    expect(screen.queryByText('Stack')).not.toBeInTheDocument()
+})

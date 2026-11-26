@@ -15,7 +15,7 @@ import { useTranslation } from 'react-i18next'
 import { useToast } from '../components/Toast'
 import { Badge } from '../components/ui/Badge'
 import { ProblemMeta } from '../components/ProblemMeta'
-import { DEFAULT_LANGUAGE, languageName, languageTemplate } from '../lib/languages'
+import { DEFAULT_LANGUAGE, effectiveLimits, languageName, languageTemplate } from '../lib/languages'
 import { useLanguages } from '../lib/useLanguages'
 import { isRemotePlatform } from '../lib/platforms'
 import { Skeleton } from '../components/ui/PageHeader'
@@ -53,6 +53,7 @@ interface ProblemData {
     id: string; slug: string; title?: string; description?: string; hint?: string;
     source?: string; difficulty?: string; rating?: number; problem_type?: string; scoring_mode?: string;
     interactive?: boolean; time_limit: number; memory_limit: number;
+    language_limits?: { language_id: string; time_limit_ms?: number | null; memory_limit_kb?: number | null }[];
     input_format?: string; output_format?: string; constraints?: string; pdf?: string;
     tags?: string[]; sample_cases?: SampleCase[];
 }
@@ -119,6 +120,16 @@ export default function ProblemDetail() {
     })
     const [dragging, setDragging] = useState(false)
     const containerRef = useRef<HTMLDivElement>(null)
+
+    // What the judge will actually enforce for the language selected below.
+    // Remote problems are judged elsewhere, so their own limits stand as-is.
+    const metaLimits = problem && !isRemotePlatform(problem.source)
+        ? effectiveLimits(problem, lang, judgeLanguages, problem.language_limits)
+        : {
+            timeLimitMs: problem?.time_limit ?? 0,
+            memoryLimitKB: problem?.memory_limit ?? 0,
+            stackLimitKB: 0,
+        }
 
     const handleMouseDown = (e: React.MouseEvent) => {
         e.preventDefault()
@@ -467,11 +478,15 @@ export default function ProblemDetail() {
                         {problem.scoring_mode === 'partial' && <Badge tone="brand">Partial scoring</Badge>}
                     </h1>
                     {/* Limits are the first thing a competitor looks for, so they
-                        get a fixed-order strip shared with the contest page. */}
+                        get a fixed-order strip shared with the contest page.
+                        Resolved for the selected language: the judge scales the
+                        problem's limits by the language's multipliers, so the
+                        base row alone is not what a submission is judged under. */}
                     <ProblemMeta
                         className="mt-3 border-b border-hairline pb-3"
-                        timeLimit={problem.time_limit}
-                        memoryLimit={problem.memory_limit}
+                        timeLimit={metaLimits.timeLimitMs}
+                        memoryLimit={metaLimits.memoryLimitKB}
+                        stackLimit={metaLimits.stackLimitKB}
                         difficulty={problem.difficulty}
                         rating={problem.rating}
                         tags={problem.tags}

@@ -31,16 +31,27 @@ func NewPublicLanguageHandler(langDir string) *PublicLanguageHandler {
 }
 
 // PublicLanguage is the wire shape for one selectable language. It carries only
-// what a submit form needs: the key it sends back, the name it shows, and the
-// file extensions the editor can use to pick a syntax mode.
+// what a submit form needs: the key it sends back, the name it shows, the file
+// extensions the editor can use to pick a syntax mode, and the resource limits
+// the judge will actually apply.
 //
 // Compile and runtime commands are deliberately absent — they name absolute
 // paths inside the judge image, and publishing them hands an attacker a map of
-// the sandbox for no UI benefit.
+// the sandbox for no UI benefit. The limits are the opposite case: the problem
+// page has to show the limit a submission will really be judged under, and that
+// is the problem's own limit scaled by the language's multipliers. Without them
+// the page could only show the raw problem row, which is not what the sandbox
+// enforces.
 type PublicLanguage struct {
 	Key        string   `json:"key"`
 	Name       string   `json:"name"`
 	Extensions []string `json:"extensions"`
+	// Multipliers, not absolute values: the base is per-problem.
+	TimeLimitMultiplier   float64 `json:"time_limit_multiplier"`
+	MemoryLimitMultiplier float64 `json:"memory_limit_multiplier"`
+	// StackLimitKB is the call-stack cap the judge applies, 0 for the sandbox
+	// default.
+	StackLimitKB int `json:"stack_limit_kb"`
 }
 
 func (h *PublicLanguageHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -69,7 +80,24 @@ func (h *PublicLanguageHandler) List(w http.ResponseWriter, r *http.Request) {
 			// Marshal as [] not null: the SPA maps over this.
 			exts = []string{}
 		}
-		result = append(result, PublicLanguage{Key: cfg.Key, Name: cfg.Name, Extensions: exts})
+		// A config saved before a field existed leaves it at 0, and a 0×
+		// multiplier would render as "0 s" and tell the user nothing. 1.0 is
+		// what the admin handlers store for an unset multiplier anyway.
+		timeMul, memMul := cfg.TimeLimitMultiplier, cfg.MemoryLimitMultiplier
+		if timeMul <= 0 {
+			timeMul = 1.0
+		}
+		if memMul <= 0 {
+			memMul = 1.0
+		}
+		result = append(result, PublicLanguage{
+			Key:                   cfg.Key,
+			Name:                  cfg.Name,
+			Extensions:            exts,
+			TimeLimitMultiplier:   timeMul,
+			MemoryLimitMultiplier: memMul,
+			StackLimitKB:          cfg.StackLimitKB,
+		})
 	}
 
 	w.Header().Set("Content-Type", "application/json")

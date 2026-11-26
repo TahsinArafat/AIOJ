@@ -745,17 +745,29 @@ func runShellCommand(cfg *compiler.LangConfig, srcName string) string {
 
 	const captureRun = " < input.txt > output.txt 2> error.txt"
 
-	if cfg.CompileCmd != "" {
+	var run string
+	switch {
+	case cfg.CompileCmd != "":
 		compile := "{ " + fill(cfg.CompileCmd) + " ; } 2> error.txt && "
 		if cfg.Runtime != "" {
-			return compile + strings.Join(strings.Fields(fill(cfg.Runtime)), " ") + captureRun
+			run = compile + strings.Join(strings.Fields(fill(cfg.Runtime)), " ") + captureRun
+		} else {
+			run = compile + "./Main" + captureRun
 		}
-		return compile + "./Main" + captureRun
+	case cfg.Runtime != "":
+		run = strings.Join(strings.Fields(fill(cfg.Runtime)), " ") + " " + srcName + captureRun
+	default:
+		run = "./Main" + captureRun
 	}
-	if cfg.Runtime != "" {
-		return strings.Join(strings.Fields(fill(cfg.Runtime)), " ") + " " + srcName + captureRun
+
+	// A run must be judged under the same stack cap a submission gets, or the
+	// scratchpad disagrees with the judge on exactly the deep-recursion cases
+	// the contestant is trying to debug. Grouped so the cap applies to the
+	// program alone and never to the compile that precedes it.
+	if cfg.StackLimitKB > 0 {
+		run = "{ ulimit -s " + strconv.Itoa(cfg.StackLimitKB) + "; " + run + "; }"
 	}
-	return "./Main" + captureRun
+	return run
 }
 
 // runOnce performs one compile-and-execute. Split out of CustomRun so BatchRun

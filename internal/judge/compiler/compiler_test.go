@@ -67,3 +67,20 @@ func TestBuildCompileCmdUsesSandboxWorkDir(t *testing.T) {
 		t.Fatalf("SandboxWorkDir = %q; go-judge's defaultWorkDir is /w", SandboxWorkDir)
 	}
 }
+
+// An operator's compile argv must reach the sandbox with only the placeholders
+// substituted. Nothing may append a stack flag or otherwise rewrite it: the
+// stack cap is a runtime rlimit, and a linker --stack flag is a PE/COFF option
+// that GNU ld rejects outright.
+func TestBuildCompileCmdLeavesOperatorFlagsIntact(t *testing.T) {
+	tmpl := "/usr/bin/g++ -Wall -Wextra -Wconversion -static -DONLINE_JUDGE " +
+		"-Wl,--stack=268435456 -O2 -std=c++20 -o {{exe}} {{src}}"
+
+	got := buildCompileCmd(tmpl, "Main", "Main.cpp")
+
+	want := "/usr/bin/g++ -Wall -Wextra -Wconversion -static -DONLINE_JUDGE " +
+		"-Wl,--stack=268435456 -O2 -std=c++20 -o Main Main.cpp"
+	if got != want {
+		t.Fatalf("compile argv was rewritten:\n got: %s\nwant: %s", got, want)
+	}
+}

@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useParams, Link, useLocation } from 'react-router-dom'
 import { EmptyState } from '../components/EmptyState'
-import { DEFAULT_LANGUAGE, languageName, languageTemplate } from '../lib/languages'
+import { DEFAULT_LANGUAGE, effectiveLimits, languageName, languageTemplate } from '../lib/languages'
 import { useLanguages } from '../lib/useLanguages'
 import { ProblemStatement } from '../components/ProblemStatement'
 import { ProblemMeta } from '../components/ProblemMeta'
@@ -303,6 +303,12 @@ export default function ContestProblem() {
     // so a round hid Clang, PyPy, JavaScript and C 32-bit entirely.
     const { languages, options: languageOptions } = useLanguages()
     const [language, setLanguage] = useState(DEFAULT_LANGUAGE)
+    // What the judge will actually enforce for the selected language. The
+    // problem row holds the base limits; the judge multiplies them by the
+    // language's own factors before handing them to the sandbox.
+    const metaLimits = problem
+        ? effectiveLimits(problem, language, languages, problem.language_limits)
+        : { timeLimitMs: 0, memoryLimitKB: 0, stackLimitKB: 0 }
     const [code, setCode] = useState('')
     const [submitting, setSubmitting] = useState(false)
     const [result, setResult] = useState<SubmissionView | null>(null)
@@ -706,11 +712,15 @@ export default function ContestProblem() {
                         </span>
                         <h1 className="text-2xl font-bold text-ink leading-tight">{problem.title}</h1>
                     </div>
-                    {/* Metadata bar — the same strip the practice page uses. */}
+                    {/* Metadata bar — the same strip the practice page uses, and
+                        resolved for the selected language for the same reason:
+                        the judge scales the problem's limits by the language's
+                        multipliers, so the base row is not what is enforced. */}
                     <ProblemMeta
                         className="mt-3"
-                        timeLimit={problem.time_limit}
-                        memoryLimit={problem.memory_limit}
+                        timeLimit={metaLimits.timeLimitMs}
+                        memoryLimit={metaLimits.memoryLimitKB}
+                        stackLimit={metaLimits.stackLimitKB}
                         difficulty={problem.difficulty}
                         rating={problem.rating}
                         tags={problem.tags}

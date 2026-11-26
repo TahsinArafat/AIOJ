@@ -13,6 +13,7 @@ interface LanguageConfig {
     copy_in: Record<string, string>
     time_limit_multiplier: number
     memory_limit_multiplier: number
+    stack_limit_kb: number
     seccomp_rule: string
     extensions: string[]
     mono: boolean
@@ -27,6 +28,7 @@ const emptyLang: LanguageConfig = {
     copy_in: {},
     time_limit_multiplier: 1.0,
     memory_limit_multiplier: 1.0,
+    stack_limit_kb: 0,
     seccomp_rule: 'general',
     extensions: [],
     mono: false,
@@ -35,7 +37,7 @@ const emptyLang: LanguageConfig = {
 
 const seccompOptions = ['general', 'c_cpp', 'java', 'node', 'none']
 
-interface DetectedTool { name: string; path: string; version?: string }
+interface DetectedTool { name: string; path: string; version?: string; binary?: string; class?: string }
 interface TestResult { status?: string; key?: string; message?: string }
 
 export default function LanguagesPanel() {
@@ -197,14 +199,18 @@ export default function LanguagesPanel() {
         }
     }
 
+    // The binary name, not the absolute path: a lang/*.yaml command runs inside
+    // the judge sandbox through a PATH lookup, and the absolute path is only
+    // informative. `binary` is what discovery found on that PATH.
     const applyDetectedCompiler = (tool: DetectedTool) => {
-        setForm({ ...form, compile: `${tool.path} -O2 -o {{exe}} {{src}}` })
+        const bin = tool.binary || tool.path
+        setForm({ ...form, compile: `${bin} -O2 -o {{exe}} {{src}}` })
         setShowCreate(true)
         setEditKey(null)
     }
 
     const applyDetectedInterpreter = (tool: DetectedTool) => {
-        setForm({ ...form, runtime: tool.path })
+        setForm({ ...form, runtime: tool.binary || tool.path })
         setShowCreate(true)
         setEditKey(null)
     }
@@ -329,6 +335,16 @@ export default function LanguagesPanel() {
                                 </select>
                             </div>
                             <div>
+                                <label className="block text-xs font-medium text-muted uppercase mb-1">Stack Limit (KB)</label>
+                                <input aria-label="Stack Limit KB" type="number" step="1024" min="0" value={form.stack_limit_kb}
+                                    onChange={e => setForm({ ...form, stack_limit_kb: parseInt(e.target.value, 10) || 0 })}
+                                    className="w-full border border-hairline-strong rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)]" />
+                                <p className="text-xs text-muted-soft mt-1">
+                                    Call-stack cap enforced with <code>ulimit -s</code> at run time. 0 keeps the sandbox default (8 MB), which segfaults deep recursion. 262144 = 256 MB.
+                                    This is the Linux equivalent of <code>-Wl,--stack=</code>, which GNU ld rejects.
+                                </p>
+                            </div>
+                            <div>
                                 <label className="flex items-center gap-2 text-sm mt-5">
                                     <input type="checkbox" checked={form.mono} onChange={e => setForm({ ...form, mono: e.target.checked })}
                                         className="rounded" />
@@ -396,6 +412,11 @@ export default function LanguagesPanel() {
                                                 <div>
                                                     <div className="text-sm font-medium">{c.name}</div>
                                                     <div className="text-xs text-muted font-mono">{c.path}</div>
+                                                    {/* A name discovery could not label is worth showing as-is:
+                                                        it is a toolchain the panel has no hint for. */}
+                                                    {c.binary && c.name === c.binary && (
+                                                        <div className="text-xs text-muted-soft mt-0.5">unrecognised toolchain</div>
+                                                    )}
                                                     {c.version && <div className="text-xs text-muted-soft mt-0.5">{c.version}</div>}
                                                 </div>
                                                 <button onClick={() => applyDetectedCompiler(c)}
@@ -460,7 +481,12 @@ export default function LanguagesPanel() {
                         <span className="font-medium text-sm">{testResult.key}</span>
                         <button onClick={() => setTestResult(null)} className="text-muted-soft hover:text-ink cursor-pointer"><X size={14} /></button>
                     </div>
-                    <pre className="text-xs font-mono text-ink-soft whitespace-pre-wrap">{JSON.stringify(testResult, null, 2)}</pre>
+                    {/* The message is the useful part; the JSON dump below it is
+                        for the fields the message does not mention. */}
+                    {testResult.message && (
+                        <p className="text-sm text-ink-soft whitespace-pre-wrap mb-2">{testResult.message}</p>
+                    )}
+                    <pre className="text-xs font-mono text-muted-soft whitespace-pre-wrap">{JSON.stringify(testResult, null, 2)}</pre>
                 </div>
             )}
 
@@ -475,6 +501,7 @@ export default function LanguagesPanel() {
                             <th className="px-4 py-2 text-left">Runtime</th>
                             <th className="px-4 py-2 text-center">Time ×</th>
                             <th className="px-4 py-2 text-center">Memory ×</th>
+                            <th className="px-4 py-2 text-center">Stack</th>
                             <th className="px-4 py-2 text-right">Actions</th>
                         </tr>
                     </thead>
@@ -487,6 +514,9 @@ export default function LanguagesPanel() {
                                 <td className="px-4 py-2 font-mono text-xs text-muted max-w-xs truncate">{lang.runtime || '—'}</td>
                                 <td className="px-4 py-2 text-center text-xs">{lang.time_limit_multiplier}×</td>
                                 <td className="px-4 py-2 text-center text-xs">{lang.memory_limit_multiplier}×</td>
+                                <td className="px-4 py-2 text-center text-xs">
+                                    {lang.stack_limit_kb > 0 ? `${Math.round(lang.stack_limit_kb / 1024)} MB` : <span className="text-muted-soft">default</span>}
+                                </td>
                                 <td className="px-4 py-2 text-right">
                                     <div className="flex items-center justify-end gap-1">
                                         <button onClick={() => handleReset(lang.key)} disabled={saving}

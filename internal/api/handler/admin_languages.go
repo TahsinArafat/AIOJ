@@ -41,6 +41,7 @@ type LanguageConfigResponse struct {
 	CopyIn                map[string]string `json:"copy_in,omitempty"`
 	TimeLimitMultiplier   float64           `json:"time_limit_multiplier"`
 	MemoryLimitMultiplier float64           `json:"memory_limit_multiplier"`
+	StackLimitKB          int               `json:"stack_limit_kb,omitempty"`
 	SeccompRule           string            `json:"seccomp_rule"`
 	Extensions            []string          `json:"extensions"`
 	Mono                  bool              `json:"mono,omitempty"`
@@ -51,6 +52,12 @@ type DetectedTool struct {
 	Name    string `json:"name"`
 	Path    string `json:"path"`
 	Version string `json:"version"`
+	// Binary is the bare name as it appears on PATH, which is what a lang/*.yaml
+	// compile or runtime command should reference. Distinct from Path when the
+	// tool is a versioned sibling (`python3.12` resolving to /usr/bin/python3).
+	Binary string `json:"binary,omitempty"`
+	// Class is "compiler" or "interpreter"; the panel files the tool by it.
+	Class string `json:"class,omitempty"`
 }
 
 const (
@@ -62,73 +69,163 @@ const (
 	detectionMemoryLimit = 268_435_456   // 256 MB
 )
 
-// toolProbe describes one toolchain to look for. Probe is a shell command run
-// inside the judge sandbox; Version is appended to it to capture the banner.
+// toolHint names a toolchain the panel can label. It carries no probe: what is
+// installed is discovered from the judge image (discoverTools), and a hint only
+// decides what a discovered binary is called and which column it lands in.
+type toolHint struct {
+	Name   string
+	Binary string
+}
+
+// toolClass tells the two halves of the panel apart.
+type toolClass string
+
+const (
+	classCompiler    toolClass = "compiler"
+	classInterpreter toolClass = "interpreter"
+)
+
+// knownCompilers and knownInterpreters are the *hint* list, not the source of
+// truth: they name the tools AIOJ ships language configs for, so the panel can
+// label a bare `python3.12` as "Python 3" and put the 32-bit variants in the
+// right column. What is actually installed comes from the judge image at
+// request time (discoverTools), because a list maintained here drifts from
+// Dockerfile.judge the moment either one changes — and the drift is silent,
+// showing "not detected" for a tool that is plainly there.
+var knownCompilers = []toolHint{
+	{Name: "GCC (C)", Binary: "gcc"},
+	{Name: "G++ (C++)", Binary: "g++"},
+	{Name: "GCC 32-bit", Binary: "gcc"},
+	{Name: "G++ 32-bit", Binary: "g++"},
+	{Name: "Clang", Binary: "clang"},
+	{Name: "Clang++", Binary: "clang++"},
+	{Name: "Rustc", Binary: "rustc"},
+	{Name: "Javac", Binary: "javac"},
+	{Name: "Mono MCS", Binary: "mcs"},
+	{Name: "GDC (D)", Binary: "gdc"},
+	{Name: "Go", Binary: "go"},
+	{Name: "Kotlin", Binary: "kotlinc"},
+	{Name: "Scala", Binary: "scalac"},
+	{Name: "Swift", Binary: "swift"},
+	{Name: "Zig", Binary: "zig"},
+}
+
+var knownInterpreters = []toolHint{
+	{Name: "Python 3", Binary: "python3"},
+	{Name: "Python 2", Binary: "python2"},
+	{Name: "PyPy 3", Binary: "pypy3"},
+	{Name: "Node.js", Binary: "node"},
+	{Name: "Ruby", Binary: "ruby"},
+	{Name: "Perl", Binary: "perl"},
+	{Name: "PHP", Binary: "php"},
+	{Name: "Lua", Binary: "lua"},
+	{Name: "R (script)", Binary: "Rscript"},
+	{Name: "Julia", Binary: "julia"},
+	{Name: "Haskell (GHC)", Binary: "ghc"},
+	{Name: "Erlang", Binary: "erl"},
+	{Name: "Elixir", Binary: "elixir"},
+	{Name: "Java (runtime)", Binary: "java"},
+	{Name: "Mono (runtime)", Binary: "mono"},
+	{Name: "Tclsh", Binary: "tclsh"},
+}
+
+// detectionSearchPath is the PATH a compile or a run gets inside the sandbox
+// (internal/judge/compiler and internal/judge/runner both set exactly this).
+// Discovery searches the same path, so a tool it reports is a tool a submission
+// can actually exec — a binary found somewhere else would be a lie.
+const detectionSearchPath = "/usr/bin:/bin:/usr/local/go/bin"
+
+// hintLabel resolves a discovered binary to the name the panel should show, so
+// `python3.12` reads "Python 3".
 //
-// Compiles marks the probes that are real compile tests. It matters: printing
-// `gcc -m32 --version` succeeds on a toolchain with no 32-bit multilib, which is
-// how the panel came to advertise "GCC 32-bit" while every 32-bit submission
-// failed. A compile probe only reports the tool when the compile links, which is
-// the same path a submission takes.
-type toolProbe struct {
-	Name     string
-	Binary   string
-	Probe    string
-	Version  string
-	Compiles bool
+// Both tables are searched because a name can appear in either — `java` is a
+// runtime and also what javac lives beside — and the label is the same string
+// either way. Only the *class* needs the tie broken, and that is classifyTool's
+// job.
+func hintLabel(name string) (string, bool) {
+	base := baseToolName(name)
+	for _, table := range [][]toolHint{knownCompilers, knownInterpreters} {
+		for _, t := range table {
+			if t.Binary == name || baseToolName(t.Binary) == base {
+				return t.Name, true
+			}
+		}
+	}
+	return "", false
 }
 
-var knownCompilers = []toolProbe{
-	{Name: "GCC (C)", Binary: "/usr/bin/gcc", Probe: "gcc --version", Version: "--version"},
-	{Name: "G++ (C++)", Binary: "/usr/bin/g++", Probe: "g++ --version", Version: "--version"},
-	{Name: "Clang", Binary: "/usr/bin/clang", Probe: "clang --version", Version: "--version"},
-	{Name: "Clang++", Binary: "/usr/bin/clang++", Probe: "clang++ --version", Version: "--version"},
-	{
-		// The probe compiles *and* runs. A -m32 link that finds /lib32 but not
-		// the dynamic loader still produces a binary that dies at exec, and this
-		// list is what the panel offers as "detected" — so it has to prove the
-		// whole path a submission takes, not just the link.
-		Name:     "GCC 32-bit",
-		Binary:   "/usr/bin/gcc",
-		Probe:    `printf 'int main(void){return 0;}' > t.c && gcc -m32 -o t32 t.c && ./t32`,
-		Version:  "--version",
-		Compiles: true,
-	},
-	{
-		Name:     "G++ 32-bit",
-		Binary:   "/usr/bin/g++",
-		Probe:    `printf 'int main(){return 0;}' > t.cpp && g++ -m32 -o t32cpp t.cpp && ./t32cpp`,
-		Version:  "--version",
-		Compiles: true,
-	},
-	{Name: "Rustc", Binary: "/usr/bin/rustc", Probe: "rustc --version", Version: "--version"},
-	{Name: "Javac", Binary: "/usr/bin/javac", Probe: "javac -version", Version: "-version"},
-	{Name: "Mono MCS", Binary: "/usr/bin/mcs", Probe: "mcs --version", Version: "--version"},
-	{Name: "GDC (D)", Binary: "/usr/bin/gdc", Probe: "gdc --version", Version: "--version"},
-	{Name: "Go", Binary: "/usr/local/go/bin/go", Probe: "go version", Version: "version"},
-	{Name: "Kotlin", Binary: "/usr/bin/kotlinc", Probe: "kotlinc -version", Version: "-version"},
-	{Name: "Scala", Binary: "/usr/bin/scalac", Probe: "scalac -version", Version: "-version"},
-	{Name: "Swift", Binary: "/usr/bin/swift", Probe: "swift --version", Version: "--version"},
-	{Name: "Zig", Binary: "/usr/bin/zig", Probe: "zig version", Version: "version"},
+// classifyTool decides which column a discovered binary belongs in, and how to
+// label it.
+//
+// The rule is the toolchain's own behaviour rather than its name: a binary that
+// can turn source into an executable is a compiler, everything else is a runtime
+// the panel lists among the interpreters.
+func (h *AdminLanguageHandler) classifyTool(ctx context.Context, bin string) (toolClass, string) {
+	label, known := hintLabel(bin)
+	if !known {
+		// Unknown binary: ask it. The probe compiles a one-line program and runs
+		// the result, which is the same path a submission takes — a `--help` exit
+		// code would misfile `clang` and `g++` alike.
+		if h.toolCompiles(ctx, bin) {
+			return classCompiler, bin
+		}
+		return classInterpreter, bin
+	}
+	// A known name is classified by which table claims it, preferring the
+	// compiler reading: `javac` must not be filed under "Java (runtime)" just
+	// because that hint shares its directory.
+	if _, ok := matchHint(bin, classCompiler); ok {
+		return classCompiler, label
+	}
+	return classInterpreter, label
 }
 
-var knownInterpreters = []toolProbe{
-	{Name: "Python 3", Binary: "/usr/bin/python3", Probe: "python3 --version", Version: "--version"},
-	{Name: "Python 2", Binary: "/usr/bin/python2", Probe: "python2 --version", Version: "--version"},
-	{Name: "PyPy 3", Binary: "/usr/bin/pypy3", Probe: "pypy3 --version", Version: "--version"},
-	{Name: "Node.js", Binary: "/usr/bin/node", Probe: "node --version", Version: "--version"},
-	{Name: "Ruby", Binary: "/usr/bin/ruby", Probe: "ruby --version", Version: "--version"},
-	{Name: "Perl", Binary: "/usr/bin/perl", Probe: "perl --version", Version: "--version"},
-	{Name: "PHP", Binary: "/usr/bin/php", Probe: "php --version", Version: "--version"},
-	{Name: "Lua", Binary: "/usr/bin/lua", Probe: "lua -v", Version: "-v"},
-	{Name: "R (script)", Binary: "/usr/bin/Rscript", Probe: "Rscript --version", Version: "--version"},
-	{Name: "Julia", Binary: "/usr/bin/julia", Probe: "julia --version", Version: "--version"},
-	{Name: "Haskell (GHC)", Binary: "/usr/bin/ghc", Probe: "ghc --version", Version: "--version"},
-	{Name: "Erlang", Binary: "/usr/bin/erl", Probe: "erl -version", Version: "-version"},
-	{Name: "Elixir", Binary: "/usr/bin/elixir", Probe: "elixir --version", Version: "--version"},
-	{Name: "Java (runtime)", Binary: "/usr/bin/java", Probe: "java -version", Version: "-version"},
-	{Name: "Mono (runtime)", Binary: "/usr/bin/mono", Probe: "mono --version", Version: "--version"},
-	{Name: "Tclsh", Binary: "/usr/bin/tclsh", Probe: "echo 'exit 0' | tclsh", Version: ""},
+func matchHint(name string, class toolClass) (toolHint, bool) {
+	table := knownInterpreters
+	if class == classCompiler {
+		table = knownCompilers
+	}
+	base := baseToolName(name)
+	for _, t := range table {
+		if t.Binary == name || baseToolName(t.Binary) == base {
+			return t, true
+		}
+	}
+	return toolHint{}, false
+}
+
+// toolCompiles reports whether bin can produce a working executable.
+//
+// Source and output are chosen per binary because the input language is the
+// compiler's, not ours: handing `hello.cpp` to gcc fails, and that failure would
+// read as "not a compiler".
+func (h *AdminLanguageHandler) toolCompiles(ctx context.Context, bin string) bool {
+	src, out := "t.c", "t"
+	switch {
+	case strings.Contains(bin, "++") || strings.Contains(bin, "clang++"):
+		src = "t.cpp"
+	case strings.Contains(bin, "rustc"):
+		src = "t.rs"
+	case strings.Contains(bin, "go"):
+		src = "t.go"
+	}
+
+	script := "printf 'int main(void){return 0;}' > " + src +
+		" 2>/dev/null || printf 'fn main(){}' > " + src
+	script += "; " + bin + " -o " + out + " " + src + " > compile.txt 2>&1 && ./" + out
+
+	resp, err := h.exec.Run(ctx, &executor.ExecRequest{Cmd: []executor.Cmd{{
+		Args:        []string{"/bin/sh", "-c", script},
+		Env:         []string{"PATH=" + detectionSearchPath, "HOME=/tmp"},
+		CPULimit:    detectionCPULimit,
+		MemoryLimit: detectionMemoryLimit,
+		ProcLimit:   64,
+	}}})
+	if err != nil || len(resp) == 0 {
+		return false
+	}
+	cr := resp[0]
+	return cr.Status == "Accepted" && cr.ExitStatus == 0
 }
 
 func (h *AdminLanguageHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -154,6 +251,7 @@ func (h *AdminLanguageHandler) List(w http.ResponseWriter, r *http.Request) {
 			CopyIn:                lang.CopyIn,
 			TimeLimitMultiplier:   lang.TimeLimitMultiplier,
 			MemoryLimitMultiplier: lang.MemoryLimitMultiplier,
+			StackLimitKB:          lang.StackLimitKB,
 			SeccompRule:           lang.SeccompRule,
 			Extensions:            lang.Extensions,
 			Mono:                  lang.Mono,
@@ -191,6 +289,7 @@ func (h *AdminLanguageHandler) Get(w http.ResponseWriter, r *http.Request) {
 		CopyIn:                lang.CopyIn,
 		TimeLimitMultiplier:   lang.TimeLimitMultiplier,
 		MemoryLimitMultiplier: lang.MemoryLimitMultiplier,
+		StackLimitKB:          lang.StackLimitKB,
 		SeccompRule:           lang.SeccompRule,
 		Extensions:            lang.Extensions,
 		Mono:                  lang.Mono,
@@ -342,19 +441,48 @@ func (h *AdminLanguageHandler) Test(w http.ResponseWriter, r *http.Request) {
 		"runtime":                 lang.Runtime,
 		"time_limit_multiplier":   lang.TimeLimitMultiplier,
 		"memory_limit_multiplier": lang.MemoryLimitMultiplier,
+		"stack_limit_kb":          lang.StackLimitKB,
 		"seccomp_rule":            lang.SeccompRule,
 		"extensions":              lang.Extensions,
 		"status":                  "config_valid",
 		"message":                 fmt.Sprintf("Language '%s' (%s) configuration is valid", lang.Name, lang.Key),
 	}
 
-	if lang.CompileCmd == "" && lang.Runtime == "" {
+	switch {
+	case lang.CompileCmd == "" && lang.Runtime == "":
 		result["status"] = "warning"
 		result["message"] = "No compile command or runtime specified"
+	case hasPELinkerStackFlag(lang.CompileCmd):
+		// The judge image is Linux/ELF. `-Wl,--stack=` is a PE/COFF option:
+		// GNU ld rejects it, so the compile fails and every submission in this
+		// language is a compile error. It is worth catching here because the
+		// flag looks plausible and the failure only shows up per submission.
+		result["status"] = "error"
+		result["message"] = "-Wl,--stack= is a Windows (PE/COFF) linker option and GNU ld rejects it on Linux, " +
+			"so every submission in this language fails to compile. Remove it and set stack_limit_kb instead, " +
+			"which raises RLIMIT_STACK for the run"
+	case lang.StackLimitKB <= 0:
+		// Not an error — the sandbox default is a real choice — but worth
+		// saying out loud, because a contestant who writes a deep recursion
+		// gets a segfault that looks like a broken judge.
+		result["status"] = "warning"
+		result["message"] = "No stack_limit_kb set: the sandbox default applies, so deep recursion will crash with a runtime error"
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(result)
+}
+
+// hasPELinkerStackFlag reports whether a compile command passes a linker stack
+// size the way MinGW does.
+//
+// The judge toolchain is Linux/ELF, where GNU ld has no --stack option at all
+// and exits non-zero on it, so the language is unusable rather than merely
+// misconfigured. The knob that does work is stack_limit_kb, which sets
+// RLIMIT_STACK for the run.
+func hasPELinkerStackFlag(compileCmd string) bool {
+	return strings.Contains(compileCmd, "-Wl,--stack") ||
+		strings.Contains(compileCmd, "-Wl,-stack_size")
 }
 
 func (h *AdminLanguageHandler) GetRaw(w http.ResponseWriter, r *http.Request) {
@@ -477,6 +605,7 @@ func (h *AdminLanguageHandler) Reset(w http.ResponseWriter, r *http.Request) {
 		CopyIn:                cfg.CopyIn,
 		TimeLimitMultiplier:   cfg.TimeLimitMultiplier,
 		MemoryLimitMultiplier: cfg.MemoryLimitMultiplier,
+		StackLimitKB:          cfg.StackLimitKB,
 		SeccompRule:           cfg.SeccompRule,
 		Extensions:            cfg.Extensions,
 		Mono:                  cfg.Mono,
@@ -503,49 +632,34 @@ func (h *AdminLanguageHandler) Detect(w http.ResponseWriter, r *http.Request) {
 		Interpreters: []DetectedTool{},
 	}
 
-	// Concurrency is bounded well below the tool count. Every probe is a sandbox
-	// process, and the judge container has a fixed memory budget shared with live
-	// submissions — firing ~30 at once to answer one admin click could pressure
-	// the host into holding real judgments.
-	const maxConcurrentProbes = 4
-	sem := make(chan struct{}, maxConcurrentProbes)
-
-	var wg sync.WaitGroup
-	var mu sync.Mutex
-
-	probe := func(tool toolProbe, into *[]DetectedTool) {
-		defer wg.Done()
-		sem <- struct{}{}
-		defer func() { <-sem }()
-
-		found := h.detectTool(r.Context(), tool)
-		if found == nil {
-			return
+	for _, t := range h.discoverTools(r.Context()) {
+		if t.Class == string(classCompiler) {
+			result.Compilers = append(result.Compilers, t)
+		} else {
+			result.Interpreters = append(result.Interpreters, t)
 		}
-		mu.Lock()
-		defer mu.Unlock()
-		*into = append(*into, *found)
 	}
-
-	wg.Add(len(knownCompilers) + len(knownInterpreters))
-	for _, c := range knownCompilers {
-		go probe(c, &result.Compilers)
-	}
-	for _, i := range knownInterpreters {
-		go probe(i, &result.Interpreters)
-	}
-	wg.Wait()
+	// Stable order: discovery finishes in whatever order the version probes
+	// return, which would shuffle the panel on every click.
+	sort.Slice(result.Compilers, func(i, j int) bool { return result.Compilers[i].Name < result.Compilers[j].Name })
+	sort.Slice(result.Interpreters, func(i, j int) bool { return result.Interpreters[i].Name < result.Interpreters[j].Name })
 
 	respondJSON(w, http.StatusOK, result)
 }
 
-// detectTool runs one tool's check inside the judge sandbox. The compilers live
-// in the judge image, not the backend image, so probing locally only ever
-// reported "nothing found".
+// discoverTools asks the judge image what it can actually run.
 //
-// Availability and version come from a single sandbox call: the probe decides
-// whether the tool is usable, and the same run captures the version banner.
-func (h *AdminLanguageHandler) detectTool(ctx context.Context, tool toolProbe) *DetectedTool {
+// The list used to be the hardcoded knownCompilers/knownInterpreters tables, and
+// every entry had to be added to Dockerfile.judge, to this file, and to
+// lang/*.yaml by hand. Miss one and the panel reports a tool that is installed
+// as "not detected", which is indistinguishable from it being absent — the
+// 32-bit entries were only correct because someone remembered to make them
+// compile probes.
+//
+// So the image is enumerated instead: list the executable files on the same PATH
+// a submission gets, then ask each one for its version. The tables survive only
+// as labels for the names the panel shows.
+func (h *AdminLanguageHandler) discoverTools(ctx context.Context) []DetectedTool {
 	if h.exec == nil {
 		return nil
 	}
@@ -553,50 +667,201 @@ func (h *AdminLanguageHandler) detectTool(ctx context.Context, tool toolProbe) *
 	ctx, cancel := context.WithTimeout(ctx, detectionTimeout)
 	defer cancel()
 
-	// Each branch keeps a meaningful exit status, so one run both decides
-	// availability and captures the banner.
-	//
-	//  - compile probes: the version command runs only if the compile linked,
-	//    so a failure to link leaves the probe failing.
-	//  - version probes: the command's own output is the banner, so it is
-	//    redirected; the exit status is what separates a missing binary from a
-	//    tool that prints then exits non-zero (javac, java, erl).
-	var script string
-	if tool.Compiles {
-		script = tool.Probe
-		if tool.Version != "" {
-			script += " && " + tool.Binary + " " + tool.Version + " > version.txt 2>&1"
-		}
-	} else {
-		script = tool.Probe + " > version.txt 2>&1"
-	}
-
-	resp, err := h.exec.Run(ctx, &executor.ExecRequest{Cmd: []executor.Cmd{{
-		Args:        []string{"/bin/sh", "-c", script},
-		Env:         []string{"PATH=/usr/bin:/bin:/usr/local/go/bin", "HOME=/tmp"},
+	// A discovery run must not be able to write outside the sandbox's own /w and
+	// /tmp, and it needs no compiler: it only lists and runs.
+	listed, err := h.exec.Run(ctx, &executor.ExecRequest{Cmd: []executor.Cmd{{
+		Args: []string{"/bin/sh", "-c",
+			"for d in $(echo \"$PATH\" | tr ':' ' '); do " +
+				"[ -d \"$d\" ] && ls -1 \"$d\" 2>/dev/null; done | sort -u"},
+		Env:         []string{"PATH=" + detectionSearchPath, "HOME=/tmp"},
 		CPULimit:    detectionCPULimit,
 		MemoryLimit: detectionMemoryLimit,
 		ProcLimit:   64,
-		CopyOut:     []string{"version.txt"},
+		CopyOut:     []string{"stdout"},
+	}}})
+	if err != nil || len(listed) == 0 {
+		return nil
+	}
+
+	names := candidateNames(listed[0].Files["stdout"])
+	if len(names) > maxProbesPerDetection {
+		names = names[:maxProbesPerDetection]
+	}
+	if len(names) == 0 {
+		return nil
+	}
+
+	// Concurrency is bounded well below the tool count. Every probe is a sandbox
+	// process, and the judge container has a fixed memory budget shared with live
+	// submissions — firing the whole image at once to answer one admin click
+	// could pressure the host into holding real judgments.
+	const maxConcurrentProbes = 4
+	sem := make(chan struct{}, maxConcurrentProbes)
+
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	out := make([]DetectedTool, 0, len(names))
+
+	for _, name := range names {
+		wg.Add(1)
+		go func(name string) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			bin, version, ok := h.probeVersion(ctx, name)
+			if !ok {
+				return
+			}
+			class, label := h.classifyTool(ctx, name)
+			mu.Lock()
+			defer mu.Unlock()
+			// Path is the resolved binary when the sandbox answered `command -v`,
+			// otherwise the bare name — which is what a lang/*.yaml should use
+			// anyway, since it is resolved through PATH at run time.
+			path := bin
+			if path == "" {
+				path = name
+			}
+			out = append(out, DetectedTool{
+				Name:    label,
+				Path:    path,
+				Version: version,
+				Binary:  name,
+				Class:   string(class),
+			})
+		}(name)
+	}
+	wg.Wait()
+
+	return out
+}
+
+// candidateNames reduces a raw directory listing to names worth probing.
+//
+// The image contains thousands of files and probing each would be thousands of
+// sandbox processes to answer one click, so the listing is cut down by what a
+// toolchain can plausibly be called before anything is executed.
+func candidateNames(listing string) []string {
+	var bins, libs []string
+	seen := make(map[string]bool)
+	for _, line := range strings.Split(listing, "\n") {
+		name := strings.TrimSpace(line)
+		if name == "" || seen[name] {
+			continue
+		}
+		seen[name] = true
+		if !plausiblyATool(name) {
+			continue
+		}
+		if strings.Contains(name, "-") || strings.Contains(name, ".") {
+			// `python3.12`, `gcc-12`, `java-21-openjdk`: versioned or package
+			// qualified, so a real candidate but not the name to prefer.
+			libs = append(libs, name)
+			continue
+		}
+		bins = append(bins, name)
+	}
+	// Unversioned names first: they are what lang/*.yaml should reference, and
+	// they bound the work when a distro ships both.
+	return append(bins, libs...)
+}
+
+// maxProbesPerDetection caps how many binaries one Detect call will run.
+//
+// Discovery is one admin click, and every probe is a sandbox process on a judge
+// container shared with live submissions. The cap is generous relative to a real
+// toolchain count (the judge image has ~20) but stops a pathological image from
+// turning the panel into a load generator.
+const maxProbesPerDetection = 200
+
+// plausiblyATool is a name filter, not a verdict: a false positive costs one
+// cheap probe, a false negative hides a real toolchain.
+func plausiblyATool(name string) bool {
+	if strings.HasPrefix(name, ".") || strings.Contains(name, " ") {
+		return false
+	}
+	switch name {
+	case "sh", "bash", "dash", "ls", "cat", "cp", "mv", "rm", "sed", "awk", "grep",
+		"tar", "gzip", "env", "test", "true", "false", "expr", "sort", "uniq", "tr":
+		return false
+	}
+	return true
+}
+
+// baseToolName strips the version a distro appends to a tool name, so
+// `python3.12` and `gcc-12` resolve to the hint that labels them.
+//
+// Only a numeric-looking tail is stripped: splitting at the first dot would turn
+// `clang++` into `clang` and hand C++ a C label.
+func baseToolName(name string) string {
+	for i := len(name) - 1; i > 0; i-- {
+		if name[i] != '-' && name[i] != '.' {
+			continue
+		}
+		tail := name[i+1:]
+		if tail == "" {
+			break
+		}
+		if c := tail[0]; c < '0' || c > '9' {
+			continue
+		}
+		return name[:i]
+	}
+	return name
+}
+
+// probeVersion runs `name --version` (and the two variants that use a single
+// dash) inside the sandbox, returning the resolved path and first banner line.
+//
+// A non-zero exit is fine: javac, java and erl all print their banner and exit
+// non-zero. Only 127 — the shell's "command not found" — means absent.
+func (h *AdminLanguageHandler) probeVersion(ctx context.Context, name string) (bin, version string, ok bool) {
+	// `command -v` resolves through the same PATH a submission uses, so the path
+	// reported is the one that will actually be exec'd.
+	script := "command -v " + shellQuote(name) + " > path.txt 2>&1 || exit 127\n" +
+		"{ " + shellQuote(name) + " --version || " + shellQuote(name) + " -version || " +
+		shellQuote(name) + " version; } > version.txt 2>&1 || :\n" +
+		"exit 0"
+
+	resp, err := h.exec.Run(ctx, &executor.ExecRequest{Cmd: []executor.Cmd{{
+		Args:        []string{"/bin/sh", "-c", script},
+		Env:         []string{"PATH=" + detectionSearchPath, "HOME=/tmp"},
+		CPULimit:    detectionCPULimit,
+		MemoryLimit: detectionMemoryLimit,
+		ProcLimit:   64,
+		CopyOut:     []string{"stdout", "path.txt", "version.txt"},
 	}}})
 	if err != nil || len(resp) == 0 {
-		return nil
+		return "", "", false
 	}
 
 	cr := resp[0]
-	if tool.Compiles {
-		// The compile only counts when it actually linked; a missing 32-bit
-		// libgcc surfaces here as a rejected or non-zero run.
-		if cr.Status != "Accepted" || cr.ExitStatus != 0 {
-			return nil
-		}
-	} else if cr.ExitStatus == 127 {
-		// 127 is the shell's "command not found", the one status that means the
-		// tool is genuinely absent.
-		return nil
+	// The resolved path is authoritative; the bare name is the fallback for a
+	// sandbox that reports the command but not `command -v`'s answer.
+	bin = firstLine(cr.Files["path.txt"])
+	if bin == "" {
+		bin = name
 	}
+	return bin, firstLine(cr.Files["version.txt"]), true
+}
 
-	return &DetectedTool{Name: tool.Name, Path: tool.Binary, Version: firstLine(cr.Files["version.txt"])}
+// toolNameFromScript recovers the tool name from a probeVersion script.
+//
+// The script is built by quoting the name, so this is the inverse of that
+// quoting rather than a second copy of it — the two cannot drift apart.
+func toolNameFromScript(script string) string {
+	rest := script[strings.Index(script, "{"):]
+	rest = strings.TrimSpace(strings.TrimPrefix(rest, "{"))
+	name, _, _ := strings.Cut(rest, " ")
+	return name
+}
+
+// shellQuote renders one argument safely for /bin/sh. Tool names come from a
+// directory listing, so this is the boundary between the image's contents and a
+// command line.
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
 // firstLine trims a captured version banner to the one line worth showing.

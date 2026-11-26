@@ -1,4 +1,4 @@
-import { Gauge, MemoryStick, Timer, type LucideIcon } from 'lucide-react'
+import { Gauge, Layers, MemoryStick, Timer, type LucideIcon } from 'lucide-react'
 import { Badge } from './ui/Badge'
 import { DIFFICULTY_TONE } from '../lib/difficulty'
 
@@ -24,6 +24,7 @@ function Limit({ icon: Icon, label, value }: { icon: LucideIcon; label: string; 
 export function ProblemMeta({
     timeLimit,
     memoryLimit,
+    stackLimit,
     difficulty,
     rating,
     tags,
@@ -35,6 +36,8 @@ export function ProblemMeta({
     timeLimit: number
     /** Kilobytes, as stored. */
     memoryLimit: number
+    /** Kilobytes of call stack the judge grants; 0 or undefined hides the chip. */
+    stackLimit?: number
     difficulty?: string
     /** Codeforces-scale rating; 0 or undefined means unrated. */
     rating?: number
@@ -57,6 +60,12 @@ export function ProblemMeta({
         <div className={`flex flex-wrap items-center gap-x-3 gap-y-2 text-xs ${className}`}>
             <Limit icon={Timer} label="Time" value={`${(timeLimit / 1000).toFixed(1)} s`} />
             <Limit icon={MemoryStick} label="Memory" value={`${Math.round(memoryLimit / 1024)} MB`} />
+            {/* Only when the language actually raises it: the sandbox default is
+                not a promise the platform makes, so advertising it would be
+                noise on every C++ problem. */}
+            {stackLimit && stackLimit > 0
+                ? <Limit icon={Layers} label="Stack" value={`${Math.round(stackLimit / 1024)} MB`} />
+                : null}
             {interactive && <Badge tone="accent">Interactive</Badge>}
             {showDifficulty && (
                 <span className="flex items-center gap-1.5">

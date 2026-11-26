@@ -254,3 +254,65 @@ func TestResetRefusesLanguageWithoutADefault(t *testing.T) {
 		t.Errorf("body = %q, want an explanation of why nothing was restored", rec.Body.String())
 	}
 }
+
+// The judge toolchain is Linux/ELF, where GNU ld has no --stack option and
+// exits non-zero on it. An operator who sets a Windows-style linker stack flag
+// therefore breaks every submission in that language, and the only symptom is a
+// per-submission compile error — so the panel's Test button has to say so.
+func TestTestFlagsAPELinkerStackFlagAsAnError(t *testing.T) {
+	dir := t.TempDir()
+	// The exact shape an operator would write when trying to raise the stack.
+	seed := "name: C++\nkey: cpp-gpp-64\n" +
+		"compile: /usr/bin/g++ -static -DONLINE_JUDGE -Wl,--stack=268435456 -O2 -o {{exe}} {{src}}\n" +
+		"stack_limit_kb: 262144\nextensions: [.cpp]\n"
+	if err := os.WriteFile(filepath.Join(dir, "cpp-gpp-64.yaml"), []byte(seed), 0644); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	h := NewAdminLanguageHandler(dir, nil)
+	rec := httptest.NewRecorder()
+	h.Test(rec, adminLangReq(http.MethodPost, "/api/admin/languages/cpp-gpp-64/test", ""))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("Test status = %d, want 200 (body: %s)", rec.Code, rec.Body.String())
+	}
+
+	var got struct {
+		Status  string `json:"status"`
+		Message string `json:"message"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if got.Status != "error" {
+		t.Errorf("status = %q, want error — the flag makes the language uncompilable", got.Status)
+	}
+	if !strings.Contains(got.Message, "stack_limit_kb") {
+		t.Errorf("message = %q, want it to name the setting that does work", got.Message)
+	}
+}
+
+// A language with a working config and a real stack limit must not be flagged:
+// the check is for one specific unusable flag, not for mentioning the stack.
+func TestTestAcceptsAWorkingStackConfig(t *testing.T) {
+	dir := t.TempDir()
+	seed := "name: C++\nkey: cpp-gpp-64\n" +
+		"compile: /usr/bin/g++ -O2 -std=c++20 -o {{exe}} {{src}}\n" +
+		"stack_limit_kb: 262144\nextensions: [.cpp]\n"
+	if err := os.WriteFile(filepath.Join(dir, "cpp-gpp-64.yaml"), []byte(seed), 0644); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	h := NewAdminLanguageHandler(dir, nil)
+	rec := httptest.NewRecorder()
+	h.Test(rec, adminLangReq(http.MethodPost, "/api/admin/languages/cpp-gpp-64/test", ""))
+
+	var got struct {
+		Status string `json:"status"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if got.Status == "error" {
+		t.Errorf("status = error for a valid config; message: %s", rec.Body.String())
+	}
+}

@@ -246,9 +246,9 @@ func buildRunArgs(langCfg *compiler.LangConfig, cr *compiler.CompileResult) []st
 		if langCfg.Runtime != "" {
 			rtParts := strings.Fields(langCfg.Runtime)
 			runCmd := strings.Join(rtParts, " ") + " " + srcName + " < input.txt > output.txt 2> error.txt"
-			return []string{"/bin/sh", "-c", runCmd}
+			return withStackLimit([]string{"/bin/sh", "-c", runCmd}, langCfg)
 		}
-		return []string{"/bin/sh", "-c", "./Main < input.txt > output.txt 2> error.txt"}
+		return withStackLimit([]string{"/bin/sh", "-c", "./Main < input.txt > output.txt 2> error.txt"}, langCfg)
 	}
 
 	if cr != nil && cr.Success {
@@ -262,18 +262,18 @@ func buildRunArgs(langCfg *compiler.LangConfig, cr *compiler.CompileResult) []st
 			if cr.TarMode {
 				runCmd = "tar -xf compile.tar && " + runCmd
 			}
-			return []string{"/bin/sh", "-c", runCmd}
+			return withStackLimit([]string{"/bin/sh", "-c", runCmd}, langCfg)
 		}
 		runCmd := "./Main < input.txt > output.txt 2> error.txt"
 		if cr.TarMode {
 			runCmd = "tar -xf compile.tar && " + runCmd
 		}
-		return []string{"/bin/sh", "-c", runCmd}
+		return withStackLimit([]string{"/bin/sh", "-c", runCmd}, langCfg)
 	}
 
 	// A compile step was configured but produced no artefact. The worker
 	// rejects this as CE before running, so this is only a safe fallback.
-	return []string{"/bin/sh", "-c", "./Main < input.txt > output.txt 2> error.txt"}
+	return withStackLimit([]string{"/bin/sh", "-c", "./Main < input.txt > output.txt 2> error.txt"}, langCfg)
 }
 
 // subtaskOrderedCases returns test cases grouped by subtask (ascending), with

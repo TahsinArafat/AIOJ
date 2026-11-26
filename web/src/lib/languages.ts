@@ -27,6 +27,25 @@ export interface Language {
     name: string
     /** Starter template offered in the IDE and the submit pane. */
     template: string
+    /**
+     * Multipliers the judge applies to the problem's own limits, and the
+     * call-stack cap in KB (0 = sandbox default). Used to show the limit a
+     * submission is actually judged under; absent on the offline fallback.
+     */
+    limits?: LanguageLimits
+}
+
+export interface LanguageLimits {
+    time_limit_multiplier: number
+    memory_limit_multiplier: number
+    stack_limit_kb: number
+}
+
+/** Multipliers assumed when the server did not report any. */
+const NEUTRAL_LIMITS: LanguageLimits = {
+    time_limit_multiplier: 1,
+    memory_limit_multiplier: 1,
+    stack_limit_kb: 0,
 }
 
 const CPP_TEMPLATE = `#include <iostream>
@@ -133,6 +152,9 @@ interface PublicLanguageRow {
     key: string
     name: string
     extensions?: string[]
+    time_limit_multiplier?: number
+    memory_limit_multiplier?: number
+    stack_limit_kb?: number
 }
 
 /** Turn the server's rows into the shape the UI expects. */
@@ -142,7 +164,46 @@ export function toLanguages(rows: PublicLanguageRow[] | undefined | null): Langu
         key: r.key,
         name: r.name || r.key,
         template: templateFor(r.key, r.extensions),
+        // An older backend omits these; neutral multipliers keep a displayed
+        // limit equal to the problem's own rather than showing "0 s".
+        limits: {
+            time_limit_multiplier: r.time_limit_multiplier ?? NEUTRAL_LIMITS.time_limit_multiplier,
+            memory_limit_multiplier: r.memory_limit_multiplier ?? NEUTRAL_LIMITS.memory_limit_multiplier,
+            stack_limit_kb: r.stack_limit_kb ?? NEUTRAL_LIMITS.stack_limit_kb,
+        },
     }))
+}
+
+/**
+ * The limits a submission in `languageKey` is actually judged under.
+ *
+ * The problem row carries the base limits; the judge multiplies them by the
+ * language's own factors (Java and Python get more, C++ exactly what the
+ * problem says). Showing only the base is what made the problem page disagree
+ * with the verdict a contestant got.
+ *
+ * A per-problem override in `overrides` replaces the base *before* the
+ * multiplier is applied, matching judge.WorkerPool.getEffectiveLimits.
+ */
+export function effectiveLimits(
+    base: { time_limit: number; memory_limit: number },
+    languageKey: string | undefined | null,
+    languages: Language[] = FALLBACK_LANGUAGES,
+    overrides?: { language_id: string; time_limit_ms?: number | null; memory_limit_kb?: number | null }[],
+): { timeLimitMs: number; memoryLimitKB: number; stackLimitKB: number } {
+    let timeLimitMs = base.time_limit
+    let memoryLimitKB = base.memory_limit
+
+    const override = overrides?.find(o => o.language_id === languageKey)
+    if (override?.time_limit_ms != null) timeLimitMs = override.time_limit_ms
+    if (override?.memory_limit_kb != null) memoryLimitKB = override.memory_limit_kb
+
+    const limits = languages.find(l => l.key === languageKey)?.limits ?? NEUTRAL_LIMITS
+    return {
+        timeLimitMs: Math.round(timeLimitMs * limits.time_limit_multiplier),
+        memoryLimitKB: Math.round(memoryLimitKB * limits.memory_limit_multiplier),
+        stackLimitKB: limits.stack_limit_kb,
+    }
 }
 
 /**
