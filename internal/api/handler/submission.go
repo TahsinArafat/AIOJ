@@ -713,30 +713,50 @@ func (h *SubmissionHandler) BatchRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// One compile for the whole sweep. Compiling inside the per-case loop meant a
+	// 20-case problem ran g++ twenty times, which multiplied both the latency and
+	// the chance that a compile gets killed for memory.
+	compiled, failed := h.compileForRun(r.Context(), req.SourceCode, cfg)
+	if failed != nil {
+		// Every case reports the same compile failure; the panel shows the first.
+		results := make([]CustomRunResponse, len(req.Cases))
+		for i := range results {
+			results[i] = *failed
+		}
+		respondJSON(w, http.StatusOK, map[string]interface{}{"results": results})
+		return
+	}
+
 	results := make([]CustomRunResponse, 0, len(req.Cases))
 	for _, c := range req.Cases {
-		results = append(results, h.runOnce(r.Context(), CustomRunRequest{
+		results = append(results, h.runPrepared(r.Context(), CustomRunRequest{
 			SourceCode:    req.SourceCode,
 			Language:      req.Language,
 			Input:         c.Input,
 			Expected:      c.Expected,
 			TimeLimitMs:   req.TimeLimitMs,
 			MemoryLimitKB: req.MemoryLimitKB,
-		}, cfg))
+		}, cfg, compiled))
 	}
 	respondJSON(w, http.StatusOK, map[string]interface{}{"results": results})
 }
 
-// runShellCommand builds the single shell command that compiles and runs the
-// submission inside the sandbox.
+// runInvocation is the command that starts the contestant's program, plus the
+// files the sandbox needs to have in place for it.
+type runInvocation struct {
+	Args   []string
+	CopyIn map[string]executor.CmdFile
+}
+
+// buildRunInvocation constructs the command that runs a compiled (or
+// interpreted) submission against input.txt, capturing stdout/stderr to files.
 //
-// The compile step redirects its own stderr into error.txt. Without that the
-// compiler's diagnostics went to the shell's stderr, which the sandbox does not
-// return — only files named in CopyOut come back. On a failed compile `&&` then
-// short-circuits, so error.txt was never even created and the IDE reported
-// "Compilation failed (no error output captured)" instead of the real error.
-// The braces group the redirect so it also covers compound compile commands.
-func runShellCommand(cfg *compiler.LangConfig, srcName string) string {
+// The interpreted branch is chosen from the language config, never from whether
+// a compile produced an artefact: a language with no compile step reports
+// Success with an empty file map, so deciding on that ran `python3` with no
+// script and every interpreted submission read the test input as its own
+// program.
+func buildRunInvocation(cfg *compiler.LangConfig, srcName, sourceCode string, compiled *compiler.CompileResult) runInvocation {
 	fill := func(s string) string {
 		s = strings.ReplaceAll(s, "{{exe}}", "Main")
 		s = strings.ReplaceAll(s, "{{src}}", srcName)
@@ -745,43 +765,72 @@ func runShellCommand(cfg *compiler.LangConfig, srcName string) string {
 
 	const captureRun = " < input.txt > output.txt 2> error.txt"
 
-	var run string
-	switch {
-	case cfg.CompileCmd != "":
-		compile := "{ " + fill(cfg.CompileCmd) + " ; } 2> error.txt && "
+	copyIn := map[string]executor.CmdFile{"input.txt": {Content: ""}}
+
+	if cfg.CompileCmd == "" {
+		copyIn[srcName] = executor.CmdFile{Content: sourceCode}
 		if cfg.Runtime != "" {
-			run = compile + strings.Join(strings.Fields(fill(cfg.Runtime)), " ") + captureRun
-		} else {
-			run = compile + "./Main" + captureRun
+			return runInvocation{
+				Args:   []string{"/bin/sh", "-c", strings.Join(strings.Fields(fill(cfg.Runtime)), " ") + " " + srcName + captureRun},
+				CopyIn: copyIn,
+			}
 		}
-	case cfg.Runtime != "":
-		run = strings.Join(strings.Fields(fill(cfg.Runtime)), " ") + " " + srcName + captureRun
-	default:
+		return runInvocation{Args: []string{"/bin/sh", "-c", "./Main" + captureRun}, CopyIn: copyIn}
+	}
+
+	// A compile step was configured. The artefact comes back as a go-judge file
+	// ID, so it is passed through unchanged.
+	if compiled != nil {
+		for name, file := range compiled.Files {
+			copyIn[name] = file
+		}
+	}
+	var run string
+	if cfg.Runtime != "" {
+		run = strings.Join(strings.Fields(fill(cfg.Runtime)), " ") + captureRun
+	} else {
 		run = "./Main" + captureRun
 	}
-
-	// A run must be judged under the same stack cap a submission gets, or the
-	// scratchpad disagrees with the judge on exactly the deep-recursion cases
-	// the contestant is trying to debug. Grouped so the cap applies to the
-	// program alone and never to the compile that precedes it.
-	if cfg.StackLimitKB > 0 {
-		run = "{ ulimit -s " + strconv.Itoa(cfg.StackLimitKB) + "; " + run + "; }"
+	if compiled != nil && compiled.TarMode {
+		run = "tar -xf compile.tar && " + run
 	}
-	return run
+	return runInvocation{Args: []string{"/bin/sh", "-c", run}, CopyIn: copyIn}
 }
 
-// runOnce performs one compile-and-execute. Split out of CustomRun so BatchRun
-// can reuse it without re-running the auth, decode and quota preamble per case.
-func (h *SubmissionHandler) runOnce(ctx context.Context, req CustomRunRequest, cfg *compiler.LangConfig) CustomRunResponse {
-	compileOutput := ""
-	copyIn := map[string]executor.CmdFile{}
-	var args []string
+// compileForRun compiles the submission once, with the same budget the judge
+// gives a compile.
+//
+// This used to be folded into the run command, which meant g++ compiled under
+// the *run* limit — 256 MB and 5 s for C++. A real -O2 compile of a
+// template-heavy file exceeds both, so cc1plus was OOM-killed and the panel
+// showed "g++: fatal error: Killed signal terminated program cc1plus" as a
+// compile error on code the judge compiles without complaint.
+//
+// A nil result with a nil response means there was nothing to compile.
+func (h *SubmissionHandler) compileForRun(ctx context.Context, sourceCode string, cfg *compiler.LangConfig) (*compiler.CompileResult, *CustomRunResponse) {
+	if cfg.CompileCmd == "" {
+		return nil, nil
+	}
 
+	compiled, err := compiler.New(h.exec).CompileContestant(ctx, sourceCode, cfg)
+	if err != nil {
+		return nil, &CustomRunResponse{Status: "SE", CompileOutput: "compilation failed: " + err.Error()}
+	}
+	if !compiled.Success {
+		out := compiled.Output
+		if out == "" {
+			out = "Compilation failed (no error output captured)"
+		}
+		return nil, &CustomRunResponse{Status: "CE", CompileOutput: out}
+	}
+	return compiled, nil
+}
+
+// runPrepared executes one input against an already-compiled submission.
+func (h *SubmissionHandler) runPrepared(ctx context.Context, req CustomRunRequest, cfg *compiler.LangConfig, compiled *compiler.CompileResult) CustomRunResponse {
 	srcName := "Main" + cfg.Extensions[0]
-	copyIn[srcName] = executor.CmdFile{Content: req.SourceCode}
-	copyIn["input.txt"] = executor.CmdFile{Content: req.Input}
-
-	args = []string{"/bin/sh", "-c", runShellCommand(cfg, srcName)}
+	inv := buildRunInvocation(cfg, srcName, req.SourceCode, compiled)
+	inv.CopyIn["input.txt"] = executor.CmdFile{Content: req.Input}
 
 	// Client-supplied limits are honored only up to hard ceilings (2x the
 	// defaults) so a single user cannot pin shared judge workers for minutes.
@@ -805,62 +854,30 @@ func (h *SubmissionHandler) runOnce(ctx context.Context, req CustomRunRequest, c
 	start := time.Now()
 	resp, err := h.exec.Run(ctx, &executor.ExecRequest{
 		Cmd: []executor.Cmd{{
-			Args:        args,
+			Args:        inv.Args,
 			Env:         []string{"PATH=/usr/bin:/bin", "HOME=/tmp"},
 			CPULimit:    cpuNs,
 			MemoryLimit: memBytes,
-			ProcLimit:   64,
-			CopyIn:      copyIn,
-			CopyOut:     []string{"output.txt", "error.txt"},
+			// The scratchpad must apply the same stack cap the judge does, or it
+			// disagrees with the verdict on exactly the deep-recursion cases a
+			// contestant is using it to debug.
+			StackLimit: cfg.StackLimitBytes(),
+			ProcLimit:  64,
+			CopyIn:     inv.CopyIn,
+			CopyOut:    []string{"output.txt", "error.txt"},
 		}},
 	})
 	elapsed := int(time.Since(start).Milliseconds())
 
 	if err != nil {
-		return CustomRunResponse{
-			Status:        "SE",
-			CompileOutput: "execution client error: " + err.Error(),
-		}
+		return CustomRunResponse{Status: "SE", CompileOutput: "execution client error: " + err.Error()}
 	}
-
 	if len(resp) == 0 {
-		return CustomRunResponse{
-			Status:        "SE",
-			CompileOutput: "no execution response received",
-		}
+		return CustomRunResponse{Status: "SE", CompileOutput: "no execution response received"}
 	}
 
 	cr := resp[0]
 	slog.Info("custom run result", "status", cr.Status, "exit", cr.ExitStatus, "error", cr.Error)
-
-	stdout := ""
-	if out, ok := cr.Files["output.txt"]; ok {
-		stdout = out
-	}
-	stderr := ""
-	if errOut, ok := cr.Files["error.txt"]; ok {
-		stderr = errOut
-	}
-
-	if cfg.CompileCmd != "" && cr.Status == "Nonzero Exit Status" {
-		compileOutput = stderr
-		if compileOutput == "" {
-			compileOutput = cr.Error
-		}
-		if compileOutput == "" {
-			// Some compilers write errors to stdout
-			if out, ok := cr.Files["output.txt"]; ok {
-				compileOutput = out
-			}
-		}
-		if compileOutput == "" {
-			compileOutput = "Compilation failed (no error output captured)"
-		}
-		return CustomRunResponse{
-			Status:        "CE",
-			CompileOutput: compileOutput,
-		}
-	}
 
 	status := "success"
 	switch cr.Status {
@@ -870,22 +887,32 @@ func (h *SubmissionHandler) runOnce(ctx context.Context, req CustomRunRequest, c
 		status = "TLE"
 	case "MemoryLimitExceeded":
 		status = "MLE"
-	case "RuntimeError":
-		status = "RE"
 	default:
 		status = "RE"
 	}
 
+	stdout := cr.Files["output.txt"]
+	stderr := cr.Files["error.txt"]
+
 	return CustomRunResponse{
-		Status:        status,
-		Stdout:        stdout,
-		Stderr:        stderr,
-		TimeUsed:      elapsed,
-		MemoryUsed:    int(cr.Memory / 1024),
-		CompileOutput: compileOutput,
-		Passed:        compareOutput(status, stdout, req.Expected),
-		Expected:      req.Expected,
+		Status:     status,
+		Stdout:     stdout,
+		Stderr:     stderr,
+		TimeUsed:   elapsed,
+		MemoryUsed: int(cr.Memory / 1024),
+		Passed:     compareOutput(status, stdout, req.Expected),
+		Expected:   req.Expected,
 	}
+}
+
+// runOnce performs one compile-and-execute for a single /run request. BatchRun
+// compiles once and calls runPrepared per case instead.
+func (h *SubmissionHandler) runOnce(ctx context.Context, req CustomRunRequest, cfg *compiler.LangConfig) CustomRunResponse {
+	compiled, failed := h.compileForRun(ctx, req.SourceCode, cfg)
+	if failed != nil {
+		return *failed
+	}
+	return h.runPrepared(ctx, req, cfg, compiled)
 }
 
 func compareOutput(status, stdout, expected string) *bool {

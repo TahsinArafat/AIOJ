@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/tahsinarafat/aioj/internal/judge/executor"
+	"github.com/tahsinarafat/aioj/lang"
+	"gopkg.in/yaml.v3"
 )
 
 // Compiled binaries are not UTF-8. go-judge's raw JSON `files` field replaces
@@ -82,5 +84,26 @@ func TestBuildCompileCmdLeavesOperatorFlagsIntact(t *testing.T) {
 		"-Wl,--stack=268435456 -O2 -std=c++20 -o Main Main.cpp"
 	if got != want {
 		t.Fatalf("compile argv was rewritten:\n got: %s\nwant: %s", got, want)
+	}
+}
+
+// The shipped configs for the native compiled languages must carry a stack
+// limit. Without one the sandbox applies no RLIMIT_STACK and the process runs
+// under the container's 8 MB, so an ordinary DFS segfaults — and because Reset
+// to Default restores these exact bytes, a missing field would also silently
+// erase an operator's own setting.
+func TestShippedCompiledLanguagesSetAStackLimit(t *testing.T) {
+	for _, key := range []string{"c-gcc-64", "cpp-gpp-64", "cpp-clang", "rust"} {
+		data, ok := lang.Default(key)
+		if !ok {
+			t.Fatalf("no shipped config for %s", key)
+		}
+		var cfg LangConfig
+		if err := yaml.Unmarshal(data, &cfg); err != nil {
+			t.Fatalf("%s: invalid YAML: %v", key, err)
+		}
+		if cfg.StackLimitKB < 64*1024 {
+			t.Errorf("%s: stack_limit_kb = %d, want at least 64 MB so recursion does not crash", key, cfg.StackLimitKB)
+		}
 	}
 }

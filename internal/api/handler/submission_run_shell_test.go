@@ -1,140 +1,211 @@
 package handler
 
 import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/tahsinarafat/aioj/internal/judge/compiler"
+	"github.com/tahsinarafat/aioj/internal/judge/executor"
 )
 
-// A failed compile has to leave its diagnostics in error.txt.
-//
-// The compile step used to run bare before `&&`, so a compiler error went to the
-// shell's stderr — which the sandbox never returns — and `&&` short-circuited
-// before error.txt was created. The IDE then reported "Compilation failed (no
-// error output captured)" instead of the error itself.
-func TestRunShellCommandCapturesCompilerStderr(t *testing.T) {
-	tests := []struct {
-		name string
-		cfg  *compiler.LangConfig
-		want []string
-	}{
-		{
-			name: "compiled, no runtime (c++)",
-			cfg: &compiler.LangConfig{
-				CompileCmd: "/usr/bin/g++ -O2 -std=c++17 -o {{exe}} {{src}}",
-				Extensions: []string{".cpp"},
-			},
-			want: []string{
-				"{ /usr/bin/g++ -O2 -std=c++17 -o Main Main.cpp ; } 2> error.txt && ./Main",
-			},
-		},
-		{
-			name: "compiled with runtime (java)",
-			cfg: &compiler.LangConfig{
-				CompileCmd: "/usr/bin/javac -d {{dir}} {{src}}",
-				Runtime:    "/usr/bin/java -cp {{dir}} Main",
-				Extensions: []string{".java"},
-			},
-			want: []string{
-				"{ /usr/bin/javac -d . Main.java ; } 2> error.txt && /usr/bin/java -cp . Main",
-			},
-		},
-		{
-			name: "interpreted (python)",
-			cfg: &compiler.LangConfig{
-				Runtime:    "/usr/bin/python3",
-				Extensions: []string{".py"},
-			},
-			want: []string{"/usr/bin/python3 Main.py"},
-		},
+// "Test Samples" used to compile and run in one sandbox process, under the run
+// limit — 256 MB and 5 s for C++. A real -O2 compile exceeds that, so cc1plus
+// was OOM-killed and the panel reported "g++: fatal error: Killed signal
+// terminated program cc1plus" as a compile error on code the judge compiles
+// happily. Compiling and running are now separate sandbox calls, each with the
+// budget the judge gives that phase.
+
+// TestCompileForRunUsesTheJudgeCompileBudget pins the memory and CPU a compile
+// gets. The numbers are the compiler package's own, so a compile cannot be
+// starved relative to the judge path.
+func TestCompileForRunUsesTheJudgeCompileBudget(t *testing.T) {
+	var got executor.Cmd
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req executor.ExecRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Errorf("decode request: %v", err)
+		}
+		got = req.Cmd[0]
+		json.NewEncoder(w).Encode([]executor.CmdResult{{
+			Status:  "Accepted",
+			FileIDs: map[string]string{"Main": "file-1"},
+		}})
+	}))
+	defer srv.Close()
+
+	h := &SubmissionHandler{exec: executor.NewClient(srv.URL)}
+	cfg := &compiler.LangConfig{
+		Key:        "cpp-gpp-64",
+		CompileCmd: "/usr/bin/g++ -O2 -o {{exe}} {{src}}",
+		Extensions: []string{".cpp"},
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			got := runShellCommand(tc.cfg, "Main"+tc.cfg.Extensions[0])
+	if _, failed := h.compileForRun(t.Context(), "int main(){}", cfg); failed != nil {
+		t.Fatalf("compile failed: %+v", failed)
+	}
 
-			for _, want := range tc.want {
-				if !strings.Contains(got, want) {
-					t.Fatalf("command missing %q:\n%s", want, got)
-				}
-			}
-			// Every branch must capture both streams, or a run reports no output
-			// and no error.
-			if !strings.Contains(got, "> output.txt") {
-				t.Errorf("stdout is not captured:\n%s", got)
-			}
-			if !strings.HasSuffix(got, "2> error.txt") {
-				t.Errorf("run stderr is not captured:\n%s", got)
-			}
-			// A compile step must redirect before `&&`, otherwise a compile
-			// failure never reaches error.txt.
-			if tc.cfg.CompileCmd != "" {
-				compileAt := strings.Index(got, "2> error.txt")
-				andAt := strings.Index(got, "&&")
-				if compileAt == -1 || andAt == -1 || compileAt > andAt {
-					t.Errorf("compile stderr is not redirected before &&:\n%s", got)
-				}
-			}
-		})
+	if got.MemoryLimit != 512*1024*1024 {
+		t.Errorf("compile memory limit = %d, want 512 MB — below this g++ is OOM-killed", got.MemoryLimit)
+	}
+	if got.CPULimit < 30*1e9 {
+		t.Errorf("compile CPU limit = %d ns, want at least 30 s", got.CPULimit)
 	}
 }
 
-// The scratchpad must judge under the same stack cap a submission gets, or it
-// disagrees with the judge on exactly the deep-recursion cases a contestant is
-// using it to debug.
-func TestRunShellCommandAppliesTheStackLimit(t *testing.T) {
+// A language with no compile step must not spend a sandbox call compiling.
+func TestCompileForRunSkipsInterpretedLanguages(t *testing.T) {
+	var calls int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		json.NewEncoder(w).Encode([]executor.CmdResult{{Status: "Accepted"}})
+	}))
+	defer srv.Close()
+
+	h := &SubmissionHandler{exec: executor.NewClient(srv.URL)}
+	cfg := &compiler.LangConfig{Key: "python", Runtime: "/usr/bin/python3", Extensions: []string{".py"}}
+
+	compiled, failed := h.compileForRun(t.Context(), "print(1)", cfg)
+	if failed != nil {
+		t.Fatalf("unexpected failure: %+v", failed)
+	}
+	if compiled != nil {
+		t.Errorf("compiled = %+v, want nil for a language with no compile step", compiled)
+	}
+	if calls != 0 {
+		t.Errorf("%d sandbox calls for an interpreted language, want 0", calls)
+	}
+}
+
+// A compile that fails must come back as CE with the compiler's own diagnostics,
+// not as a runtime error from the run phase.
+func TestCompileForRunReportsCEWithCompilerOutput(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode([]executor.CmdResult{{
+			Status:     "Nonzero Exit Status",
+			ExitStatus: 1,
+			Files:      map[string]string{"error.txt": "Main.cpp:1:1: error: expected ';'"},
+		}})
+	}))
+	defer srv.Close()
+
+	h := &SubmissionHandler{exec: executor.NewClient(srv.URL)}
+	cfg := &compiler.LangConfig{CompileCmd: "/usr/bin/g++ -o {{exe}} {{src}}", Extensions: []string{".cpp"}}
+
+	_, failed := h.compileForRun(t.Context(), "int main(){", cfg)
+	if failed == nil {
+		t.Fatal("a failed compile returned no error response")
+	}
+	if failed.Status != "CE" {
+		t.Errorf("status = %q, want CE", failed.Status)
+	}
+	if !strings.Contains(failed.CompileOutput, "expected ';'") {
+		t.Errorf("compile output = %q, want the compiler's diagnostics", failed.CompileOutput)
+	}
+}
+
+// The run call must carry the stack limit as a sandbox rlimit. go-judge applies
+// rlimits before exec, so this is the only value that has any effect.
+func TestRunPreparedSendsTheStackLimit(t *testing.T) {
+	var got executor.Cmd
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req executor.ExecRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Errorf("decode request: %v", err)
+		}
+		got = req.Cmd[0]
+		json.NewEncoder(w).Encode([]executor.CmdResult{{Status: "Accepted"}})
+	}))
+	defer srv.Close()
+
+	h := &SubmissionHandler{exec: executor.NewClient(srv.URL)}
 	cfg := &compiler.LangConfig{
 		CompileCmd:   "/usr/bin/g++ -O2 -o {{exe}} {{src}}",
 		Extensions:   []string{".cpp"},
 		StackLimitKB: 262144,
 	}
 
-	got := runShellCommand(cfg, "Main.cpp")
+	h.runPrepared(t.Context(), CustomRunRequest{Input: "1"}, cfg,
+		&compiler.CompileResult{Success: true, Files: map[string]executor.CmdFile{"Main": {FileID: "f1"}}})
 
-	if !strings.Contains(got, "ulimit -s 262144") {
-		t.Fatalf("stack limit missing:\n%s", got)
+	if got.StackLimit != 262144*1024 {
+		t.Errorf("stackLimit = %d, want 262144 KB in bytes", got.StackLimit)
 	}
-	// The cap must apply to the program only. A limit set before the compile
-	// would also be inherited by g++, which needs a normal stack to run at all.
-	if at := strings.Index(got, "ulimit -s"); at > strings.Index(got, "g++") {
-		t.Errorf("stack limit is set before the compile runs:\n%s", got)
-	}
-	// Ungrouped, the `;` would also apply the limit to anything the caller
-	// appends after the program.
-	if !strings.Contains(got, "{ ulimit -s 262144; ") {
-		t.Errorf("stack limit is not scoped to the run:\n%s", got)
+	// The compiled artefact has to travel with the run, or the sandbox has
+	// nothing to execute.
+	if _, ok := got.CopyIn["Main"]; !ok {
+		t.Errorf("copyIn = %v, want the compiled artefact", got.CopyIn)
 	}
 }
 
-// A language with no stack_limit_kb keeps the sandbox default; the command must
-// be byte-identical to what it was before the knob existed.
-func TestRunShellCommandLeavesTheCommandAloneWithoutAStackLimit(t *testing.T) {
+// An unset stack limit must leave the field at zero so the sandbox default
+// stands; sending 0 explicitly is what "no limit configured" means to go-judge.
+func TestRunPreparedOmitsAnUnsetStackLimit(t *testing.T) {
+	var got executor.Cmd
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req executor.ExecRequest
+		json.NewDecoder(r.Body).Decode(&req)
+		got = req.Cmd[0]
+		json.NewEncoder(w).Encode([]executor.CmdResult{{Status: "Accepted"}})
+	}))
+	defer srv.Close()
+
+	h := &SubmissionHandler{exec: executor.NewClient(srv.URL)}
 	cfg := &compiler.LangConfig{Runtime: "/usr/bin/python3", Extensions: []string{".py"}}
 
-	if got := runShellCommand(cfg, "Main.py"); got != "/usr/bin/python3 Main.py < input.txt > output.txt 2> error.txt" {
-		t.Fatalf("command = %q, want it untouched when stack_limit_kb is unset", got)
+	h.runPrepared(t.Context(), CustomRunRequest{Input: "1"}, cfg, nil)
+
+	if got.StackLimit != 0 {
+		t.Errorf("stackLimit = %d, want 0 when the language sets none", got.StackLimit)
 	}
 }
 
-// The placeholders in lang/*.yaml are what make the command runnable; an
-// unreplaced one reaches the shell as literal text.
-func TestRunShellCommandFillsPlaceholders(t *testing.T) {
+// buildRunInvocation is the batch path's command builder: every branch has to
+// capture both streams and read input.txt, or a run reports nothing.
+func TestBuildRunInvocationCapturesBothStreams(t *testing.T) {
+	cases := map[string]*compiler.LangConfig{
+		"compiled":           {CompileCmd: "/usr/bin/g++ -o {{exe}} {{src}}", Extensions: []string{".cpp"}},
+		"compiled + runtime": {CompileCmd: "/usr/bin/javac -d {{dir}} {{src}}", Runtime: "/usr/bin/java -cp {{dir}} Main", Extensions: []string{".java"}},
+		"interpreted":        {Runtime: "/usr/bin/python3", Extensions: []string{".py"}},
+	}
+
+	for name, cfg := range cases {
+		inv := buildRunInvocation(cfg, "Main"+cfg.Extensions[0], "code", &compiler.CompileResult{Success: true})
+		script := inv.Args[len(inv.Args)-1]
+
+		if !strings.Contains(script, "< input.txt") {
+			t.Errorf("%s: command does not read input.txt:\n%s", name, script)
+		}
+		if !strings.Contains(script, "> output.txt") {
+			t.Errorf("%s: stdout is not captured:\n%s", name, script)
+		}
+		if !strings.Contains(script, "2> error.txt") {
+			t.Errorf("%s: stderr is not captured:\n%s", name, script)
+		}
+		if strings.Contains(script, "{{") {
+			t.Errorf("%s: unreplaced placeholder:\n%s", name, script)
+		}
+	}
+}
+
+// The tarball Java's compile produces has to be unpacked before the run, or
+// `java -cp . Main` finds no classes.
+func TestBuildRunInvocationUnpacksTarMode(t *testing.T) {
 	cfg := &compiler.LangConfig{
-		CompileCmd: "/usr/bin/mcs -out:{{exe}} {{src}}",
-		Runtime:    "/usr/bin/mono {{exe}}",
-		Extensions: []string{".cs"},
+		CompileCmd: "/usr/bin/javac -d {{dir}} {{src}}",
+		Runtime:    "/usr/bin/java -cp {{dir}} Main",
+		Extensions: []string{".java"},
 	}
 
-	got := runShellCommand(cfg, "Main.cs")
+	inv := buildRunInvocation(cfg, "Main.java", "code",
+		&compiler.CompileResult{Success: true, TarMode: true, Files: map[string]executor.CmdFile{"compile.tar": {FileID: "f1"}}})
 
-	if strings.Contains(got, "{{") {
-		t.Fatalf("unreplaced placeholder left in command:\n%s", got)
+	if !strings.Contains(inv.Args[len(inv.Args)-1], "tar -xf compile.tar") {
+		t.Errorf("command does not unpack the class archive:\n%s", inv.Args[len(inv.Args)-1])
 	}
-	if !strings.Contains(got, "/usr/bin/mcs -out:Main Main.cs") {
-		t.Errorf("compile placeholders not filled:\n%s", got)
-	}
-	if !strings.Contains(got, "/usr/bin/mono Main") {
-		t.Errorf("runtime placeholders not filled:\n%s", got)
+	if _, ok := inv.CopyIn["compile.tar"]; !ok {
+		t.Errorf("copyIn = %v, want the archive", inv.CopyIn)
 	}
 }

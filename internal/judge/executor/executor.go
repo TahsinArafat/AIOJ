@@ -53,11 +53,21 @@ func (f CmdFile) MarshalJSON() ([]byte, error) {
 }
 
 type Cmd struct {
-	Args          []string           `json:"args"`
-	Env           []string           `json:"env,omitempty"`
-	Files         []CmdFile          `json:"files,omitempty"`
-	CPULimit      uint64             `json:"cpuLimit"`
-	MemoryLimit   uint64             `json:"memoryLimit"`
+	Args        []string  `json:"args"`
+	Env         []string  `json:"env,omitempty"`
+	Files       []CmdFile `json:"files,omitempty"`
+	CPULimit    uint64    `json:"cpuLimit"`
+	MemoryLimit uint64    `json:"memoryLimit"`
+	// StackLimit is the RLIMIT_STACK go-judge applies to the process, in bytes.
+	// Zero means "leave the sandbox default", which is the container's inherited
+	// value (8 MB) — far below what a recursive solution needs, and the reason
+	// deep recursion died with SIGSEGV at a depth unrelated to the memory limit.
+	//
+	// This is the only way to change it: go-judge applies rlimits itself before
+	// exec, so a `ulimit -s` in the command's own shell runs *after* the value is
+	// already fixed, and `-Wl,--stack=` is a PE/COFF linker option that GNU ld
+	// rejects outright on Linux.
+	StackLimit    uint64             `json:"stackLimit,omitempty"`
 	ProcLimit     uint64             `json:"procLimit"`
 	CopyIn        map[string]CmdFile `json:"copyIn,omitempty"`
 	CopyOut       []string           `json:"copyOut,omitempty"`

@@ -104,9 +104,13 @@ func (b *BatchRunner) runOne(
 			Env:         []string{"PATH=/usr/bin:/bin", "HOME=/tmp"},
 			CPULimit:    in.CPULimitNs,
 			MemoryLimit: in.MemLimitBytes,
-			ProcLimit:   64,
-			CopyIn:      copyIn,
-			CopyOut:     []string{"output.txt", "error.txt"},
+			// The stack cap has to be a sandbox rlimit, not a shell command:
+			// go-judge applies rlimits before exec, so `ulimit -s` in the
+			// command's own shell could only ever lower the inherited value.
+			StackLimit: langCfg.StackLimitBytes(),
+			ProcLimit:  64,
+			CopyIn:     copyIn,
+			CopyOut:    []string{"output.txt", "error.txt"},
 		}},
 	})
 	elapsed := int(time.Since(start).Milliseconds())
@@ -246,9 +250,9 @@ func buildRunArgs(langCfg *compiler.LangConfig, cr *compiler.CompileResult) []st
 		if langCfg.Runtime != "" {
 			rtParts := strings.Fields(langCfg.Runtime)
 			runCmd := strings.Join(rtParts, " ") + " " + srcName + " < input.txt > output.txt 2> error.txt"
-			return withStackLimit([]string{"/bin/sh", "-c", runCmd}, langCfg)
+			return []string{"/bin/sh", "-c", runCmd}
 		}
-		return withStackLimit([]string{"/bin/sh", "-c", "./Main < input.txt > output.txt 2> error.txt"}, langCfg)
+		return []string{"/bin/sh", "-c", "./Main < input.txt > output.txt 2> error.txt"}
 	}
 
 	if cr != nil && cr.Success {
@@ -262,18 +266,18 @@ func buildRunArgs(langCfg *compiler.LangConfig, cr *compiler.CompileResult) []st
 			if cr.TarMode {
 				runCmd = "tar -xf compile.tar && " + runCmd
 			}
-			return withStackLimit([]string{"/bin/sh", "-c", runCmd}, langCfg)
+			return []string{"/bin/sh", "-c", runCmd}
 		}
 		runCmd := "./Main < input.txt > output.txt 2> error.txt"
 		if cr.TarMode {
 			runCmd = "tar -xf compile.tar && " + runCmd
 		}
-		return withStackLimit([]string{"/bin/sh", "-c", runCmd}, langCfg)
+		return []string{"/bin/sh", "-c", runCmd}
 	}
 
 	// A compile step was configured but produced no artefact. The worker
 	// rejects this as CE before running, so this is only a safe fallback.
-	return withStackLimit([]string{"/bin/sh", "-c", "./Main < input.txt > output.txt 2> error.txt"}, langCfg)
+	return []string{"/bin/sh", "-c", "./Main < input.txt > output.txt 2> error.txt"}
 }
 
 // subtaskOrderedCases returns test cases grouped by subtask (ascending), with

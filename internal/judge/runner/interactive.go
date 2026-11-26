@@ -90,11 +90,6 @@ func (ir *InteractiveRunner) Run(ctx context.Context, in RunInput) (RunOutput, e
 			contestantArgs = []string{compiler.SandboxWorkDir + "/Main"}
 			contestantRunCopyIn["Main"] = compiledBin
 		}
-		// Interactive problems recurse just like batch ones, so the contestant's
-		// stack cap is raised here too. The pair runs as one sandbox request, so
-		// this wraps only the contestant's argv, never the interactor's.
-		contestantArgs = withStackLimit(contestantArgs, cfg)
-
 		interArgs := []string{compiler.SandboxWorkDir + "/interactor"}
 		if inputContent != "" {
 			interArgs = append(interArgs, compiler.SandboxWorkDir+"/input.txt")
@@ -103,7 +98,7 @@ func (ir *InteractiveRunner) Run(ctx context.Context, in RunInput) (RunOutput, e
 		iResult, err := runInteractivePair(ctx, ir.exec,
 			interArgs, interRunCopyIn,
 			contestantArgs, contestantRunCopyIn,
-			in.CPULimitNs, in.MemLimitBytes)
+			in.CPULimitNs, in.MemLimitBytes, cfg.StackLimitBytes())
 		if err != nil {
 			results = append(results, model.TestCaseResult{
 				Index:    i + 1,
@@ -262,6 +257,7 @@ func runInteractivePair(
 	contestantCopyIn map[string]executor.CmdFile,
 	cpuLimitNs uint64,
 	memoryLimitBytes uint64,
+	stackLimitBytes uint64,
 ) (*interactiveResult, error) {
 	req := &executor.ExecRequest{
 		Cmd: []executor.Cmd{
@@ -276,8 +272,11 @@ func runInteractivePair(
 				Args:        contestantCmd,
 				CPULimit:    cpuLimitNs,
 				MemoryLimit: memoryLimitBytes,
-				ProcLimit:   64,
-				CopyIn:      contestantCopyIn,
+				// Only the contestant gets the configured stack: the interactor is
+				// platform code, and a problem's stack setting is not about it.
+				StackLimit: stackLimitBytes,
+				ProcLimit:  64,
+				CopyIn:     contestantCopyIn,
 			},
 		},
 		PipeInput: true,
