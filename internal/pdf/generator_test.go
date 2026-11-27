@@ -440,3 +440,38 @@ func TestBookletStatesPartialScoring(t *testing.T) {
 		t.Fatal("a complete-scored problem printed a partial-scoring notice")
 	}
 }
+
+// Input and output share one row. Stacked, each sample cost a second box of
+// vertical space, which is the first thing to go when a booklet is printed.
+func TestBookletPutsSampleInputAndOutputSideBySide(t *testing.T) {
+	c := &model.Contest{ID: "c1", Title: "R", StartTime: mustTime(), EndTime: mustTime()}
+	out, err := NewGenerator().GenerateContestPDF(c, []model.ProblemWithSamples{{
+		Index: "A",
+		Problem: model.Problem{
+			Title:       "D",
+			Description: "Read $n$.",
+			SampleCases: []model.SampleCase{{Input: "4 7", Output: "1"}},
+		},
+	}})
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	html := string(out)
+
+	// One row, two cells: the input cell must open before the output cell.
+	cells := strings.Count(html, `<td class="sample-cell">`)
+	if cells != 2 {
+		t.Fatalf("a sample has %d cells, want 2 (input and output share one row)", cells)
+	}
+	if strings.Index(html, "Input") > strings.Index(html, "Output") {
+		t.Fatal("the output cell precedes the input cell")
+	}
+	if !strings.Contains(html, `<table class="sample-table">`) {
+		t.Fatal("the sample pair is not a table, so the two boxes cannot share a row")
+	}
+	// The boxes keep their own labels, so a reader can still tell which is which.
+	if !strings.Contains(html, `<div class="sample-box-label">Input</div>`) ||
+		!strings.Contains(html, `<div class="sample-box-label">Output</div>`) {
+		t.Fatal("a sample lost its Input/Output label")
+	}
+}

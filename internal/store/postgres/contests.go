@@ -22,7 +22,7 @@ func (s *ContestStore) Create(ctx context.Context, c *model.Contest) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	var configJSON []byte
 	if c.EducationalConfig != nil {
@@ -302,7 +302,7 @@ func (s *ContestStore) Update(ctx context.Context, c *model.Contest) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	_, err = tx.ExecContext(ctx,
 		`UPDATE contests SET title=$1, type=$2, format=$3, format_config=$4, start_time=$5, end_time=$6,
 	 freeze_time=$7, password_hash=$8, description=$9, pdf_enabled=$10, statement_hidden=$11,
@@ -448,7 +448,7 @@ func (s *ContestStore) RenumberProblems(ctx context.Context, contestID string) (
 	if err != nil {
 		return nil, fmt.Errorf("begin tx: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	rows, err := tx.QueryContext(ctx,
 		`SELECT problem_id FROM contest_problems

@@ -633,6 +633,20 @@ var pdfTemplate = `<!DOCTYPE html>
     text-transform: uppercase;
     letter-spacing: 0.3pt;
   }
+  /* Input and output side by side, as on the problem page: two stacked boxes
+     cost a full extra column of vertical space per sample, and a printed
+     booklet is where that adds up. */
+  .sample-table {
+    border-collapse: collapse;
+    width: 100%;
+    table-layout: fixed;
+  }
+  .sample-cell {
+    width: 50%;
+    vertical-align: top;
+    padding: 0;
+  }
+  .sample-cell + .sample-cell { padding-left: 4mm; }
   .sample-box {
     border: 1pt solid #bbb;
     background: #fafafa;
@@ -786,10 +800,18 @@ var pdfTemplate = `<!DOCTYPE html>
   {{range .Samples}}
     <div class="sample-pair">
       <div class="sample-label">Sample {{.Number}}</div>
-      <div class="sample-box-label">Input</div>
-      <div class="sample-box">{{.Input}}</div>
-      <div class="sample-box-label">Output</div>
-      <div class="sample-box">{{.Output}}</div>
+      <table class="sample-table">
+        <tr>
+          <td class="sample-cell">
+            <div class="sample-box-label">Input</div>
+            <div class="sample-box">{{.Input}}</div>
+          </td>
+          <td class="sample-cell">
+            <div class="sample-box-label">Output</div>
+            <div class="sample-box">{{.Output}}</div>
+          </td>
+        </tr>
+      </table>
       {{if .HasExplain}}<div class="explanation">{{.Explanation}}</div>{{end}}
     </div>
   {{end}}
