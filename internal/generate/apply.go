@@ -41,7 +41,8 @@ func (s *ApplyService) Apply(ctx context.Context, job *model.AIGenerationJob, ac
 	// generation to seed several problems. Re-applying to an EXISTING problem is
 	// still refused — that path would silently overwrite a problem the setter has
 	// since edited.
-	if job.Status != "ready" && !(job.Status == "applied" && job.ProblemID == nil) {
+	appliable := job.Status == "ready" || (job.Status == "applied" && job.ProblemID == nil)
+	if !appliable {
 		return nil, fmt.Errorf("job is not ready")
 	}
 	var p Proposal
