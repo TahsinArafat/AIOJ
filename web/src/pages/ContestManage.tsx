@@ -1214,6 +1214,7 @@ function SettingsTab({ contestId }: { contestId: string }) {
     // a separate review action, not a field on this form.
     const [status, setStatus] = useState<string>('draft')
     const [publishing, setPublishing] = useState(false)
+    const toast = useToast()
     // Publishing is an admin action; a setter can only propose. The server
     // enforces this (initialContestStatus and ReviewContest both check the role),
     // so this only decides which button to show.
@@ -1302,44 +1303,31 @@ function SettingsTab({ contestId }: { contestId: string }) {
      * setter submits for review. That matches initialContestStatus on the server,
      * where only an admin's round starts published.
      */
-    const handlePublish = async () => {
-        setError('')
-        setPublishing(true)
-        try {
-            if (isAdmin) {
-                await api.admin.contestReview.review(contestId, 'published')
-                setStatus('published')
-            } else {
-                await api.contests.submitForReview(contestId)
-                setStatus('pending')
-            }
-        } catch (err) {
-            setError(errorMessage(err) || 'Failed to change publication state')
-        } finally {
-            setPublishing(false)
-        }
-    }
-
-    const handleSave = async () => {
-        if (!form.title.trim()) { setError('Title is required'); return }
-        if (!form.start_time || !form.end_time) { setError('Start and end time required'); return }
-        if (new Date(form.end_time) <= new Date(form.start_time)) { setError('End must be after start'); return }
-        if (form.visibility === 'private' && !form.has_password && !form.password.trim()) { setError('Password is required for Private contests'); return }
-        if (form.visibility === 'group' && !form.group_id) { setError('Please select a group'); return }
+    /**
+     * Shared save: validates the form and PUTs the payload. Returns true when
+     * the server accepted it, false when validation or the request failed
+     * (error is already set on screen). The caller owns the saving/publishing
+     * spinner and any toast.
+     */
+    const saveContest = async (): Promise<boolean> => {
+        if (!form.title.trim()) { setError('Title is required'); return false }
+        if (!form.start_time || !form.end_time) { setError('Start and end time required'); return false }
+        if (new Date(form.end_time) <= new Date(form.start_time)) { setError('End must be after start'); return false }
+        if (form.visibility === 'private' && !form.has_password && !form.password.trim()) { setError('Password is required for Private contests'); return false }
+        if (form.visibility === 'group' && !form.group_id) { setError('Please select a group'); return false }
         // The slug is part of the public URL, so a stray space or slash is worth
         // catching here rather than turning into a 500 on a UNIQUE violation.
         const slug = form.slug.trim()
         if (slug && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/i.test(slug)) {
             setError('Slug may contain only letters, numbers and hyphens')
-            return
+            return false
         }
         const maxParticipants = form.max_participants.trim() === '' ? undefined : Number(form.max_participants)
-        if (maxParticipants !== undefined && (!Number.isFinite(maxParticipants) || maxParticipants < 0)) {
+        if (maxParticipants !== undefined && (!Number.isFinite(maxParticipants) || maxParticipants <= 0)) {
             setError('Max participants must be a positive number')
-            return
+            return false
         }
         setError('')
-        setSaving(true)
         try {
             await api.contests.update(contestId, {
                 title: form.title,
@@ -1396,10 +1384,39 @@ function SettingsTab({ contestId }: { contestId: string }) {
                 rated_for_min: form.rated_for_min,
                 rated_for_max: form.rated_for_max,
             })
+            return true
         } catch (err) {
             setError(errorMessage(err) || 'Failed to save')
+            return false
+        }
+    }
+
+    const handleSave = async () => {
+        setSaving(true)
+        const ok = await saveContest()
+        setSaving(false)
+        if (ok) toast.success('Settings saved')
+    }
+
+    const handlePublish = async () => {
+        setError('')
+        setPublishing(true)
+        try {
+            // Publish acts on the stored state, so save any unsaved edits first
+            // instead of submitting a round in its pre-edit shape.
+            const ok = await saveContest()
+            if (!ok) return
+            if (isAdmin) {
+                await api.admin.contestReview.review(contestId, 'published')
+                setStatus('published')
+            } else {
+                await api.contests.submitForReview(contestId)
+                setStatus('pending')
+            }
+        } catch (err) {
+            setError(errorMessage(err) || 'Failed to change publication state')
         } finally {
-            setSaving(false)
+            setPublishing(false)
         }
     }
 
