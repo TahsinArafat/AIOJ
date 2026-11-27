@@ -236,6 +236,108 @@ func (s *SitemapStore) PublicTeams(ctx context.Context, origin string) ([]Sitema
 	return out, rows.Err()
 }
 
+// PublicOrganizations returns organizations worth crawling.
+//
+// Organizations have no visibility column and OrganizationStore.List returns them
+// all, so there is nothing to filter on.
+func (s *SitemapStore) PublicOrganizations(ctx context.Context, origin string) ([]SitemapEntry, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT o.id, COALESCE(o.updated_at, o.created_at)
+		   FROM organizations o
+		  ORDER BY o.created_at DESC
+		  LIMIT 50000`)
+	if err != nil {
+		return nil, fmt.Errorf("sitemap organizations: %w", err)
+	}
+	defer rows.Close()
+
+	out := []SitemapEntry{}
+	for rows.Next() {
+		var id string
+		var lastMod time.Time
+		if err := rows.Scan(&id, &lastMod); err != nil {
+			return nil, fmt.Errorf("scan sitemap organization: %w", err)
+		}
+		out = append(out, SitemapEntry{
+			Location:   origin + "/organizations/" + id,
+			LastMod:    lastMod,
+			ChangeFreq: "monthly",
+			Priority:   "0.4",
+		})
+	}
+	return out, rows.Err()
+}
+
+// PublicTrainingPlans returns the plans that are public.
+//
+// IsPublic is derived rather than stored: a plan owned by an organization is
+// private to it, so the predicate is "no organization". TrainingPlanStore.GetByID
+// computes the same thing, which is what keeps the sitemap and the card in step.
+func (s *SitemapStore) PublicTrainingPlans(ctx context.Context, origin string) ([]SitemapEntry, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT tp.id, COALESCE(tp.updated_at, tp.created_at)
+		   FROM training_plans tp
+		  WHERE tp.organization_id IS NULL
+		  ORDER BY tp.created_at DESC
+		  LIMIT 50000`)
+	if err != nil {
+		return nil, fmt.Errorf("sitemap training plans: %w", err)
+	}
+	defer rows.Close()
+
+	out := []SitemapEntry{}
+	for rows.Next() {
+		var id string
+		var lastMod time.Time
+		if err := rows.Scan(&id, &lastMod); err != nil {
+			return nil, fmt.Errorf("scan sitemap training plan: %w", err)
+		}
+		out = append(out, SitemapEntry{
+			Location:   origin + "/training/" + id,
+			LastMod:    lastMod,
+			ChangeFreq: "monthly",
+			Priority:   "0.4",
+		})
+	}
+	return out, rows.Err()
+}
+
+// PublicGyms returns public gyms whose contest is published.
+//
+// Both halves matter: GymStore.List makes the same pair of conditions, because a
+// gym pointing at an unpublished contest would otherwise advertise that contest's
+// existence.
+func (s *SitemapStore) PublicGyms(ctx context.Context, origin string) ([]SitemapEntry, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT g.id, COALESCE(g.updated_at, g.created_at)
+		   FROM gym_contests g
+		   JOIN contests c ON g.contest_id = c.id
+		  WHERE g.is_public = true
+		    AND c.visible = true
+		  ORDER BY g.created_at DESC
+		  LIMIT 50000`)
+	if err != nil {
+		return nil, fmt.Errorf("sitemap gyms: %w", err)
+	}
+	defer rows.Close()
+
+	out := []SitemapEntry{}
+	for rows.Next() {
+		var id string
+		var lastMod time.Time
+		if err := rows.Scan(&id, &lastMod); err != nil {
+			return nil, fmt.Errorf("scan sitemap gym: %w", err)
+		}
+		out = append(out, SitemapEntry{
+			Location:   origin + "/gym/" + id,
+			LastMod:    lastMod,
+			ChangeFreq: "monthly",
+			Priority:   "0.4",
+		})
+	}
+	return out, rows.Err()
+}
+
 // PublicUsers returns user profiles worth crawling.
 //
 // Ported from dmoj's judge/sitemap.py UserSitemap. dmoj indexes every user; here

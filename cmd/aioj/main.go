@@ -798,6 +798,74 @@ schema is unrecoverable.`, err)
 							Kind:        "article",
 						}, nil
 					}
+					if id, ok := entityPathID(path, "/organizations/"); ok {
+						// Organizations have no visibility column and List returns
+						// them all, so there is nothing to gate on.
+						o, err := orgStore.GetByID(ctx, id)
+						if err != nil {
+							return nil, err
+						}
+						if o == nil {
+							return nil, nil
+						}
+						return &handler.ShareCard{
+							Title:       o.Name,
+							Description: o.Description,
+							Path:        "/organizations/" + o.ID,
+							Kind:        "article",
+						}, nil
+					}
+					if id, ok := entityPathID(path, "/training/"); ok {
+						// IsPublic is derived, not stored: a plan owned by an
+						// organization is private to it.
+						p, err := trainingStore.GetByID(ctx, id)
+						if err != nil {
+							return nil, err
+						}
+						if p == nil || !p.IsPublic {
+							return nil, nil
+						}
+						return &handler.ShareCard{
+							Title:       p.Title,
+							Description: p.Description,
+							Path:        "/training/" + p.ID,
+							Kind:        "article",
+						}, nil
+					}
+					if id, ok := entityPathID(path, "/gym/"); ok {
+						// GetByID resolves as an anonymous viewer, so a gym pointing
+						// at an unpublished contest is already invisible here.
+						g, err := gymStore.GetByID(ctx, id)
+						if err != nil {
+							return nil, err
+						}
+						if g == nil || !g.IsPublic {
+							return nil, nil
+						}
+						return &handler.ShareCard{
+							Title:       g.ContestTitle,
+							Description: g.Description,
+							Path:        "/gym/" + g.ID,
+							Kind:        "article",
+						}, nil
+					}
+					if username, ok := entityPathID(path, "/users/"); ok {
+						// Same exclusion as the sitemap's PublicUsers: bot and staff
+						// profiles are not search results, and a card would make them
+						// shareable.
+						u, err := userStore.GetByUsername(ctx, username)
+						if err != nil {
+							return nil, err
+						}
+						if u == nil || u.IsBot || u.Role == "admin" || u.Role == "staff" {
+							return nil, nil
+						}
+						return &handler.ShareCard{
+							Title: u.Username,
+							Path:  "/users/" + u.Username,
+							Kind:  "profile",
+						}, nil
+					}
 					return nil, nil
 				},
 				ProblemCard: func(ctx context.Context, slug string) (*handler.ShareCard, error) {
@@ -854,10 +922,16 @@ schema is unrecoverable.`, err)
 						editorials, errEditorials := sitemapStore.PublicEditorials(ctx, origin)
 						groups, errGroups := sitemapStore.PublicGroups(ctx, origin)
 						teams, errTeams := sitemapStore.PublicTeams(ctx, origin)
+						orgs, errOrgs := sitemapStore.PublicOrganizations(ctx, origin)
+						plans, errPlans := sitemapStore.PublicTrainingPlans(ctx, origin)
+						gyms, errGyms := sitemapStore.PublicGyms(ctx, origin)
 						users, errUsers := sitemapStore.PublicUsers(ctx, origin)
 						// If any section errored, propagate so the caller can 500
 						// rather than serve a silently incomplete sitemap.
-						for _, e := range []error{errProblems, errContests, errBlog, errEditorials, errGroups, errTeams, errUsers} {
+						for _, e := range []error{
+							errProblems, errContests, errBlog, errEditorials,
+							errGroups, errTeams, errOrgs, errPlans, errGyms, errUsers,
+						} {
 							if e != nil {
 								return nil, e
 							}
@@ -869,6 +943,9 @@ schema is unrecoverable.`, err)
 							{Name: "editorials", URLs: toURLs(editorials)},
 							{Name: "groups", URLs: toURLs(groups)},
 							{Name: "teams", URLs: toURLs(teams)},
+							{Name: "organizations", URLs: toURLs(orgs)},
+							{Name: "training", URLs: toURLs(plans)},
+							{Name: "gym", URLs: toURLs(gyms)},
 							{Name: "users", URLs: toURLs(users)},
 							// Static pages: always present, no store to fail.
 							{Name: "legal", URLs: handler.LegalSitemapURLs(origin)},
