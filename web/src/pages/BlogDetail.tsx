@@ -4,6 +4,7 @@ import { api, getAccessToken } from '../lib/api'
 import { useDocumentTitle } from '../lib/documentTitle'
 import CommentSection from '../components/CommentSection'
 import MarkdownContent from '../components/MarkdownContent'
+import RichTextField from '../components/RichTextField'
 import { useConfirm } from '../components/ConfirmDialog'
 import { useToast } from '../components/Toast'
 
@@ -126,7 +127,7 @@ export default function BlogDetail() {
                     </div>
                     <div>
                         <div className="flex items-center justify-between mb-1">
-                            <label className="block text-sm font-medium">Content (Markdown + LaTeX supported)</label>
+                            <span className="block text-sm font-medium">Content (Markdown + LaTeX supported)</span>
                             <button type="button" onClick={() => setShowPreview(v => !v)}
                                 className="text-xs text-brand hover:underline">
                                 {showPreview ? 'Write' : 'Preview'}
@@ -139,11 +140,11 @@ export default function BlogDetail() {
                                     : <p className="text-muted-soft italic">Nothing to preview yet.</p>}
                             </div>
                         ) : (
-                            <textarea aria-label="Content (Markdown + LaTeX supported)"
+                            <RichTextField
+                                ariaLabel="Content (Markdown + LaTeX supported)"
                                 value={editContent}
-                                onChange={e => setEditContent(e.target.value)}
+                                onChange={setEditContent}
                                 rows={12}
-                                className="w-full border border-hairline-strong bg-transparent rounded p-2 text-sm font-mono"
                             />
                         )}
                     </div>

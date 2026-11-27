@@ -237,6 +237,28 @@ body {
     font-size: 0.875em !important;
 }
 
+/* GFM tables. The typography plugin draws only a rule under the header, so a
+   table in a statement read as a loose block of cells. The WYSIWYG editor draws
+   full borders on the same markup, and the editor and the published page have
+   to look like each other, so both read these tokens. */
+.prose :where(table):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.prose :where(th, td):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+    border: 1px solid var(--border-strong);
+    padding: 6px 8px;
+    vertical-align: top;
+    text-align: left;
+}
+
+.prose :where(th):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+    background: var(--surface-2);
+    font-weight: 600;
+}
+
 /* ── Prose in dark mode ───────────────────────────────────────────────────────
    The typography plugin's palette is keyed to `prose-invert`, which has to be
    opted into per element. Most statement/editorial/blog surfaces here are

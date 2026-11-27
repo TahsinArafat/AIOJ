@@ -42,3 +42,47 @@
 .ProseMirror-selectednode .math-node {
   outline: 2px solid var(--ring);
 }
+
+/* Tables. The Table extension renders real <table> markup, but nothing styled
+ * it, so a table in a statement showed as unruled text and read as one blob of
+ * cells. The problem page renders the same GFM table through `prose`, so these
+ * rules keep the editing surface looking like the published page. */
+.tiptap table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1em 0;
+  table-layout: fixed;
+}
+
+.tiptap th,
+.tiptap td {
+  border: 1px solid var(--border-strong);
+  padding: 6px 8px;
+  vertical-align: top;
+  text-align: left;
+  position: relative;
+}
+
+.tiptap th {
+  background: var(--surface-2);
+  font-weight: 600;
+}
+
+/* The Table extension's column-resize handle sits on the cell edge. */
+.tiptap .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--primary);
+  pointer-events: none;
+}
+
+.tiptap .selectedCell::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: color-mix(in oklab, var(--primary) 15%, transparent);
+  pointer-events: none;
+}

@@ -54,6 +54,11 @@ function Divider() {
 export default function Toolbar({ editor }: ToolbarProps) {
   const [showMathDialog, setShowMathDialog] = useState(false)
 
+  // A destroyed editor's `can()` throws ("Cannot read properties of null"),
+  // and React still renders this toolbar once more after the editor goes away —
+  // removing a sample case, switching tabs. Nothing to show at that point.
+  if (editor.isDestroyed) return null
+
   const insertMath = (latex: string, displayMode: boolean) => {
     // A math node, not `$...$` text: text is escaped by the markdown converter
     // on save, which turns `\le` into `\\le` — rendered as "l e".

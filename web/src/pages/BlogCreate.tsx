@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { api } from '../lib/api'
 import { useToast } from '../components/Toast'
 import MarkdownContent from '../components/MarkdownContent'
+import RichTextField from '../components/RichTextField'
 
 export default function BlogCreate() {
     const toast = useToast()
@@ -42,7 +43,7 @@ export default function BlogCreate() {
                 </div>
                 <div>
                     <div className="flex items-center justify-between mb-1">
-                        <label htmlFor="blog-content" className="block text-sm font-semibold text-ink-soft">Content (Markdown + LaTeX)</label>
+                        <span className="block text-sm font-semibold text-ink-soft">Content (Markdown + LaTeX)</span>
                         <button type="button" onClick={() => setShowPreview(v => !v)} className="text-xs text-brand hover:underline">
                             {showPreview ? 'Write' : 'Preview'}
                         </button>
@@ -54,9 +55,14 @@ export default function BlogCreate() {
                                 : <p className="text-muted-soft italic">Nothing to preview yet.</p>}
                         </div>
                     ) : (
-                        <textarea id="blog-content" value={content} onChange={e => setContent(e.target.value)} required rows={10}
-                            className="w-full border rounded px-3 py-2 text-sm"
-                            placeholder="Write your post content... Use $...$ for inline math and $$...$$ for display math." />
+                        <RichTextField
+                            ariaLabel="Content (Markdown + LaTeX)"
+                            value={content}
+                            onChange={setContent}
+                            rows={10}
+                            required
+                            placeholder="Write your post content... Use $...$ for inline math and $$...$$ for display math."
+                        />
                     )}
                     <p className="mt-1 text-xs text-muted">Markdown and LaTeX math are rendered when the post is published.</p>
                 </div>

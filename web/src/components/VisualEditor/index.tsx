@@ -20,9 +20,11 @@ interface VisualEditorProps {
   content: string
   onChange: (markdown: string) => void
   placeholder?: string
+  /** Minimum height of the editing surface. Short fields (a sample explanation) do not need the full statement height. */
+  minHeight?: string
 }
 
-export default function VisualEditor({ content, onChange, placeholder }: VisualEditorProps) {
+export default function VisualEditor({ content, onChange, placeholder, minHeight = '200px' }: VisualEditorProps) {
   // Last markdown this editor produced. Anything else arriving through
   // `content` was written from outside — an inserted image, an applied AI
   // draft — and has to be re-seeded instead of being ignored.
@@ -63,13 +65,21 @@ export default function VisualEditor({ content, onChange, placeholder }: VisualE
     onUpdate: ({ editor }) => {
       const html = editor.getHTML()
       const markdown = htmlToMarkdown(html)
+      // tiptap fires `update` while the editor is still being constructed, which
+      // lands a setState on the parent mid-render (React warns, and can drop the
+      // value). Deferring keeps the write out of the render phase; an unchanged
+      // document is not an edit, so that echo is dropped too.
+      if (markdown === emitted.current) return
       emitted.current = markdown
-      onChange(markdown)
+      queueMicrotask(() => onChange(markdown))
     },
   })
 
   useEffect(() => {
-    if (!editor || content === emitted.current) return
+    // A Suspense boundary that reveals this editor replays its passive effects
+    // against the instance React already tore down, and tiptap's `commands`
+    // getter throws on a destroyed editor — taking the whole form with it.
+    if (!editor || editor.isDestroyed || content === emitted.current) return
     emitted.current = content
     editor.commands.setContent(markdownToHtml(content), { emitUpdate: false })
   }, [content, editor])
@@ -79,7 +89,7 @@ export default function VisualEditor({ content, onChange, placeholder }: VisualE
   return (
     <div className="border border-hairline-strong rounded-lg overflow-hidden">
       <Toolbar editor={editor} />
-      <EditorContent editor={editor} className="prose prose-sm dark:prose-invert max-w-none p-4 min-h-[200px]" />
+      <EditorContent editor={editor} className="prose prose-sm dark:prose-invert max-w-none p-4" style={{ minHeight }} />
     </div>
   )
 }

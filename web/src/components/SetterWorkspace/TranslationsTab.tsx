@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../../lib/api'
 import { LOCALES, DEFAULT_LOCALE } from '../../i18n/locales'
+import RichTextField from '../RichTextField'
 
 /**
  * Lets a setter supply per-language titles/descriptions for a problem.
@@ -165,13 +166,13 @@ export default function TranslationsTab({ problemId, defaultTitle, defaultDescri
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">Statement</label>
-            <textarea aria-label="Statement"
+            <p className="block text-sm font-medium mb-1">Statement</p>
+            <RichTextField
+              ariaLabel="Statement"
               value={description}
-              onChange={(e) => { setDescription(e.target.value); setSaved(false) }}
+              onChange={(markdown) => { setDescription(markdown); setSaved(false) }}
               placeholder={defaultDescription || 'Translated statement (Markdown supported)'}
               rows={10}
-              className="w-full border rounded px-3 py-2 text-sm font-mono bg-surface border-hairline-strong"
             />
           </div>
 

@@ -1,7 +1,5 @@
 import type { Components } from 'react-markdown'
-import ReactMarkdown from 'react-markdown'
-import rehypeKatex from 'rehype-katex'
-import { richTextRemarkPlugins } from '../lib/markdown'
+import MarkdownContent from './MarkdownContent'
 
 /**
  * Statement rendering shared by the practice page and the contest page.
@@ -29,17 +27,7 @@ const statementMarkdownComponents: Components = {
 /** The problem statement itself: markdown, GFM tables and KaTeX math. */
 export function StatementBody({ body, className = STATEMENT_PROSE }: { body?: string | null; className?: string }) {
     if (!body) return null
-    return (
-        <div className={className}>
-            <ReactMarkdown
-                remarkPlugins={richTextRemarkPlugins}
-                rehypePlugins={[rehypeKatex]}
-                components={statementMarkdownComponents}
-            >
-                {body}
-            </ReactMarkdown>
-        </div>
-    )
+    return <MarkdownContent content={body} className={className} components={statementMarkdownComponents} />
 }
 
 /** One statement sub-section: heading plus KaTeX/GFM-rendered body. */

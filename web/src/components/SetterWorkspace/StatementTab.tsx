@@ -1,29 +1,6 @@
-import { lazy, Suspense, useRef } from 'react'
-import ReactMarkdown from 'react-markdown'
-import rehypeKatex from 'rehype-katex'
-import { richTextRemarkPlugins } from '../../lib/markdown'
-import 'katex/dist/katex.min.css'
+import { useRef } from 'react'
+import RichTextField, { RichTextPreview } from '../RichTextField'
 import type { ProblemFormState } from '../../types/problem-workspace'
-
-// The tiptap/lowlight/turndown stack is by far the heaviest part of the
-// setter workspace. Lazy-loading it keeps StatementTab itself small and
-// defers the editor bundle until React actually mounts the first field.
-const VisualEditor = lazy(() => import('../VisualEditor'))
-
-function VisualEditorField(props: { content: string; onChange: (markdown: string) => void; placeholder?: string }) {
-  return (
-    <Suspense
-      fallback={
-        <div
-          aria-label="Loading editor"
-          className="border border-hairline-strong rounded-lg min-h-[200px] animate-pulse bg-surface-2"
-        />
-      }
-    >
-      <VisualEditor {...props} />
-    </Suspense>
-  )
-}
 
 interface StatementTabProps {
   formState: ProblemFormState
@@ -131,7 +108,7 @@ export default function StatementTab({
         <div className="space-y-4">
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="block text-xs font-semibold text-muted uppercase">Description (Markdown + LaTeX)</label>
+              <span className="block text-xs font-semibold text-muted uppercase">Description (Markdown + LaTeX)</span>
               <input aria-label="Description (Markdown + LaTeX)"
                 type="file"
                 ref={imageInputRef}
@@ -151,8 +128,9 @@ export default function StatementTab({
                 {uploadingImage ? 'Uploading...' : 'Insert Image'}
               </button>
             </div>
-            <VisualEditorField
-              content={formState.description}
+            <RichTextField
+              ariaLabel="Description (Markdown + LaTeX)"
+              value={formState.description}
               onChange={(markdown) => onUpdate('description', markdown)}
               placeholder="Write your problem statement..."
             />
@@ -160,91 +138,64 @@ export default function StatementTab({
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-muted uppercase mb-1">Input Format</label>
-              <VisualEditorField
-                content={formState.inputFormat}
+              <RichTextField
+                ariaLabel="Input Format"
+                label="Input Format"
+                value={formState.inputFormat}
                 onChange={(markdown) => onUpdate('inputFormat', markdown)}
                 placeholder="Describe the input format..."
+                rows={4}
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-muted uppercase mb-1">Output Format</label>
-              <VisualEditorField
-                content={formState.outputFormat}
+              <RichTextField
+                ariaLabel="Output Format"
+                label="Output Format"
+                value={formState.outputFormat}
                 onChange={(markdown) => onUpdate('outputFormat', markdown)}
                 placeholder="Describe the output format..."
+                rows={4}
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-muted uppercase mb-1">Constraints</label>
+            <p className="mb-1 text-xs text-muted uppercase font-semibold">Constraints</p>
             <p className="mb-1 text-xs text-muted-soft">
               One bound per line, e.g. <code className="font-mono">$1 \le n \le 2\cdot10^5$</code>. Rendered as its own section on the problem page.
             </p>
-            <VisualEditorField
-              content={formState.constraints}
+            <RichTextField
+              ariaLabel="Constraints"
+              value={formState.constraints}
               onChange={(markdown) => onUpdate('constraints', markdown)}
               placeholder="e.g. $1 \le n \le 2\cdot10^5$"
+              rows={3}
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-muted uppercase mb-1">Notes / Hint (optional)</label>
-            <VisualEditorField
-              content={formState.hint}
+            <RichTextField
+              ariaLabel="Notes / Hint (optional)"
+              label="Notes / Hint (optional)"
+              value={formState.hint}
               onChange={(markdown) => onUpdate('hint', markdown)}
               placeholder="Optional clarification shown under Notes. Do not reveal the solution."
+              rows={3}
             />
           </div>
         </div>
 
         <div>
           <label className="block text-xs font-semibold text-muted uppercase mb-1">Live Preview</label>
-          <div className="prose prose-sm max-w-none bg-surface-2 border border-hairline rounded-lg p-4 max-h-[600px] overflow-y-auto">
+          <div className="prose prose-sm max-w-none bg-surface-2 border border-hairline rounded-lg p-4 max-h-[600px] overflow-y-auto space-y-4">
             {formState.description || formState.inputFormat || formState.outputFormat || formState.constraints || formState.hint ? (
-              <div className="space-y-4">
-                {formState.description && (
-                  <div>
-                    <h4 className="text-xs font-bold text-muted-soft uppercase tracking-wider mb-2">Description</h4>
-                    <ReactMarkdown remarkPlugins={richTextRemarkPlugins} rehypePlugins={[rehypeKatex]}>
-                      {formState.description}
-                    </ReactMarkdown>
-                  </div>
-                )}
-                {formState.inputFormat && (
-                  <div>
-                    <h4 className="text-xs font-bold text-muted-soft uppercase tracking-wider mb-2">Input Format</h4>
-                    <ReactMarkdown remarkPlugins={richTextRemarkPlugins} rehypePlugins={[rehypeKatex]}>
-                      {formState.inputFormat}
-                    </ReactMarkdown>
-                  </div>
-                )}
-                {formState.outputFormat && (
-                  <div>
-                    <h4 className="text-xs font-bold text-muted-soft uppercase tracking-wider mb-2">Output Format</h4>
-                    <ReactMarkdown remarkPlugins={richTextRemarkPlugins} rehypePlugins={[rehypeKatex]}>
-                      {formState.outputFormat}
-                    </ReactMarkdown>
-                  </div>
-                )}
-                {formState.constraints && (
-                  <div>
-                    <h4 className="text-xs font-bold text-muted-soft uppercase tracking-wider mb-2">Constraints</h4>
-                    <ReactMarkdown remarkPlugins={richTextRemarkPlugins} rehypePlugins={[rehypeKatex]}>
-                      {formState.constraints}
-                    </ReactMarkdown>
-                  </div>
-                )}
-                {formState.hint && (
-                  <div>
-                    <h4 className="text-xs font-bold text-muted-soft uppercase tracking-wider mb-2">Notes</h4>
-                    <ReactMarkdown remarkPlugins={richTextRemarkPlugins} rehypePlugins={[rehypeKatex]}>
-                      {formState.hint}
-                    </ReactMarkdown>
-                  </div>
-                )}
-              </div>
+              <>
+                <RichTextPreview label="Description" value={formState.description} />
+                <RichTextPreview label="Input Format" value={formState.inputFormat} />
+                <RichTextPreview label="Output Format" value={formState.outputFormat} />
+                <RichTextPreview label="Constraints" value={formState.constraints} />
+                <RichTextPreview label="Notes" value={formState.hint} />
+              </>
             ) : (
               <p className="text-muted-soft text-sm italic">Start typing to see a live preview of your problem statement with rendered Markdown and LaTeX math formulas.</p>
             )}
@@ -305,18 +256,19 @@ export default function StatementTab({
               </div>
             </div>
             <div>
-              <label className="block text-xs font-medium text-muted mb-1">Explanation (optional)</label>
-              {/* Rendered as markdown on the problem page, so it has to accept
-                  more than one line. */}
-              <textarea aria-label="Explanation (optional)"
+              <p className="text-xs font-medium text-muted mb-1">Explanation (optional)</p>
+              {/* Rendered as markdown on the problem page, so it takes the same
+                  editor as the statement rather than a plain textarea. */}
+              <RichTextField
+                ariaLabel="Explanation (optional)"
                 value={sc.explanation ?? ''}
-                onChange={e => {
+                onChange={(markdown) => {
                   const updated = [...formState.sampleCases]
-                  updated[i] = { ...updated[i], explanation: e.target.value }
+                  updated[i] = { ...updated[i], explanation: markdown }
                   onUpdate('sampleCases', updated)
                 }}
                 rows={2}
-                className="w-full text-sm border border-hairline-strong rounded px-2 py-1.5 focus:outline-none focus:ring-2 focus-visible:outline-[var(--ring)] bg-surface"
+                minHeight="80px"
               />
             </div>
           </div>

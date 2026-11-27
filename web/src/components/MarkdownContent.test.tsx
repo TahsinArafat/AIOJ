@@ -51,3 +51,18 @@ test('leaves code block whitespace alone', () => {
     expect(container.querySelector('br')).toBeNull()
     expect(container.querySelector('code')?.textContent).toBe('1 2\n3 4\n')
 })
+
+// The problem page and the setter's live preview have to agree, so the page's
+// per-element styling is an override on this renderer rather than its own
+// ReactMarkdown instance with its own plugin list.
+test('applies caller element overrides without changing parsing', () => {
+    const { container } = render(
+        <MarkdownContent
+            content={'Takes $O(n)$ time and `x`.'}
+            components={{ code: ({ children }) => <code data-testid="styled">{children}</code> }}
+        />
+    )
+
+    expect(container.querySelectorAll('.katex').length).toBeGreaterThanOrEqual(1)
+    expect(container.querySelector('[data-testid="styled"]')).not.toBeNull()
+})

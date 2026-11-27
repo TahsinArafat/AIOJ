@@ -12,6 +12,12 @@ interface MarkdownContentProps {
      * (complexity, approach blurbs) so the output stays inline in its container.
      */
     inline?: boolean
+    /**
+     * Per-element overrides. The plugin set is fixed here on purpose; callers
+     * may restyle an element but never change how markdown is parsed, or the
+     * same statement would render differently in two places.
+     */
+    components?: Components
 }
 
 const inlineComponents: Components = {
@@ -24,14 +30,14 @@ const inlineComponents: Components = {
  * statements, blogs and editorials all use this so Markdown + LaTeX behave
  * identically everywhere.
  */
-export default function MarkdownContent({ content, className, inline = false }: MarkdownContentProps) {
+export default function MarkdownContent({ content, className, inline = false, components }: MarkdownContentProps) {
     if (!content) return null
 
     const markdown = (
         <ReactMarkdown
             remarkPlugins={richTextRemarkPlugins}
             rehypePlugins={[rehypeKatex]}
-            components={inline ? inlineComponents : undefined}
+            components={inline ? { ...inlineComponents, ...components } : components}
         >
             {content}
         </ReactMarkdown>
