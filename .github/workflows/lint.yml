@@ -81,6 +81,10 @@ jobs:
           # One line per finding, e.g. "path/file.go:12:5: message (linter)".
           count=$(grep -cE '^[a-z][^:]*\.go:[0-9]+' lint-report.txt || true)
           echo "findings on this commit: ${count} (baseline ${LINT_BASELINE})"
+          # Also print the findings to the log. The step summary is not readable
+          # from `gh run view --log`, so a failing job used to name a count with
+          # no way to see which findings it meant.
+          grep -E '^[a-z][^:]*\.go:[0-9]+' lint-report.txt || true
 
           if [ -f lint-report.txt ]; then
             {
