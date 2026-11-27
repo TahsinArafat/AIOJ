@@ -118,7 +118,7 @@ func (s *SitemapStore) PublicBlogPosts(ctx context.Context, origin string) ([]Si
 	if err != nil {
 		return nil, fmt.Errorf("sitemap blog posts: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	out := []SitemapEntry{}
 	for rows.Next() {
@@ -152,7 +152,7 @@ func (s *SitemapStore) PublicEditorials(ctx context.Context, origin string) ([]S
 	if err != nil {
 		return nil, fmt.Errorf("sitemap editorials: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	out := []SitemapEntry{}
 	for rows.Next() {
@@ -186,7 +186,7 @@ func (s *SitemapStore) PublicGroups(ctx context.Context, origin string) ([]Sitem
 	if err != nil {
 		return nil, fmt.Errorf("sitemap groups: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	out := []SitemapEntry{}
 	for rows.Next() {
@@ -217,7 +217,7 @@ func (s *SitemapStore) PublicTeams(ctx context.Context, origin string) ([]Sitema
 	if err != nil {
 		return nil, fmt.Errorf("sitemap teams: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	out := []SitemapEntry{}
 	for rows.Next() {
@@ -249,7 +249,7 @@ func (s *SitemapStore) PublicOrganizations(ctx context.Context, origin string) (
 	if err != nil {
 		return nil, fmt.Errorf("sitemap organizations: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	out := []SitemapEntry{}
 	for rows.Next() {
@@ -283,7 +283,7 @@ func (s *SitemapStore) PublicTrainingPlans(ctx context.Context, origin string) (
 	if err != nil {
 		return nil, fmt.Errorf("sitemap training plans: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	out := []SitemapEntry{}
 	for rows.Next() {
@@ -322,7 +322,7 @@ func (s *SitemapStore) PublicGyms(ctx context.Context, origin string) ([]Sitemap
 	if err != nil {
 		return nil, fmt.Errorf("sitemap gyms: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	out := []SitemapEntry{}
 	for rows.Next() {
