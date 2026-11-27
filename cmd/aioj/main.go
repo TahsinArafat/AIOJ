@@ -764,6 +764,40 @@ schema is unrecoverable.`, err)
 							Kind:        "article",
 						}, nil
 					}
+					if id, ok := entityPathID(path, "/groups/"); ok {
+						// The store returns is_public rather than filtering on it, so
+						// the gate lives here — the same shape as the contest branch.
+						// A private group's name and description must not reach a
+						// crawler.
+						g, err := groupStore.GetByID(ctx, id)
+						if err != nil {
+							return nil, err
+						}
+						if g == nil || !g.IsPublic {
+							return nil, nil
+						}
+						return &handler.ShareCard{
+							Title:       g.Name,
+							Description: g.Description,
+							Path:        "/groups/" + g.ID,
+							Kind:        "article",
+						}, nil
+					}
+					if id, ok := entityPathID(path, "/teams/"); ok {
+						t, err := teamStore.GetByID(ctx, id)
+						if err != nil {
+							return nil, err
+						}
+						if t == nil || !t.IsPublic {
+							return nil, nil
+						}
+						return &handler.ShareCard{
+							Title:       t.Name,
+							Description: t.Description,
+							Path:        "/teams/" + t.ID,
+							Kind:        "article",
+						}, nil
+					}
 					return nil, nil
 				},
 				ProblemCard: func(ctx context.Context, slug string) (*handler.ShareCard, error) {
@@ -818,10 +852,12 @@ schema is unrecoverable.`, err)
 						contests, errContests := sitemapStore.PublicContests(ctx, origin)
 						blogPosts, errBlog := sitemapStore.PublicBlogPosts(ctx, origin)
 						editorials, errEditorials := sitemapStore.PublicEditorials(ctx, origin)
+						groups, errGroups := sitemapStore.PublicGroups(ctx, origin)
+						teams, errTeams := sitemapStore.PublicTeams(ctx, origin)
 						users, errUsers := sitemapStore.PublicUsers(ctx, origin)
 						// If any section errored, propagate so the caller can 500
 						// rather than serve a silently incomplete sitemap.
-						for _, e := range []error{errProblems, errContests, errBlog, errEditorials, errUsers} {
+						for _, e := range []error{errProblems, errContests, errBlog, errEditorials, errGroups, errTeams, errUsers} {
 							if e != nil {
 								return nil, e
 							}
@@ -831,6 +867,8 @@ schema is unrecoverable.`, err)
 							{Name: "contests", URLs: toURLs(contests)},
 							{Name: "blog", URLs: toURLs(blogPosts)},
 							{Name: "editorials", URLs: toURLs(editorials)},
+							{Name: "groups", URLs: toURLs(groups)},
+							{Name: "teams", URLs: toURLs(teams)},
 							{Name: "users", URLs: toURLs(users)},
 							// Static pages: always present, no store to fail.
 							{Name: "legal", URLs: handler.LegalSitemapURLs(origin)},

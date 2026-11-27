@@ -171,6 +171,71 @@ func (s *SitemapStore) PublicEditorials(ctx context.Context, origin string) ([]S
 	return out, rows.Err()
 }
 
+// PublicGroups returns public groups worth crawling.
+//
+// is_public is the flag GroupStore.GetByID returns but does not filter on; the
+// card resolver applies the same rule, so a group is either in both the sitemap
+// and the preview or in neither.
+func (s *SitemapStore) PublicGroups(ctx context.Context, origin string) ([]SitemapEntry, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT g.id, COALESCE(g.updated_at, g.created_at)
+		   FROM groups g
+		  WHERE g.is_public = true
+		  ORDER BY g.created_at DESC
+		  LIMIT 50000`)
+	if err != nil {
+		return nil, fmt.Errorf("sitemap groups: %w", err)
+	}
+	defer rows.Close()
+
+	out := []SitemapEntry{}
+	for rows.Next() {
+		var id string
+		var lastMod time.Time
+		if err := rows.Scan(&id, &lastMod); err != nil {
+			return nil, fmt.Errorf("scan sitemap group: %w", err)
+		}
+		out = append(out, SitemapEntry{
+			Location:   origin + "/groups/" + id,
+			LastMod:    lastMod,
+			ChangeFreq: "monthly",
+			Priority:   "0.4",
+		})
+	}
+	return out, rows.Err()
+}
+
+// PublicTeams returns public teams worth crawling. Same is_public rule as
+// PublicGroups.
+func (s *SitemapStore) PublicTeams(ctx context.Context, origin string) ([]SitemapEntry, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT t.id, COALESCE(t.updated_at, t.created_at)
+		   FROM teams t
+		  WHERE t.is_public = true
+		  ORDER BY t.created_at DESC
+		  LIMIT 50000`)
+	if err != nil {
+		return nil, fmt.Errorf("sitemap teams: %w", err)
+	}
+	defer rows.Close()
+
+	out := []SitemapEntry{}
+	for rows.Next() {
+		var id string
+		var lastMod time.Time
+		if err := rows.Scan(&id, &lastMod); err != nil {
+			return nil, fmt.Errorf("scan sitemap team: %w", err)
+		}
+		out = append(out, SitemapEntry{
+			Location:   origin + "/teams/" + id,
+			LastMod:    lastMod,
+			ChangeFreq: "monthly",
+			Priority:   "0.4",
+		})
+	}
+	return out, rows.Err()
+}
+
 // PublicUsers returns user profiles worth crawling.
 //
 // Ported from dmoj's judge/sitemap.py UserSitemap. dmoj indexes every user; here
