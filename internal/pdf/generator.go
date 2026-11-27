@@ -26,9 +26,19 @@ type problemData struct {
 	Description  template.HTML
 	InputFormat  template.HTML
 	OutputFormat template.HTML
+	Constraints  template.HTML
 	Samples      []sampleData
 	Hint         string
 	HasHint      bool
+	// Interactive and OutputOnly change what the statement must tell the
+	// contestant to submit; the browser shows a banner for both and the printed
+	// booklet had neither, so the one copy a contestant keeps at the desk was
+	// the one that never mentioned it.
+	Interactive bool
+	OutputOnly  bool
+	// PartialScore is the browser's "you earn points for each passing subtask"
+	// banner; the printed sheet had no way to say a problem is scored partially.
+	PartialScore bool
 }
 
 type sampleData struct {
@@ -57,11 +67,14 @@ func stripIOSections(md string) string {
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
 
-		// Check for section headers that we render separately
+		// Check for section headers that we render separately. Constraints counts
+		// too: it has its own field and its own <h3> now, so leaving it in the
+		// description would print the bounds twice on the same page.
 		if strings.HasPrefix(trimmed, "## ") || strings.HasPrefix(trimmed, "### ") {
 			header := strings.ToLower(strings.TrimLeft(trimmed, "# "))
 			header = strings.TrimSpace(header)
-			if header == "input" || header == "output" || header == "hint" || header == "hints" {
+			if header == "input" || header == "output" || header == "hint" || header == "hints" ||
+				header == "constraint" || header == "constraints" {
 				skip = true
 				continue
 			}
@@ -78,6 +91,13 @@ func stripIOSections(md string) string {
 }
 
 func mdToHTML(md string, stripIO bool) string {
+	return mdToHTMLMode(md, stripIO, false)
+}
+
+// mdToHTMLMode is mdToHTML with the line-break policy made explicit.
+// hardBreaks keeps a single source newline as a real line break, which is what a
+// constraints block (one bound per line) is written as.
+func mdToHTMLMode(md string, stripIO, hardBreaks bool) string {
 	// Strip Input/Output/Hint sections if they're rendered separately
 	if stripIO {
 		md = stripIOSections(md)
@@ -86,24 +106,34 @@ func mdToHTML(md string, stripIO bool) string {
 	var out strings.Builder
 	inCode := false
 	inList := false
-	// para accumulates consecutive prose lines into ONE <p>. Emitting a <p> per
-	// source line split a wrapped sentence into fragments, which is why statements
-	// looked shredded across the page: Markdown soft-wraps prose, it does not
-	// start a new paragraph on every newline.
-	var para []string
+	// line accumulates the current paragraph, with the math already rendered
+	// (markMath runs per line, in hardBreaks mode) and the source lines joined by
+	// a newline the break pass turns into <br>.
+	//
+	// A soft wrap is a space, so the non-hardBreaks path joins with one: emitting
+	// a <p> per source line fragmented every statement, which is why the booklet
+	// looked shredded across the page.
+	var line strings.Builder
 
 	// flushPara writes the pending prose as a single paragraph.
 	flushPara := func() {
-		if len(para) == 0 {
+		if line.Len() == 0 {
 			return
 		}
-		joined := strings.Join(para, " ")
-		para = para[:0]
-		out.WriteString(fmt.Sprintf("<p>%s</p>\n", processInline(joined)))
+		src := line.String()
+		line.Reset()
+		html := processInline(src)
+		if hardBreaks {
+			// Math was rendered per line by markMath, so the inline pass has
+			// nothing left to do and any newline still in the text is an authored
+			// line break between two bounds.
+			html = strings.ReplaceAll(src, "\n", "<br>\n")
+		}
+		out.WriteString(fmt.Sprintf("<p>%s</p>\n", html))
 	}
 
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
+	for _, raw := range lines {
+		trimmed := strings.TrimSpace(raw)
 
 		// Code blocks
 		if strings.HasPrefix(trimmed, "```") {
@@ -118,7 +148,7 @@ func mdToHTML(md string, stripIO bool) string {
 			continue
 		}
 		if inCode {
-			out.WriteString(template.HTMLEscapeString(line) + "\n")
+			out.WriteString(template.HTMLEscapeString(raw) + "\n")
 			continue
 		}
 
@@ -169,7 +199,20 @@ func mdToHTML(md string, stripIO bool) string {
 			continue
 		}
 
-		para = append(para, trimmed)
+		if line.Len() > 0 {
+			// A soft wrap is a space; in hardBreaks mode the newline itself is
+			// the formatting and becomes a <br> after the inline pass.
+			if hardBreaks {
+				line.WriteString("\n")
+			} else {
+				line.WriteString(" ")
+			}
+		}
+		if hardBreaks {
+			line.WriteString(markMath(trimmed))
+		} else {
+			line.WriteString(trimmed)
+		}
 	}
 
 	flushPara()
@@ -235,6 +278,51 @@ func processInline(s string) string {
 	})
 
 	return res
+}
+
+// markMath renders every $...$ / $$...$$ span to its final KaTeX markup, before
+// the source lines of a paragraph are joined.
+//
+// It exists so a line break can be told apart from a formula: once the formulas
+// are spans, the newlines left between them are exactly the authored line breaks,
+// and the caller turns those into <br>. A formula spanning two lines stays inside
+// its span, which is where KaTeX reads the newline as a space.
+//
+// A delimiter with no partner on the same line stays plain text: "$5 and $10" is
+// money, not a formula, and pairing them would swallow the prose between.
+//
+// The prose around a formula is escaped here, so the caller gets markup ready to
+// emit.
+func markMath(s string) string {
+	var b strings.Builder
+	for i := 0; i < len(s); {
+		if s[i] != '$' {
+			j := strings.IndexByte(s[i:], '$')
+			if j < 0 {
+				b.WriteString(template.HTMLEscapeString(s[i:]))
+				break
+			}
+			b.WriteString(template.HTMLEscapeString(s[i : i+j]))
+			i += j
+			continue
+		}
+		// $$...$$ is display math; the opening pair is matched first so a
+		// doubled delimiter is not read as an empty inline formula.
+		delim, class := "$", "katex-inline"
+		if i+1 < len(s) && s[i+1] == '$' {
+			delim, class = "$$", "katex-display"
+		}
+		end := strings.Index(s[i+len(delim):], delim)
+		if end < 0 {
+			b.WriteString(template.HTMLEscapeString(s[i:]))
+			break
+		}
+		b.WriteString(`<span class="` + class + `">`)
+		b.WriteString(s[i : i+len(delim)+end+len(delim)])
+		b.WriteString("</span>")
+		i += len(delim) + end + len(delim)
+	}
+	return b.String()
 }
 
 func escapeAndProcessMath(s string) string {
@@ -307,6 +395,13 @@ func (g *Generator) GenerateContestPDF(contest *model.Contest, problems []model.
 		if p.OutputFormat != "" {
 			outputHTML = mdToHTML(p.OutputFormat, false)
 		}
+		// The Constraints block is its own field, exactly as on the problem page.
+		// The booklet never read it, so the printed statement — the copy a
+		// contestant keeps at the desk — was the only surface without the bounds.
+		constraintsHTML := ""
+		if p.Constraints != "" {
+			constraintsHTML = mdToHTMLMode(p.Constraints, false, true)
+		}
 
 		memLimit := p.MemoryLimit / 1024
 
@@ -327,9 +422,13 @@ func (g *Generator) GenerateContestPDF(contest *model.Contest, problems []model.
 			Description:  template.HTML(descHTML),
 			InputFormat:  template.HTML(inputHTML),
 			OutputFormat: template.HTML(outputHTML),
+			Constraints:  template.HTML(constraintsHTML),
 			Samples:      samples,
 			Hint:         p.Hint,
 			HasHint:      p.Hint != "",
+			Interactive:  p.ProblemType == model.ProblemTypeInteractive,
+			OutputOnly:   p.ProblemType == model.ProblemTypeOutputOnly,
+			PartialScore: p.ScoringMode == "partial",
 		})
 	}
 
@@ -604,6 +703,16 @@ var pdfTemplate = `<!DOCTYPE html>
     color: #555;
     page-break-inside: avoid;
   }
+  /* Interactive / output-only notice: a contestant reading the printed sheet
+     has no other way to learn what to submit. */
+  .notice {
+    margin: 4mm 0 0;
+    padding: 3mm 4mm;
+    border: 1pt solid #999;
+    background: #f4f4f4;
+    font-size: 10pt;
+    page-break-inside: avoid;
+  }
 
   @media print {
     .no-print, .toolbar { display: none !important; }
@@ -657,6 +766,20 @@ var pdfTemplate = `<!DOCTYPE html>
   {{if .OutputFormat}}
   <h3>Output</h3>
   {{.OutputFormat}}
+  {{end}}
+
+  {{if .Constraints}}
+  <h3>Constraints</h3>
+  {{.Constraints}}
+  {{end}}
+
+  {{if .Interactive}}
+  <div class="notice"><strong>Interactive problem.</strong> Your program communicates with the interactor over standard input and output; flush your output buffer after every write.</div>
+  {{else if .OutputOnly}}
+  <div class="notice"><strong>Output-only problem.</strong> Submit the output file for each test rather than a program.</div>
+  {{end}}
+  {{if .PartialScore}}
+  <div class="notice"><strong>Partial scoring.</strong> You earn points for every subtask your solution passes; the score is the sum over the subtasks.</div>
   {{end}}
 
   <div class="samples">

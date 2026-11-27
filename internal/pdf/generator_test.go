@@ -297,3 +297,146 @@ func TestBlankLineStartsANewParagraph(t *testing.T) {
 		t.Fatalf("blank line produced %d paragraphs, want 2", n)
 	}
 }
+
+/**
+ * The printed booklet was the only surface without the bounds. Constraints is its
+ * own column and the problem page renders it as its own section; the generator
+ * never read the field, so a contestant holding the paper copy had no constraints
+ * at all. These pin the section, its math, and the one-bound-per-line layout.
+ */
+func TestBookletRendersConstraintsSection(t *testing.T) {
+	c := &model.Contest{ID: "c1", Title: "R", StartTime: mustTime(), EndTime: mustTime()}
+	constraints := "$1 \\le n \\le 2 \\cdot 10^5$\n$1 \\le a_i \\le 10^9$"
+	out, err := NewGenerator().GenerateContestPDF(c, []model.ProblemWithSamples{{
+		Index: "A",
+		Problem: model.Problem{
+			Title:       "D",
+			Description: "Read $n$ integers.",
+			Constraints: constraints,
+		},
+	}})
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	html := string(out)
+
+	if !strings.Contains(html, "<h3>Constraints</h3>") {
+		t.Fatal("the booklet has no Constraints section, so the bounds never print")
+	}
+	// The bounds must reach KaTeX as math, not as literal backslash-l text.
+	if !strings.Contains(html, `<span class="katex-inline">$1 \le n \le 2 \cdot 10^5$</span>`) {
+		t.Fatalf("constraints math was not emitted for KaTeX: %s", html)
+	}
+	// One bound per line is the authored layout; joined into a paragraph the
+	// block reads as one run-on sentence.
+	if !strings.Contains(html, "10^5$</span><br>\n<span class=\"katex-inline\">$1 \\le a_i") {
+		t.Fatal("constraint lines were joined instead of kept on separate lines")
+	}
+	// The section appears once, after Output, matching the problem page order.
+	if n := strings.Count(html, "<h3>Constraints</h3>"); n != 1 {
+		t.Fatalf("Constraints section rendered %d times, want 1", n)
+	}
+}
+
+// A problem with no constraints must not print an empty heading.
+func TestBookletOmitsEmptyConstraints(t *testing.T) {
+	c := &model.Contest{ID: "c1", Title: "R", StartTime: mustTime(), EndTime: mustTime()}
+	out, err := NewGenerator().GenerateContestPDF(c, []model.ProblemWithSamples{{
+		Index:   "A",
+		Problem: model.Problem{Title: "D", Description: "Read $n$ integers."},
+	}})
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	if strings.Contains(string(out), "Constraints") {
+		t.Fatal("a problem without constraints printed an empty Constraints section")
+	}
+}
+
+// Setters who put the bounds in the description under a "## Constraints" heading
+// would otherwise get them twice: once from the description, once from the field.
+func TestBookletDoesNotDuplicateConstraintsFromDescription(t *testing.T) {
+	c := &model.Contest{ID: "c1", Title: "R", StartTime: mustTime(), EndTime: mustTime()}
+	out, err := NewGenerator().GenerateContestPDF(c, []model.ProblemWithSamples{{
+		Index: "A",
+		Problem: model.Problem{
+			Title:       "D",
+			Description: "Read $n$ integers.\n\n## Constraints\n\n$1 \\le n \\le 10$",
+			Constraints: "$1 \\le n \\le 10$",
+		},
+	}})
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	if n := strings.Count(string(out), "1 \\le n \\le 10"); n != 1 {
+		t.Fatalf("the bounds printed %d times, want 1 (description heading not stripped)", n)
+	}
+}
+
+// The paper copy is the only copy for an onsite round, and it was the one that
+// never said a problem was interactive or output-only.
+func TestBookletStatesInteractiveAndOutputOnly(t *testing.T) {
+	c := &model.Contest{ID: "c1", Title: "R", StartTime: mustTime(), EndTime: mustTime()}
+
+	interactive, err := NewGenerator().GenerateContestPDF(c, []model.ProblemWithSamples{{
+		Index:   "A",
+		Problem: model.Problem{Title: "D", ProblemType: model.ProblemTypeInteractive},
+	}})
+	if err != nil {
+		t.Fatalf("generate interactive: %v", err)
+	}
+	if !strings.Contains(string(interactive), "Interactive problem.") {
+		t.Fatal("an interactive problem's booklet page does not say so")
+	}
+
+	outputOnly, err := NewGenerator().GenerateContestPDF(c, []model.ProblemWithSamples{{
+		Index:   "B",
+		Problem: model.Problem{Title: "E", ProblemType: model.ProblemTypeOutputOnly},
+	}})
+	if err != nil {
+		t.Fatalf("generate output-only: %v", err)
+	}
+	if !strings.Contains(string(outputOnly), "Output-only problem.") {
+		t.Fatal("an output-only problem's booklet page does not say so")
+	}
+
+	// A standard problem carries no notice.
+	plain, err := NewGenerator().GenerateContestPDF(c, []model.ProblemWithSamples{{
+		Index:   "C",
+		Problem: model.Problem{Title: "F", ProblemType: model.ProblemTypeStandard},
+	}})
+	if err != nil {
+		t.Fatalf("generate standard: %v", err)
+	}
+	if strings.Contains(string(plain), `class="notice"`) {
+		t.Fatal("a standard problem printed a problem-type notice")
+	}
+}
+
+// The browser tells a contestant a problem is scored by subtask; the printed sheet
+// is the only copy that never did.
+func TestBookletStatesPartialScoring(t *testing.T) {
+	c := &model.Contest{ID: "c1", Title: "R", StartTime: mustTime(), EndTime: mustTime()}
+
+	partial, err := NewGenerator().GenerateContestPDF(c, []model.ProblemWithSamples{{
+		Index:   "A",
+		Problem: model.Problem{Title: "D", ScoringMode: "partial"},
+	}})
+	if err != nil {
+		t.Fatalf("generate partial: %v", err)
+	}
+	if !strings.Contains(string(partial), "Partial scoring.") {
+		t.Fatal("a partially scored problem's booklet page does not say so")
+	}
+
+	complete, err := NewGenerator().GenerateContestPDF(c, []model.ProblemWithSamples{{
+		Index:   "B",
+		Problem: model.Problem{Title: "E", ScoringMode: "complete"},
+	}})
+	if err != nil {
+		t.Fatalf("generate complete: %v", err)
+	}
+	if strings.Contains(string(complete), "Partial scoring.") {
+		t.Fatal("a complete-scored problem printed a partial-scoring notice")
+	}
+}
