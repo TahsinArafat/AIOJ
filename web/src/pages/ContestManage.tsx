@@ -9,7 +9,7 @@ import { useTheme } from '../context/ThemeContext'
 import {
     FileText, FileDown, MessageSquare, Users, FileCode, Printer,
     Trophy, BarChart3, Search, CircleDot, Megaphone, Shield, Settings,
-    Loader2, Play, Check, EyeOff, UserPlus, ArrowDown, ArrowUp, Scale
+    Loader2, Play, Check, UserPlus, ArrowDown, ArrowUp, Scale
 } from 'lucide-react'
 import { useConfirm } from '../components/ConfirmDialog'
 import { useToast } from '../components/Toast'
@@ -1351,7 +1351,10 @@ function SettingsTab({ contestId }: { contestId: string }) {
                 // becomes the UTC instant the API expects.
                 start_time: localInputToIso(form.start_time),
                 end_time: localInputToIso(form.end_time),
-                freeze_time: localInputToIso(form.freeze_time),
+                // null clears the freeze; omitting the key would mean "leave it alone".
+                // localInputToIso returns undefined for an empty box, and JSON.stringify
+                // drops undefined keys, so an emptied field used to keep the old freeze.
+                freeze_time: localInputToIso(form.freeze_time) ?? null,
                 ...contestVisibilityPayload(form),
                 // Always sent, whole-map: the server treats a present
                 // access_config as a replace, so an emptied map is how a setter
@@ -1642,7 +1645,7 @@ function SettingsTab({ contestId }: { contestId: string }) {
                             ['upsolving_enabled', 'Upsolving', 'Let competitors keep submitting after the round ends.'],
                             ['virtual_contest_enabled', 'Virtual participation', 'Let people run this round as a timed practice attempt.'],
                             ['pdf_enabled', 'Printable booklet', 'Offer a PDF of the problems for printing.'],
-                            ['statement_hidden', 'Hide statements', 'Keep each problem statement hidden until the round starts.'],
+                            ['statement_hidden', 'Hide statements', 'Keep every problem statement from anyone who is not an organizer, and withhold the booklet. For onsite rounds that hand out paper.'],
                         ] as const).map(([key, label, hint]) => (
                             <label key={key} className="flex items-start gap-2 cursor-pointer p-2 rounded-lg hover:bg-surface-2 border border-hairline">
                                 <input type="checkbox" checked={Boolean(form[key])}
@@ -1693,26 +1696,6 @@ function SettingsTab({ contestId }: { contestId: string }) {
                             </div>
                         </div>
                     )}
-                </div>
-
-                {/* Options */}
-                <div>
-                    <label className="block text-sm font-medium text-ink-soft mb-2">Options</label>
-                    <div className="grid grid-cols-2 gap-3">
-                        {([
-                            ['pdf_enabled', 'PDF Generation', FileText],
-                            ['statement_hidden', 'Hide Statements (Onsite)', EyeOff],
-                            ['upsolving_enabled', 'Enable Upsolving', Loader2],
-                            ['virtual_contest_enabled', 'Virtual Contests', Play],
-                        ] as const).map(([key, label, icon]) => (
-                            <label key={key} className="flex items-center gap-2 cursor-pointer p-2 rounded-lg hover:bg-surface-2 border border-hairline">
-                                <input type="checkbox" checked={form[key] as boolean}
-                                    onChange={e => setForm(p => ({ ...p, [key]: e.target.checked }))}
-                                    className="rounded border-hairline-strong text-brand focus-visible:outline-[var(--ring)]" />
-                                <span className="text-sm flex items-center gap-1.5">{typeof icon === "string" ? icon : React.createElement(icon as unknown as React.ComponentType<{ className?: string }>, { className: "w-4 h-4" })} {label}</span>
-                            </label>
-                        ))}
-                    </div>
                 </div>
 
                 {/* Rating. is_rated has been in the schema since migration

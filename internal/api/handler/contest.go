@@ -662,7 +662,12 @@ func (h *ContestHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if !req.EndTime.IsZero() {
 		c.EndTime = req.EndTime
 	}
-	if req.FreezeTime != nil {
+	// Presence, not value, like the other nullable columns: freeze_time is a
+	// *time.Time, so JSON null and an absent key both decode to nil. Reading the
+	// pointer alone made the freeze one-way — settable, never removable, because
+	// an emptied "Freeze Time (optional)" box omits the key rather than sending
+	// null.
+	if _, sent := present["freeze_time"]; sent {
 		c.FreezeTime = req.FreezeTime
 	}
 	// Password semantics on update, matching every other optional field here:

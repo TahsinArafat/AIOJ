@@ -145,19 +145,24 @@ test('empty challenge list points at the Add Problem flow', async () => {
 })
 
 /**
- * The reported bug began here: "Private (Password/Invite required)" saved with
- * visible: true, so the round was listed publicly. These pin the pairing.
+ * "Private" and "Specific Group" are access gates: a password and a group. They
+ * are NOT catalog presence. These pin the two gates, and pin `visible` staying out
+ * of the payload — the server derives visibility from the round's status and
+ * ignores the key, so sending it only implied control the form does not have.
  */
-test('a private contest is saved hidden and keeps its password', () => {
+test('a private contest keeps its password', () => {
     const payload = contestVisibilityPayload({ visibility: 'private', password: 'hunter2', group_id: '' })
-    expect(payload.visible).toBe(false)
     expect(payload.password).toBe('hunter2')
     expect(payload.group_id).toBe('')
 })
 
+test('the payload does not send visible: publication is the status, listing is listed', () => {
+    const payload = contestVisibilityPayload({ visibility: 'public', password: '', group_id: '' })
+    expect('visible' in payload).toBe(false)
+})
+
 test('switching a private contest back to public clears the password', () => {
     const payload = contestVisibilityPayload({ visibility: 'public', password: 'hunter2', group_id: '' })
-    expect(payload.visible).toBe(true)
     expect(payload.password).toBe('')
 })
 
@@ -166,8 +171,7 @@ test('a private contest with a blank field leaves the stored password alone', ()
     expect(payload.password).toBeUndefined()
 })
 
-test('a group contest is visible but scoped to the group', () => {
+test('a group contest is scoped to the group', () => {
     const payload = contestVisibilityPayload({ visibility: 'group', password: '', group_id: 'g1' })
-    expect(payload.visible).toBe(true)
     expect(payload.group_id).toBe('g1')
 })

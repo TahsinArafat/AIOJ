@@ -1,12 +1,16 @@
 /**
- * The visibility half of a contest's settings payload.
+ * The access half of a contest's settings payload.
  *
- * The bug this prevents: the settings form offered "Private (Password/Invite
- * required)" but the save sent `visible: true` unconditionally. Choosing private
- * therefore produced a contest that was visible to everyone — and, before the
- * server-side fix, one whose password was never enforced either. The two settings
- * have to move together: a private round is hidden from the catalog and reached by
- * its direct link.
+ * Two gates live here, and neither of them is catalog presence:
+ *   - password: who may OPEN a private round.
+ *   - group_id: which group may open a restricted one.
+ *
+ * `visible` deliberately does not appear. It used to be sent as
+ * `visibility !== 'private'`, and the server now discards it outright
+ * (handler/contest.go Update, "_ = req.Visible") because a round is visible when
+ * its status is published — the store derives the column from status. Whether a
+ * round is advertised is the separate `listed` field. Sending `visible` made this
+ * form look like it controlled publication when it controlled nothing.
  *
  * Lives in lib/ rather than next to the page so the rule can be unit-tested
  * without pulling a component into the test's module graph (react-refresh).
@@ -17,7 +21,6 @@ export function contestVisibilityPayload(form: {
     group_id: string
 }) {
     return {
-        visible: form.visibility !== 'private',
         // undefined = leave the stored password alone; '' = remove it.
         password: form.visibility === 'private' ? (form.password.trim() || undefined) : '',
         group_id: form.visibility === 'group' ? form.group_id : '',

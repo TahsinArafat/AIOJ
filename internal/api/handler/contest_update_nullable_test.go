@@ -20,11 +20,12 @@ import (
 /**
  * A settings save must be able to remove a limit it once set.
  *
- * max_participants and registration_deadline are nullable, and the handler read
- * both through `if req.X != nil`, which cannot tell "clear it" from "don't touch
- * it" — a JSON null and an absent key both produce a nil pointer. The Settings tab
- * expresses "no cap" by sending null, so a cap could be set once and never
- * removed. The handler now decodes the set of keys as well as the struct.
+ * max_participants, registration_deadline and freeze_time are nullable, and the
+ * handler read each through `if req.X != nil`, which cannot tell "clear it" from
+ * "don't touch it" — a JSON null and an absent key both produce a nil pointer. The
+ * Settings tab expresses "no cap" and "no freeze" by sending null, so a cap or a
+ * freeze could be set once and never removed. The handler now decodes the set of
+ * keys as well as the struct.
  *
  * The assertion is on the stored row, not on the response: the pre-fix handler
  * returned 200 with the old value still in the database, which is exactly why this
@@ -49,10 +50,12 @@ func TestContestUpdateClearsNullableFieldsWhenSentAsNull(t *testing.T) {
 	start := time.Now().UTC().Add(time.Hour).Truncate(time.Second)
 	cap := 25
 	deadline := start.Add(-time.Minute)
+	freeze := start.Add(30 * time.Minute)
 	c := &model.Contest{
 		ID: uuid.New().String(), Title: "Handler " + uuid.New().String()[:8],
 		Type: "acm", Format: "acm", StartTime: start, EndTime: start.Add(2 * time.Hour),
-		CreatedBy: owner.ID, Status: model.ContestStatusPublished,
+		FreezeTime: &freeze,
+		CreatedBy:  owner.ID, Status: model.ContestStatusPublished,
 		IsRated: true, RatedForMin: 0, RatedForMax: 9999,
 		RegistrationRequired: true, MaxParticipants: &cap, RegistrationDeadline: &deadline,
 	}
@@ -66,7 +69,7 @@ func TestContestUpdateClearsNullableFieldsWhenSentAsNull(t *testing.T) {
 	}()
 
 	t.Run("null clears", func(t *testing.T) {
-		rec := putContest(t, h, c.ID, owner.ID, `{"max_participants":null,"registration_deadline":null}`)
+		rec := putContest(t, h, c.ID, owner.ID, `{"max_participants":null,"registration_deadline":null,"freeze_time":null}`)
 		if rec.Code != http.StatusOK {
 			t.Fatalf("update = %d, want 200 (body=%q)", rec.Code, rec.Body.String())
 		}
@@ -80,13 +83,19 @@ func TestContestUpdateClearsNullableFieldsWhenSentAsNull(t *testing.T) {
 		if got.RegistrationDeadline != nil {
 			t.Fatalf("registration_deadline = %v after sending null, want NULL", *got.RegistrationDeadline)
 		}
+		if got.FreezeTime != nil {
+			t.Fatalf("freeze_time = %v after sending null, want NULL — a freeze that cannot be cleared", *got.FreezeTime)
+		}
 	})
 
 	t.Run("omitted leaves the column alone", func(t *testing.T) {
-		// Re-set a cap, then save an unrelated field and confirm it survives.
+		// Re-set a cap and a freeze, then save an unrelated field and confirm
+		// both survive.
 		again := 99
 		got, _ := contestStore.GetByID(ctx, c.ID)
 		got.MaxParticipants = &again
+		refreeze := time.Now().UTC().Add(time.Hour).Truncate(time.Second)
+		got.FreezeTime = &refreeze
 		if err := contestStore.Update(ctx, got); err != nil {
 			t.Fatalf("seed cap: %v", err)
 		}
@@ -97,6 +106,9 @@ func TestContestUpdateClearsNullableFieldsWhenSentAsNull(t *testing.T) {
 		after, _ := contestStore.GetByID(ctx, c.ID)
 		if after.MaxParticipants == nil || *after.MaxParticipants != 99 {
 			t.Fatalf("max_participants = %v after an unrelated save, want 99 (an omitted field must not clear it)", after.MaxParticipants)
+		}
+		if after.FreezeTime == nil {
+			t.Fatalf("freeze_time was cleared by an unrelated save (an omitted field must not clear it)")
 		}
 		if after.Title != "renamed" {
 			t.Fatalf("title = %q, want renamed", after.Title)
