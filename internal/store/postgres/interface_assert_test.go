@@ -16,6 +16,7 @@ var (
 	_ store.OrganizationStore = (*OrganizationStore)(nil)
 	_ store.TeamStore         = (*TeamStore)(nil)
 	_ store.GymStore          = (*GymStore)(nil)
+	_ store.LanguageStore     = (*LanguageStore)(nil)
 )
 
 // The submission, contest and user stores are each split into roles, with the

@@ -17,17 +17,17 @@ import (
 // offering the hardcoded set, and offering a key the judge had no config for
 // produced a submission that failed at judge time.
 //
-// This handler reads the same lang/*.yaml directory the judge reads, on every
-// request, so an admin edit is visible on the next page load. The files are
-// small (a dozen, a few hundred bytes each) and this endpoint is hit once per
-// page load, not per keystroke, so caching would buy nothing and only add a way
-// for the UI to disagree with the judge.
+// This handler reads the same registry the judge reads, through the shared
+// loader, so an admin edit is visible on the next page load. It is the endpoint
+// that always was: it re-read on every request while the judge cached forever,
+// which is how a language could appear in the submit dropdown and still be
+// rejected as "unsupported" at judge time.
 type PublicLanguageHandler struct {
-	langDir string
+	loader *compiler.Loader
 }
 
-func NewPublicLanguageHandler(langDir string) *PublicLanguageHandler {
-	return &PublicLanguageHandler{langDir: langDir}
+func NewPublicLanguageHandler(loader *compiler.Loader) *PublicLanguageHandler {
+	return &PublicLanguageHandler{loader: loader}
 }
 
 // PublicLanguage is the wire shape for one selectable language. It carries only
@@ -55,9 +55,9 @@ type PublicLanguage struct {
 }
 
 func (h *PublicLanguageHandler) List(w http.ResponseWriter, r *http.Request) {
-	langs, err := compiler.LoadLanguages(h.langDir)
+	langs, err := h.loader.All(r.Context())
 	if err != nil {
-		// A missing lang directory is an install fault, not a client error.
+		// An unreachable registry is an install fault, not a client error.
 		// Answering with an empty list here would render an empty language
 		// dropdown and look like "this judge accepts no languages".
 		http.Error(w, "failed to load languages: "+err.Error(), http.StatusInternalServerError)

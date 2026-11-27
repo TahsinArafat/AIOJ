@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
 	"github.com/tahsinarafat/aioj/internal/auth"
+	"github.com/tahsinarafat/aioj/internal/judge/compiler"
 	"github.com/tahsinarafat/aioj/internal/model"
 	"github.com/tahsinarafat/aioj/internal/store"
 	"github.com/tahsinarafat/aioj/internal/store/postgres"
@@ -148,7 +149,7 @@ func TestRejudgeForbiddenForStranger(t *testing.T) {
 	problems := postgres.NewProblemStore(db)
 	contests := postgres.NewContestStore(db)
 	subs := postgres.NewSubmissionStore(db)
-	h := NewSubmissionHandler(subs, problems, contests, &nopQueue{}, nil, nil, "", nil, users)
+	h := NewSubmissionHandler(subs, problems, contests, &nopQueue{}, nil, nil, compiler.NewLoader(compiler.NewFileSource("../../../lang")), nil, users)
 
 	newUser := func(role string) *model.User {
 		u := &model.User{

@@ -681,7 +681,8 @@ export const api = {
     },
     languages: {
         /**
-         * The judge's own language list, read from lang/*.yaml on the server.
+         * The judge's own language list, read from the language registry on the
+         * server.
          * Public and unauthenticated. This is the single source of truth for
          * every language dropdown — the SPA must not keep its own copy, or an
          * admin edit in the panel silently fails to reach the submit forms.
@@ -840,7 +841,7 @@ export const api = {
                 request<unknown>(`/admin/languages/${key}/raw`, { method: 'PUT', body: JSON.stringify({ content }) }),
             delete: (key: string) =>
                 request(`/admin/languages/${key}`, { method: 'DELETE' }),
-            /** Restore the config shipped in lang/<key>.yaml. */
+            /** Restore the config that ships in lang/<key>.yaml. */
             reset: (key: string) =>
                 request<LanguageConfig>(`/admin/languages/${key}/reset`, { method: 'POST' }),
             test: (key: string) =>

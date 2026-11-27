@@ -33,7 +33,6 @@ type Config struct {
 	Mail        MailConfig        `yaml:"mail"`
 	RemoteJudge RemoteJudgeConfig `yaml:"remote_judge"`
 	Features    FeaturesConfig    `yaml:"features"`
-	LangDir     string            `yaml:"lang_dir"`
 }
 
 // PublicOrigin returns the externally visible origin for absolute links, or ""

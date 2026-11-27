@@ -51,27 +51,35 @@ const maxCapturedOutput = 8 << 20 // 8 MiB, matching the existing AI sandbox cap
 
 // JudgeRunner runs code in go-judge.
 type JudgeRunner struct {
-	Exec    *executor.Client
-	LangDir string
-	// langs is loaded once per runner; LoadLanguages reads the YAML registry,
-	// which must not happen per call.
-	langs map[string]*compiler.LangConfig
+	Exec *executor.Client
+	// Langs is the shared language cache. It reads through to the registry, so a
+	// harness run started after an admin edit uses the edited config instead of a
+	// snapshot taken when this runner was built.
+	Langs *compiler.Loader
 }
 
-// NewJudgeRunner loads the language registry.
-func NewJudgeRunner(exec *executor.Client, langDir string) (*JudgeRunner, error) {
-	langs, err := compiler.LoadLanguages(langDir)
-	if err != nil {
-		return nil, fmt.Errorf("problemgen: load languages: %w", err)
+// NewJudgeRunner wires the shared language cache.
+//
+// The error result is kept for its callers: the loader no longer reads at
+// construction time, so the only failure is a missing loader.
+func NewJudgeRunner(exec *executor.Client, langs *compiler.Loader) (*JudgeRunner, error) {
+	if langs == nil {
+		return nil, fmt.Errorf("problemgen: no language registry configured")
 	}
-	return &JudgeRunner{Exec: exec, LangDir: langDir, langs: langs}, nil
+	return &JudgeRunner{Exec: exec, Langs: langs}, nil
 }
 
-// Languages exposes the loaded registry for validation of language ids.
-func (r *JudgeRunner) Languages() map[string]*compiler.LangConfig { return r.langs }
+// Languages exposes the registry for validation of language ids.
+func (r *JudgeRunner) Languages() map[string]*compiler.LangConfig {
+	langs, err := r.Langs.All(context.Background())
+	if err != nil {
+		return map[string]*compiler.LangConfig{}
+	}
+	return langs
+}
 
 func (r *JudgeRunner) Compile(ctx context.Context, language, source string) (CompileOutcome, error) {
-	cfg := r.langs[language]
+	cfg := r.Languages()[language]
 	if cfg == nil {
 		return CompileOutcome{}, fmt.Errorf("unsupported language %q", language)
 	}

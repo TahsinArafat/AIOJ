@@ -11,6 +11,7 @@ import (
 
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
 	"github.com/tahsinarafat/aioj/internal/auth"
+	"github.com/tahsinarafat/aioj/internal/judge/compiler"
 	"github.com/tahsinarafat/aioj/internal/judge/executor"
 )
 
@@ -38,7 +39,7 @@ func decodeDetect(t *testing.T, srv *httptest.Server) map[string]json.RawMessage
 	if srv != nil {
 		exec = executor.NewClient(srv.URL)
 	}
-	h := NewAdminLanguageHandler(t.TempDir(), exec)
+	h := NewAdminLanguageHandler(newMemLanguageStore(), compiler.NewLoader(newMemLanguageStore()), exec)
 
 	rec := httptest.NewRecorder()
 	h.Detect(rec, adminDetectReq())
@@ -86,7 +87,8 @@ func TestDetectReturnsArraysWhenSandboxUnreachable(t *testing.T) {
 	deadURL := srv.URL
 	srv.Close() // nothing listening now
 
-	h := NewAdminLanguageHandler(t.TempDir(), executor.NewClient(deadURL))
+	st := newMemLanguageStore()
+	h := NewAdminLanguageHandler(st, compiler.NewLoader(st), executor.NewClient(deadURL))
 
 	rec := httptest.NewRecorder()
 	h.Detect(rec, adminDetectReq())
@@ -109,7 +111,8 @@ func TestDetectReturnsArraysWhenSandboxUnreachable(t *testing.T) {
 
 // No executor client at all (server misconfigured) must not panic or emit null.
 func TestDetectWithoutExecutorReturnsArrays(t *testing.T) {
-	h := &AdminLanguageHandler{langDir: t.TempDir()}
+	st := newMemLanguageStore()
+	h := NewAdminLanguageHandler(st, compiler.NewLoader(st), nil)
 
 	rec := httptest.NewRecorder()
 	h.Detect(rec, adminDetectReq())

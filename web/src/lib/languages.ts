@@ -1,7 +1,7 @@
 /**
  * Judge languages, as configured on the server.
  *
- * `lang/*.yaml` on the backend is the only place a language is defined, and
+ * The backend language registry is the only place a language is defined, and
  * GET /api/languages serves that same directory live — so an admin edit in
  * admin#languages, or a language added there, shows up in the IDE and the
  * submit forms without a rebuild.

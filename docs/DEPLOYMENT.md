@@ -526,7 +526,7 @@ Two independent resources are at play, and confusing them is the usual source of
 "the judge ran out of space" reports.
 
 **1. Memory for judged code (cgroups).** Each sandbox gets the problem's memory
-limit, scaled by that language's multiplier from `lang/*.yaml`:
+limit, scaled by that language's multiplier from the language registry:
 
 | Language | Multiplier | 256 MB problem asks for | 2 GB problem asks for |
 |---|---|---|---|

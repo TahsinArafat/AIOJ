@@ -49,7 +49,7 @@ AIOJ is a complete online judge you can run yourself — a Codeforces-style plat
 
 **Judging**
 - Secure, cgroup-isolated execution via [`criyle/go-judge`](https://github.com/criyle/go-judge).
-- 12 pre-configured languages (C/C++/Clang/GCC 32/64, Python, PyPy, Java, Rust, Node.js, JavaScript, C#) declared in `lang/*.yaml`.
+- 12 pre-configured languages (C/C++/Clang/GCC 32/64, Python, PyPy, Java, Rust, Node.js, JavaScript, C#), editable from the admin panel and stored in the database.
 - Rich judging engine: subtasks, interactive problems, submit-answer problems, per-language limits, and 8 output checkers (byte-identical, sorted, unordered, float absolute/relative, and more).
 - Fully asynchronous queue backed by Redis (falls back to an in-memory queue when Redis is unset).
 
@@ -282,7 +282,6 @@ Configuration is layered: **`config.yaml`** provides defaults, and environment v
 | `JUDGE_ENDPOINT` | go-judge base URL | `http://localhost:5050` |
 | `JUDGE_CONCURRENCY` | Parallel judge workers | `4` |
 | `REDIS_URL` | Redis address; empty → in-memory queue | → queue |
-| `LANG_DIR` | Directory of `lang/*.yaml` | `./lang` |
 | `MAIL_DRIVER` | `smtp` \| `catcher` \| `noop`. `catcher`/`noop` never deliver — verification and reset links silently vanish | `catcher` |
 | `MAIL_HOST` / `MAIL_PORT` / `MAIL_USERNAME` / `MAIL_PASSWORD` / `MAIL_FROM` | Transactional SMTP relay. Brevo: `smtp-relay.brevo.com`, port 587 or 465, password = an SMTP key | none |
 | `MAIL_PUBLIC_URL` / `PUBLIC_ORIGIN` | Public base URL for links, sitemap, feeds | `http://localhost:8081` |
@@ -346,7 +345,7 @@ web/                 React SPA (Vite)
     test/            Vitest setup & fixtures
   e2e/               Playwright specs
 
-lang/*.yaml          Language compiler/run configurations
+lang/*.yaml          Shipped language defaults (seeded into the DB on first boot)
 deploy/              Caddyfile, nginx, prometheus, grafana, status page
 docs/                OpenAPI spec, legal, runbooks, plans
 ```
@@ -383,7 +382,7 @@ POST /api/submissions
 5. Output is verified by the configured **checker** (exact, lines, float, sorted, unordered, …).
 6. The verdict is persisted and pushed to the client over **WebSocket** in real time.
 
-**Languages** are declared as data in `lang/*.yaml`, so adding a language rarely requires Go changes.
+**Languages** are data: `lang/*.yaml` holds the shipped defaults, seeded into the `languages` table on boot and edited from the admin panel. Adding or retuning a language needs no Go changes.
 
 ---
 

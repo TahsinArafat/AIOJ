@@ -29,7 +29,7 @@ Two seams keep this swappable:
 
 The model chooses *what to do next*. It never chooses *what gets executed*: there
 is no shell tool, no tool that accepts a path, and no language outside the
-`lang/*.yaml` registry.
+language registry (`languages` table, seeded from `lang/*.yaml`).
 
 ## Decision order, and who can change the bar
 

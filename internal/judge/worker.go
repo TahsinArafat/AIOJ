@@ -63,7 +63,7 @@ type WorkerPool struct {
 	batchRunner       *runner.BatchRunner
 	interactiveRunner *runner.InteractiveRunner
 	outputOnlyRunner  *runner.OutputOnlyRunner
-	langDir           string
+	langs             *compiler.Loader
 	sem               chan struct{}
 	subStore          submissionJudgeStore
 	probStore         judgeProblemStore
@@ -89,15 +89,6 @@ type WorkerPool struct {
 	// notifier pushes finished verdicts to subscribed browsers. Nil is valid.
 	notifier VerdictNotifier
 
-	// langs caches the language configs loaded from langDir.  LoadLanguages
-	// reads and YAML-parses every lang/*.yaml on every call — doing that per
-	// submission was measurable I/O on every judgment.  The cache is populated
-	// once on first use (sync.Once) and is safe for concurrent reads.  The
-	// YAML files only change when a new language is added, which requires a
-	// restart anyway, so there is no need to watch the directory.
-	langsOnce sync.Once
-	langs     map[string]*compiler.LangConfig
-
 	// judgmentTimeout caps a single submission end to end. Zero means the
 	// package default; see DefaultJudgmentTimeout for why it exists.
 	judgmentTimeout time.Duration
@@ -114,11 +105,11 @@ type WorkerPool struct {
 	closed bool
 }
 
-func NewWorkerPool(q queue.JudgeQueue, exec *executor.Client, langDir string, concurrency int, subStore submissionJudgeStore, probStore store.ProblemStore, langLimitStore store.LanguageLimitStore, balloonStore store.BalloonStore) *WorkerPool {
+func NewWorkerPool(q queue.JudgeQueue, exec *executor.Client, langs *compiler.Loader, concurrency int, subStore submissionJudgeStore, probStore store.ProblemStore, langLimitStore store.LanguageLimitStore, balloonStore store.BalloonStore) *WorkerPool {
 	return &WorkerPool{
 		queue: q, exec: exec, compiler: compiler.New(exec),
 		batchRunner: runner.NewBatchRunner(exec), interactiveRunner: runner.NewInteractiveRunner(exec), outputOnlyRunner: runner.NewOutputOnlyRunner(),
-		langDir: langDir, sem: make(chan struct{}, concurrency), subStore: subStore, probStore: probStore,
+		langs: langs, sem: make(chan struct{}, concurrency), subStore: subStore, probStore: probStore,
 		langLimitStore: langLimitStore, balloonStore: balloonStore,
 		judgmentTimeout: DefaultJudgmentTimeout,
 		health:          NewHealthState(),
@@ -157,20 +148,19 @@ func (wp *WorkerPool) WithNotifier(n VerdictNotifier) *WorkerPool {
 	return wp
 }
 
-// loadLangs returns the cached language map, loading it from disk on first
-// call.  The result is shared across all goroutines in the pool.
+// loadLangs returns the shared language map.
+//
+// The cache lives in compiler.Loader, which every process that judges shares, so
+// an admin save reaches this worker on TTL expiry instead of never. The previous
+// sync.Once assumed "the YAML only changes when a language is added, which needs
+// a restart anyway" — true for files, and false once the panel writes rows.
 func (wp *WorkerPool) loadLangs() map[string]*compiler.LangConfig {
-	wp.langsOnce.Do(func() {
-		langs, err := compiler.LoadLanguages(wp.langDir)
-		if err != nil {
-			slog.Error("judge: failed to load language configs", "error", err)
-			langs = map[string]*compiler.LangConfig{}
-		} else {
-			slog.Info("judge: language configs loaded", "count", len(langs))
-		}
-		wp.langs = langs
-	})
-	return wp.langs
+	langs, err := wp.langs.All(context.Background())
+	if err != nil {
+		slog.Error("judge: failed to load language configs", "error", err)
+		return map[string]*compiler.LangConfig{}
+	}
+	return langs
 }
 
 func (wp *WorkerPool) Start(ctx context.Context) {

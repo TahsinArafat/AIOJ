@@ -56,7 +56,7 @@ Browser -> nginx(:80) -> React SPA (Vite + TypeScript + Tailwind)
 
 **Database migrations** are at `internal/store/migrations/` (numbered .up.sql / .down.sql)
 
-**Language configs** are at `lang/*.yaml` (C++, Python, Java, Rust, Node.js, etc.)
+**Language configs** live in the `languages` table (C++, Python, Java, Rust, Node.js, etc.), seeded from `lang/*.yaml` and edited via `/admin#languages`
 
 ---
 
@@ -252,7 +252,7 @@ internal/virtual/service.go             Virtual contest logic
 internal/hack/service.go               Hack validation
 internal/notification/service.go        Notification dispatch
 internal/auth/*.go                      JWT + password hashing
-lang/*.yaml                             Language compiler configs
+lang/*.yaml                             Shipped language defaults (seeded into the DB)
 ```
 
 ### Frontend (React)

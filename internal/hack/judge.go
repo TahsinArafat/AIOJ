@@ -21,20 +21,20 @@ import (
 // and "actual_mock_output". Nothing was executed, so the hack phase was
 // decorative.
 type Judge struct {
-	exec    *executor.Client
-	langDir string
+	exec  *executor.Client
+	langs *compiler.Loader
 }
 
-// NewJudge builds a hack judge. A nil executor or empty langDir leaves the
-// judge disabled; Callers must check Enabled() and refuse hacks rather than
+// NewJudge builds a hack judge. A nil executor or nil language loader leaves
+// the judge disabled; callers must check Enabled() and refuse hacks rather than
 // silently accepting them.
-func NewJudge(exec *executor.Client, langDir string) *Judge {
-	return &Judge{exec: exec, langDir: langDir}
+func NewJudge(exec *executor.Client, langs *compiler.Loader) *Judge {
+	return &Judge{exec: exec, langs: langs}
 }
 
 // Enabled reports whether the judge can actually run code.
 func (j *Judge) Enabled() bool {
-	return j != nil && j.exec != nil && j.langDir != ""
+	return j != nil && j.exec != nil && j.langs != nil
 }
 
 // Verdict is the outcome of executing a submission against a hack input.
@@ -67,7 +67,7 @@ func (j *Judge) Run(ctx context.Context, prob *model.Problem, sub *model.Submiss
 		return Verdict{}, fmt.Errorf("hack judging is not configured")
 	}
 
-	langs, err := compiler.LoadLanguages(j.langDir)
+	langs, err := j.langs.All(ctx)
 	if err != nil {
 		return Verdict{}, fmt.Errorf("load languages: %w", err)
 	}

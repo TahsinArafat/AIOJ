@@ -133,7 +133,6 @@ services:
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env (openssl rand -hex 32)}
       AIOJ_ENV: ${AIOJ_ENV:-production}
       METRICS_TOKEN: ${METRICS_TOKEN:?METRICS_TOKEN must be set in .env}
-      LANG_DIR: /app/lang
       REDIS_URL: ${REDIS_URL:-redis:6379}
       REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
       CF_SUBMIT_URL: ${CF_SUBMIT_URL:-http://host.docker.internal:8003}
@@ -172,7 +171,6 @@ services:
       - sandbox
     volumes:
       - testdata:/app/testdata
-      - ./lang:/app/lang
       - backups:/app/backups
     depends_on:
       postgres:
@@ -226,7 +224,6 @@ services:
       - sandbox
     volumes:
       - testdata:/app/testdata
-      - ./lang:/app/lang
     depends_on:
       postgres:
         condition: service_healthy
@@ -262,7 +259,6 @@ services:
       AIOJ_ENV: ${AIOJ_ENV:-production}
       REDIS_URL: ${REDIS_URL:-redis:6379}
       REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
-      LANG_DIR: /app/lang
       CF_SUBMIT_URL: ${CF_SUBMIT_URL:-http://host.docker.internal:8003}
       # Pressure gate: hold new judgments when the host is under RAM or CPU
       # pressure. These defaults are conservative — a Java compile spike is
@@ -288,7 +284,6 @@ services:
       JUDGE_HEALTH_ADDR: ${JUDGE_HEALTH_ADDR:-:8081}
     volumes:
       - testdata:/app/testdata
-      - ./lang:/app/lang
     networks:
       - default
       - sandbox

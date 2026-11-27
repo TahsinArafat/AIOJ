@@ -15,7 +15,7 @@ import (
 // checks exclusively in go-judge. It never executes generated code on the API host.
 type SandboxValidator struct {
 	Exec        *executor.Client
-	LangDir     string
+	Langs       *compiler.Loader
 	StagingRoot string
 }
 
@@ -23,7 +23,7 @@ func (v *SandboxValidator) Validate(ctx context.Context, p *Proposal, jobID stri
 	if v == nil || v.Exec == nil {
 		return nil, fmt.Errorf("sandbox executor is unavailable")
 	}
-	langs, err := compiler.LoadLanguages(v.LangDir)
+	langs, err := v.Langs.All(ctx)
 	if err != nil {
 		return nil, err
 	}

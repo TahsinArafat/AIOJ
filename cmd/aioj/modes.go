@@ -16,6 +16,7 @@ import (
 	"github.com/tahsinarafat/aioj/internal/harness"
 	"github.com/tahsinarafat/aioj/internal/harness/problemgen"
 	"github.com/tahsinarafat/aioj/internal/judge"
+	"github.com/tahsinarafat/aioj/internal/judge/compiler"
 	"github.com/tahsinarafat/aioj/internal/judge/executor"
 	"github.com/tahsinarafat/aioj/internal/queue"
 	"github.com/tahsinarafat/aioj/internal/store"
@@ -122,7 +123,10 @@ func runAIHarness(
 	}
 
 	problemgen.MaxN = cfg.AI.MaxCaseN
-	runner, err := problemgen.NewJudgeRunner(execClient, cfg.LangDir)
+	// This mode is its own process, so it builds its own loader over the same
+	// registry. It reads through on TTL, which means a harness run started after
+	// an admin edit compiles with the edited command instead of a boot-time copy.
+	runner, err := problemgen.NewJudgeRunner(execClient, compiler.NewLoader(postgres.NewLanguageStore(db)))
 	if err != nil {
 		log.Fatalf("ai harness: %v", err)
 	}

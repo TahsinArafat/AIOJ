@@ -86,7 +86,6 @@ oauth:
     client_id: ""             # override with GOOGLE_CLIENT_ID
     client_secret: ""         # override with GOOGLE_CLIENT_SECRET
     redirect_url: "http://localhost:8081/api/auth/oauth/google/callback"
-lang_dir: "./lang"
 
 # Out-of-process submit services. Codeforces and AtCoder both need a real browser
 # session to submit, which the judge's HTTP client cannot hold, so each has a

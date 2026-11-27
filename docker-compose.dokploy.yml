@@ -196,7 +196,6 @@ services:
       CSRF_SECRET: ${CSRF_SECRET:?CSRF_SECRET must be set in Dokploy env}
       OAUTH_STATE_SECRET: ${OAUTH_STATE_SECRET:-}
       METRICS_TOKEN: ${METRICS_TOKEN:?METRICS_TOKEN must be set in Dokploy env}
-      LANG_DIR: /app/lang
       REDIS_URL: ${REDIS_URL:-redis:6379}
       REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in Dokploy env}
       PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-https://${DOMAIN:?DOMAIN must be set in Dokploy env}}
@@ -264,7 +263,6 @@ services:
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in Dokploy env}
       REDIS_URL: ${REDIS_URL:-redis:6379}
       REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in Dokploy env}
-      LANG_DIR: /app/lang
       JUDGE_CONCURRENCY: ${JUDGE_CONCURRENCY:-2}
       JUDGE_MIN_FREE_MEM_MB: ${JUDGE_MIN_FREE_MEM_MB:-512}
       JUDGE_MAX_LOAD_PER_CPU: ${JUDGE_MAX_LOAD_PER_CPU:-1.5}

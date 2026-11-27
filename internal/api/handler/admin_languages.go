@@ -4,9 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
-	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -16,12 +15,20 @@ import (
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
 	"github.com/tahsinarafat/aioj/internal/judge/compiler"
 	"github.com/tahsinarafat/aioj/internal/judge/executor"
+	"github.com/tahsinarafat/aioj/internal/store"
 	"github.com/tahsinarafat/aioj/lang"
 	"gopkg.in/yaml.v3"
 )
 
 type AdminLanguageHandler struct {
-	langDir string
+	// store is the live language registry. lang/*.yaml is only the shipped
+	// default: the seeder and Reset-to-Default read it, nothing else does.
+	store store.LanguageStore
+	// loader is the shared judge-side cache. Every mutation invalidates it, so
+	// a save is visible to the next request in this process rather than after
+	// the TTL — the reason an admin edit used to reach the submit dropdown but
+	// not the judge.
+	loader *compiler.Loader
 	// exec probes for toolchains through the judge sandbox rather than the
 	// backend's own filesystem. The backend image (Dockerfile.api) deliberately
 	// ships no compilers, so a host-side os.Stat/exec found nothing and reported
@@ -29,8 +36,8 @@ type AdminLanguageHandler struct {
 	exec *executor.Client
 }
 
-func NewAdminLanguageHandler(langDir string, exec *executor.Client) *AdminLanguageHandler {
-	return &AdminLanguageHandler{langDir: langDir, exec: exec}
+func NewAdminLanguageHandler(st store.LanguageStore, loader *compiler.Loader, exec *executor.Client) *AdminLanguageHandler {
+	return &AdminLanguageHandler{store: st, loader: loader, exec: exec}
 }
 
 type LanguageConfigResponse struct {
@@ -45,7 +52,6 @@ type LanguageConfigResponse struct {
 	SeccompRule           string            `json:"seccomp_rule"`
 	Extensions            []string          `json:"extensions"`
 	Mono                  bool              `json:"mono,omitempty"`
-	FilePath              string            `json:"file_path"`
 }
 
 type DetectedTool struct {
@@ -228,6 +234,80 @@ func (h *AdminLanguageHandler) toolCompiles(ctx context.Context, bin string) boo
 	return cr.Status == "Accepted" && cr.ExitStatus == 0
 }
 
+// toLanguageResponse renders a stored config for the admin panel.
+//
+// FilePath is gone: there is no file any more. It was never rendered by the
+// panel (LanguagesPanel.tsx declared the field but displayed nothing), so
+// dropping it changes no UI.
+func toLanguageResponse(cfg *compiler.LangConfig) LanguageConfigResponse {
+	return LanguageConfigResponse{
+		Name:                  cfg.Name,
+		Key:                   cfg.Key,
+		CompileCmd:            cfg.CompileCmd,
+		Runtime:               cfg.Runtime,
+		CopyIn:                cfg.CopyIn,
+		TimeLimitMultiplier:   cfg.TimeLimitMultiplier,
+		MemoryLimitMultiplier: cfg.MemoryLimitMultiplier,
+		StackLimitKB:          cfg.StackLimitKB,
+		SeccompRule:           cfg.SeccompRule,
+		Extensions:            cfg.Extensions,
+		Mono:                  cfg.Mono,
+	}
+}
+
+// decodeLangConfig parses a stored JSONB document into a LangConfig.
+func decodeLangConfig(doc []byte) (*compiler.LangConfig, error) {
+	var cfg compiler.LangConfig
+	if err := json.Unmarshal(doc, &cfg); err != nil {
+		return nil, err
+	}
+	return &cfg, nil
+}
+
+// encodeLangConfig renders a LangConfig as the JSONB document the store holds.
+func encodeLangConfig(cfg *compiler.LangConfig) ([]byte, error) {
+	if cfg.TimeLimitMultiplier <= 0 {
+		cfg.TimeLimitMultiplier = 1.0
+	}
+	if cfg.MemoryLimitMultiplier <= 0 {
+		cfg.MemoryLimitMultiplier = 1.0
+	}
+	return json.Marshal(cfg)
+}
+
+// loadLang returns one stored language, or nil when it does not exist.
+func (h *AdminLanguageHandler) loadLang(ctx context.Context, key string) (*compiler.LangConfig, error) {
+	row, err := h.store.GetByKey(ctx, key)
+	if err != nil {
+		return nil, err
+	}
+	if row == nil {
+		return nil, nil
+	}
+	return decodeLangConfig(row.Config)
+}
+
+// saveLang writes one language and drops this process's cache so the change is
+// visible to the next request instead of after the TTL.
+func (h *AdminLanguageHandler) saveLang(w http.ResponseWriter, r *http.Request, key string, cfg *compiler.LangConfig) bool {
+	data, err := encodeLangConfig(cfg)
+	if err != nil {
+		http.Error(w, "failed to encode language config", http.StatusInternalServerError)
+		return false
+	}
+
+	updatedBy := ""
+	if claims := middleware.GetUserClaims(r); claims != nil {
+		updatedBy = claims.UserID
+	}
+	if err := h.store.Upsert(r.Context(), key, data, updatedBy); err != nil {
+		http.Error(w, "failed to save language: "+err.Error(), http.StatusInternalServerError)
+		return false
+	}
+	h.loader.Invalidate()
+	return true
+}
+
 func (h *AdminLanguageHandler) List(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetUserClaims(r)
 	if claims == nil || claims.Role != "admin" {
@@ -235,28 +315,29 @@ func (h *AdminLanguageHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	langs, err := compiler.LoadLanguages(h.langDir)
+	rows, err := h.store.List(r.Context())
 	if err != nil {
 		http.Error(w, "failed to load languages: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	var result []LanguageConfigResponse
-	for _, lang := range langs {
-		result = append(result, LanguageConfigResponse{
-			Name:                  lang.Name,
-			Key:                   lang.Key,
-			CompileCmd:            lang.CompileCmd,
-			Runtime:               lang.Runtime,
-			CopyIn:                lang.CopyIn,
-			TimeLimitMultiplier:   lang.TimeLimitMultiplier,
-			MemoryLimitMultiplier: lang.MemoryLimitMultiplier,
-			StackLimitKB:          lang.StackLimitKB,
-			SeccompRule:           lang.SeccompRule,
-			Extensions:            lang.Extensions,
-			Mono:                  lang.Mono,
-			FilePath:              lang.Key + ".yaml",
-		})
+	// Non-nil so an empty table marshals to [] rather than null: the panel maps
+	// over this, and null blanked the page when the list was empty.
+	result := make([]LanguageConfigResponse, 0, len(rows))
+	for _, row := range rows {
+		cfg, err := decodeLangConfig(row.Config)
+		if err != nil {
+			// A row that does not parse is skipped, not fatal: one bad config
+			// must not hide every other language from the panel. It surfaces as
+			// "unsupported language" for that key alone, which is the same
+			// failure the file loader had for an unparseable YAML file.
+			slog.Error("admin languages: skipping malformed config", "key", row.Key, "error", err)
+			continue
+		}
+		if cfg.Key == "" {
+			cfg.Key = row.Key
+		}
+		result = append(result, toLanguageResponse(cfg))
 	}
 
 	sort.Slice(result, func(i, j int) bool {
@@ -275,29 +356,21 @@ func (h *AdminLanguageHandler) Get(w http.ResponseWriter, r *http.Request) {
 	}
 
 	key := chi.URLParam(r, "key")
-	lang, err := h.loadLang(key)
+	cfg, err := h.loadLang(r.Context(), key)
 	if err != nil {
+		http.Error(w, "failed to load language: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if cfg == nil {
 		http.Error(w, "language not found", http.StatusNotFound)
 		return
 	}
-
-	resp := LanguageConfigResponse{
-		Name:                  lang.Name,
-		Key:                   lang.Key,
-		CompileCmd:            lang.CompileCmd,
-		Runtime:               lang.Runtime,
-		CopyIn:                lang.CopyIn,
-		TimeLimitMultiplier:   lang.TimeLimitMultiplier,
-		MemoryLimitMultiplier: lang.MemoryLimitMultiplier,
-		StackLimitKB:          lang.StackLimitKB,
-		SeccompRule:           lang.SeccompRule,
-		Extensions:            lang.Extensions,
-		Mono:                  lang.Mono,
-		FilePath:              key + ".yaml",
+	if cfg.Key == "" {
+		cfg.Key = key
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	json.NewEncoder(w).Encode(toLanguageResponse(cfg))
 }
 
 func (h *AdminLanguageHandler) Update(w http.ResponseWriter, r *http.Request) {
@@ -308,9 +381,13 @@ func (h *AdminLanguageHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	key := chi.URLParam(r, "key")
-	filePath := filepath.Join(h.langDir, key+".yaml")
 
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+	existing, err := h.store.GetByKey(r.Context(), key)
+	if err != nil {
+		http.Error(w, "failed to load language: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if existing == nil {
 		http.Error(w, "language not found; use POST /api/admin/languages to create new languages", http.StatusNotFound)
 		return
 	}
@@ -328,21 +405,8 @@ func (h *AdminLanguageHandler) Update(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "name is required", http.StatusBadRequest)
 		return
 	}
-	if cfg.TimeLimitMultiplier <= 0 {
-		cfg.TimeLimitMultiplier = 1.0
-	}
-	if cfg.MemoryLimitMultiplier <= 0 {
-		cfg.MemoryLimitMultiplier = 1.0
-	}
 
-	data, err := yaml.Marshal(&cfg)
-	if err != nil {
-		http.Error(w, "failed to marshal yaml", http.StatusInternalServerError)
-		return
-	}
-
-	if err := os.WriteFile(filePath, data, 0644); err != nil {
-		http.Error(w, "failed to write file: "+err.Error(), http.StatusInternalServerError)
+	if !h.saveLang(w, r, key, &cfg) {
 		return
 	}
 
@@ -358,17 +422,22 @@ func (h *AdminLanguageHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	key := chi.URLParam(r, "key")
-	filePath := filepath.Join(h.langDir, key+".yaml")
 
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+	existing, err := h.store.GetByKey(r.Context(), key)
+	if err != nil {
+		http.Error(w, "failed to load language: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if existing == nil {
 		http.Error(w, "language not found", http.StatusNotFound)
 		return
 	}
 
-	if err := os.Remove(filePath); err != nil {
+	if err := h.store.Delete(r.Context(), key); err != nil {
 		http.Error(w, "failed to delete: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+	h.loader.Invalidate()
 
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -391,27 +460,17 @@ func (h *AdminLanguageHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	filePath := filepath.Join(h.langDir, cfg.Key+".yaml")
-	if _, err := os.Stat(filePath); err == nil {
+	existing, err := h.store.GetByKey(r.Context(), cfg.Key)
+	if err != nil {
+		http.Error(w, "failed to load language: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if existing != nil {
 		http.Error(w, "language already exists", http.StatusConflict)
 		return
 	}
 
-	if cfg.TimeLimitMultiplier <= 0 {
-		cfg.TimeLimitMultiplier = 1.0
-	}
-	if cfg.MemoryLimitMultiplier <= 0 {
-		cfg.MemoryLimitMultiplier = 1.0
-	}
-
-	data, err := yaml.Marshal(&cfg)
-	if err != nil {
-		http.Error(w, "failed to marshal yaml", http.StatusInternalServerError)
-		return
-	}
-
-	if err := os.WriteFile(filePath, data, 0644); err != nil {
-		http.Error(w, "failed to write file: "+err.Error(), http.StatusInternalServerError)
+	if !h.saveLang(w, r, cfg.Key, &cfg) {
 		return
 	}
 
@@ -428,10 +487,17 @@ func (h *AdminLanguageHandler) Test(w http.ResponseWriter, r *http.Request) {
 	}
 
 	key := chi.URLParam(r, "key")
-	lang, err := h.loadLang(key)
+	lang, err := h.loadLang(r.Context(), key)
 	if err != nil {
+		http.Error(w, "failed to load language: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if lang == nil {
 		http.Error(w, "language not found", http.StatusNotFound)
 		return
+	}
+	if lang.Key == "" {
+		lang.Key = key
 	}
 
 	result := map[string]interface{}{
@@ -485,6 +551,11 @@ func hasPELinkerStackFlag(compileCmd string) bool {
 		strings.Contains(compileCmd, "-Wl,-stack_size")
 }
 
+// GetRaw renders the stored config back as YAML.
+//
+// The editor stays, so this is a rendering of the row rather than a file read.
+// The document is the same LangConfig the file used to hold, so what an operator
+// sees and edits is unchanged.
 func (h *AdminLanguageHandler) GetRaw(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.GetUserClaims(r)
 	if claims == nil || claims.Role != "admin" {
@@ -493,11 +564,22 @@ func (h *AdminLanguageHandler) GetRaw(w http.ResponseWriter, r *http.Request) {
 	}
 
 	key := chi.URLParam(r, "key")
-	filePath := filepath.Join(h.langDir, key+".yaml")
-
-	data, err := os.ReadFile(filePath)
+	cfg, err := h.loadLang(r.Context(), key)
 	if err != nil {
+		http.Error(w, "failed to load language: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if cfg == nil {
 		http.Error(w, "file not found", http.StatusNotFound)
+		return
+	}
+	if cfg.Key == "" {
+		cfg.Key = key
+	}
+
+	data, err := yaml.Marshal(cfg)
+	if err != nil {
+		http.Error(w, "failed to render yaml", http.StatusInternalServerError)
 		return
 	}
 
@@ -513,9 +595,13 @@ func (h *AdminLanguageHandler) UpdateRaw(w http.ResponseWriter, r *http.Request)
 	}
 
 	key := chi.URLParam(r, "key")
-	filePath := filepath.Join(h.langDir, key+".yaml")
 
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+	existing, err := h.store.GetByKey(r.Context(), key)
+	if err != nil {
+		http.Error(w, "failed to load language: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if existing == nil {
 		http.Error(w, "language not found; use POST /api/admin/languages to create new languages", http.StatusNotFound)
 		return
 	}
@@ -533,9 +619,11 @@ func (h *AdminLanguageHandler) UpdateRaw(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "invalid YAML: "+err.Error(), http.StatusBadRequest)
 		return
 	}
+	if cfg.Key == "" {
+		cfg.Key = key
+	}
 
-	if err := os.WriteFile(filePath, []byte(body.Content), 0644); err != nil {
-		http.Error(w, "failed to write file: "+err.Error(), http.StatusInternalServerError)
+	if !h.saveLang(w, r, key, &cfg) {
 		return
 	}
 
@@ -543,25 +631,12 @@ func (h *AdminLanguageHandler) UpdateRaw(w http.ResponseWriter, r *http.Request)
 	json.NewEncoder(w).Encode(map[string]string{"status": "success"})
 }
 
-func (h *AdminLanguageHandler) loadLang(key string) (*compiler.LangConfig, error) {
-	filePath := filepath.Join(h.langDir, strings.ToLower(key)+".yaml")
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		return nil, err
-	}
-	var cfg compiler.LangConfig
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return nil, err
-	}
-	return &cfg, nil
-}
-
 // Reset restores a language to the config that ships in lang/*.yaml.
 //
-// The panel edits those files in place, so a save that drops a field — or an
-// operator clearing a command by hand — leaves the language broken with no way
-// back short of a redeploy. Reset is that way back, and it restores the real
-// shipped bytes rather than a second hardcoded copy, so the two cannot drift.
+// The panel edits the live row, so a save that drops a field — or an operator
+// clearing a command by hand — leaves the language broken with no way back
+// short of a redeploy. Reset is that way back, and it restores the real shipped
+// bytes rather than a second hardcoded copy, so the two cannot drift.
 //
 // A language an operator created has no shipped default; that is a 404 with a
 // message saying so, not a silent no-op.
@@ -581,36 +656,24 @@ func (h *AdminLanguageHandler) Reset(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate before writing. A malformed shipped file would otherwise be
-	// written to disk and then ignored by the judge's loader, which skips
-	// unparseable configs — the language would disappear from every submission
-	// dropdown with no error anywhere.
+	// stored and then ignored by the judge's loader, which skips unparseable
+	// configs — the language would disappear from every submission dropdown
+	// with no error anywhere.
 	var cfg compiler.LangConfig
 	if err := yaml.Unmarshal(defaults, &cfg); err != nil {
 		http.Error(w, "embedded default is invalid: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+	if cfg.Key == "" {
+		cfg.Key = key
+	}
 
-	filePath := filepath.Join(h.langDir, key+".yaml")
-	if err := os.WriteFile(filePath, defaults, 0644); err != nil {
-		http.Error(w, "failed to write file: "+err.Error(), http.StatusInternalServerError)
+	if !h.saveLang(w, r, key, &cfg) {
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(LanguageConfigResponse{
-		Name:                  cfg.Name,
-		Key:                   cfg.Key,
-		CompileCmd:            cfg.CompileCmd,
-		Runtime:               cfg.Runtime,
-		CopyIn:                cfg.CopyIn,
-		TimeLimitMultiplier:   cfg.TimeLimitMultiplier,
-		MemoryLimitMultiplier: cfg.MemoryLimitMultiplier,
-		StackLimitKB:          cfg.StackLimitKB,
-		SeccompRule:           cfg.SeccompRule,
-		Extensions:            cfg.Extensions,
-		Mono:                  cfg.Mono,
-		FilePath:              key + ".yaml",
-	})
+	json.NewEncoder(w).Encode(toLanguageResponse(&cfg))
 }
 
 func (h *AdminLanguageHandler) Detect(w http.ResponseWriter, r *http.Request) {

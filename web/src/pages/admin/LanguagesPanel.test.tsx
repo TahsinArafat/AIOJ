@@ -131,7 +131,6 @@ const oneLang = {
         seccomp_rule: 'c_cpp',
         extensions: ['.cpp'],
         mono: false,
-        file_path: 'cpp-gpp-64.yaml',
     }],
 }
 
@@ -140,7 +139,7 @@ function renderWithOneLang() {
     return renderPanel()
 }
 
-// Reset exists because the panel edits lang/*.yaml in place: a bad save could
+// Reset exists because the panel edits the stored config in place: a bad save could
 // otherwise only be undone by a redeploy.
 test('Reset restores the language after confirmation', async () => {
     vi.mocked(api.admin.languages.reset).mockResolvedValue(oneLang.data[0] as never)

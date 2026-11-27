@@ -11,7 +11,6 @@ import (
 	"os/signal"
 	"strconv"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 	"unicode/utf8"
@@ -134,6 +133,30 @@ schema is unrecoverable.`, err)
 		slog.Info("database migrations skipped (database.migrate_on_boot is false)")
 	}
 
+	// Language registry. The shipped lang/*.yaml files are seeded into the table
+	// on every boot, INSERT-only: an operator's edit is never overwritten, and a
+	// language they deleted stays deleted because the soft-deleted row still
+	// occupies the key. This is what makes an admin#languages change survive a
+	// redeploy — the file-based version wrote into the container's writable
+	// layer, which the next deploy discarded.
+	languageStore := postgres.NewLanguageStore(db)
+	defaults, err := compiler.ShippedDefaults()
+	if err != nil {
+		log.Fatalf("language defaults: %v", err)
+	}
+	seedCtx, seedCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	seeded, err := languageStore.Seed(seedCtx, defaults)
+	seedCancel()
+	if err != nil {
+		log.Fatalf("seed language configs: %v", err)
+	}
+	if seeded > 0 {
+		slog.Info("seeded shipped language configs", "created", seeded)
+	}
+	// One loader per process, shared by the judge worker, the submission handler
+	// and the public list, so all three agree on what a language is.
+	languageLoader := compiler.NewLoader(languageStore)
+
 	accessTTL, _ := time.ParseDuration(cfg.Auth.AccessTTL)
 	refreshTTL, _ := time.ParseDuration(cfg.Auth.RefreshTTL)
 	jwtManager := auth.NewJWTManager(cfg.Auth.JWTSecret, accessTTL, refreshTTL)
@@ -164,7 +187,7 @@ schema is unrecoverable.`, err)
 	langLimitH := handler.NewLanguageLimitHandler(langLimitStore, problemStore)
 	balloonStore := postgres.NewBalloonStore(db)
 	printStore := postgres.NewPrintStore(db)
-	workerPool := judge.NewWorkerPool(judgeQueue, execClient, cfg.LangDir, cfg.Judge.Concurrency, submissionStore, problemStore, langLimitStore, balloonStore)
+	workerPool := judge.NewWorkerPool(judgeQueue, execClient, languageLoader, cfg.Judge.Concurrency, submissionStore, problemStore, langLimitStore, balloonStore)
 
 	// Attach a pressure gate when thresholds are configured.  On Linux the
 	// gate reads /proc/meminfo + /proc/loadavg before every dispatch; on
@@ -298,7 +321,7 @@ schema is unrecoverable.`, err)
 	// round (safe, but the contestant could never get in).
 	contestGrantStore := postgres.NewContestGrantStore(db)
 
-	submissionH := handler.NewSubmissionHandler(submissionStore, problemStore, contestStore, judgeQueue, wsManager, execClient, cfg.LangDir, vjService, userStore).
+	submissionH := handler.NewSubmissionHandler(submissionStore, problemStore, contestStore, judgeQueue, wsManager, execClient, languageLoader, vjService, userStore).
 		WithGrants(contestGrantStore)
 	teamStore := postgres.NewTeamStore(db)
 	// Built here rather than beside its handler further down, because the contest
@@ -349,20 +372,16 @@ schema is unrecoverable.`, err)
 
 	testcaseH := handler.NewTestcaseHandler(problemStore, "./testdata")
 	// The validator exists only inside the AI harness today; this gives setters the
-	// same check on hand-authored problems. Languages are loaded once and shared.
+	// same check on hand-authored problems. It reads the shared loader, so it sees
+	// the same languages the judge does rather than a snapshot taken at boot.
 	validatorRunner := validator.New(compiler.New(execClient), execClient)
-	var validatorLangsOnce sync.Once
-	var validatorLangs map[string]*compiler.LangConfig
 	testcaseH.WithValidator(validatorRunner, func() map[string]*compiler.LangConfig {
-		validatorLangsOnce.Do(func() {
-			l, err := compiler.LoadLanguages(cfg.LangDir)
-			if err != nil {
-				slog.Error("validator: failed to load language configs", "error", err)
-				l = map[string]*compiler.LangConfig{}
-			}
-			validatorLangs = l
-		})
-		return validatorLangs
+		l, err := languageLoader.All(context.Background())
+		if err != nil {
+			slog.Error("validator: failed to load language configs", "error", err)
+			return map[string]*compiler.LangConfig{}
+		}
+		return l
 	})
 	importH := handler.NewImportHandler(problemStore, "./testdata")
 	ratingH := handler.NewRatingHandler(ratingStore, contestStore)
@@ -376,7 +395,7 @@ schema is unrecoverable.`, err)
 		WithGrants(contestGrantStore)
 	hackStore := postgres.NewHackStore(db)
 	hackService := hack.NewService(hackStore, contestStore, submissionStore).
-		WithJudge(problemStore, hack.NewJudge(execClient, cfg.LangDir))
+		WithJudge(problemStore, hack.NewJudge(execClient, languageLoader))
 	hackH := handler.NewHackHandler(hackService, hackStore, contestStore)
 	statsH := handler.NewStatsHandler(submissionStore, problemStore)
 	notifStore := postgres.NewNotificationStore(db)
@@ -462,7 +481,7 @@ schema is unrecoverable.`, err)
 	// saved through the panel invalidates the cache the gates read.
 	featureResolver := feature.NewResolver(settingsStore, userStore)
 	featuresH := handler.NewFeaturesHandler(featureResolver, settingsStore)
-	langAdminH := handler.NewAdminLanguageHandler(cfg.LangDir, execClient)
+	langAdminH := handler.NewAdminLanguageHandler(languageStore, languageLoader, execClient)
 
 	remoteLangH := handler.NewRemoteLanguageHandler(remoteLangStore, vjService)
 	// No WithContestStore here: it used to attach the contest store for a
@@ -485,7 +504,7 @@ schema is unrecoverable.`, err)
 	aiGenerationStore := postgres.NewAIGenerationStore(db)
 	aiJobService := &generate.JobService{Jobs: aiGenerationStore, Models: aiModelStore, Problems: problemStore}
 	generationAssetStore := postgres.NewGenerationAssetStore(db)
-	aiWorker := &generate.JobWorker{Jobs: aiGenerationStore, Models: aiModelStore, Problems: problemStore, Timeout: time.Duration(cfg.AI.JobTimeoutSeconds) * time.Second, Sandbox: &generate.SandboxValidator{Exec: execClient, LangDir: cfg.LangDir, StagingRoot: cfg.AI.StagedTestdataRoot}}
+	aiWorker := &generate.JobWorker{Jobs: aiGenerationStore, Models: aiModelStore, Problems: problemStore, Timeout: time.Duration(cfg.AI.JobTimeoutSeconds) * time.Second, Sandbox: &generate.SandboxValidator{Exec: execClient, Langs: languageLoader, StagingRoot: cfg.AI.StagedTestdataRoot}}
 	startAIWorkers := func() {
 		for i := 0; i < cfg.AI.WorkerConcurrency; i++ {
 			go aiWorker.Run(ctx)
@@ -1079,7 +1098,7 @@ schema is unrecoverable.`, err)
 			}(),
 			APIKeys:         apiKeyStore,
 			Media:           mediaH,
-			PublicLanguages: handler.NewPublicLanguageHandler(cfg.LangDir),
+			PublicLanguages: handler.NewPublicLanguageHandler(languageLoader),
 			CDN:             handler.NewCDNHandler(handler.CDNConfig{}),
 			Achievements:    handler.NewAchievementHandler(postgres.NewAchievementStore(db)),
 			Friendships:     handler.NewFriendshipHandler(postgres.NewFriendshipStore(db), userStore),

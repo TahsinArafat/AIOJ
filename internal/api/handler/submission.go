@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -65,19 +64,18 @@ type SubmissionHandler struct {
 	queue        queue.JudgeQueue
 	wsManager    *WSManager
 	exec         *executor.Client
-	langDir      string
-	vjudgeSvc    *vjudge.Service
-	users        emailVerifiedReader
+	// langs is the shared judge-side language cache. It used to be a local
+	// sync.Once over lang/*.yaml, which never invalidated: an admin edit reached
+	// the dropdown but not this handler, so a renamed language was rejected here
+	// as "unsupported" until the process restarted.
+	langs     *compiler.Loader
+	vjudgeSvc *vjudge.Service
+	users     emailVerifiedReader
 	// submitQuota and runQuota are per-user budgets. Without them a single
 	// account could flood the judge queue or use /run as a free compile-and-
 	// execute service, starving everybody else.
 	submitQuota *userQuota
 	runQuota    *userQuota
-	// langsOnce / langs cache the YAML language configs loaded from langDir.
-	// /run is called on every "run code" click; re-parsing the YAML files on
-	// each request was wasted disk I/O.  Languages only change on restart.
-	langsOnce sync.Once
-	langs     map[string]*compiler.LangConfig
 	// audit records setter-initiated rejudges; optional.
 	audit *AuditLogHandler
 	// scoreboardCache is invalidated when a submission is voided, so a standing
@@ -106,27 +104,26 @@ func (h *SubmissionHandler) WithGrants(gs contestGrantChecker) *SubmissionHandle
 }
 
 func NewSubmissionHandler(sub submissionServiceStore, prob store.ProblemStore, contest contestReadAccess,
-	q queue.JudgeQueue, ws *WSManager, exec *executor.Client, langDir string, vjSvc *vjudge.Service,
+	q queue.JudgeQueue, ws *WSManager, exec *executor.Client, langs *compiler.Loader, vjSvc *vjudge.Service,
 	users emailVerifiedReader) *SubmissionHandler {
-	h := &SubmissionHandler{subStore: sub, probStore: prob, contestStore: contest, queue: q, wsManager: ws, exec: exec, langDir: langDir, vjudgeSvc: vjSvc, users: users,
+	h := &SubmissionHandler{subStore: sub, probStore: prob, contestStore: contest, queue: q, wsManager: ws, exec: exec, langs: langs, vjudgeSvc: vjSvc, users: users,
 		submitQuota: newSubmissionQuota(), runQuota: newRunQuota()}
 	h.access = newContestAccessPolicy(contest, nil)
 	return h
 }
 
-// loadLangs returns the cached language map, initialising it on first call.
-// Language configs only change when a new lang/*.yaml is added, which requires
-// a process restart — so reading from disk once and caching forever is correct.
+// loadLangs returns the shared language map.
+//
+// The cache lives in compiler.Loader now, so this handler and the judge worker
+// see the same configs and an admin save invalidates both — instead of each
+// holding a sync.Once over lang/*.yaml that no write could ever clear.
 func (h *SubmissionHandler) loadLangs() map[string]*compiler.LangConfig {
-	h.langsOnce.Do(func() {
-		langs, err := compiler.LoadLanguages(h.langDir)
-		if err != nil {
-			slog.Error("submission: failed to load language configs", "error", err)
-			langs = map[string]*compiler.LangConfig{}
-		}
-		h.langs = langs
-	})
-	return h.langs
+	langs, err := h.langs.All(context.Background())
+	if err != nil {
+		slog.Error("submission: failed to load language configs", "error", err)
+		return map[string]*compiler.LangConfig{}
+	}
+	return langs
 }
 
 // checkQuota enforces a per-user budget and writes a 429 when it is exhausted.

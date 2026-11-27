@@ -17,7 +17,6 @@ interface LanguageConfig {
     seccomp_rule: string
     extensions: string[]
     mono: boolean
-    file_path: string
 }
 
 const emptyLang: LanguageConfig = {
@@ -32,7 +31,6 @@ const emptyLang: LanguageConfig = {
     seccomp_rule: 'general',
     extensions: [],
     mono: false,
-    file_path: '',
 }
 
 const seccompOptions = ['general', 'c_cpp', 'java', 'node', 'none']
@@ -132,7 +130,7 @@ export default function LanguagesPanel() {
         }
     }
 
-    // Restores lang/<key>.yaml to the config that ships with the repo. The
+    // Restores the language to the config that ships with the repo. The
     // panel edits those files in place, so a bad save (or a hand edit) could
     // otherwise only be undone by a redeploy.
     const handleReset = async (key: string) => {
@@ -199,7 +197,7 @@ export default function LanguagesPanel() {
         }
     }
 
-    // The binary name, not the absolute path: a lang/*.yaml command runs inside
+    // The binary name, not the absolute path: a language command runs inside
     // the judge sandbox through a PATH lookup, and the absolute path is only
     // informative. `binary` is what discovery found on that PATH.
     const applyDetectedCompiler = (tool: DetectedTool) => {

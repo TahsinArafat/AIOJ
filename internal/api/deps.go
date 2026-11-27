@@ -109,7 +109,7 @@ type OptionalDeps struct {
 	APIKeyUsers APIUserLookup
 	Media       *handler.MediaHandler
 	// PublicLanguages serves the judge's language list to the SPA, so the IDE
-	// and the submit forms offer exactly what lang/*.yaml defines.
+	// and the submit forms offer exactly what the language registry defines.
 	PublicLanguages *handler.PublicLanguageHandler
 	CDN             *handler.CDNHandler
 	Achievements    *handler.AchievementHandler

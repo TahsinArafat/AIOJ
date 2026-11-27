@@ -67,7 +67,6 @@ mail:
   password: ""
   from: "noreply@aioj.com"
   public_url: "http://localhost:8081"
-lang_dir: "./lang"
 # Geolocation / rollout flags (Phase C). Empty allowlist = enabled everywhere.
 features:
   remote_bots_regions: []   # e.g. ["BD","US","DE"]

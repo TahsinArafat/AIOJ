@@ -1,14 +1,15 @@
-// Package lang exposes the judge language configs that ship with the repo.
+// Package lang exposes the judge language configs that SHIP with the repo.
 //
-// The YAML files in this directory are the only definition of a language — the
-// judge loads them at start-up and the admin panel edits them in place. Editing
-// in place means an operator can also break one, and "Reset to Default" needs
-// the original bytes to restore.
+// These files are no longer the live definition of a language: the registry is
+// the `languages` table, and the admin panel edits rows. They are the shipped
+// defaults — what a fresh install seeds from (DefaultsJSON) and what "Reset to
+// Default" restores (Default). Editing in place meant an operator could break a
+// language, and reset needs the original bytes to put it back.
 //
 // Embedding is what makes that possible without a second copy: a hardcoded
 // default table drifts the moment a file here changes (the previous one still
 // advertised `cpp-gcc`, a key no config has used for months). Embedding reads
-// the same files that are written to disk, so the two cannot disagree.
+// the same files that are compiled into the binary, so the two cannot disagree.
 //
 // The embed directive only matches in this directory, which is why the
 // package lives here rather than next to its callers.

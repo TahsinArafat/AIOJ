@@ -1779,7 +1779,7 @@ export interface PublicLanguage {
     stack_limit_kb: number
 }
 
-/** Admin language config rows (YAML-backed, not DB models). */
+/** Admin language config rows, stored in the language registry. */
 export interface LanguageConfig {
     name: string
     key: string
@@ -1792,7 +1792,6 @@ export interface LanguageConfig {
     seccomp_rule: string
     extensions: string[]
     mono: boolean
-    file_path: string
 }
 export interface DetectedTool { name: string; path: string; version?: string }
 export interface TestResult { status?: string; key?: string; message?: string }

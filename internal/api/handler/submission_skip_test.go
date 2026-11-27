@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
 	"github.com/tahsinarafat/aioj/internal/auth"
+	"github.com/tahsinarafat/aioj/internal/judge/compiler"
 	"github.com/tahsinarafat/aioj/internal/model"
 	"github.com/tahsinarafat/aioj/internal/store/postgres"
 	"github.com/tahsinarafat/aioj/internal/testdb"
@@ -43,7 +44,7 @@ func TestSkipSubmissionAuthorization(t *testing.T) {
 	problemStore := postgres.NewProblemStore(db)
 	contestStore := postgres.NewContestStore(db)
 	subStore := postgres.NewSubmissionStore(db)
-	h := NewSubmissionHandler(subStore, problemStore, contestStore, nil, nil, nil, "", nil, userStore)
+	h := NewSubmissionHandler(subStore, problemStore, contestStore, nil, nil, nil, compiler.NewLoader(compiler.NewFileSource("../../../lang")), nil, userStore)
 
 	newUser := func(role string) *model.User {
 		u := &model.User{

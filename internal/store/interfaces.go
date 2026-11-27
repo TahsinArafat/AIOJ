@@ -782,6 +782,28 @@ type RemoteLanguageStore interface {
 	BulkUpsert(ctx context.Context, platform string, langs []model.RemoteLanguage) error
 }
 
+// LanguageStore is the live judge language registry.
+//
+// lang/*.yaml is no longer the source of truth: it is the set of SHIPPED
+// DEFAULTS that Seed writes on first boot and that Reset-to-Default restores.
+// The table is what the judge and the admin panel read, which is what lets an
+// operator's edit survive a redeploy — the file-based version lost every edit to
+// the container's writable layer.
+type LanguageStore interface {
+	// List returns every live language. Soft-deleted rows are excluded.
+	List(ctx context.Context) ([]model.Language, error)
+	// GetByKey returns one live language, or (nil, nil) when it does not exist.
+	GetByKey(ctx context.Context, key string) (*model.Language, error)
+	// Upsert creates or replaces one language. updatedBy may be empty.
+	Upsert(ctx context.Context, key string, config json.RawMessage, updatedBy string) error
+	// Delete soft-deletes a language. A shipped key must stay deleted across
+	// restarts, so this cannot remove the row — see the languages migration.
+	Delete(ctx context.Context, key string) error
+	// Seed inserts shipped defaults, leaving existing rows untouched. Returns
+	// how many rows it created.
+	Seed(ctx context.Context, langs map[string]json.RawMessage) (int, error)
+}
+
 type OnsiteUserStore interface {
 	CreateBatch(ctx context.Context, contestID string, users []model.BatchUserRequest) ([]model.OnsiteBatchUser, error)
 	GetByUsername(ctx context.Context, username string) (*model.OnsiteBatchUser, error)

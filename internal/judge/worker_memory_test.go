@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/tahsinarafat/aioj/internal/judge/compiler"
 	"github.com/tahsinarafat/aioj/internal/model"
 )
 
@@ -45,7 +46,7 @@ func newMemoryPool(t *testing.T, sub *model.Submission, prob *model.Problem) (*W
 	return &WorkerPool{
 		subStore:  store,
 		probStore: &memoryProblemStore{prob: prob},
-		langDir:   "../../lang",
+		langs:     compiler.NewLoader(compiler.NewFileSource("../../lang")),
 	}, store
 }
 
@@ -136,7 +137,7 @@ func TestRequiredMemoryBytesPropagatesMissingSubmission(t *testing.T) {
 	pool := &WorkerPool{
 		subStore:  &memoryStore{sub: nil},
 		probStore: &memoryProblemStore{prob: &model.Problem{ID: "p1"}},
-		langDir:   "../../lang",
+		langs:     compiler.NewLoader(compiler.NewFileSource("../../lang")),
 	}
 	if _, err := pool.requiredMemoryBytes(context.Background(), "s1"); err == nil {
 		t.Fatal("expected an error for a missing submission")

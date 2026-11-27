@@ -59,34 +59,22 @@ func adminLangReq(method, url, body string) *http.Request {
 	return r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, rctx))
 }
 
-// writeSampleLang places the canonical config in a temp dir and returns it.
-func writeSampleLang(t *testing.T) string {
+// writeSampleLang places the canonical config in a temp dir, loads it into an
+// in-memory registry, and returns that registry.
+func writeSampleLang(t *testing.T) *memLanguageStore {
 	t.Helper()
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "cpp-gpp-64.yaml"), []byte(sampleLang), 0644); err != nil {
 		t.Fatalf("seed lang file: %v", err)
 	}
-	return dir
-}
-
-func readLangFile(t *testing.T, dir string) compiler.LangConfig {
-	t.Helper()
-	data, err := os.ReadFile(filepath.Join(dir, "cpp-gpp-64.yaml"))
-	if err != nil {
-		t.Fatalf("read saved lang file: %v", err)
-	}
-	var cfg compiler.LangConfig
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		t.Fatalf("saved lang file is not valid YAML: %v\n%s", err, data)
-	}
-	return cfg
+	return newMemLanguageStore().fromDir(t, dir)
 }
 
 // TestUpdateKeepsCompileCommand is the direct regression test: submit the exact
 // JSON body the panel produces and require the compile command to survive.
 func TestUpdateKeepsCompileCommand(t *testing.T) {
-	dir := writeSampleLang(t)
-	h := NewAdminLanguageHandler(dir, nil)
+	st := writeSampleLang(t)
+	h := newLangHandler(st)
 
 	// Shape mirrors LanguageConfigResponse, which is what the panel PUTs back.
 	body := `{
@@ -108,7 +96,7 @@ func TestUpdateKeepsCompileCommand(t *testing.T) {
 		t.Fatalf("Update status = %d, want 200 (body: %s)", rec.Code, rec.Body.String())
 	}
 
-	got := readLangFile(t, dir)
+	got := st.lang(t, "cpp-gpp-64")
 	if got.CompileCmd == "" {
 		t.Fatal("compile command was erased by save — the admin form's compile field vanishes after saving")
 	}
@@ -142,7 +130,8 @@ func TestUpdateRoundTripsRuntimeForInterpretedLanguages(t *testing.T) {
 		t.Fatalf("seed lang file: %v", err)
 	}
 
-	h := NewAdminLanguageHandler(dir, nil)
+	st := newMemLanguageStore().fromDir(t, dir)
+	h := newLangHandler(st)
 	body := `{"name":"Python 3","key":"python","compile":"","runtime":"/usr/bin/python3",
 	          "time_limit_multiplier":3,"memory_limit_multiplier":2,
 	          "seccomp_rule":"general","extensions":[".py"]}`
@@ -158,14 +147,7 @@ func TestUpdateRoundTripsRuntimeForInterpretedLanguages(t *testing.T) {
 		t.Fatalf("Update status = %d, want 200 (body: %s)", rec.Code, rec.Body.String())
 	}
 
-	data, err := os.ReadFile(filepath.Join(dir, "python.yaml"))
-	if err != nil {
-		t.Fatalf("read saved file: %v", err)
-	}
-	var got compiler.LangConfig
-	if err := yaml.Unmarshal(data, &got); err != nil {
-		t.Fatalf("invalid YAML: %v", err)
-	}
+	got := st.lang(t, "python")
 	if got.Runtime != "/usr/bin/python3" {
 		t.Fatalf("runtime = %q, want /usr/bin/python3 — an erased runtime makes every Python submission unrunnable", got.Runtime)
 	}
@@ -203,14 +185,15 @@ func TestResetRestoresTheShippedConfig(t *testing.T) {
 		t.Fatalf("seed broken config: %v", err)
 	}
 
-	h := NewAdminLanguageHandler(dir, nil)
+	st := newMemLanguageStore().fromDir(t, dir)
+	h := newLangHandler(st)
 	rec := httptest.NewRecorder()
 	h.Reset(rec, adminLangReq(http.MethodPost, "/api/admin/languages/cpp-gpp-64/reset", ""))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("Reset status = %d, want 200 (body: %s)", rec.Code, rec.Body.String())
 	}
 
-	got := readLangFile(t, dir)
+	got := st.lang(t, "cpp-gpp-64")
 	if got.CompileCmd == "" {
 		t.Fatal("reset left the compile command empty; it must restore the shipped one")
 	}
@@ -220,25 +203,35 @@ func TestResetRestoresTheShippedConfig(t *testing.T) {
 	if got.SeccompRule == "nope" {
 		t.Error("reset did not restore the shipped seccomp rule")
 	}
-	// The restored config must be the shipped file, byte for byte.
+	// The restored config must equal the shipped one. The registry stores the
+	// document as JSON rather than the original YAML bytes, so the comparison is
+	// field by field against the config decoded from lang/cpp-gpp-64.yaml.
 	shipped, ok := lang.Default("cpp-gpp-64")
 	if !ok {
 		t.Fatal("no embeddable default for cpp-gpp-64")
 	}
-	onDisk, err := os.ReadFile(filepath.Join(dir, "cpp-gpp-64.yaml"))
-	if err != nil {
-		t.Fatalf("read reset file: %v", err)
+	var want compiler.LangConfig
+	if err := yaml.Unmarshal(shipped, &want); err != nil {
+		t.Fatalf("shipped default is not valid YAML: %v", err)
 	}
-	if string(onDisk) != string(shipped) {
-		t.Errorf("reset wrote %q, want the shipped lang/cpp-gpp-64.yaml", string(onDisk))
+	if got.CompileCmd != want.CompileCmd {
+		t.Errorf("compile = %q, want the shipped %q", got.CompileCmd, want.CompileCmd)
+	}
+	if got.Name != want.Name {
+		t.Errorf("name = %q, want the shipped %q", got.Name, want.Name)
+	}
+	if got.SeccompRule != want.SeccompRule {
+		t.Errorf("seccomp_rule = %q, want the shipped %q", got.SeccompRule, want.SeccompRule)
+	}
+	if got.TimeLimitMultiplier != want.TimeLimitMultiplier {
+		t.Errorf("time_limit_multiplier = %v, want the shipped %v", got.TimeLimitMultiplier, want.TimeLimitMultiplier)
 	}
 }
 
 // A language an operator created has no shipped default, so Reset must say so
 // rather than writing nothing and reporting success.
 func TestResetRefusesLanguageWithoutADefault(t *testing.T) {
-	dir := t.TempDir()
-	h := NewAdminLanguageHandler(dir, nil)
+	h := newLangHandler(newMemLanguageStore())
 
 	req := adminLangReq(http.MethodPost, "/api/admin/languages/operator-made/reset", "")
 	rctx := chi.NewRouteContext()
@@ -269,7 +262,8 @@ func TestTestFlagsAPELinkerStackFlagAsAnError(t *testing.T) {
 		t.Fatalf("seed: %v", err)
 	}
 
-	h := NewAdminLanguageHandler(dir, nil)
+	st := newMemLanguageStore().fromDir(t, dir)
+	h := newLangHandler(st)
 	rec := httptest.NewRecorder()
 	h.Test(rec, adminLangReq(http.MethodPost, "/api/admin/languages/cpp-gpp-64/test", ""))
 	if rec.Code != http.StatusOK {
@@ -302,7 +296,8 @@ func TestTestAcceptsAWorkingStackConfig(t *testing.T) {
 		t.Fatalf("seed: %v", err)
 	}
 
-	h := NewAdminLanguageHandler(dir, nil)
+	st := newMemLanguageStore().fromDir(t, dir)
+	h := newLangHandler(st)
 	rec := httptest.NewRecorder()
 	h.Test(rec, adminLangReq(http.MethodPost, "/api/admin/languages/cpp-gpp-64/test", ""))
 

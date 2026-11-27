@@ -11,8 +11,8 @@ import (
 
 // The IDE and the submit forms used to carry their own hardcoded language
 // list, so an admin edit in admin#languages never reached them. This endpoint
-// is the seam that makes lang/*.yaml the single source of truth: whatever the
-// files say is what the dropdowns offer.
+// is the seam that makes the language registry the single source of truth:
+// whatever the stored configs say is what the dropdowns offer.
 
 func seedLangs(t *testing.T) string {
 	t.Helper()
@@ -31,7 +31,7 @@ func seedLangs(t *testing.T) string {
 
 func listPublicLanguages(t *testing.T, dir string) []PublicLanguage {
 	t.Helper()
-	h := NewPublicLanguageHandler(dir)
+	h := NewPublicLanguageHandler(newFileLoader(dir))
 	rec := httptest.NewRecorder()
 	h.List(rec, httptest.NewRequest(http.MethodGet, "/api/languages", nil))
 	if rec.Code != http.StatusOK {
@@ -68,12 +68,12 @@ func TestPublicLanguagesReflectTheFiles(t *testing.T) {
 }
 
 // TestPublicLanguagesFollowAnAdminEdit pins the live-read behaviour: the panel
-// writes lang/<key>.yaml, and the very next request must show the new name.
-// A cached or hardcoded list would keep serving the old one.
+// saves a config, and the very next request must show the new name. A hardcoded
+// list would keep serving the old one.
 func TestPublicLanguagesFollowAnAdminEdit(t *testing.T) {
 	dir := seedLangs(t)
 
-	h := NewPublicLanguageHandler(dir)
+	h := NewPublicLanguageHandler(newFileLoader(dir))
 	before := httptest.NewRecorder()
 	h.List(before, httptest.NewRequest(http.MethodGet, "/api/languages", nil))
 
@@ -81,6 +81,8 @@ func TestPublicLanguagesFollowAnAdminEdit(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "cpp-gpp-64.yaml"), []byte(renamed), 0644); err != nil {
 		t.Fatalf("rewrite lang file: %v", err)
 	}
+	// The loader is rebuilt by listPublicLanguages below, which is how the test
+	// models "the next request" rather than "the same cache".
 
 	after := listPublicLanguages(t, dir)
 	if after[0].Name != "C++ 20" {
@@ -92,7 +94,7 @@ func TestPublicLanguagesFollowAnAdminEdit(t *testing.T) {
 // display-only. Compile/runtime strings name absolute paths inside the judge
 // image; publishing them maps the sandbox for no UI benefit.
 func TestPublicLanguagesOmitSandboxPaths(t *testing.T) {
-	h := NewPublicLanguageHandler(seedLangs(t))
+	h := NewPublicLanguageHandler(newFileLoader(seedLangs(t)))
 	rec := httptest.NewRecorder()
 	h.List(rec, httptest.NewRequest(http.MethodGet, "/api/languages", nil))
 
@@ -120,7 +122,7 @@ func TestPublicLanguagesNeverMarshalNullExtensions(t *testing.T) {
 		t.Fatalf("seed: %v", err)
 	}
 
-	h := NewPublicLanguageHandler(dir)
+	h := NewPublicLanguageHandler(newFileLoader(dir))
 	rec := httptest.NewRecorder()
 	h.List(rec, httptest.NewRequest(http.MethodGet, "/api/languages", nil))
 
@@ -141,7 +143,7 @@ func TestPublicLanguagesNeverMarshalNullExtensions(t *testing.T) {
 // A missing lang directory must be a loud error. An empty list would render an
 // empty dropdown and read as "this judge accepts no languages".
 func TestPublicLanguagesFailLoudlyOnMissingDirectory(t *testing.T) {
-	h := NewPublicLanguageHandler(filepath.Join(t.TempDir(), "does-not-exist"))
+	h := NewPublicLanguageHandler(newFileLoader(filepath.Join(t.TempDir(), "does-not-exist")))
 	rec := httptest.NewRecorder()
 	h.List(rec, httptest.NewRequest(http.MethodGet, "/api/languages", nil))
 
