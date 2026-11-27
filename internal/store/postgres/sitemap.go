@@ -308,8 +308,11 @@ func (s *SitemapStore) PublicTrainingPlans(ctx context.Context, origin string) (
 // gym pointing at an unpublished contest would otherwise advertise that contest's
 // existence.
 func (s *SitemapStore) PublicGyms(ctx context.Context, origin string) ([]SitemapEntry, error) {
+	// gym_contests has created_at but no updated_at (migration 000009), so the
+	// lastmod is the creation time. Reaching for updated_at here 500s the whole
+	// sitemap, not just this section.
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT g.id, COALESCE(g.updated_at, g.created_at)
+		`SELECT g.id, g.created_at
 		   FROM gym_contests g
 		   JOIN contests c ON g.contest_id = c.id
 		  WHERE g.is_public = true
