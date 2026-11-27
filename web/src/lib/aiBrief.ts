@@ -5,6 +5,13 @@ import type { AIBrief } from '../types/api'
  *
  * Kept out of the component file so it exports components only (the
  * react-refresh/only-export-components lint rule).
+ *
+ * CONTRACT with the backend: the cross-field rules below (rating 800–3500,
+ * range must contain the rating, ICPC rejects subtasks) mirror
+ * internal/generate/request.go's Validate. The server is the authority and
+ * re-checks every brief; these helpers exist only to fail fast in the form. If
+ * a bound changes server-side, update withRating/withRange/briefIsValid here too
+ * or the client blocks briefs the server would accept (or vice versa).
  */
 
 export const DEFAULT_BRIEF: AIBrief = {

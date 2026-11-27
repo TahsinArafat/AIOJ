@@ -126,9 +126,16 @@ export function totalTokens(job: Pick<AIGenerationJob, 'prompt_tokens' | 'comple
  * what a job produced, and the review UI has to offer exactly that. A section
  * offered for an artifact that cannot produce it is an apply request for empty
  * content, which the server accepts and writes.
+ *
+ * CONTRACT with the backend: the section keys here must match the `selected[...]`
+ * reads in internal/generate/apply.go and the ws/wsol/we/wt flags in
+ * internal/generate/proposal.go. A section offered here that apply.go does not
+ * read is silently accepted and written as nothing — the editorial bug. The
+ * aiJobs.test.ts "artifact sections match the apply contract" test locks this list
+ * so a drift fails CI rather than silently dropping a section.
  */
 export const ARTIFACT_SECTIONS: Record<string, string[]> = {
-    full_problem: ['statement', 'solution', 'tests'],
+    full_problem: ['statement', 'solution', 'tests', 'editorial'],
     statement: ['statement'],
     tests: ['tests'],
     solution: ['solution'],

@@ -3,6 +3,7 @@ import { api } from '../../lib/api'
 import type { AIGenerationJob } from '../../types/api'
 import { canRetryJob, elapsed, isJobActive, totalTokens } from '../../lib/aiJobs'
 import { errorMessage } from '../../lib/errors'
+import { useConfirm } from '../ConfirmDialog'
 import { Button } from '../ui/Button'
 import { Card, CardBody, CardHeader } from '../ui/Card'
 import AIJobStatusBadge from './AIJobStatusBadge'
@@ -22,8 +23,16 @@ type Props = {
     onApplied?: () => void
     /** Called when a ready-or-failed job is discarded, to clear the parent's selection. */
     onDiscarded?: () => void
+    /** Called after a successful cancel, so a parent tracking the job can refetch. */
+    onCancelled?: () => void
     /** Called with the retried job's id — a retry creates a NEW job. */
     onRetried?: (newJobId: string) => void
+    /**
+     * Optimistic-concurrency guard for apply against an EXISTING problem: the
+     * problem's updated_at as the setter last saw it. The server refuses the
+     * write if the problem changed in between. Ignored in new-problem mode.
+     */
+    expectedUpdatedAt?: string
 }
 
 function Stat({ label, value }: { label: string; value: string | number }) {
@@ -56,13 +65,16 @@ export default function AIJobDetail({
     onCreated,
     onApplied,
     onDiscarded,
+    onCancelled,
     onRetried,
+    expectedUpdatedAt,
 }: Props) {
     const [job, setJob] = useState<AIGenerationJob | null>(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
     const [busy, setBusy] = useState('')
     const [showRaw, setShowRaw] = useState(false)
+    const confirm = useConfirm()
 
     useEffect(() => {
         let cancelled = false
@@ -105,6 +117,7 @@ export default function AIJobDetail({
     const doCancel = () => act('cancel', async () => {
         await api.ai.cancelJob(jobId)
         setJob(await api.ai.getJob(jobId))
+        onCancelled?.()
     })
 
     const doDiscard = () => act('discard', async () => {
@@ -121,7 +134,18 @@ export default function AIJobDetail({
     })
 
     const doApply = (sections: string[]) => act('apply', async () => {
-        const result = await api.ai.applyJob(jobId, sections)
+        // Re-applying an already-applied job in new-problem mode creates ANOTHER
+        // draft from the same proposal. Confirm first: the click is cheap and the
+        // result is a second problem the setter may not have meant to make.
+        if (job?.status === 'applied' && isNew) {
+            const ok = await confirm({
+                title: 'Create another problem?',
+                message: 'This proposal was already applied. Applying it again creates a new draft problem from the same content — the existing one is left untouched.',
+                confirmLabel: 'Create problem',
+            })
+            if (!ok) return
+        }
+        const result = await api.ai.applyJob(jobId, sections, expectedUpdatedAt)
         setJob(await api.ai.getJob(jobId))
         if (isNew) onCreated?.(result.problem_slug)
         onApplied?.()
@@ -205,18 +229,20 @@ export default function AIJobDetail({
                 </Card>
             )}
 
-            {job.status === 'ready' && job.proposal && (
+            {(job.status === 'ready' || (job.status === 'applied' && isNew)) && job.proposal && (
                 <Card>
                     <CardHeader
                         title={isNew ? 'Review the generated problem' : 'Proposal — select sections to apply'}
-                        description="Only the checked sections are written to the problem."
+                        description={job.status === 'applied'
+                            ? 'Already applied once. Applying again creates a new draft problem from the same content.'
+                            : 'Only the checked sections are written to the problem.'}
                     />
                     <CardBody>
                         <AIProposalReview
                             proposal={job.proposal}
                             artifactType={job.artifact_type}
                             requireStatement={isNew}
-                            applyLabel={isNew ? 'Create problem' : 'Apply selected sections'}
+                            applyLabel={isNew ? (job.status === 'applied' ? 'Create another problem' : 'Create problem') : 'Apply selected sections'}
                             busy={busy === 'apply'}
                             onApply={doApply}
                         />
@@ -224,7 +250,7 @@ export default function AIJobDetail({
                 </Card>
             )}
 
-            {job.status === 'applied' && job.proposal && (
+            {job.status === 'applied' && !isNew && job.proposal && (
                 <Card>
                     <CardHeader title="Proposal" description="Already applied." />
                     <CardBody>

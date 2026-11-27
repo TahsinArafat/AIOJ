@@ -35,7 +35,13 @@ type GenerationAssetStore interface {
 }
 
 func (s *ApplyService) Apply(ctx context.Context, job *model.AIGenerationJob, actorID string, req ApplyRequest) (*ApplyResult, error) {
-	if job.Status != "ready" {
+	// A ready job is applied to its target problem. An already-applied job may be
+	// applied again in new-problem mode (no ProblemID): each re-apply authors a
+	// fresh draft from the same proposal, which is what lets a setter reuse one
+	// generation to seed several problems. Re-applying to an EXISTING problem is
+	// still refused — that path would silently overwrite a problem the setter has
+	// since edited.
+	if job.Status != "ready" && !(job.Status == "applied" && job.ProblemID == nil) {
 		return nil, fmt.Errorf("job is not ready")
 	}
 	var p Proposal

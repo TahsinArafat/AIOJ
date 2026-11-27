@@ -277,7 +277,11 @@ func (s *AIGenerationStore) MarkDiscarded(ctx context.Context, id, actorID strin
 	return n == 1, nil
 }
 func (s *AIGenerationStore) MarkApplied(ctx context.Context, id string) error {
-	r, err := s.db.ExecContext(ctx, `UPDATE ai_generation_jobs SET status='applied',applied_at=NOW() WHERE id=$1 AND status='ready'`, id)
+	// ready -> applied is the first apply. applied -> applied is a re-apply in
+	// new-problem mode: the job already carries applied_at, and the guard on
+	// status='ready' would reject the transition and fail the whole apply after
+	// the problem was already created. Both are idempotent on the timestamp.
+	r, err := s.db.ExecContext(ctx, `UPDATE ai_generation_jobs SET status='applied',applied_at=COALESCE(applied_at,NOW()) WHERE id=$1 AND status IN ('ready','applied')`, id)
 	if err != nil {
 		return err
 	}

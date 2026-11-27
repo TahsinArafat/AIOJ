@@ -35,10 +35,21 @@ type proposalDoc struct {
 	EditorialTitle    string            `json:"editorial_title"`
 	EditorialContent  string            `json:"editorial_content"`
 	EditorialApproach string            `json:"editorial_approach"`
+	// The harness does not author an editorial, its complexity analysis, or a
+	// difficulty rationale; the fields are present so the JSON contract matches
+	// generate.Proposal and apply.go reads them as empty rather than missing.
+	TimeComplexity    string            `json:"time_complexity"`
+	SpaceComplexity   string            `json:"space_complexity"`
 	GeneratorCode     string            `json:"generator_code"`
 	GeneratorLanguage string            `json:"generator_language"`
-	Seeds             []int64           `json:"seeds"`
-	CuratedCases      []json.RawMessage `json:"curated_cases"`
+	// The harness pipeline produces a validator (ArtifactValidator); carrying it
+	// here is what lets apply.go persist it onto the problem instead of dropping
+	// it on the floor.
+	ValidatorCode       string              `json:"validator_code"`
+	ValidatorLanguage   string              `json:"validator_language"`
+	Seeds               []int64             `json:"seeds"`
+	CuratedCases        []json.RawMessage   `json:"curated_cases"`
+	DifficultyRationale json.RawMessage     `json:"difficulty_rationale"`
 }
 
 // proposalJSON renders the manifest as an applyable proposal.
@@ -69,6 +80,8 @@ func proposalJSON(m Manifest) (json.RawMessage, error) {
 		SolutionLanguage:  m.Languages[string(ArtifactSolution)],
 		GeneratorCode:     m.Artifacts[string(ArtifactGenerator)],
 		GeneratorLanguage: m.Languages[string(ArtifactGenerator)],
+		ValidatorCode:     m.Artifacts[string(ArtifactValidator)],
+		ValidatorLanguage: m.Languages[string(ArtifactValidator)],
 		Seeds:             manifestSeeds(m.Cases),
 	}
 	if doc.SolutionLanguage == "" {

@@ -71,6 +71,7 @@ export interface AIProposal {
     tags?: string[]; difficulty?: string; solution_code?: string; solution_language?: string; editorial_title?: string
     editorial_content?: string; editorial_approach?: string; time_complexity?: string; space_complexity?: string
     generator_code?: string; generator_language?: string; seeds?: number[]
+    validator_code?: string; validator_language?: string
     curated_cases?: Array<{ name: string; input: string; intent: string; score: number }>; difficulty_rationale?: Record<string, unknown>
 }
 export interface AIGenerationJob {

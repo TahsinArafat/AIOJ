@@ -6,9 +6,6 @@ import { DEFAULT_BRIEF } from '../../lib/aiBrief'
 import { offeredForExisting, pruneBrief } from '../../lib/aiArtifacts'
 import { useArtifactScope, useArtifacts } from '../../hooks/useArtifacts'
 import { isJobActive, statusLabel } from '../../lib/aiJobs'
-import AIJobStatusBadge from '../AI/AIJobStatusBadge'
-import AIValidationList from '../AI/AIValidationList'
-import AIProposalReview from '../AI/AIProposalReview'
 import AIJobList from '../AI/AIJobList'
 import AIJobDetail from '../AI/AIJobDetail'
 
@@ -112,17 +109,6 @@ export default function AIStudioTab({
 
     useEffect(() => { refreshActive() }, [])
 
-    // The poll that used to live here is gone: AIJobDetail owns the timer for the
-    // job in view, and it is the only component that needs it. Two loops over one
-    // job was the reason a cancel could appear to do nothing for a second.
-    useEffect(() => {
-        if (!job || !isJobActive(job)) return
-        const id = window.setInterval(() => {
-            api.ai.getJob(job.id).then(setJob).catch(() => {})
-        }, 1500)
-        return () => window.clearInterval(id)
-    }, [job?.status, job?.id]) // eslint-disable-line react-hooks/exhaustive-deps
-
     const updateBrief = (patch: Partial<AIBrief>) => setBrief(b => ({ ...b, ...patch }))
 
     const start = async () => {
@@ -147,37 +133,11 @@ export default function AIStudioTab({
         }
     }
 
-    // Cancelling frees the setter's slot on the server immediately, so reflect
-    // it here too. Refetching would show 'running' again until the worker
-    // notices (up to a second), and the Generate button would stay blocked with
-    // no visible reason.
-    const cancelCurrent = async () => {
-        if (!job) return
-        setError('')
-        try {
-            await api.ai.cancelJob(job.id)
-            setJob(j => (j ? { ...j, status: 'cancelled' } : j))
-            setActiveJobs(list => list.filter(j => j.id !== job.id))
-        } catch (e) {
-            setError(e instanceof Error ? e.message : String(e))
-        }
-    }
-
-    const apply = async (sections: string[]) => {
-        if (!job) return
-        setError('')
-        try {
-            const result = await api.ai.applyJob(job.id, sections, problemUpdatedAt)
-            setJob(await api.ai.getJob(job.id))
-            if (isNew) {
-                setAppliedSlug(result.problem_slug)
-                onCreated?.(result.problem_slug)
-            }
-            onApplied?.()
-        } catch (e) {
-            setError(e instanceof Error ? e.message : String(e))
-        }
-    }
+    // Cancelling, applying, retrying and discarding the job in view are all
+    // AIJobDetail's job now — the Studio used to keep a second copy of each,
+    // which is how a cancel could be fired twice and an apply could skip the
+    // re-apply confirmation. The Studio only starts runs and tracks the active
+    // set for the Generate gate below.
 
     // Gate the button on the same rules the server enforces, so the click cannot
     // walk into a rejection. The form stays editable; only starting a run is
@@ -333,110 +293,39 @@ export default function AIStudioTab({
 
             {job && (
                 <div className="space-y-4">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                        <AIJobStatusBadge status={job.status} />
-                        {/* Shown whenever this job is not still working. The form
-                            above is hidden while a job is in view, so without this
-                            an `applied` job — which has no Discard and no Start
-                            again — left the setter with no way to run anything
-                            else on this problem. Leaving the view never discards
-                            the job; it stays in Job history. */}
-                        {!jobActive && (
-                            <button
-                                type="button"
-                                onClick={() => setJob(null)}
-                                className="cursor-pointer text-sm font-medium text-brand hover:underline"
-                            >
-                                Start a new run
-                            </button>
-                        )}
-                    </div>
-
-                    {/* Progress card */}
-                    <div className="rounded border border-hairline p-4">
-                        <div className="flex items-start justify-between text-sm">
-                            <div>
-                                <span className="font-medium capitalize">{statusLabel(job.stage)}</span>
-                                <span className="ml-2 text-xs text-muted-soft capitalize">
-                                    ({statusLabel(job.artifact_type)})
-                                </span>
-                            </div>
-                            <span>{job.progress}%</span>
-                        </div>
-                        <div className="mt-2 h-2 rounded bg-surface-3">
-                            <div
-                                className={`h-2 rounded transition-all ${jobActive ? 'bg-brand' : 'bg-bad'}`}
-                                style={{ width: `${job.progress}%` }}
-                            />
-                        </div>
-                        <p className="mt-2 text-xs text-muted">
-                            {statusLabel(job.status)} · {job.prompt_tokens + job.completion_tokens} tokens · {job.latency_ms} ms
-                        </p>
+                    {/* Shown whenever this job is not still working. The form
+                        above is hidden while a job is in view, so without this
+                        an `applied` job — which has no Discard and no Start
+                        again — left the setter with no way to run anything
+                        else on this problem. Leaving the view never discards
+                        the job; it stays in Job history. */}
+                    {!jobActive && (
                         <button
                             type="button"
-                            onClick={() => { setHistoryJobId(job.id); setHistoryOpen(true) }}
-                            className="mt-1.5 cursor-pointer text-xs text-brand hover:underline"
+                            onClick={() => setJob(null)}
+                            className="cursor-pointer text-sm font-medium text-brand hover:underline"
                         >
-                            Open full status →
-                        </button>
-                    </div>
-
-                    {jobActive && (
-                        <button
-                            type="button"
-                            onClick={cancelCurrent}
-                            className="min-h-11 cursor-pointer rounded border border-hairline-strong px-4"
-                        >
-                            Cancel
+                            Start a new run
                         </button>
                     )}
-
-                    {job.validation_report && (
-                        <div className="rounded border border-hairline p-4">
-                            <h3 className="mb-2 font-medium">Validation</h3>
-                            <AIValidationList report={job.validation_report} />
-                        </div>
-                    )}
-
-                    {/* Apply section — scoped to what this artifact produces, by the
-                        same component the full status view uses, so the two cannot
-                        offer different sections for one job. */}
-                    {job.status === 'ready' && job.proposal && (
-                        <div className="space-y-3">
-                            <h3 className="font-medium">
-                                {isNew ? 'Review the generated problem' : `Review proposed ${statusLabel(job.artifact_type)}`}
-                            </h3>
-                            <AIProposalReview
-                                proposal={job.proposal}
-                                artifactType={job.artifact_type}
-                                requireStatement={isNew}
-                                applyLabel={isNew ? 'Create problem' : 'Apply selected'}
-                                onApply={apply}
-                            />
-                            <button
-                                type="button"
-                                onClick={() => api.ai.discardJob(job.id).then(() => { setJob(null); refreshActive() })}
-                                className="min-h-11 cursor-pointer rounded border border-hairline-strong px-4"
-                            >
-                                Discard
-                            </button>
-                        </div>
-                    )}
-
-                    {(job.status === 'failed' || job.status === 'validation_failed' || job.status === 'cancelled') && (
-                        <div>
-                            <p className="text-sm text-bad">{job.error_message || `Job ${statusLabel(job.status)}`}</p>
-                            <div className="mt-2 flex gap-2">
-                                <button
-                                    type="button"
-                                    onClick={() => api.ai.retryJob(job.id).then(setJob).catch(e => setError(String(e)))}
-                                    className="min-h-11 cursor-pointer rounded bg-brand px-4 text-on-brand"
-                                >
-                                    Retry
-                                </button>
-                            </div>
-                        </div>
-                    )}
+                    {/* The live job view — progress, cancel, validation, apply,
+                        retry, discard — is AIJobDetail, the same component Job
+                        history uses. The Studio previously kept a second copy of
+                        all of it (its own poll loop, its own cancel/apply/retry
+                        handlers, a raw progress card); that was the double-cancel
+                        bug and the "1000ms vs 1000 ms" drift. One component, one
+                        timer, one set of actions. */}
+                    <AIJobDetail
+                        key={job.id}
+                        jobId={job.id}
+                        isNew={isNew}
+                        expectedUpdatedAt={problemUpdatedAt}
+                        onCreated={(slug) => { setAppliedSlug(slug); onCreated?.(slug) }}
+                        onApplied={() => { refreshActive(); onApplied?.() }}
+                        onDiscarded={() => { setJob(null); refreshActive() }}
+                        onCancelled={() => { if (job) api.ai.getJob(job.id).then(setJob).catch(() => {}); refreshActive() }}
+                        onRetried={(newId) => { setHistoryJobId(newId); refreshActive() }}
+                    />
                 </div>
             )}
 

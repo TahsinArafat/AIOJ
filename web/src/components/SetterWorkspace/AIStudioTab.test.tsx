@@ -1,8 +1,13 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { expect, test, vi, beforeEach } from 'vitest'
 import AIStudioTab from './AIStudioTab'
+import { ConfirmProvider } from '../ConfirmDialog'
 import { api } from '../../lib/api'
 import type { AIArtifactSpec } from '../../types/api'
+
+// AIJobDetail (rendered inside the Studio for the job in view) calls useConfirm,
+// which throws outside a ConfirmProvider. Wrap every render in one.
+const renderStudio = (ui: React.ReactElement) => render(<ConfirmProvider>{ui}</ConfirmProvider>)
 
 vi.mock('../../lib/api', () => ({ api: { ai: { connections: vi.fn(), artifacts: vi.fn(), problemJobs: vi.fn(), listJobs: vi.fn(), createJob: vi.fn(), getJob: vi.fn(), cancelJob: vi.fn(), discardJob: vi.fn(), applyJob: vi.fn() } } }))
 
@@ -35,31 +40,44 @@ beforeEach(() => {
  vi.mocked(api.ai.createJob).mockReset()
  vi.mocked(api.ai.problemJobs).mockReset().mockResolvedValue({data:[]})
  vi.mocked(api.ai.listJobs).mockReset().mockResolvedValue({data:[], total:0})
+ // AIJobDetail renders for the job in view and fetches it by id. Default to
+ // echoing the most recent job the tab loaded — from createJob (a fresh run) or
+ // problemJobs (a resumed one) — so the detail view is consistent. Tests that
+ // need a specific job override getJob directly.
+ vi.mocked(api.ai.getJob).mockReset().mockImplementation(async () => {
+  const created = vi.mocked(api.ai.createJob).mock.results.at(-1)?.value
+  if (created) return created instanceof Promise ? await created : created
+  const resumed = vi.mocked(api.ai.problemJobs).mock.results.at(-1)?.value
+  if (resumed instanceof Promise) {
+   const r = await resumed
+   return r?.data?.[0] ?? {id:'unknown'}
+  }
+  return resumed?.data?.[0] ?? {id:'unknown'}
+ })
 })
 
 test('renders artifact choices and creates a scoped job', async () => {
  vi.mocked(api.ai.createJob).mockResolvedValue({id:'j1',actor_id:'u1',artifact_type:'tests',status:'queued',stage:'queued',progress:0,submitted_brief:{tags:['dp'],rating:1400,problem_type:'standard',testcase_count:10,has_subtasks:false},normalized_brief:{tags:['dp'],rating:1400,problem_type:'standard',testcase_count:10,has_subtasks:false},prompt_tokens:0,completion_tokens:0,latency_ms:0,created_at:''})
- render(<AIStudioTab problemId="p1" />)
+ renderStudio(<AIStudioTab problemId="p1" />)
  await waitFor(()=>expect(screen.getByText(/Local/)).toBeInTheDocument())
  // The artifact picker is now radio inputs — select "Tests & generator"
  fireEvent.click(screen.getByRole('radio', {name:/Tests/}))
  fireEvent.click(screen.getByRole('button',{name:/Generate Tests/}))
  await waitFor(()=>expect(api.ai.createJob).toHaveBeenCalledWith(expect.objectContaining({problem_id:'p1',artifact_type:'tests'})))
- expect(screen.getAllByText(/queued/).length).toBeGreaterThan(0)
+ // AIJobDetail fetches the job by id and renders its status badge; wait for it.
+ await waitFor(()=>expect(screen.getAllByText(/queued/).length).toBeGreaterThan(0))
 })
 
 test('ready proposal exposes selective apply controls', async () => {
  const ready={id:'j1',actor_id:'u1',artifact_type:'statement',status:'ready' as const,stage:'ready',progress:100,submitted_brief:{tags:['dp'],rating:1400,problem_type:'standard',testcase_count:10,has_subtasks:false},normalized_brief:{tags:['dp'],rating:1400,problem_type:'standard',testcase_count:10,has_subtasks:false},proposal:{title:'Generated',description:'Statement'},validation_report:{valid:true,checks:[{name:'statement',passed:true,message:'ok'}]},prompt_tokens:10,completion_tokens:20,latency_ms:100,created_at:''}
  vi.mocked(api.ai.createJob).mockResolvedValue(ready)
- render(<AIStudioTab problemId="p1" />)
+ renderStudio(<AIStudioTab problemId="p1" />)
  await waitFor(()=>screen.getByText(/Local/))
  fireEvent.click(screen.getByRole('button',{name:/Generate Statement/}))
- await waitFor(()=>expect(screen.getByRole('button',{name:'Apply selected'})).toBeInTheDocument())
- // The gate name and its message are separate nodes now that AIValidationList
- // renders them (the old inline markup emitted "statement: ok" as one string, which
- // the shared component deliberately does not — a long message has to wrap on its
- // own rather than as part of the name).
- expect(screen.getByText('statement')).toBeInTheDocument()
+ await waitFor(()=>expect(screen.getByRole('button',{name:'Apply selected sections'})).toBeInTheDocument())
+ // The validation gate's message renders on its own line (AIValidationList),
+ // separate from the gate name. "statement" alone is ambiguous now that the
+ // proposal review also labels a section "statement", so assert the message.
  expect(screen.getByText(/— ok/)).toBeInTheDocument()
 })
 
@@ -68,7 +86,7 @@ test('ready proposal exposes selective apply controls', async () => {
 // package (the other artifact scopes only patch an existing problem).
 test('creates a new problem when no problemId is given', async () => {
  vi.mocked(api.ai.createJob).mockResolvedValue({id:'j2',actor_id:'u1',artifact_type:'full_problem',status:'queued',stage:'queued',progress:0,submitted_brief:{tags:['dp'],rating:1400,problem_type:'standard',testcase_count:10,has_subtasks:false},normalized_brief:{tags:['dp'],rating:1400,problem_type:'standard',testcase_count:10,has_subtasks:false},prompt_tokens:0,completion_tokens:0,latency_ms:0,created_at:''})
- render(<AIStudioTab />)
+ renderStudio(<AIStudioTab />)
  await waitFor(()=>expect(screen.getByText(/Local/)).toBeInTheDocument())
  // No existing problem, so no resume lookup and no artifact picker.
  expect(api.ai.problemJobs).not.toHaveBeenCalled()
@@ -88,7 +106,7 @@ test('carries the operator brief customisation into the job', async () => {
  vi.mocked(api.ai.createJob).mockResolvedValue({id:'j3',actor_id:'u1',artifact_type:'full_problem',status:'queued',stage:'queued',progress:0,submitted_brief:{tags:['dp'],rating:1400,problem_type:'standard',testcase_count:10,has_subtasks:false},normalized_brief:{tags:['dp'],rating:1400,problem_type:'standard',testcase_count:10,has_subtasks:false},prompt_tokens:0,completion_tokens:0,latency_ms:0,created_at:''})
  // No problemId: the full-package scope, which is the one that takes topics and
  // a rating at all.
- render(<AIStudioTab />)
+ renderStudio(<AIStudioTab />)
  await waitFor(()=>expect(screen.getByText(/Local/)).toBeInTheDocument())
 
  // Topic chip, rating quick-pick, and a free-form field.
@@ -111,7 +129,7 @@ test('carries the operator brief customisation into the job', async () => {
 // every type of input like rating/topic etc". An editorial takes no topics, no
 // rating and no test count — it explains a problem that already exists.
 test('an editorial asks for no topics, rating or test count', async () => {
-  render(<AIStudioTab problemId="p1" />)
+  renderStudio(<AIStudioTab problemId="p1" />)
   await waitFor(()=>expect(screen.getByText(/Local/)).toBeInTheDocument())
 
   fireEvent.click(screen.getByRole('radio', {name:/Editorial/}))
@@ -130,7 +148,7 @@ test('an editorial asks for no topics, rating or test count', async () => {
 // topics to pick, so it must be startable without them.
 test('an editorial is not blocked for having no topics', async () => {
   vi.mocked(api.ai.createJob).mockResolvedValue({id:'j20',actor_id:'u1',artifact_type:'editorial',status:'queued',stage:'queued',progress:0,submitted_brief:BLANK_BRIEF,normalized_brief:BLANK_BRIEF,prompt_tokens:0,completion_tokens:0,latency_ms:0,created_at:''})
-  render(<AIStudioTab problemId="p1" />)
+  renderStudio(<AIStudioTab problemId="p1" />)
   await waitFor(()=>expect(screen.getByText(/Local/)).toBeInTheDocument())
 
   fireEvent.click(screen.getByRole('radio', {name:/Editorial/}))
@@ -152,7 +170,7 @@ test('an editorial is not blocked for having no topics', async () => {
 // Switching scope must not carry the previous scope's answers into the job.
 test('switching from statement to tests drops the fields the new scope ignores', async () => {
   vi.mocked(api.ai.createJob).mockResolvedValue({id:'j21',actor_id:'u1',artifact_type:'tests',status:'queued',stage:'queued',progress:0,submitted_brief:BLANK_BRIEF,normalized_brief:BLANK_BRIEF,prompt_tokens:0,completion_tokens:0,latency_ms:0,created_at:''})
-  render(<AIStudioTab problemId="p1" />)
+  renderStudio(<AIStudioTab problemId="p1" />)
   await waitFor(()=>expect(screen.getByText(/Local/)).toBeInTheDocument())
 
   // A statement takes story tone but no test count.
@@ -173,7 +191,7 @@ test('switching from statement to tests drops the fields the new scope ignores',
 // be checked." Every scope but the full package reads the existing problem, so
 // the tab states what the run is based on — and which version of it.
 test('says what the run is based on, and which version', async () => {
-  render(<AIStudioTab problemId="p1" problemUpdatedAt="2026-11-14T09:30:00Z" />)
+  renderStudio(<AIStudioTab problemId="p1" problemUpdatedAt="2026-11-14T09:30:00Z" />)
   await waitFor(()=>expect(screen.getByText(/Local/)).toBeInTheDocument())
 
   // The whole note, not just the label span, so the assertions can read it.
@@ -187,7 +205,7 @@ test('says what the run is based on, and which version', async () => {
 
 // A new problem has nothing to be based on.
 test('a new problem does not claim to be based on an existing one', async () => {
-  render(<AIStudioTab />)
+  renderStudio(<AIStudioTab />)
   await waitFor(()=>expect(screen.getByText(/Local/)).toBeInTheDocument())
   expect(screen.queryByText(/Based on/)).not.toBeInTheDocument()
 })
@@ -199,9 +217,9 @@ test('apply sends the loaded problem timestamp so a stale write is refused', asy
   vi.mocked(api.ai.problemJobs).mockResolvedValue({data:[ready]})
   vi.mocked(api.ai.applyJob).mockReset().mockResolvedValue({problem_id:'p1',problem_slug:'p1'})
   vi.mocked(api.ai.getJob).mockReset().mockResolvedValue(ready)
-  render(<AIStudioTab problemId="p1" problemUpdatedAt="2026-11-14T09:30:00Z" />)
+  renderStudio(<AIStudioTab problemId="p1" problemUpdatedAt="2026-11-14T09:30:00Z" />)
 
-  const applyButton = await screen.findByRole('button',{name:'Apply selected'})
+  const applyButton = await screen.findByRole('button',{name:'Apply selected sections'})
   // The proposal review seeds its section selection in a microtask, and the
   // button is disabled while nothing is selected. A real browser flushes that
   // before paint; here the wait has to be explicit or the click is swallowed.
@@ -219,7 +237,7 @@ test('apply sends the loaded problem timestamp so a stale write is refused', asy
 test('blocks starting a job while another problem has one running', async () => {
     const elsewhere = {id:'j4',actor_id:'u1',problem_id:'other',artifact_type:'full_problem',status:'running' as const,stage:'drafting',progress:10,submitted_brief:{tags:['dp'],rating:1400,problem_type:'standard',testcase_count:10,has_subtasks:false},normalized_brief:{tags:['dp'],rating:1400,problem_type:'standard',testcase_count:10,has_subtasks:false},prompt_tokens:0,completion_tokens:0,latency_ms:0,created_at:''}
     vi.mocked(api.ai.listJobs).mockResolvedValue({data:[elsewhere], total:1})
-    render(<AIStudioTab />)
+    renderStudio(<AIStudioTab />)
 
     const button = await screen.findByRole('button', {name:'Generate problem'})
     await waitFor(()=>expect(button).toBeDisabled())
@@ -237,23 +255,28 @@ test('leaves the running state as soon as the job is cancelled', async () => {
     vi.mocked(api.ai.problemJobs).mockResolvedValue({data:[running]})
     vi.mocked(api.ai.listJobs).mockResolvedValue({data:[running], total:1})
     vi.mocked(api.ai.cancelJob).mockReset().mockResolvedValue({cancelled:true})
-    render(<AIStudioTab problemId="p1" />)
+    // getJob returns the running job on first fetch (so Cancel is shown), then
+    // the cancelled job after cancel (so the tab leaves the running state).
+    vi.mocked(api.ai.getJob).mockReset()
+      .mockResolvedValueOnce(running)
+      .mockResolvedValue({...running, status:'cancelled' as const})
+    renderStudio(<AIStudioTab problemId="p1" />)
 
-    fireEvent.click(await screen.findByRole('button', {name:'Cancel'}))
+    fireEvent.click(await screen.findByRole('button', {name:'Cancel job'}))
     await waitFor(()=>expect(api.ai.cancelJob).toHaveBeenCalledWith('j5'))
     // 'Start a new run' only renders for a settled job, so its appearance is the
     // signal that the tab stopped treating this run as active.
     await waitFor(()=>expect(screen.getByRole('button',{name:'Start a new run'})).toBeInTheDocument())
-    expect(screen.queryByRole('button',{name:'Cancel'})).not.toBeInTheDocument()
+    expect(screen.queryByRole('button',{name:'Cancel job'})).not.toBeInTheDocument()
 })
 
 test('resumes the newest job for the problem on mount', async () => {
  const ready={id:'j9',actor_id:'u1',artifact_type:'statement',status:'ready' as const,stage:'ready',progress:100,submitted_brief:{tags:['dp'],rating:1400,problem_type:'standard',testcase_count:10,has_subtasks:false},normalized_brief:{tags:['dp'],rating:1400,problem_type:'standard',testcase_count:10,has_subtasks:false},proposal:{title:'Resumed',description:'Statement'},validation_report:{valid:true,checks:[{name:'coverage',passed:true,message:'31 cases'}]},prompt_tokens:10,completion_tokens:20,latency_ms:100,created_at:''}
  vi.mocked(api.ai.problemJobs).mockResolvedValue({data:[ready]})
- render(<AIStudioTab problemId="p1" />)
+ renderStudio(<AIStudioTab problemId="p1" />)
  // A finished proposal must survive a reload instead of resetting to a blank
  // form, otherwise it can never be reviewed or applied.
- await waitFor(()=>expect(screen.getByRole('button',{name:'Apply selected'})).toBeInTheDocument())
+ await waitFor(()=>expect(screen.getByRole('button',{name:'Apply selected sections'})).toBeInTheDocument())
  expect(api.ai.problemJobs).toHaveBeenCalledWith('p1')
 })
 
@@ -265,7 +288,7 @@ test('resumes the newest job for the problem on mount', async () => {
 test('an applied job does not trap the tab — a new run is still startable', async () => {
   const applied={id:'j10',actor_id:'u1',artifact_type:'statement',status:'applied' as const,stage:'applied',progress:100,submitted_brief:{tags:['dp'],rating:1400,problem_type:'standard',testcase_count:10,has_subtasks:false},normalized_brief:{tags:['dp'],rating:1400,problem_type:'standard',testcase_count:10,has_subtasks:false},prompt_tokens:10,completion_tokens:20,latency_ms:100,created_at:''}
   vi.mocked(api.ai.problemJobs).mockResolvedValue({data:[applied]})
-  render(<AIStudioTab problemId="p1" />)
+  renderStudio(<AIStudioTab problemId="p1" />)
 
   // The form must be reachable rather than the old job being force-loaded.
   const generate = await screen.findByRole('button', {name: /Generate/})
@@ -278,7 +301,7 @@ test('an applied job does not trap the tab — a new run is still startable', as
 test('a settled job offers a way back to a new run', async () => {
   const ready={id:'j11',actor_id:'u1',artifact_type:'statement',status:'ready' as const,stage:'ready',progress:100,submitted_brief:{tags:['dp'],rating:1400,problem_type:'standard',testcase_count:10,has_subtasks:false},normalized_brief:{tags:['dp'],rating:1400,problem_type:'standard',testcase_count:10,has_subtasks:false},proposal:{title:'Resumed',description:'Statement'},validation_report:{valid:true,checks:[]},prompt_tokens:10,completion_tokens:20,latency_ms:100,created_at:''}
   vi.mocked(api.ai.problemJobs).mockResolvedValue({data:[ready]})
-  render(<AIStudioTab problemId="p1" />)
+  renderStudio(<AIStudioTab problemId="p1" />)
 
   // The resumed proposal hides the form; the button is the way back to it.
   const back = await screen.findByRole('button', {name:'Start a new run'})
@@ -288,7 +311,7 @@ test('a settled job offers a way back to a new run', async () => {
 
   // Form is back, and the proposal is gone from view (still in history).
   expect(await screen.findByRole('button', {name:/Generate/})).toBeInTheDocument()
-  expect(screen.queryByRole('button', {name:'Apply selected'})).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', {name:'Apply selected sections'})).not.toBeInTheDocument()
   // Leaving the view must not delete the job.
   expect(api.ai.discardJob).not.toHaveBeenCalled()
 })
