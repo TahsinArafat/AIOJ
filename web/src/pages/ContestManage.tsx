@@ -687,7 +687,7 @@ function PrintsTab({ contestId }: { contestId: string }) {
                                 <div className="flex gap-2">
                                     {p.status === 'pending' && (
                                         <>
-                                            <button onClick={() => updateStatus(p.id, 'printed')} className="text-xs px-2 py-1 bg-ok-fill text-white rounded hover:bg-ok-fill">Mark Printed</button>
+                                            <button onClick={() => updateStatus(p.id, 'printed')} className="text-xs px-2 py-1 bg-ok-fill text-white rounded">Mark Printed</button>
                                             <button onClick={() => updateStatus(p.id, 'cancelled')} className="text-xs px-2 py-1 bg-bad/12 text-bad rounded hover:bg-bad/20">Cancel</button>
                                         </>
                                     )}
@@ -855,7 +855,7 @@ function BalloonsTab({ contestId }: { contestId: string }) {
             <div className="flex gap-2 mb-4">
                 {(['all', 'pending', 'dispatched'] as const).map(f => (
                     <button key={f} onClick={() => setFilter(f)}
-                        className={`px-3 py-1.5 text-xs rounded-full font-medium capitalize ${filter === f ? 'bg-brand text-on-brand' : 'bg-surface-3 text-muted hover:bg-surface-3'}`}>
+                        className={`px-3 py-1.5 text-xs rounded-full font-medium capitalize ${filter === f ? 'bg-brand text-on-brand' : 'bg-surface-3 text-muted'}`}>
                         {f} {f === 'pending' ? `(${pending})` : ''}
                     </button>
                 ))}
@@ -892,7 +892,7 @@ function BalloonsTab({ contestId }: { contestId: string }) {
                                 </div>
                             </div>
                             {!b.dispatched ? (
-                                <button onClick={() => dispatch(b.id)} className="px-3 py-1.5 bg-ok-fill text-white text-xs rounded-lg hover:bg-ok-fill font-medium">
+                                <button onClick={() => dispatch(b.id)} className="px-3 py-1.5 bg-ok-fill text-white text-xs rounded-lg font-medium">
                                     Dispatch
                                 </button>
                             ) : (
@@ -950,7 +950,7 @@ function AnnouncementsTab({ contestId }: { contestId: string }) {
                                 <p className="text-sm text-ink">{n.content}</p>
                                 <span className="text-xs text-muted-soft">{new Date(n.created_at).toLocaleString()}</span>
                             </div>
-                            <button onClick={() => remove(n.id)} className="text-bad hover:text-bad text-xs ml-4">✕</button>
+                            <button onClick={() => remove(n.id)} className="text-bad text-xs ml-4">✕</button>
                         </div>
                     ))}
                 </div>
@@ -1037,7 +1037,7 @@ function ModeratorsTab({ contestId }: { contestId: string }) {
                                 <Link to={`/user/${p.username}`} className="font-medium text-sm text-ink hover:text-brand">{p.username || p.user_id}</Link>
                                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${levelColor(p.access_level)}`}>{p.access_level}</span>
                             </div>
-                            <button onClick={() => remove(p.user_id)} className="text-bad hover:text-bad text-xs">Remove</button>
+                            <button onClick={() => remove(p.user_id)} className="text-bad text-xs">Remove</button>
                         </div>
                     ))}
                 </div>
@@ -1117,7 +1117,7 @@ function OnsiteTeamsTab({ contestId }: { contestId: string }) {
                 <>
                     <div className="flex justify-end mb-3">
                         <button onClick={copyAllCredentials}
-                            className="px-3 py-1.5 bg-surface-3 text-ink-soft text-xs rounded-lg hover:bg-surface-3">
+                            className="px-3 py-1.5 bg-surface-3 text-ink-soft text-xs rounded-lg">
                             Copy All to Clipboard
                         </button>
                     </div>
@@ -1147,7 +1147,7 @@ function OnsiteTeamsTab({ contestId }: { contestId: string }) {
                                         </td>
                                         <td className="py-2">
                                             <button onClick={() => deleteUser(t.id)}
-                                                className="text-bad hover:text-bad text-xs font-medium">
+                                                className="text-bad text-xs font-medium">
                                                 Del
                                             </button>
                                         </td>
@@ -1758,7 +1758,7 @@ function SettingsTab({ contestId }: { contestId: string }) {
                         className="px-6 py-2.5 bg-brand text-on-brand rounded-lg hover:bg-brand-hover disabled:opacity-50 font-medium text-sm transition-colors">
                         {saving ? 'Saving...' : 'Save Changes'}
                     </button>
-                    <Link to={`/contests/${contestId}`} className="px-4 py-2.5 bg-surface-3 text-muted rounded-lg hover:bg-surface-3 text-sm">
+                    <Link to={`/contests/${contestId}`} className="px-4 py-2.5 bg-surface-3 text-muted rounded-lg text-sm">
                         Cancel
                     </Link>
                 </div>
