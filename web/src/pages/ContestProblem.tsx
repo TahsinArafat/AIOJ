@@ -308,7 +308,7 @@ export default function ContestProblem() {
     // language's own factors before handing them to the sandbox.
     const metaLimits = problem
         ? effectiveLimits(problem, language, languages, problem.language_limits)
-        : { timeLimitMs: 0, memoryLimitKB: 0, stackLimitKB: 0 }
+        : { timeLimitMs: 0, memoryLimitKB: 0 }
     const [code, setCode] = useState('')
     const [submitting, setSubmitting] = useState(false)
     const [result, setResult] = useState<SubmissionView | null>(null)
@@ -720,7 +720,6 @@ export default function ContestProblem() {
                         className="mt-3"
                         timeLimit={metaLimits.timeLimitMs}
                         memoryLimit={metaLimits.memoryLimitKB}
-                        stackLimit={metaLimits.stackLimitKB}
                         difficulty={problem.difficulty}
                         rating={problem.rating}
                         tags={problem.tags}

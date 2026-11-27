@@ -148,7 +148,6 @@ const java = toLanguages([{
   extensions: ['.java'],
   time_limit_multiplier: 2,
   memory_limit_multiplier: 2,
-  stack_limit_kb: 262144,
 }])[0]
 
 test('a language multiplier scales the problem limits', () => {
@@ -156,22 +155,18 @@ test('a language multiplier scales the problem limits', () => {
 
   expect(got.timeLimitMs).toBe(2000)
   expect(got.memoryLimitKB).toBe(524288)
-  expect(got.stackLimitKB).toBe(262144)
 })
 
 test('C++ gets exactly what the problem says', () => {
   const cpp = toLanguages([{
     key: 'cpp-gpp-64', name: 'C++', extensions: ['.cpp'],
-    time_limit_multiplier: 1, memory_limit_multiplier: 1, stack_limit_kb: 0,
+    time_limit_multiplier: 1, memory_limit_multiplier: 1,
   }])[0]
 
   const got = effectiveLimits({ time_limit: 1500, memory_limit: 262144 }, 'cpp-gpp-64', [cpp])
 
   expect(got.timeLimitMs).toBe(1500)
   expect(got.memoryLimitKB).toBe(262144)
-  // 0 means the sandbox default applies, and the page must not advertise a
-  // stack limit the platform never promised.
-  expect(got.stackLimitKB).toBe(0)
 })
 
 test('a per-problem override replaces the base before the multiplier', () => {
@@ -190,7 +185,7 @@ test('a per-problem override replaces the base before the multiplier', () => {
 test('an unknown language leaves the problem limits as they are', () => {
   const got = effectiveLimits({ time_limit: 1000, memory_limit: 262144 }, 'brainfuck', [java])
 
-  expect(got).toEqual({ timeLimitMs: 1000, memoryLimitKB: 262144, stackLimitKB: 0 })
+  expect(got).toEqual({ timeLimitMs: 1000, memoryLimitKB: 262144 })
 })
 
 test('rows without multipliers do not render a zero limit', () => {
@@ -200,7 +195,6 @@ test('rows without multipliers do not render a zero limit', () => {
   expect(lang.limits).toEqual({
     time_limit_multiplier: 1,
     memory_limit_multiplier: 1,
-    stack_limit_kb: 0,
   })
   expect(effectiveLimits({ time_limit: 1000, memory_limit: 262144 }, 'rust', [lang]).timeLimitMs).toBe(1000)
 })

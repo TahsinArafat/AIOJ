@@ -128,7 +128,6 @@ export default function ProblemDetail() {
         : {
             timeLimitMs: problem?.time_limit ?? 0,
             memoryLimitKB: problem?.memory_limit ?? 0,
-            stackLimitKB: 0,
         }
 
     const handleMouseDown = (e: React.MouseEvent) => {
@@ -486,7 +485,6 @@ export default function ProblemDetail() {
                         className="mt-3 border-b border-hairline pb-3"
                         timeLimit={metaLimits.timeLimitMs}
                         memoryLimit={metaLimits.memoryLimitKB}
-                        stackLimit={metaLimits.stackLimitKB}
                         difficulty={problem.difficulty}
                         rating={problem.rating}
                         tags={problem.tags}

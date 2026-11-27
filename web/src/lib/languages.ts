@@ -28,9 +28,9 @@ export interface Language {
     /** Starter template offered in the IDE and the submit pane. */
     template: string
     /**
-     * Multipliers the judge applies to the problem's own limits, and the
-     * call-stack cap in KB (0 = sandbox default). Used to show the limit a
-     * submission is actually judged under; absent on the offline fallback.
+     * Multipliers the judge applies to the problem's own limits. Used to show
+     * the limit a submission is actually judged under; absent on the offline
+     * fallback.
      */
     limits?: LanguageLimits
 }
@@ -38,14 +38,12 @@ export interface Language {
 export interface LanguageLimits {
     time_limit_multiplier: number
     memory_limit_multiplier: number
-    stack_limit_kb: number
 }
 
 /** Multipliers assumed when the server did not report any. */
 const NEUTRAL_LIMITS: LanguageLimits = {
     time_limit_multiplier: 1,
     memory_limit_multiplier: 1,
-    stack_limit_kb: 0,
 }
 
 const CPP_TEMPLATE = `#include <iostream>
@@ -154,7 +152,6 @@ interface PublicLanguageRow {
     extensions?: string[]
     time_limit_multiplier?: number
     memory_limit_multiplier?: number
-    stack_limit_kb?: number
 }
 
 /** Turn the server's rows into the shape the UI expects. */
@@ -169,7 +166,6 @@ export function toLanguages(rows: PublicLanguageRow[] | undefined | null): Langu
         limits: {
             time_limit_multiplier: r.time_limit_multiplier ?? NEUTRAL_LIMITS.time_limit_multiplier,
             memory_limit_multiplier: r.memory_limit_multiplier ?? NEUTRAL_LIMITS.memory_limit_multiplier,
-            stack_limit_kb: r.stack_limit_kb ?? NEUTRAL_LIMITS.stack_limit_kb,
         },
     }))
 }
@@ -190,7 +186,7 @@ export function effectiveLimits(
     languageKey: string | undefined | null,
     languages: Language[] = FALLBACK_LANGUAGES,
     overrides?: { language_id: string; time_limit_ms?: number | null; memory_limit_kb?: number | null }[],
-): { timeLimitMs: number; memoryLimitKB: number; stackLimitKB: number } {
+): { timeLimitMs: number; memoryLimitKB: number } {
     let timeLimitMs = base.time_limit
     let memoryLimitKB = base.memory_limit
 
@@ -202,7 +198,6 @@ export function effectiveLimits(
     return {
         timeLimitMs: Math.round(timeLimitMs * limits.time_limit_multiplier),
         memoryLimitKB: Math.round(memoryLimitKB * limits.memory_limit_multiplier),
-        stackLimitKB: limits.stack_limit_kb,
     }
 }
 
