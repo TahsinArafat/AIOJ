@@ -27,4 +27,9 @@ Disallow: /forgot-password
 Disallow: /*?*sort=
 Disallow: /*?*page=
 
-Sitemap: http://localhost:8081/sitemap.xml
+# The origin is deployment configuration, so this is filled in at build time
+# from PUBLIC_ORIGIN by `scripts/prerender-robots.mjs` — the same value
+# index.html's og:image and the legal pages' canonical tags use. A relative
+# Sitemap URL is invalid per the robots.txt spec, so the line is dropped
+# entirely when the origin is unset rather than shipped as a broken path.
+Sitemap: %SITE_ORIGIN%/sitemap.xml

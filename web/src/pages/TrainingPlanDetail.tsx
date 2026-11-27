@@ -4,6 +4,7 @@ import { EmptyState } from '../components/EmptyState'
 import { useParams, Link } from 'react-router-dom'
 import { api, getAccessToken } from '../lib/api'
 import { useToast } from '../components/Toast'
+import { useDocumentTitle } from '../lib/documentTitle'
 
 export default function TrainingPlanDetail() {
 	const toast = useToast()
@@ -39,6 +40,7 @@ export default function TrainingPlanDetail() {
 	}
 
 	const [data, setData] = useState<TrainingPlan | null>(null)
+	useDocumentTitle(data?.title)
 	const [loading, setLoading] = useState(true)
 	const [enrolling, setEnrolling] = useState(false)
 
