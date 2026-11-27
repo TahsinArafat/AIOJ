@@ -3,6 +3,8 @@ package generate
 import (
 	"fmt"
 	"strings"
+
+	"github.com/tahsinarafat/aioj/internal/model"
 )
 
 // systemPrompt is sent as the "system" role message.
@@ -71,10 +73,24 @@ Rules:
 - Do NOT copy existing Codeforces problems verbatim; create a novel scenario.`
 
 // buildUserPrompt constructs the user message from a generation Request.
-func buildUserPrompt(req Request) string {
+//
+// artifact and existing are not optional decoration: a job on an existing
+// problem must be generated against that problem. Before this the legacy worker
+// sent only the brief, so "write the reference solution for this problem"
+// produced a solution to a problem the model had invented, and Apply wrote it
+// onto the real one. The harness worker already passed the problem; this keeps
+// both pipelines answering the same question.
+func buildUserPrompt(req Request, artifact string, existing *model.Problem) string {
 	var b strings.Builder
 
-	fmt.Fprintf(&b, "Generate a competitive programming problem with these specifications:\n\n")
+	if existing != nil {
+		fmt.Fprintf(&b, "%s\n\n", artifactInstruction(artifact))
+		b.WriteString("## Existing problem — authoritative, reuse its values\n")
+		b.WriteString(renderExistingProblem(existing))
+		b.WriteString("\n## Operator brief\n")
+	} else {
+		b.WriteString("Generate a competitive programming problem with these specifications:\n\n")
+	}
 	fmt.Fprintf(&b, "- Algorithmic topics (tags): %s\n", strings.Join(req.Tags, ", "))
 	fmt.Fprintf(&b, "- Difficulty rating: %d (Codeforces scale)\n", req.Rating)
 	fmt.Fprintf(&b, "- Problem type: %s\n", req.ProblemType)
@@ -132,4 +148,79 @@ func buildUserPrompt(req Request) string {
 
 	b.WriteString("\nRemember: output ONLY the JSON object, nothing else.")
 	return b.String()
+}
+
+// artifactInstruction states what a single-artifact job must produce, and what
+// it must leave alone. A full-package job authors everything, so it gets no
+// scope line — the existing problem is context, not a constraint on the output.
+func artifactInstruction(artifact string) string {
+	switch artifact {
+	case "statement":
+		return "Rewrite ONLY the statement and its samples for the existing problem below. " +
+			"Reuse its constraints, limits and formats verbatim — do not reword them."
+	case "tests":
+		return "Author ONLY the test generator and cases for the existing problem below. " +
+			"Reuse its statement, constraints, limits and samples verbatim — do not reword them."
+	case "solution":
+		return "Write ONLY the reference solution for the existing problem below. " +
+			"It must solve exactly the statement and samples given, within the stated limits."
+	case "editorial":
+		return "Write ONLY the editorial for the existing problem below. " +
+			"It must explain the approach to the statement as given, not to a different problem."
+	case "full_problem":
+		return "Build the complete package. The existing problem below is context — match its subject, " +
+			"and reuse its constraints, limits and formats unless the brief says otherwise."
+	default:
+		return "Produce the requested artifact for the existing problem below."
+	}
+}
+
+// renderExistingProblem projects an existing problem into the legacy pipeline's
+// user message. Field set mirrors the harness's renderProblem so the two
+// pipelines give the model the same view of the problem it is working on.
+func renderExistingProblem(p *model.Problem) string {
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "Title: %s\n", p.Title)
+	if p.Difficulty != "" {
+		fmt.Fprintf(&sb, "Difficulty: %s\n", p.Difficulty)
+	}
+	if len(p.Tags) > 0 {
+		fmt.Fprintf(&sb, "Tags: %s\n", strings.Join(p.Tags, ", "))
+	}
+	if p.TimeLimit > 0 || p.MemoryLimit > 0 {
+		fmt.Fprintf(&sb, "Limits: %d ms, %d KiB\n", p.TimeLimit, p.MemoryLimit)
+	}
+
+	sb.WriteString("\n### Statement\n")
+	sb.WriteString(placeholderIfEmpty(p.Description))
+	if strings.TrimSpace(p.Constraints) != "" {
+		sb.WriteString("\n\n### Constraints\n")
+		sb.WriteString(p.Constraints)
+	}
+	if strings.TrimSpace(p.InputFormat) != "" {
+		sb.WriteString("\n\n### Input format\n")
+		sb.WriteString(p.InputFormat)
+	}
+	if strings.TrimSpace(p.OutputFormat) != "" {
+		sb.WriteString("\n\n### Output format\n")
+		sb.WriteString(p.OutputFormat)
+	}
+
+	if len(p.SampleCases) > 0 {
+		sb.WriteString("\n\n### Samples\n")
+		for i, s := range p.SampleCases {
+			fmt.Fprintf(&sb, "%d. input: %s\n   output: %s\n", i+1, s.Input, s.Output)
+			if strings.TrimSpace(s.Explanation) != "" {
+				fmt.Fprintf(&sb, "   explanation: %s\n", s.Explanation)
+			}
+		}
+	}
+	return sb.String()
+}
+
+func placeholderIfEmpty(s string) string {
+	if strings.TrimSpace(s) == "" {
+		return "(empty)"
+	}
+	return s
 }

@@ -19,37 +19,37 @@ import (
 // the two pipelines' contracts impossible to evolve independently. Apply unmarshals
 // the bytes, so only the JSON tags have to agree.
 type proposalDoc struct {
-	Title             string            `json:"title"`
-	Description       string            `json:"description"`
-	Constraints       string            `json:"constraints"`
-	InputFormat       string            `json:"input_format"`
-	OutputFormat      string            `json:"output_format"`
-	Hint              string            `json:"hint"`
-	SampleCases       []Sample          `json:"sample_cases"`
-	TimeLimitMs       int               `json:"time_limit_ms"`
-	MemoryLimitKB     int               `json:"memory_limit_kb"`
-	Tags              []string          `json:"tags"`
-	Difficulty        string            `json:"difficulty"`
-	SolutionCode      string            `json:"solution_code"`
-	SolutionLanguage  string            `json:"solution_language"`
-	EditorialTitle    string            `json:"editorial_title"`
-	EditorialContent  string            `json:"editorial_content"`
-	EditorialApproach string            `json:"editorial_approach"`
+	Title             string   `json:"title"`
+	Description       string   `json:"description"`
+	Constraints       string   `json:"constraints"`
+	InputFormat       string   `json:"input_format"`
+	OutputFormat      string   `json:"output_format"`
+	Hint              string   `json:"hint"`
+	SampleCases       []Sample `json:"sample_cases"`
+	TimeLimitMs       int      `json:"time_limit_ms"`
+	MemoryLimitKB     int      `json:"memory_limit_kb"`
+	Tags              []string `json:"tags"`
+	Difficulty        string   `json:"difficulty"`
+	SolutionCode      string   `json:"solution_code"`
+	SolutionLanguage  string   `json:"solution_language"`
+	EditorialTitle    string   `json:"editorial_title"`
+	EditorialContent  string   `json:"editorial_content"`
+	EditorialApproach string   `json:"editorial_approach"`
 	// The harness does not author an editorial, its complexity analysis, or a
 	// difficulty rationale; the fields are present so the JSON contract matches
 	// generate.Proposal and apply.go reads them as empty rather than missing.
-	TimeComplexity    string            `json:"time_complexity"`
-	SpaceComplexity   string            `json:"space_complexity"`
-	GeneratorCode     string            `json:"generator_code"`
-	GeneratorLanguage string            `json:"generator_language"`
+	TimeComplexity    string `json:"time_complexity"`
+	SpaceComplexity   string `json:"space_complexity"`
+	GeneratorCode     string `json:"generator_code"`
+	GeneratorLanguage string `json:"generator_language"`
 	// The harness pipeline produces a validator (ArtifactValidator); carrying it
 	// here is what lets apply.go persist it onto the problem instead of dropping
 	// it on the floor.
-	ValidatorCode       string              `json:"validator_code"`
-	ValidatorLanguage   string              `json:"validator_language"`
-	Seeds               []int64             `json:"seeds"`
-	CuratedCases        []json.RawMessage   `json:"curated_cases"`
-	DifficultyRationale json.RawMessage     `json:"difficulty_rationale"`
+	ValidatorCode       string            `json:"validator_code"`
+	ValidatorLanguage   string            `json:"validator_language"`
+	Seeds               []int64           `json:"seeds"`
+	CuratedCases        []json.RawMessage `json:"curated_cases"`
+	DifficultyRationale json.RawMessage   `json:"difficulty_rationale"`
 }
 
 // proposalJSON renders the manifest as an applyable proposal.

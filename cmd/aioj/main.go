@@ -485,7 +485,7 @@ schema is unrecoverable.`, err)
 	aiGenerationStore := postgres.NewAIGenerationStore(db)
 	aiJobService := &generate.JobService{Jobs: aiGenerationStore, Models: aiModelStore, Problems: problemStore}
 	generationAssetStore := postgres.NewGenerationAssetStore(db)
-	aiWorker := &generate.JobWorker{Jobs: aiGenerationStore, Models: aiModelStore, Timeout: time.Duration(cfg.AI.JobTimeoutSeconds) * time.Second, Sandbox: &generate.SandboxValidator{Exec: execClient, LangDir: cfg.LangDir, StagingRoot: cfg.AI.StagedTestdataRoot}}
+	aiWorker := &generate.JobWorker{Jobs: aiGenerationStore, Models: aiModelStore, Problems: problemStore, Timeout: time.Duration(cfg.AI.JobTimeoutSeconds) * time.Second, Sandbox: &generate.SandboxValidator{Exec: execClient, LangDir: cfg.LangDir, StagingRoot: cfg.AI.StagedTestdataRoot}}
 	startAIWorkers := func() {
 		for i := 0; i < cfg.AI.WorkerConcurrency; i++ {
 			go aiWorker.Run(ctx)

@@ -123,6 +123,45 @@ paths:
       responses:
         "201":
           description: Accepted
+  /api/editorials/problem/{problemId}/solution:
+    get:
+      tags: [editorials]
+      summary: Read the problem's official reference solution
+      description: >
+        Optionally authenticated. A setter on a draft gets claims and reads the
+        answer key; a public visitor on a published problem reads it with no token.
+        Returns an empty object when no solution has been written yet.
+      parameters:
+        - { name: problemId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: The official reference solution, or empty
+    put:
+      tags: [editorials]
+      summary: Create or update the official reference solution
+      description: >
+        Writes only solution_code and solution_language onto the official
+        editorial, preserving any prose. Shares the row with AI Studio apply.
+        Owner, admin, or co-author only.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: problemId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [solution_code, solution_language]
+              properties:
+                solution_code: { type: string }
+                solution_language: { type: string }
+      responses:
+        "200":
+          description: Saved
+        "403":
+          description: Not owner, admin, or co-author
 components:
   securitySchemes:
     bearerAuth:

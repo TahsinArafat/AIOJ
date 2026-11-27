@@ -146,7 +146,9 @@ DELETE /api/contests/{id}/void-ratings                      security-headers pas
 POST   /api/contests/{id}/void-ratings                      security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required pass-through
 GET    /api/editorials/                                     security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
 POST   /api/editorials/                                     security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
-GET    /api/editorials/problem/{problemId}                  security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
+GET    /api/editorials/problem/{problemId}                  security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
+GET    /api/editorials/problem/{problemId}/solution         security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
+PUT    /api/editorials/problem/{problemId}/solution         security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
 GET    /api/editorials/{id}                                 security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
 GET    /api/groups/                                         security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
 POST   /api/groups/                                         security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required

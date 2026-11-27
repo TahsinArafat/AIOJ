@@ -98,11 +98,15 @@ func limitMessage(running, queued int, blocking *model.AIGenerationJob) string {
 }
 
 type JobWorker struct {
-	Jobs    store.AIGenerationJobStore
-	Models  store.AIModelStore
-	Poll    time.Duration
-	Timeout time.Duration
-	Sandbox *SandboxValidator
+	Jobs   store.AIGenerationJobStore
+	Models store.AIModelStore
+	// Problems lets a job on an existing problem be generated against it.
+	// Without it the legacy pipeline sent only the brief, so a reference-solution
+	// or editorial job answered a problem the model had invented.
+	Problems generateProblemStore
+	Poll     time.Duration
+	Timeout  time.Duration
+	Sandbox  *SandboxValidator
 	// CancelPoll is how often a running job checks the store for a cancel
 	// request. Zero means one second.
 	CancelPoll time.Duration
@@ -197,7 +201,23 @@ func (w *JobWorker) processOne(ctx context.Context) bool {
 	defer close(watchDone)
 	go w.watchCancel(ctx, job.ID, cancel, watchDone)
 	start := time.Now()
-	result, err := client.CompleteJSON(runCtx, systemPrompt, buildUserPrompt(brief), ProposalJSONSchema())
+	// A job on an existing problem must be generated against that problem.
+	// Failure to load it is fatal rather than silently generating blind: a
+	// solution written for an invented problem is worse than no solution.
+	var existing *model.Problem
+	if job.ProblemID != nil {
+		if w.Problems == nil {
+			_ = w.Jobs.Fail(ctx, job.ID, token, "problem_unavailable", "the problem to improve could not be loaded", nil)
+			return true
+		}
+		p, perr := w.Problems.GetByID(ctx, *job.ProblemID)
+		if perr != nil || p == nil {
+			_ = w.Jobs.Fail(ctx, job.ID, token, "problem_unavailable", "the problem to improve could not be loaded", nil)
+			return true
+		}
+		existing = p
+	}
+	result, err := client.CompleteJSON(runCtx, systemPrompt, buildUserPrompt(brief, job.ArtifactType, existing), ProposalJSONSchema())
 	if err != nil {
 		if cancelled, _ := w.Jobs.IsCancellationRequested(ctx, job.ID); cancelled {
 			_ = w.Jobs.MarkCancelled(ctx, job.ID, token)
