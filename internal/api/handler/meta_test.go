@@ -205,6 +205,84 @@ func TestMetaHandlerProblem(t *testing.T) {
 	})
 }
 
+// A route that resolves to a public entity must unfurl with the entity's own
+// name. Contests were the reported case: every shared round showed the site
+// tagline because only problems had a resolver.
+func TestMetaHandlerPageUsesEntityCard(t *testing.T) {
+	h := &MetaHandler{
+		Origin: func() string { return "https://aioj0.cyou" },
+		Card: func(_ context.Context, path string) (*ShareCard, error) {
+			if path == "/contests/aioj-round-1" {
+				return &ShareCard{
+					Title:       "AIOJ Round 1",
+					Description: "The first round.",
+					Path:        path,
+					Kind:        "article",
+					Facts:       []string{"Div. 3", "ACM", "2h 30m"},
+				}, nil
+			}
+			return nil, nil
+		},
+	}
+	srv := newMetaTestRouter(h)
+
+	t.Run("entity route carries its own title", func(t *testing.T) {
+		rec := httptest.NewRecorder()
+		srv.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/meta/contests/aioj-round-1", nil))
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want 200", rec.Code)
+		}
+		body := rec.Body.String()
+		if !strings.Contains(body, `<title>AIOJ Round 1 — AIOJ</title>`) {
+			t.Errorf("missing the contest title:\n%s", body)
+		}
+		if !strings.Contains(body, `og:title" content="AIOJ Round 1"`) {
+			t.Errorf("og:title should be the bare name, not the tab title:\n%s", body)
+		}
+		if !strings.Contains(body, `rel="canonical" href="https://aioj0.cyou/contests/aioj-round-1"`) {
+			t.Errorf("canonical should be the entity route:\n%s", body)
+		}
+		// Facts lead the description so a preview shows the division and length
+		// before the prose.
+		if !strings.Contains(body, "Div. 3 · ACM · 2h 30m") {
+			t.Errorf("facts should lead the description:\n%s", body)
+		}
+	})
+
+	// An unresolved path is an ordinary SPA route, not a missing entity: it keeps
+	// the site card with a 200 rather than 404ing like an unknown problem slug.
+	t.Run("unresolved route keeps the site card", func(t *testing.T) {
+		rec := httptest.NewRecorder()
+		srv.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/meta/contests/missing", nil))
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want 200", rec.Code)
+		}
+		if !strings.Contains(rec.Body.String(), `<title>AIOJ — Online Judge</title>`) {
+			t.Errorf("unresolved route should get the site card:\n%s", rec.Body.String())
+		}
+	})
+
+	t.Run("lookup error degrades to the site card", func(t *testing.T) {
+		broken := &MetaHandler{
+			Origin: func() string { return "https://aioj0.cyou" },
+			Card: func(context.Context, string) (*ShareCard, error) {
+				return nil, errors.New("db down")
+			},
+		}
+		rec := httptest.NewRecorder()
+		newMetaTestRouter(broken).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/meta/contests/aioj-round-1", nil))
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status = %d, want 200", rec.Code)
+		}
+		if !strings.Contains(rec.Body.String(), "og:image") {
+			t.Errorf("degraded card should still carry an image:\n%s", rec.Body.String())
+		}
+	})
+}
+
 // Every other app route gets the generic card, but still with the page's own
 // canonical URL and an image.
 func TestMetaHandlerPageStripsPrefix(t *testing.T) {

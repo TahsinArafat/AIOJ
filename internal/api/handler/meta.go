@@ -69,6 +69,14 @@ type MetaHandler struct {
 	// visible — the caller must answer 404 rather than publish the title of a
 	// private problem to a crawler.
 	ProblemCard func(ctx context.Context, slug string) (*ShareCard, error)
+	// Card resolves any other app route to its share card, e.g. "/contests/aioj-round-1".
+	// It returns (nil, nil) when the path is not a public entity page, and the
+	// caller falls back to the generic site card.
+	//
+	// Separate from ProblemCard because problems 404 on a miss (a mistyped slug
+	// must not become an indexable duplicate of the site root) while an unknown
+	// path here is an ordinary SPA route that still deserves a card.
+	Card func(ctx context.Context, path string) (*ShareCard, error)
 	// Origin returns the absolute site origin (e.g. "https://aioj0.cyou"), or
 	// "" when unconfigured. Used for canonical and og:image URLs, which
 	// platforms require to be absolute.
@@ -234,15 +242,32 @@ func (h *MetaHandler) Problem(w http.ResponseWriter, r *http.Request) {
 	h.write(w, card, http.StatusOK, 600)
 }
 
-// Page serves the share card for any other app route. It exists so a crawl of
-// /contests, /blog or any future route gets a complete card (title, image,
-// canonical) instead of the SPA shell with no Open Graph tags at all.
+// Page serves the share card for any other app route. A route that resolves to a
+// public entity gets that entity's own title and description; everything else
+// gets the generic site card, which still beats the SPA shell with no Open Graph
+// tags at all.
 func (h *MetaHandler) Page(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/meta")
 	if path == "" {
 		path = "/"
 	}
-	h.write(w, siteCard(path), http.StatusOK, 600)
+	if h.Card == nil {
+		h.write(w, siteCard(path), http.StatusOK, 600)
+		return
+	}
+	card, err := h.Card(r.Context(), path)
+	if err != nil {
+		// Degrade rather than fail: a card without the entity title still beats
+		// one with no page at all. The short max-age means the next share retries.
+		slog.Error("meta: card lookup failed", "path", path, "error", err)
+		h.write(w, siteCard(path), http.StatusOK, 60)
+		return
+	}
+	if card == nil {
+		h.write(w, siteCard(path), http.StatusOK, 600)
+		return
+	}
+	h.write(w, card, http.StatusOK, 600)
 }
 
 func (h *MetaHandler) write(w http.ResponseWriter, card *ShareCard, status, maxAge int) {

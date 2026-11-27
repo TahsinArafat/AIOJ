@@ -32,6 +32,7 @@ import (
 	"github.com/tahsinarafat/aioj/internal/judge/pressure"
 	"github.com/tahsinarafat/aioj/internal/judge/validator"
 	"github.com/tahsinarafat/aioj/internal/mail"
+	"github.com/tahsinarafat/aioj/internal/model"
 	"github.com/tahsinarafat/aioj/internal/notify"
 	"github.com/tahsinarafat/aioj/internal/oauth"
 	"github.com/tahsinarafat/aioj/internal/observability"
@@ -710,6 +711,28 @@ schema is unrecoverable.`, err)
 			DevMail:       devMailH,
 			Meta: &handler.MetaHandler{
 				Origin: func() string { return cfg.PublicOrigin() },
+				Card: func(ctx context.Context, path string) (*handler.ShareCard, error) {
+					// Only entity detail routes carry their own name. A listing page
+					// (/contests, /blog) has no single title to show, so it keeps the
+					// site card.
+					id, ok := contestPathID(path)
+					if !ok {
+						return nil, nil
+					}
+					c, err := contestStore.GetByID(ctx, id)
+					if err != nil {
+						return nil, err
+					}
+					// The same predicate as the sitemap's PublicContests: a round a
+					// crawler may be told about is one it may also preview. A nil
+					// card degrades to the site card rather than 404ing, because
+					// unlike a problem slug an unknown contest id is an ordinary SPA
+					// route.
+					if c == nil || !c.Visible || c.PasswordHash != "" || c.GroupID != "" {
+						return nil, nil
+					}
+					return contestShareCard(c), nil
+				},
 				ProblemCard: func(ctx context.Context, slug string) (*handler.ShareCard, error) {
 					m, err := problemMetaStore.GetBySlug(ctx, slug)
 					if err != nil {
@@ -974,6 +997,63 @@ func shareCardFacts(m *postgres.ProblemMeta) []string {
 		facts = append(facts, strings.Join(tags, ", "))
 	}
 	return facts
+}
+
+// contestPathID extracts the contest id from a detail path like
+// "/contests/aioj-round-1". Only the exact two-segment form matches: the
+// scoreboard, plagiarism and per-problem routes carry more segments and have no
+// single entity name of their own, so they keep the site card.
+func contestPathID(path string) (string, bool) {
+	rest, ok := strings.CutPrefix(path, "/contests/")
+	if !ok || rest == "" || strings.Contains(rest, "/") {
+		return "", false
+	}
+	return rest, true
+}
+
+// contestShareCard builds the preview card for a public round. Facts lead the
+// description the way they do for a problem: someone scanning a shared link wants
+// the division, the scoring format and the length before the prose.
+func contestShareCard(c *model.Contest) *handler.ShareCard {
+	facts := make([]string, 0, 3)
+	if name := model.DivisionNames[c.Division]; name != "" {
+		facts = append(facts, name)
+	}
+	if f := strings.TrimSpace(c.Format); f != "" {
+		facts = append(facts, strings.ToUpper(f))
+	}
+	if d := c.EndTime.Sub(c.StartTime); d > 0 {
+		facts = append(facts, formatCardDuration(d))
+	}
+
+	// Slug is the public URL and is nullable; DisplayID is the fallback the store
+	// itself resolves, so the canonical path is never "/contests/".
+	id := c.Slug
+	if id == "" {
+		id = strconv.Itoa(c.DisplayID)
+	}
+
+	return &handler.ShareCard{
+		Title:       c.Title,
+		Description: c.Description,
+		Path:        "/contests/" + id,
+		Kind:        "article",
+		Facts:       facts,
+	}
+}
+
+// formatCardDuration renders a contest length compactly ("2h 30m", "6h", "45m").
+func formatCardDuration(d time.Duration) string {
+	mins := int(d.Minutes())
+	h, m := mins/60, mins%60
+	switch {
+	case h == 0:
+		return fmt.Sprintf("%dm", m)
+	case m == 0:
+		return fmt.Sprintf("%dh", h)
+	default:
+		return fmt.Sprintf("%dh %dm", h, m)
+	}
 }
 
 // truncateForFeed bounds a problem statement for feed readers, which often
