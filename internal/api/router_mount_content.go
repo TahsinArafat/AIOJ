@@ -15,10 +15,21 @@ func (b *routerBuilder) mountContent(r chi.Router) {
 		r.Use(b.gate(feature.KeyEditorials))
 		r.Get("/", editorialH.List)
 		r.Get("/{id}", editorialH.GetByID)
-		r.Get("/problem/{problemId}", editorialH.GetByProblem)
+		// GetByProblem is optionally authenticated: a setter on a DRAFT problem
+		// needs claims for canReadProblem to grant access (an unauthenticated
+		// request has none, so every draft's editorials — including the official
+		// one AI Studio just applied — read as "not found" and the Editorials tab
+		// stayed empty). A public visitor on a published problem still reads it
+		// with no token.
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.OptionalAuthMiddleware(b.jwt))
+			r.Get("/problem/{problemId}", editorialH.GetByProblem)
+			r.Get("/problem/{problemId}/solution", editorialH.GetSolution)
+		})
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.AuthMiddleware(b.jwt))
 			r.Post("/", editorialH.Create)
+			r.Put("/problem/{problemId}/solution", editorialH.UpsertSolution)
 		})
 	})
 

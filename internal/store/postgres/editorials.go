@@ -40,6 +40,28 @@ func (s *EditorialStore) UpsertOfficial(ctx context.Context, e *model.Editorial)
 	return err
 }
 
+// UpsertOfficialSolution writes only the reference solution onto the official
+// editorial, leaving any prose the setter wrote intact. If no official editorial
+// exists yet, one is created with a placeholder title/content so the solution
+// has a home; the setter can fill in the prose later from the Editorials tab.
+func (s *EditorialStore) UpsertOfficialSolution(ctx context.Context, e *model.Editorial) error {
+	var id string
+	err := s.db.QueryRowContext(ctx, `SELECT id FROM editorials WHERE problem_id=$1 AND is_official=true ORDER BY created_at LIMIT 1`, e.ProblemID).Scan(&id)
+	if err == sql.ErrNoRows {
+		e.IsOfficial = true
+		if e.Title == "" {
+			e.Title = "Official Editorial"
+		}
+		return s.Create(ctx, e)
+	}
+	if err != nil {
+		return err
+	}
+	_, err = s.db.ExecContext(ctx, `UPDATE editorials SET solution_code=$2, solution_language=$3, updated_at=NOW() WHERE id=$1`, id, e.SolutionCode, e.SolutionLanguage)
+	e.ID = id
+	return err
+}
+
 func (s *EditorialStore) GetByID(ctx context.Context, id string) (*model.Editorial, error) {
 	if _, err := uuid.Parse(id); err != nil {
 		return nil, nil
@@ -92,6 +114,27 @@ func (s *EditorialStore) GetByProblem(ctx context.Context, problemID string) ([]
 		editorials = []model.Editorial{}
 	}
 	return editorials, nil
+}
+
+// GetOfficialSolution returns the official editorial's reference solution for a
+// problem, or nil when none exists. Unlike GetByProblem it selects the solution
+// fields, because the Reference Solution tab needs the code itself, not just the
+// editorial's title.
+func (s *EditorialStore) GetOfficialSolution(ctx context.Context, problemID string) (*model.Editorial, error) {
+	var e model.Editorial
+	err := s.db.QueryRowContext(ctx,
+		`SELECT e.id, e.problem_id, e.solution_code, e.solution_language
+		 FROM editorials e
+		 WHERE e.problem_id = $1 AND e.is_official = true
+		 ORDER BY e.created_at LIMIT 1`,
+		problemID).Scan(&e.ID, &e.ProblemID, &e.SolutionCode, &e.SolutionLanguage)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &e, nil
 }
 
 func (s *EditorialStore) List(ctx context.Context, offset, limit int) ([]model.Editorial, int, error) {

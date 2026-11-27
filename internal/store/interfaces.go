@@ -617,8 +617,10 @@ type EditorialStore interface {
 	Create(ctx context.Context, e *model.Editorial) error
 	GetByID(ctx context.Context, id string) (*model.Editorial, error)
 	GetByProblem(ctx context.Context, problemID string) ([]model.Editorial, error)
+	GetOfficialSolution(ctx context.Context, problemID string) (*model.Editorial, error)
 	List(ctx context.Context, offset, limit int) ([]model.Editorial, int, error)
 	UpsertOfficial(ctx context.Context, e *model.Editorial) error
+	UpsertOfficialSolution(ctx context.Context, e *model.Editorial) error
 }
 
 type APIKeyStore interface {

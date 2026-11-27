@@ -109,9 +109,9 @@ func (h *EditorialHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 func (h *EditorialHandler) GetByProblem(w http.ResponseWriter, r *http.Request) {
 	problemID := chi.URLParam(r, "problemId")
 
-	// An editorial carries the solution. On a draft that is the answer key, and
-	// this route is unauthenticated, so the problem itself must be readable
-	// first — the editorialVisible() filter in the store only covers contests.
+	// An editorial carries the solution. On a draft that is the answer key, so
+	// the problem itself must be readable first — the editorialVisible() filter
+	// in the store only covers contests, not draft visibility.
 	p, err := h.problemStore.GetByID(r.Context(), problemID)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -143,4 +143,65 @@ func (h *EditorialHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	items, total, _ := h.store.List(r.Context(), offset, limit)
 	respondJSON(w, http.StatusOK, map[string]interface{}{"data": items, "total": total})
+}
+
+// UpsertSolution creates or updates the official reference solution for a
+// problem, without touching any editorial prose. This is the setter's "manage
+// reference solution" path — the AI Studio apply and this endpoint share the
+// same official editorial row, so a solution written here is the one a future
+// editorial apply updates rather than duplicating.
+func (h *EditorialHandler) UpsertSolution(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r)
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	problemID := chi.URLParam(r, "problemId")
+	var req model.CreateEditorialRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	p, err := h.problemStore.GetByID(r.Context(), problemID)
+	if err != nil || p == nil {
+		http.Error(w, "problem not found", http.StatusNotFound)
+		return
+	}
+	// Only the owner, an admin, or a collaborator with edit rights may write the
+	// answer key. canReadProblem is not enough — reading a problem is not
+	// authoring for it.
+	if claims.Role != "admin" && p.CreatedBy != claims.UserID &&
+		!h.problemStore.HasAccess(r.Context(), p.ID, claims.UserID, "owner", "co_author") {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	e := &model.Editorial{
+		ProblemID:        p.ID,
+		UserID:           claims.UserID,
+		SolutionCode:     req.SolutionCode,
+		SolutionLanguage: req.SolutionLanguage,
+		IsOfficial:       true,
+	}
+	if err := h.store.UpsertOfficialSolution(r.Context(), e); err != nil {
+		http.Error(w, "save failed", http.StatusInternalServerError)
+		return
+	}
+	respondJSON(w, http.StatusOK, e)
+}
+
+// GetSolution returns the official reference solution for a problem, or an empty
+// object when none has been written yet. Optionally authenticated so a setter on
+// a draft can read the answer key back.
+func (h *EditorialHandler) GetSolution(w http.ResponseWriter, r *http.Request) {
+	problemID := chi.URLParam(r, "problemId")
+	e, err := h.store.GetOfficialSolution(r.Context(), problemID)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if e == nil {
+		respondJSON(w, http.StatusOK, &model.Editorial{ProblemID: problemID})
+		return
+	}
+	respondJSON(w, http.StatusOK, e)
 }
