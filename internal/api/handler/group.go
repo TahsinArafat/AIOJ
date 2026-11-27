@@ -87,6 +87,26 @@ func (h *GroupHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
+	// A private group is for its members. The route is open because an anonymous
+	// visitor may legitimately hold a link, so the check lives here rather than in
+	// middleware. 404 rather than 403 keeps the group's existence unconfirmed to
+	// someone outside it.
+	if !g.IsPublic {
+		claims := middleware.GetUserClaims(r)
+		if claims == nil {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		role, err := h.store.GetMemberRole(r.Context(), g.ID, claims.UserID)
+		if err != nil {
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		if role == "" {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+	}
 
 	respondJSON(w, http.StatusOK, g)
 }

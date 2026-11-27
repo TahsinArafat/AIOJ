@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/google/uuid"
 	"github.com/tahsinarafat/aioj/internal/model"
 )
 
@@ -25,6 +26,11 @@ func (s *ClassStore) Create(ctx context.Context, c *model.Class) error {
 }
 
 func (s *ClassStore) GetByID(ctx context.Context, id string) (*model.Class, error) {
+	// Without this a malformed id reached Postgres and came back as a 500, which
+	// reads as a server fault rather than the bad request it is.
+	if _, err := uuid.Parse(id); err != nil {
+		return nil, nil
+	}
 	var c model.Class
 	err := s.db.QueryRowContext(ctx,
 		`SELECT c.id, c.organization_id, o.name, c.name, c.description, c.invite_code,

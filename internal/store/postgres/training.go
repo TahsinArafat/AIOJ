@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/tahsinarafat/aioj/internal/model"
 )
 
@@ -26,6 +27,10 @@ func (s *TrainingPlanStore) Create(ctx context.Context, p *model.TrainingPlan) e
 }
 
 func (s *TrainingPlanStore) GetByID(ctx context.Context, id string) (*model.TrainingPlan, error) {
+	// Same guard as the other stores: a malformed id is a missing plan, not a 500.
+	if _, err := uuid.Parse(id); err != nil {
+		return nil, nil
+	}
 	var p model.TrainingPlan
 	var orgID sql.NullString
 	var orgName sql.NullString

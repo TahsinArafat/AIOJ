@@ -75,6 +75,25 @@ func (h *TeamHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
+	// A private team is for its members; see GroupHandler.GetByID for why this is
+	// a 404 and not a 403.
+	if !t.IsPublic {
+		claims := middleware.GetUserClaims(r)
+		if claims == nil {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		role, err := h.store.GetMemberRole(r.Context(), t.ID, claims.UserID)
+		if err != nil {
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		if role == "" {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+	}
+
 	respondJSON(w, http.StatusOK, t)
 }
 

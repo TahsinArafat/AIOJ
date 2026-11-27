@@ -26,7 +26,10 @@ func (b *routerBuilder) mountSocial(r chi.Router) {
 		r.Use(b.gate(feature.KeyGroups))
 		r.Get("/", groupH.List)
 		r.With(middleware.AuthMiddleware(b.jwt)).Post("/join-code", groupH.JoinByCode)
-		r.Get("/{id}", groupH.GetByID)
+		// Optional, not required, auth: an anonymous visitor may hold a link, and
+		// the handler needs the claims to tell a member of a private group from a
+		// stranger.
+		r.With(middleware.OptionalAuthMiddleware(b.jwt)).Get("/{id}", groupH.GetByID)
 		r.Get("/{id}/members", groupH.GetMembers)
 		r.Get("/{id}/contests", groupH.GetContests)
 		r.Group(func(r chi.Router) {
@@ -48,7 +51,7 @@ func (b *routerBuilder) mountSocial(r chi.Router) {
 	r.Route("/api/teams", func(r chi.Router) {
 		r.Use(b.gate(feature.KeyTeams))
 		r.Get("/", teamH.List)
-		r.Get("/{id}", teamH.GetByID)
+		r.With(middleware.OptionalAuthMiddleware(b.jwt)).Get("/{id}", teamH.GetByID)
 		r.Get("/{id}/members", teamH.GetMembers)
 		r.Group(func(r chi.Router) {
 			r.Use(middleware.AuthMiddleware(b.jwt))

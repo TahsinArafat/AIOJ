@@ -153,7 +153,7 @@ POST   /api/groups/                                         security-headers pas
 POST   /api/groups/join-code                                security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
 GET    /api/groups/my                                       security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
 DELETE /api/groups/{id}                                     security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
-GET    /api/groups/{id}                                     security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
+GET    /api/groups/{id}                                     security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
 PUT    /api/groups/{id}                                     security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
 GET    /api/groups/{id}/contests                            security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
 POST   /api/groups/{id}/contests                            security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
@@ -254,7 +254,7 @@ POST   /api/submissions/{id}/skip                           security-headers pas
 GET    /api/teams/                                          security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
 POST   /api/teams/                                          security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
 DELETE /api/teams/{id}                                      security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
-GET    /api/teams/{id}                                      security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
+GET    /api/teams/{id}                                      security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
 PUT    /api/teams/{id}                                      security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
 POST   /api/teams/{id}/invite                               security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
 POST   /api/teams/{id}/join                                 security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
