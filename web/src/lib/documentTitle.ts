@@ -145,3 +145,22 @@ export function titleForPath(pathname: string): string {
     }
     return 'Page not found'
 }
+
+/**
+ * The canonical URL for a pathname.
+ *
+ * `index.html` ships no canonical on purpose: the SPA answers every route from
+ * one file, so a static tag would name one URL as canonical for all of them.
+ * Search engines execute JavaScript, so the tag is added at runtime instead —
+ * which is what makes an entity page canonical to itself rather than to the shell.
+ *
+ * The query string and hash are dropped: both are view state here (`?sort=`,
+ * `#settings`) and robots.txt already disallows the query forms. Returns ''
+ * without an origin, which is the case outside a browser.
+ */
+export function canonicalHref(pathname: string, origin: string): string {
+    const base = origin.trim().replace(/\/+$/, '')
+    if (!base) return ''
+    const path = pathname || '/'
+    return base + (path.startsWith('/') ? path : `/${path}`)
+}

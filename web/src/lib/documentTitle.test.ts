@@ -1,6 +1,6 @@
 import { renderHook } from '@testing-library/react'
 import { expect, test, beforeEach } from 'vitest'
-import { formatTitle, titleForPath, useDocumentTitle } from './documentTitle'
+import { canonicalHref, formatTitle, titleForPath, useDocumentTitle } from './documentTitle'
 
 beforeEach(() => {
     document.title = 'AIOJ — Online Judge'
@@ -76,4 +76,26 @@ test('useDocumentTitle ignores an empty title', () => {
 
     renderHook(() => useDocumentTitle('   '))
     expect(document.title).toBe('AIOJ — Online Judge')
+})
+
+/**
+ * The canonical has to be absolute and has to name the entity's own route.
+ * index.html ships none, so this is the only thing telling a crawler that
+ * /contests/aioj-round-1 is not a duplicate of the site root.
+ */
+test('canonicalHref builds an absolute self-referencing URL', () => {
+    expect(canonicalHref('/contests/aioj-round-1', 'https://aioj0.cyou')).toBe(
+        'https://aioj0.cyou/contests/aioj-round-1'
+    )
+    expect(canonicalHref('/', 'https://aioj0.cyou')).toBe('https://aioj0.cyou/')
+})
+
+test('canonicalHref drops a trailing slash on the origin', () => {
+    expect(canonicalHref('/problems/hello', 'https://aioj0.cyou/')).toBe(
+        'https://aioj0.cyou/problems/hello'
+    )
+})
+
+test('canonicalHref is empty without an origin', () => {
+    expect(canonicalHref('/problems/hello', '')).toBe('')
 })
