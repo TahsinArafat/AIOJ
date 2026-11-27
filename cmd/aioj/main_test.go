@@ -10,26 +10,30 @@ import (
 // The card resolver only claims the exact two-segment detail route. A prefix
 // match would hand the scoreboard and per-problem routes the contest's own
 // canonical URL, telling crawlers those pages are duplicates of the round.
-func TestContestPathID(t *testing.T) {
+func TestEntityPathID(t *testing.T) {
 	cases := []struct {
-		path string
-		want string
-		ok   bool
+		path   string
+		prefix string
+		want   string
+		ok     bool
 	}{
-		{"/contests/aioj-round-1", "aioj-round-1", true},
-		{"/contests/42", "42", true},
-		{"/contests/", "", false},
-		{"/contests", "", false},
-		{"/contests/aioj-round-1/scoreboard", "", false},
-		{"/contests/aioj-round-1/plagiarism", "", false},
-		{"/contests/aioj-round-1/problem/A", "", false},
-		{"/problems/hello", "", false},
-		{"/", "", false},
+		{"/contests/aioj-round-1", "/contests/", "aioj-round-1", true},
+		{"/contests/42", "/contests/", "42", true},
+		{"/contests/", "/contests/", "", false},
+		{"/contests", "/contests/", "", false},
+		{"/contests/aioj-round-1/scoreboard", "/contests/", "", false},
+		{"/contests/aioj-round-1/plagiarism", "/contests/", "", false},
+		{"/contests/aioj-round-1/problem/A", "/contests/", "", false},
+		{"/blog/0f2c-4a", "/blog/", "0f2c-4a", true},
+		{"/blog/0f2c-4a/comments", "/blog/", "", false},
+		{"/editorials/abc", "/editorials/", "abc", true},
+		{"/problems/hello", "/contests/", "", false},
+		{"/", "/contests/", "", false},
 	}
 	for _, c := range cases {
-		got, ok := contestPathID(c.path)
+		got, ok := entityPathID(c.path, c.prefix)
 		if got != c.want || ok != c.ok {
-			t.Errorf("contestPathID(%q) = (%q, %v), want (%q, %v)", c.path, got, ok, c.want, c.ok)
+			t.Errorf("entityPathID(%q, %q) = (%q, %v), want (%q, %v)", c.path, c.prefix, got, ok, c.want, c.ok)
 		}
 	}
 }

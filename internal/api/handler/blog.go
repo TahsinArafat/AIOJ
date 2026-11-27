@@ -57,7 +57,10 @@ func (h *BlogHandler) CreatePost(w http.ResponseWriter, r *http.Request) {
 
 func (h *BlogHandler) GetPost(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	p, err := h.store.GetPostByID(r.Context(), id)
+	// The public read: an invisible or not-yet-published post answers 404 here
+	// even though it exists. UpdatePost and DeletePost keep using the unfiltered
+	// getter so an author can still open a draft to edit it.
+	p, err := h.store.GetPublicPostByID(r.Context(), id)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return

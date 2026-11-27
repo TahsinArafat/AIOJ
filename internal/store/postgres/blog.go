@@ -47,6 +47,39 @@ func (s *BlogStore) GetPostByID(ctx context.Context, id string) (*model.BlogPost
 	return &p, nil
 }
 
+// GetPublicPostByID is GetPostByID with the visibility rule from migration 000058
+// applied in SQL: a visible post whose publish_on has arrived, where a NULL
+// publish_on means "publish immediately". ListPosts and the Atom feed already
+// filter this way; the single-post read did not, so an invisible or
+// not-yet-published post was readable by anyone who knew its id.
+//
+// A separate method rather than a filter on GetPostByID because UpdatePost and
+// DeletePost read through that one, and an author has to be able to open a draft.
+func (s *BlogStore) GetPublicPostByID(ctx context.Context, id string) (*model.BlogPost, error) {
+	if _, err := uuid.Parse(id); err != nil {
+		return nil, nil
+	}
+	var p model.BlogPost
+	var tags []string
+	err := s.db.QueryRowContext(ctx,
+		`SELECT bp.id, bp.user_id, u.username, bp.title, bp.content, bp.tags, bp.upvotes, bp.downvotes,
+		        bp.comment_count, bp.is_pinned, bp.created_at, bp.updated_at
+		 FROM blog_posts bp JOIN users u ON bp.user_id = u.id
+		 WHERE bp.id = $1
+		   AND COALESCE(bp.visible, true) = true
+		   AND COALESCE(bp.publish_on, bp.created_at) <= now()`,
+		id).Scan(&p.ID, &p.UserID, &p.Username, &p.Title, &p.Content, pq.Array(&tags),
+		&p.Upvotes, &p.Downvotes, &p.CommentCount, &p.IsPinned, &p.CreatedAt, &p.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	p.Tags = tags
+	return &p, nil
+}
+
 func (s *BlogStore) ListPosts(ctx context.Context, offset, limit int, tag string) ([]model.BlogListItem, int, error) {
 	var total int
 	// Match the feed's rule (migration 000058): only visible posts whose

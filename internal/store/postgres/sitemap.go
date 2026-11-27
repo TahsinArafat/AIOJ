@@ -101,6 +101,76 @@ func (s *SitemapStore) PublicContests(ctx context.Context, origin string) ([]Sit
 	return out, rows.Err()
 }
 
+// PublicBlogPosts returns published blog posts worth crawling.
+//
+// The predicate is the same one ListPosts and the Atom feed use (migration
+// 000058): visible, and publish_on arrived, where a NULL publish_on means
+// "publish immediately". A scheduled or hidden post must not be advertised to a
+// crawler even though it exists.
+func (s *SitemapStore) PublicBlogPosts(ctx context.Context, origin string) ([]SitemapEntry, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT bp.id, COALESCE(bp.updated_at, bp.created_at)
+		   FROM blog_posts bp
+		  WHERE COALESCE(bp.visible, true) = true
+		    AND COALESCE(bp.publish_on, bp.created_at) <= now()
+		  ORDER BY bp.created_at DESC
+		  LIMIT 50000`)
+	if err != nil {
+		return nil, fmt.Errorf("sitemap blog posts: %w", err)
+	}
+	defer rows.Close()
+
+	out := []SitemapEntry{}
+	for rows.Next() {
+		var id string
+		var lastMod time.Time
+		if err := rows.Scan(&id, &lastMod); err != nil {
+			return nil, fmt.Errorf("scan sitemap blog post: %w", err)
+		}
+		out = append(out, SitemapEntry{
+			Location:   origin + "/blog/" + id,
+			LastMod:    lastMod,
+			ChangeFreq: "monthly",
+			Priority:   "0.5",
+		})
+	}
+	return out, rows.Err()
+}
+
+// PublicEditorials returns editorials whose round has ended.
+//
+// editorialVisible is the same SQL function EditorialStore.GetByID filters on, so
+// the sitemap and the page agree: an editorial for a round still running is not
+// published, and listing it would point a crawler at a 404.
+func (s *SitemapStore) PublicEditorials(ctx context.Context, origin string) ([]SitemapEntry, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT e.id, COALESCE(e.updated_at, e.created_at)
+		   FROM editorials e
+		  WHERE editorialVisible(e.contest_id)
+		  ORDER BY e.created_at DESC
+		  LIMIT 50000`)
+	if err != nil {
+		return nil, fmt.Errorf("sitemap editorials: %w", err)
+	}
+	defer rows.Close()
+
+	out := []SitemapEntry{}
+	for rows.Next() {
+		var id string
+		var lastMod time.Time
+		if err := rows.Scan(&id, &lastMod); err != nil {
+			return nil, fmt.Errorf("scan sitemap editorial: %w", err)
+		}
+		out = append(out, SitemapEntry{
+			Location:   origin + "/editorials/" + id,
+			LastMod:    lastMod,
+			ChangeFreq: "monthly",
+			Priority:   "0.5",
+		})
+	}
+	return out, rows.Err()
+}
+
 // PublicUsers returns user profiles worth crawling.
 //
 // Ported from dmoj's judge/sitemap.py UserSitemap. dmoj indexes every user; here

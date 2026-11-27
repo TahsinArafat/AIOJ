@@ -715,23 +715,56 @@ schema is unrecoverable.`, err)
 					// Only entity detail routes carry their own name. A listing page
 					// (/contests, /blog) has no single title to show, so it keeps the
 					// site card.
-					id, ok := contestPathID(path)
-					if !ok {
-						return nil, nil
+					if id, ok := entityPathID(path, "/contests/"); ok {
+						c, err := contestStore.GetByID(ctx, id)
+						if err != nil {
+							return nil, err
+						}
+						// The same predicate as the sitemap's PublicContests: a round a
+						// crawler may be told about is one it may also preview. A nil
+						// card degrades to the site card rather than 404ing, because
+						// unlike a problem slug an unknown contest id is an ordinary SPA
+						// route.
+						if c == nil || !c.Visible || c.PasswordHash != "" || c.GroupID != "" {
+							return nil, nil
+						}
+						return contestShareCard(c), nil
 					}
-					c, err := contestStore.GetByID(ctx, id)
-					if err != nil {
-						return nil, err
+					if id, ok := entityPathID(path, "/blog/"); ok {
+						// GetPublicPostByID applies the visibility rule in SQL, so an
+						// invisible or scheduled post is never described to a crawler.
+						p, err := blogStore.GetPublicPostByID(ctx, id)
+						if err != nil {
+							return nil, err
+						}
+						if p == nil {
+							return nil, nil
+						}
+						return &handler.ShareCard{
+							Title:       p.Title,
+							Description: p.Content,
+							Path:        "/blog/" + p.ID,
+							Kind:        "article",
+						}, nil
 					}
-					// The same predicate as the sitemap's PublicContests: a round a
-					// crawler may be told about is one it may also preview. A nil
-					// card degrades to the site card rather than 404ing, because
-					// unlike a problem slug an unknown contest id is an ordinary SPA
-					// route.
-					if c == nil || !c.Visible || c.PasswordHash != "" || c.GroupID != "" {
-						return nil, nil
+					if id, ok := entityPathID(path, "/editorials/"); ok {
+						// The store's own query filters on editorialVisible(contest_id),
+						// so an editorial for a round still running stays unpublished.
+						e, err := editorialStore.GetByID(ctx, id)
+						if err != nil {
+							return nil, err
+						}
+						if e == nil {
+							return nil, nil
+						}
+						return &handler.ShareCard{
+							Title:       e.Title,
+							Description: e.Content,
+							Path:        "/editorials/" + e.ID,
+							Kind:        "article",
+						}, nil
 					}
-					return contestShareCard(c), nil
+					return nil, nil
 				},
 				ProblemCard: func(ctx context.Context, slug string) (*handler.ShareCard, error) {
 					m, err := problemMetaStore.GetBySlug(ctx, slug)
@@ -783,10 +816,12 @@ schema is unrecoverable.`, err)
 					sections, _ := cache.Get(func() ([]handler.SitemapSection, error) {
 						problems, errProblems := sitemapStore.PublicProblems(ctx, origin)
 						contests, errContests := sitemapStore.PublicContests(ctx, origin)
+						blogPosts, errBlog := sitemapStore.PublicBlogPosts(ctx, origin)
+						editorials, errEditorials := sitemapStore.PublicEditorials(ctx, origin)
 						users, errUsers := sitemapStore.PublicUsers(ctx, origin)
 						// If any section errored, propagate so the caller can 500
 						// rather than serve a silently incomplete sitemap.
-						for _, e := range []error{errProblems, errContests, errUsers} {
+						for _, e := range []error{errProblems, errContests, errBlog, errEditorials, errUsers} {
 							if e != nil {
 								return nil, e
 							}
@@ -794,6 +829,8 @@ schema is unrecoverable.`, err)
 						return []handler.SitemapSection{
 							{Name: "problems", URLs: toURLs(problems)},
 							{Name: "contests", URLs: toURLs(contests)},
+							{Name: "blog", URLs: toURLs(blogPosts)},
+							{Name: "editorials", URLs: toURLs(editorials)},
 							{Name: "users", URLs: toURLs(users)},
 							// Static pages: always present, no store to fail.
 							{Name: "legal", URLs: handler.LegalSitemapURLs(origin)},
@@ -999,12 +1036,12 @@ func shareCardFacts(m *postgres.ProblemMeta) []string {
 	return facts
 }
 
-// contestPathID extracts the contest id from a detail path like
-// "/contests/aioj-round-1". Only the exact two-segment form matches: the
-// scoreboard, plagiarism and per-problem routes carry more segments and have no
-// single entity name of their own, so they keep the site card.
-func contestPathID(path string) (string, bool) {
-	rest, ok := strings.CutPrefix(path, "/contests/")
+// entityPathID extracts the id from an entity detail path like
+// "/contests/aioj-round-1" given its prefix. Only the exact two-segment form
+// matches: the scoreboard, plagiarism and per-problem routes carry more segments
+// and have no single entity name of their own, so they keep the site card.
+func entityPathID(path, prefix string) (string, bool) {
+	rest, ok := strings.CutPrefix(path, prefix)
 	if !ok || rest == "" || strings.Contains(rest, "/") {
 		return "", false
 	}

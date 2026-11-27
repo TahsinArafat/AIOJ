@@ -596,6 +596,11 @@ type TeamStore interface {
 type BlogStore interface {
 	CreatePost(ctx context.Context, p *model.BlogPost) error
 	GetPostByID(ctx context.Context, id string) (*model.BlogPost, error)
+	// GetPublicPostByID applies the visibility rule in SQL: only a visible post
+	// whose publish_on has arrived. GetPostByID stays unfiltered because
+	// UpdatePost and DeletePost read through it and an author must be able to
+	// edit a draft.
+	GetPublicPostByID(ctx context.Context, id string) (*model.BlogPost, error)
 	ListPosts(ctx context.Context, offset, limit int, tag string) ([]model.BlogListItem, int, error)
 	ListByUser(ctx context.Context, userID string, offset, limit int) ([]model.BlogListItem, int, error)
 	GetCommentsByUser(ctx context.Context, userID string, offset, limit int) ([]model.Comment, int, error)
