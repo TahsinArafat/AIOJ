@@ -1,12 +1,17 @@
 package handler
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/tahsinarafat/aioj/internal/api/middleware"
+	"github.com/tahsinarafat/aioj/internal/auth"
 	"github.com/tahsinarafat/aioj/internal/model"
 	"github.com/tahsinarafat/aioj/internal/store"
 )
@@ -143,6 +148,105 @@ func (h *EditorialHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	items, total, _ := h.store.List(r.Context(), offset, limit)
 	respondJSON(w, http.StatusOK, map[string]interface{}{"data": items, "total": total})
+}
+
+// canManageEditorial reports whether the caller may rewrite or remove this
+// editorial: an admin, its author, or someone who can author the problem it
+// belongs to. canReadProblem is deliberately not enough — reading a problem is
+// not authoring for it.
+//
+// The problem's creator is checked against CreatedBy, not left to HasAccess:
+// HasAccess reads problem_permissions, which does not necessarily hold a row for
+// the creator, so relying on it alone would lock an owner out of their own draft.
+func (h *EditorialHandler) canManageEditorial(ctx context.Context, e *model.Editorial, claims *auth.Claims) bool {
+	if claims.Role == "admin" || e.UserID == claims.UserID {
+		return true
+	}
+	p, err := h.problemStore.GetByID(ctx, e.ProblemID)
+	if err != nil || p == nil {
+		return false
+	}
+	if p.CreatedBy == claims.UserID {
+		return true
+	}
+	return h.problemStore.HasAccess(ctx, e.ProblemID, claims.UserID, "owner", "co_author")
+}
+
+// Update rewrites one editorial's prose and solution fields. Ownership of the
+// row is what grants the right, so an author can fix their own editorial
+// without holding a role on the problem.
+func (h *EditorialHandler) Update(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r)
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	existing, err := h.store.GetForManage(r.Context(), chi.URLParam(r, "id"))
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	// A row the caller may not manage is reported as absent, so the endpoint
+	// cannot be used to probe for editorial ids.
+	if existing == nil || !h.canManageEditorial(r.Context(), existing, claims) {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	var req model.CreateEditorialRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	if strings.TrimSpace(req.Title) == "" || strings.TrimSpace(req.Content) == "" {
+		http.Error(w, "title and content are required", http.StatusBadRequest)
+		return
+	}
+
+	existing.Title = req.Title
+	existing.Content = req.Content
+	existing.Approach = req.Approach
+	existing.SolutionCode = req.SolutionCode
+	existing.SolutionLanguage = req.SolutionLanguage
+	existing.TimeComplexity = req.TimeComplexity
+	existing.SpaceComplexity = req.SpaceComplexity
+
+	if err := h.store.Update(r.Context(), existing); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "update failed", http.StatusInternalServerError)
+		return
+	}
+	respondJSON(w, http.StatusOK, existing)
+}
+
+// Delete removes one editorial. Same ownership rule as Update.
+func (h *EditorialHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.GetUserClaims(r)
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	existing, err := h.store.GetForManage(r.Context(), chi.URLParam(r, "id"))
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if existing == nil || !h.canManageEditorial(r.Context(), existing, claims) {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if err := h.store.Delete(r.Context(), existing.ID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "delete failed", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // UpsertSolution creates or updates the official reference solution for a

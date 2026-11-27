@@ -162,6 +162,54 @@ paths:
           description: Saved
         "403":
           description: Not owner, admin, or co-author
+  /api/editorials/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string } }
+    put:
+      tags: [editorials]
+      summary: Edit an editorial
+      description: >
+        Rewrites the prose and solution fields of one editorial. Does not move it
+        to another problem, and does not change is_official — that flag decides who
+        may read it, so it is set at creation. Allowed for an admin, the
+        editorial's author, or a problem owner/co-author; anyone else gets 404
+        rather than 403, so the endpoint cannot be used to probe for ids.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, content]
+              properties:
+                title: { type: string }
+                content: { type: string }
+                approach: { type: string }
+                solution_code: { type: string }
+                solution_language: { type: string }
+                time_complexity: { type: string }
+                space_complexity: { type: string }
+      responses:
+        "200":
+          description: Updated editorial
+        "400":
+          description: Title or content is empty
+        "404":
+          description: No such editorial, or the caller may not manage it
+    delete:
+      tags: [editorials]
+      summary: Delete an editorial
+      description: >
+        Removes one editorial. Same ownership rule as the PUT on this path.
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: No such editorial, or the caller may not manage it
 components:
   securitySchemes:
     bearerAuth:

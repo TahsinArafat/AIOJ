@@ -615,7 +615,15 @@ type BlogStore interface {
 
 type EditorialStore interface {
 	Create(ctx context.Context, e *model.Editorial) error
+	// Update rewrites the editable prose and solution fields of one editorial.
+	// Scoped by id; authorization is the handler's job, not the store's.
+	Update(ctx context.Context, e *model.Editorial) error
+	Delete(ctx context.Context, id string) error
 	GetByID(ctx context.Context, id string) (*model.Editorial, error)
+	// GetForManage reads one editorial without the editorialVisible() filter.
+	// GetByID answers "may this reader see it", which is the wrong question for
+	// an author editing their own editorial on a contest that has not ended yet.
+	GetForManage(ctx context.Context, id string) (*model.Editorial, error)
 	GetByProblem(ctx context.Context, problemID string) ([]model.Editorial, error)
 	GetOfficialSolution(ctx context.Context, problemID string) (*model.Editorial, error)
 	List(ctx context.Context, offset, limit int) ([]model.Editorial, int, error)

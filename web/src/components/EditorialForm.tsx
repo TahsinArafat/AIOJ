@@ -1,23 +1,40 @@
 import { useState } from 'react'
 import { api } from '../lib/api'
 import MarkdownContent from './MarkdownContent'
+import RichTextField from './RichTextField'
 
 interface EditorialFormProps {
   problemId: string
   isUserAdmin: boolean
+  /**
+   * Existing editorial to edit. When present the form submits an update instead
+   * of a create, and the title/body fields start from its values.
+   */
+  editorial?: {
+    id: string
+    title: string
+    content: string
+    approach?: string
+    solution_code?: string
+    solution_language?: string
+    time_complexity?: string
+    space_complexity?: string
+    is_official?: boolean
+  }
   onSuccess: () => void
   onCancel?: () => void
 }
 
-export default function EditorialForm({ problemId, isUserAdmin, onSuccess, onCancel }: EditorialFormProps) {
-  const [title, setTitle] = useState('')
-  const [content, setContent] = useState('')
-  const [approach, setApproach] = useState('')
-  const [solutionCode, setSolutionCode] = useState('')
-  const [solutionLanguage, setSolutionLanguage] = useState('cpp')
-  const [timeComplexity, setTimeComplexity] = useState('')
-  const [spaceComplexity, setSpaceComplexity] = useState('')
-  const [isOfficial, setIsOfficial] = useState(false)
+export default function EditorialForm({ problemId, isUserAdmin, editorial, onSuccess, onCancel }: EditorialFormProps) {
+  const editing = Boolean(editorial)
+  const [title, setTitle] = useState(editorial?.title ?? '')
+  const [content, setContent] = useState(editorial?.content ?? '')
+  const [approach, setApproach] = useState(editorial?.approach ?? '')
+  const [solutionCode, setSolutionCode] = useState(editorial?.solution_code ?? '')
+  const [solutionLanguage, setSolutionLanguage] = useState(editorial?.solution_language || 'cpp')
+  const [timeComplexity, setTimeComplexity] = useState(editorial?.time_complexity ?? '')
+  const [spaceComplexity, setSpaceComplexity] = useState(editorial?.space_complexity ?? '')
+  const [isOfficial, setIsOfficial] = useState(editorial?.is_official ?? false)
   const [showPreview, setShowPreview] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -31,8 +48,7 @@ export default function EditorialForm({ problemId, isUserAdmin, onSuccess, onCan
     setSubmitting(true)
     setError(null)
     try {
-      await api.editorials.create({
-        problem_id: problemId,
+      const payload = {
         title: title.trim(),
         content: content.trim(),
         approach: approach.trim() || undefined,
@@ -40,11 +56,19 @@ export default function EditorialForm({ problemId, isUserAdmin, onSuccess, onCan
         solution_language: solutionLanguage || undefined,
         time_complexity: timeComplexity.trim() || undefined,
         space_complexity: spaceComplexity.trim() || undefined,
-        is_official: isUserAdmin ? isOfficial : false,
-      })
+      }
+      if (editorial) {
+        await api.editorials.update(editorial.id, payload)
+      } else {
+        await api.editorials.create({
+          problem_id: problemId,
+          ...payload,
+          is_official: isUserAdmin ? isOfficial : false,
+        })
+      }
       onSuccess()
     } catch (err) {
-      setError((err instanceof Error ? err.message : '') || 'Failed to submit editorial.')
+      setError((err instanceof Error ? err.message : '') || `Failed to ${editing ? 'update' : 'submit'} editorial.`)
     } finally {
       setSubmitting(false)
     }
@@ -67,19 +91,19 @@ export default function EditorialForm({ problemId, isUserAdmin, onSuccess, onCan
       </div>
 
       <div>
-        <label className="block font-medium text-ink-soft mb-1">Approach Description</label>
-        <textarea aria-label="Approach Description"
+        <p className="block font-medium text-ink-soft mb-1">Approach Description</p>
+        <RichTextField
+          ariaLabel="Approach Description"
           value={approach}
-          onChange={e => setApproach(e.target.value)}
+          onChange={setApproach}
           rows={3}
-          className="w-full border rounded px-3 py-2 bg-surface dark:border-gray-700"
           placeholder="Briefly summarize the logic/approach..."
         />
       </div>
 
       <div>
         <div className="flex items-center justify-between mb-1">
-          <label className="block font-medium text-ink-soft">Editorial Content (Markdown + LaTeX) *</label>
+          <p className="block font-medium text-ink-soft">Editorial Content (Markdown + LaTeX) *</p>
           <button type="button" onClick={() => setShowPreview(v => !v)} className="text-xs text-brand hover:underline">
             {showPreview ? 'Write' : 'Preview'}
           </button>
@@ -91,12 +115,12 @@ export default function EditorialForm({ problemId, isUserAdmin, onSuccess, onCan
               : <p className="text-muted-soft italic">Nothing to preview yet.</p>}
           </div>
         ) : (
-          <textarea aria-label="Editorial Content (Markdown + LaTeX)"
+          <RichTextField
+            ariaLabel="Editorial Content (Markdown + LaTeX)"
             value={content}
-            onChange={e => setContent(e.target.value)}
+            onChange={setContent}
             rows={6}
             required
-            className="w-full border rounded px-3 py-2 bg-surface dark:border-gray-700 font-mono"
             placeholder="Detailed explanation, proofs, cases... Use $...$ for inline math and $$...$$ for display math."
           />
         )}
@@ -155,7 +179,10 @@ export default function EditorialForm({ problemId, isUserAdmin, onSuccess, onCan
         />
       </div>
 
-      {isUserAdmin && (
+      {/* Promotion to official is a create-time decision; the update endpoint
+          deliberately does not touch `is_official`, because that flag controls
+          who may read the editorial. */}
+      {isUserAdmin && !editing && (
         <div className="flex items-center gap-2">
           <input
             type="checkbox"
@@ -184,7 +211,9 @@ export default function EditorialForm({ problemId, isUserAdmin, onSuccess, onCan
           disabled={submitting}
           className="bg-brand hover:bg-brand-hover text-on-brand px-4 py-2 rounded font-medium disabled:opacity-50"
         >
-          {submitting ? 'Submitting...' : 'Save Editorial'}
+          {submitting
+            ? (editing ? 'Saving...' : 'Submitting...')
+            : (editing ? 'Save Changes' : 'Save Editorial')}
         </button>
       </div>
     </form>

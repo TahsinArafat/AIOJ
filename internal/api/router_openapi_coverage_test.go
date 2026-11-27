@@ -28,10 +28,10 @@ import (
  */
 
 // undocumentedRouteCeiling is the largest number of mounted paths that may be
-// absent from the OpenAPI document. Measured, not guessed: 234 paths are
-// mounted and the spec documents 5, so the honest starting point is 230. Lower
-// it as the spec grows; it must never rise.
-const undocumentedRouteCeiling = 230
+// absent from the OpenAPI document. Measured, not guessed: 235 paths are
+// mounted and the spec documents 7, so the honest figure is 229. Lower it as
+// the spec grows; it must never rise.
+const undocumentedRouteCeiling = 229
 
 // openAPIPathRe matches a path key in the YAML document ("  /api/health:").
 var openAPIPathRe = regexp.MustCompile(`(?m)^\s{2}(/\S*):\s*$`)

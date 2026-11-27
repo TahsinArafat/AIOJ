@@ -30,6 +30,8 @@ func (b *routerBuilder) mountContent(r chi.Router) {
 			r.Use(middleware.AuthMiddleware(b.jwt))
 			r.Post("/", editorialH.Create)
 			r.Put("/problem/{problemId}/solution", editorialH.UpsertSolution)
+			r.Put("/{id}", editorialH.Update)
+			r.Delete("/{id}", editorialH.Delete)
 		})
 	})
 

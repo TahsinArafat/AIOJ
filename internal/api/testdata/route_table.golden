@@ -149,7 +149,9 @@ POST   /api/editorials/                                     security-headers pas
 GET    /api/editorials/problem/{problemId}                  security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
 GET    /api/editorials/problem/{problemId}/solution         security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
 PUT    /api/editorials/problem/{problemId}/solution         security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
+DELETE /api/editorials/{id}                                 security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
 GET    /api/editorials/{id}                                 security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
+PUT    /api/editorials/{id}                                 security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
 GET    /api/groups/                                         security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through
 POST   /api/groups/                                         security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required
 POST   /api/groups/join-code                                security-headers pass-through pass-through pass-through pass-through pass-through pass-through pass-through pass-through auth-required

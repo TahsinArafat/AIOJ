@@ -62,6 +62,70 @@ func (s *EditorialStore) UpsertOfficialSolution(ctx context.Context, e *model.Ed
 	return err
 }
 
+// Update rewrites the editable fields of one editorial. `problem_id`,
+// `contest_id` and `is_official` are deliberately not written: moving an
+// editorial to another problem or promoting it to official changes who may read
+// it, which is a decision this endpoint is not the place to make.
+func (s *EditorialStore) Update(ctx context.Context, e *model.Editorial) error {
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE editorials
+		 SET title=$2, content=$3, solution_code=$4, solution_language=$5,
+		     approach=$6, time_complexity=$7, space_complexity=$8, updated_at=NOW()
+		 WHERE id=$1`,
+		e.ID, e.Title, e.Content, e.SolutionCode, e.SolutionLanguage,
+		e.Approach, e.TimeComplexity, e.SpaceComplexity)
+	if err != nil {
+		return err
+	}
+	// A caller passing an unknown id would otherwise get a silent 200 for a row
+	// that does not exist.
+	if n, err := res.RowsAffected(); err == nil && n == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
+func (s *EditorialStore) Delete(ctx context.Context, id string) error {
+	if _, err := uuid.Parse(id); err != nil {
+		return sql.ErrNoRows
+	}
+	res, err := s.db.ExecContext(ctx, `DELETE FROM editorials WHERE id=$1`, id)
+	if err != nil {
+		return err
+	}
+	if n, err := res.RowsAffected(); err == nil && n == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
+// GetForManage returns an editorial regardless of editorialVisible(). The
+// visibility rule answers "may this reader see it", and a contest editorial is
+// hidden until the round ends — but its author still has to be able to fix a
+// typo in it. Authorization happens in the handler, on the row this returns.
+func (s *EditorialStore) GetForManage(ctx context.Context, id string) (*model.Editorial, error) {
+	if _, err := uuid.Parse(id); err != nil {
+		return nil, nil
+	}
+	var e model.Editorial
+	err := s.db.QueryRowContext(ctx,
+		`SELECT e.id, e.problem_id, e.contest_id, e.user_id, e.title, e.content,
+		        e.solution_code, e.solution_language, e.approach, e.time_complexity,
+		        e.space_complexity, e.is_official, e.created_at, e.updated_at
+		 FROM editorials e
+		 WHERE e.id = $1`,
+		id).Scan(&e.ID, &e.ProblemID, &e.ContestID, &e.UserID, &e.Title, &e.Content,
+		&e.SolutionCode, &e.SolutionLanguage, &e.Approach, &e.TimeComplexity,
+		&e.SpaceComplexity, &e.IsOfficial, &e.CreatedAt, &e.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &e, nil
+}
+
 func (s *EditorialStore) GetByID(ctx context.Context, id string) (*model.Editorial, error) {
 	if _, err := uuid.Parse(id); err != nil {
 		return nil, nil

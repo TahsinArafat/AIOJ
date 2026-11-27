@@ -1170,6 +1170,9 @@ export const api = {
         get: (id: string) => request<Editorial>(`/editorials/${id}`),
         getByProblem: (problemId: string) => request<{ data: Editorial[] }>(`/editorials/problem/${problemId}`),
         create: (d: unknown) => request<Editorial>('/editorials', { method: 'POST', body: JSON.stringify(d) }),
+        update: (id: string, d: unknown) =>
+            request<Editorial>(`/editorials/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
+        delete: (id: string) => request(`/editorials/${id}`, { method: 'DELETE' }),
         getSolution: (problemId: string) => request<Editorial>(`/editorials/problem/${problemId}/solution`),
         upsertSolution: (problemId: string, d: { solution_code: string; solution_language: string }) =>
             request<Editorial>(`/editorials/problem/${problemId}/solution`, { method: 'PUT', body: JSON.stringify(d) }),
