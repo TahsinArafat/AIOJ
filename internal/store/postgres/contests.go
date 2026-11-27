@@ -60,11 +60,11 @@ func (s *ContestStore) Create(ctx context.Context, c *model.Contest) error {
 	err = tx.QueryRowContext(ctx,
 		`INSERT INTO contests(id,slug,title,type,format,format_config,start_time,end_time,freeze_time,password_hash,visible,description,
 		                    registration_required,registration_deadline,max_participants,division,educational_config,created_by,
-		                    status,is_rated,rated_for_min,rated_for_max,access_config,listed)
-		 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24) RETURNING created_at`,
+		                    status,is_rated,rated_for_min,rated_for_max,access_config,listed,proposed_rated)
+		 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25) RETURNING created_at`,
 		c.ID, slug, c.Title, c.Type, c.Format, formatConfigJSON, c.StartTime, c.EndTime, c.FreezeTime, c.PasswordHash, c.Visible, c.Description,
 		c.RegistrationRequired, c.RegistrationDeadline, c.MaxParticipants, c.Division, configJSON, c.CreatedBy,
-		c.Status, c.IsRated, c.RatedForMin, c.RatedForMax, accessConfigJSON, c.Listed,
+		c.Status, c.IsRated, c.RatedForMin, c.RatedForMax, accessConfigJSON, c.Listed, c.ProposedRated,
 	).Scan(&c.CreatedAt)
 	if err != nil {
 		return err
@@ -117,6 +117,7 @@ func (s *ContestStore) getByWhere(ctx context.Context, where string, args ...int
 		        COALESCE(status,'draft'), COALESCE(review_note,''),
 		        COALESCE(is_rated,true), COALESCE(rated_for_min,0), COALESCE(rated_for_max,9999),
 		        access_config, listed, COALESCE(rating_voided,false),
+		        COALESCE(proposed_rated,true),
 		        (SELECT group_id::text FROM group_contests WHERE contest_id = id LIMIT 1) AS group_id
 		 FROM contests WHERE `+where, args...).Scan(
 		&c.ID, &c.DisplayID, &slug, &c.Title, &c.Type, &c.Format, &formatConfigJSON, &c.StartTime, &c.EndTime, &c.FreezeTime,
@@ -125,7 +126,8 @@ func (s *ContestStore) getByWhere(ctx context.Context, where string, args ...int
 		&c.Division, &configJSON,
 		&c.UpsolvingEnabled, &c.VirtualContestEnabled, &c.PDFEnabled, &c.StatementHidden,
 		&c.CreatedBy, &c.CreatedAt, &c.Status, &c.ReviewNote,
-		&c.IsRated, &c.RatedForMin, &c.RatedForMax, &accessConfigJSON, &c.Listed, &c.RatingVoided, &groupID)
+		&c.IsRated, &c.RatedForMin, &c.RatedForMax, &accessConfigJSON, &c.Listed, &c.RatingVoided,
+		&c.ProposedRated, &groupID)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -268,6 +270,18 @@ func (s *ContestStore) Update(ctx context.Context, c *model.Contest) error {
 	if c.Status == "" {
 		c.Status = model.ContestStatusDraft
 	}
+	// is_rated is likewise not writable here: whether a round moves the global
+	// leaderboard is an admin's verdict, and a settings save that could write the
+	// column would let an author announce — or withdraw — a rated round with no
+	// review. proposed_rated is what the author asks for and SetReviewState is what
+	// resolves it, so it is written below rather than in this statement.
+	// rated_for_min/max stay writable: they only bound which entrants of an already
+	// rated round count.
+	//
+	// The two statements run in one transaction: a save that wrote the settings and
+	// then failed on the proposal would leave the round's rating answering to a
+	// value nobody saved.
+	//
 	// Every placeholder must be both referenced and supplied. This statement
 	// once carried visible=$10 while also deriving visible from status, which
 	// left $10 dangling: Postgres cannot infer the type of a parameter that
@@ -284,40 +298,74 @@ func (s *ContestStore) Update(ctx context.Context, c *model.Contest) error {
 	if err != nil {
 		return fmt.Errorf("marshal access_config: %w", err)
 	}
-	_, err = s.db.ExecContext(ctx,
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	_, err = tx.ExecContext(ctx,
 		`UPDATE contests SET title=$1, type=$2, format=$3, format_config=$4, start_time=$5, end_time=$6,
 	 freeze_time=$7, password_hash=$8, description=$9, pdf_enabled=$10, statement_hidden=$11,
-	 slug=$13, upsolving_enabled=$14, virtual_contest_enabled=$15,
-	 visible=($16::varchar='published'), status=$16, is_rated=$17, rated_for_min=$18, rated_for_max=$19,
-	 registration_required=$20, registration_deadline=$21, max_participants=$22, division=$23,
-	 access_config=$24, listed=$25
-	 WHERE id=$12`,
+	 slug=$12, upsolving_enabled=$13, virtual_contest_enabled=$14,
+	 visible=($15::varchar='published'), status=$15, rated_for_min=$16, rated_for_max=$17,
+	 registration_required=$18, registration_deadline=$19, max_participants=$20, division=$21,
+	 access_config=$22, listed=$23
+	 WHERE id=$24`,
 		c.Title, c.Type, c.Format, formatConfigJSON, c.StartTime, c.EndTime, c.FreezeTime, c.PasswordHash, c.Description,
-		c.PDFEnabled, c.StatementHidden, c.ID, slug, c.UpsolvingEnabled, c.VirtualContestEnabled,
-		c.Status, c.IsRated, c.RatedForMin, c.RatedForMax,
+		c.PDFEnabled, c.StatementHidden, slug, c.UpsolvingEnabled, c.VirtualContestEnabled,
+		c.Status, c.RatedForMin, c.RatedForMax,
 		c.RegistrationRequired, c.RegistrationDeadline, c.MaxParticipants, c.Division,
-		accessConfigJSON, c.Listed)
+		accessConfigJSON, c.Listed, c.ID)
+	if err != nil {
+		return err
+	}
+	_, err = tx.ExecContext(ctx,
+		`UPDATE contests SET proposed_rated = $2 WHERE id = $1`, c.ID, c.ProposedRated)
 	if err != nil {
 		return err
 	}
 
-	_, _ = s.db.ExecContext(ctx, `DELETE FROM group_contests WHERE contest_id = $1`, c.ID)
+	_, err = tx.ExecContext(ctx, `DELETE FROM group_contests WHERE contest_id = $1`, c.ID)
+	if err != nil {
+		return err
+	}
 	if c.GroupID != "" {
-		_, _ = s.db.ExecContext(ctx, `INSERT INTO group_contests (group_id, contest_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, c.GroupID, c.ID)
+		_, err = tx.ExecContext(ctx,
+			`INSERT INTO group_contests (group_id, contest_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+			c.GroupID, c.ID)
+		if err != nil {
+			return err
+		}
 	}
 
-	return nil
+	return tx.Commit()
 }
 
 // SetReviewState records an admin's verdict on a contest. Publishing is the only
 // thing that makes a round visible, so a proposal cannot go live by itself.
+//
+// Publishing is also what resolves the rating proposal: is_rated takes the value
+// the author asked for at the moment the round becomes public, and stays whatever
+// it was for any other verdict — sending a round back for revision must not
+// silently re-rate it, and a later approval of the same proposal must land on what
+// was asked for rather than on the rejected round's leftover value.
 func (s *ContestStore) SetReviewState(ctx context.Context, id, status, note, reviewerID string) error {
 	_, err := s.db.ExecContext(ctx,
 		`UPDATE contests
 		    SET status=$2, review_note=$3, reviewed_by=NULLIF($4,'')::uuid, reviewed_at=NOW(),
-		        visible=($2::varchar='published')
+		        visible=($2::varchar='published'),
+		        is_rated=CASE WHEN $2::varchar='published' THEN proposed_rated ELSE is_rated END
 		  WHERE id=$1`,
 		id, status, note, reviewerID)
+	return err
+}
+
+// SetProposedRated records what the author asked for, or what the reviewer
+// decided instead. It never touches is_rated: the round's rating changes only when
+// a verdict publishes it, which is what makes the declaration reviewable rather
+// than self-service.
+func (s *ContestStore) SetProposedRated(ctx context.Context, id string, rated bool) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE contests SET proposed_rated = $2 WHERE id = $1`, id, rated)
 	return err
 }
 
@@ -332,7 +380,7 @@ func (s *ContestStore) ListByStatus(ctx context.Context, status string, offset, 
 		        upsolving_enabled,virtual_contest_enabled,pdf_enabled,statement_hidden,created_by,created_at,
 		        COALESCE(status,'draft'), COALESCE(review_note,''),
 		        COALESCE(is_rated,true), COALESCE(rated_for_min,0), COALESCE(rated_for_max,9999),
-		        access_config, listed, COALESCE(rating_voided,false)
+		        access_config, listed, COALESCE(rating_voided,false), COALESCE(proposed_rated,true)
 		   FROM contests WHERE status=$1 ORDER BY created_at ASC OFFSET $2 LIMIT $3`, status, offset, limit)
 	if err != nil {
 		return nil, 0, err
@@ -349,7 +397,8 @@ func (s *ContestStore) ListByStatus(ctx context.Context, status string, offset, 
 			&c.RegistrationRequired, &c.RegistrationDeadline, &c.MaxParticipants, &c.Division, &configJSON,
 			&c.UpsolvingEnabled, &c.VirtualContestEnabled, &c.PDFEnabled, &c.StatementHidden,
 			&c.CreatedBy, &c.CreatedAt, &c.Status, &c.ReviewNote,
-			&c.IsRated, &c.RatedForMin, &c.RatedForMax, &accessConfigJSON, &c.Listed, &c.RatingVoided)
+			&c.IsRated, &c.RatedForMin, &c.RatedForMax, &accessConfigJSON, &c.Listed, &c.RatingVoided,
+			&c.ProposedRated)
 		c.AccessConfig = decodeAccessConfig(accessConfigJSON)
 		items = append(items, c)
 	}

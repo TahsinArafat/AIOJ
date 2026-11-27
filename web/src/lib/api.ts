@@ -773,10 +773,13 @@ export const api = {
                 request<{ data: Contest[]; total: number }>(
                     `/admin/contest-review?status=${encodeURIComponent(status)}&offset=${offset}&limit=${limit}`,
                 ),
-            review: (id: string, status: string, note = '') =>
+            // isRated is the reviewer's own answer, overriding what the author
+            // proposed. Omitted means "accept the proposal", which is why it is
+            // optional rather than a required boolean.
+            review: (id: string, status: string, note = '', isRated?: boolean) =>
                 request(`/admin/contest-review/${id}`, {
                     method: 'POST',
-                    body: JSON.stringify({ status, note }),
+                    body: JSON.stringify({ status, note, ...(isRated === undefined ? {} : { is_rated: isRated }) }),
                 }),
         },
         botAccounts: {

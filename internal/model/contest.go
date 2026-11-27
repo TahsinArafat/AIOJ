@@ -85,9 +85,22 @@ type Contest struct {
 	// IsRated was in the schema since migration 000003 and no Go code ever read
 	// or wrote it, so every contest was implicitly rated and an unrated round
 	// could not exist. It is now part of the model and of the create/update path.
+	//
+	// Whether a round is rated is an admin's verdict, not the author's: it decides
+	// whether the round moves every entrant's rating on the global leaderboard.
+	// An author proposes it (ProposedRated) and ReviewContest resolves it, the
+	// same way Status decides whether the round is public at all.
 	IsRated     bool `json:"is_rated"`
 	RatedForMin int  `json:"rated_for_min"`
 	RatedForMax int  `json:"rated_for_max"`
+	// ProposedRated is what the author asked for while the round was a proposal.
+	// It is the answer an admin is shown in the review queue, and it is only ever
+	// read there: IsRated is what the rest of the system believes.
+	//
+	// Separate from IsRated because the two disagree for exactly as long as a
+	// proposal is waiting, and a round that is not yet approved must not be able
+	// to declare itself rated by writing the column everyone reads.
+	ProposedRated bool `json:"proposed_rated"`
 	// RatingVoided reports that this round's ratings no longer count. The round
 	// keeps its standings and stays published; only its effect on the rating
 	// ledger is withdrawn, which is what a disputed round needs. Distinct from an

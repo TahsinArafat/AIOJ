@@ -207,6 +207,45 @@ func initialContestStatus(role string) string {
 	return model.ContestStatusDraft
 }
 
+// settableRating reports whether this caller may decide that a round is rated at
+// all, rather than only proposing it.
+//
+// is_rated decides whether a round moves every entrant's rating on the global
+// leaderboard, so an author must not be able to set it: a setter could announce a
+// rated round — or withdraw one whose ratings were already paid out — with no
+// review. Publishing is gated the same way (initialContestStatus); this is the
+// other half of that rule.
+//
+// An author's answer is recorded as proposed_rated instead, which is what the
+// review queue shows the admin and what SetReviewState copies into is_rated when
+// the round is published. An admin's answer settles both.
+//
+// Deliberately about is_rated only. The rating window (rated_for_min/max) stays
+// the author's: it bounds which entrants of an already rated round count, so it
+// changes nothing about whether the round is rated.
+func settableRating(role string) bool { return role == "admin" }
+
+// applyRatingRequest writes a rating declaration onto the round from the request.
+//
+// Both create and update need this, and the split is the point: the field an
+// author may write is proposed_rated, the field the system reads is is_rated, and
+// only an admin's declaration is both.
+func applyRatingRequest(c *model.Contest, req model.CreateContestRequest, role string, isCreate bool) {
+	if req.IsRated == nil {
+		return
+	}
+	if settableRating(role) {
+		c.IsRated = *req.IsRated
+	}
+	// A published round has already been decided, so a later edit must not
+	// re-propose it: nothing would resolve the proposal until the round was
+	// unpublished and republished, and the queue would show a round that is not
+	// waiting for anything.
+	if isCreate || c.Status != model.ContestStatusPublished {
+		c.ProposedRated = *req.IsRated
+	}
+}
+
 // derefBool/derefInt apply a default when an optional request field is absent.
 // The create path needs them because the request DTO marks these fields optional
 // to keep update's "omitted means unchanged" semantics.
@@ -343,12 +382,12 @@ func (h *ContestHandler) Create(w http.ResponseWriter, r *http.Request) {
 		RegistrationDeadline: req.RegistrationDeadline,
 		MaxParticipants:      req.MaxParticipants,
 		Division:             derefInt(req.Division, model.DivisionNone),
-		// A new round is rated by default: that is what the schema default
-		// (is_rated=true) and every competitive round mean. An omitted field on
-		// create therefore must not silently produce an unrated contest.
-		IsRated:     derefBool(req.IsRated, true),
-		RatedForMin: derefInt(req.RatedForMin, 0),
-		RatedForMax: derefInt(req.RatedForMax, 9999),
+		RatedForMin:          derefInt(req.RatedForMin, 0),
+		RatedForMax:          derefInt(req.RatedForMax, 9999),
+		// Both start at the schema default (rated), which is what every round meant
+		// before rating could be proposed; the request's answer is applied below.
+		IsRated:       true,
+		ProposedRated: true,
 		// Listed defaults to true, matching the column default and matching every
 		// round that existed before the field. This has to be spelled out on the
 		// create path: the Go zero value for a bool is false, so a round created by
@@ -357,6 +396,10 @@ func (h *ContestHandler) Create(w http.ResponseWriter, r *http.Request) {
 		// the exact failure the column would then be blamed for.
 		Listed: derefBool(req.Listed, true),
 	}
+	// An omitted is_rated leaves the round rated, which is what the schema default
+	// and every competitive round mean. A sent one splits by role: an admin settles
+	// it, an author only proposes it for review.
+	applyRatingRequest(c, req, claims.Role, true)
 
 	if err := h.store.Create(r.Context(), c); err != nil {
 		http.Error(w, "create failed", http.StatusInternalServerError)
@@ -724,13 +767,11 @@ func (h *ContestHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if req.VirtualContestEnabled != nil {
 		c.VirtualContestEnabled = *req.VirtualContestEnabled
 	}
-	// Rating controls. Create already read these; Update did not, so is_rated
-	// could be chosen once and never changed — the Settings tab had no control
-	// for it because the server would have dropped the value anyway. The store
-	// writes all three (contests.go Update), so nothing else is needed here.
-	if req.IsRated != nil {
-		c.IsRated = *req.IsRated
-	}
+	// Rating. An author's is_rated is a proposal (proposed_rated); only an admin's
+	// settles is_rated, which is what decides whether the round moves the
+	// leaderboard. The rating window is the author's either way — it only bounds
+	// which entrants of an already rated round count.
+	applyRatingRequest(c, req, claims.Role, false)
 	if req.RatedForMin != nil {
 		c.RatedForMin = *req.RatedForMin
 	}
@@ -2276,6 +2317,11 @@ func (h *ContestHandler) ReviewContest(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Status string `json:"status"`
 		Note   string `json:"note"`
+		// IsRated is the reviewer's own answer, overriding what the author
+		// proposed. Optional because most verdicts accept the proposal as it
+		// stands, and because a note-only rejection must not be forced to restate
+		// a rating it is not deciding.
+		IsRated *bool `json:"is_rated,omitempty"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid body", http.StatusBadRequest)
@@ -2291,6 +2337,20 @@ func (h *ContestHandler) ReviewContest(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		respondContestLookupError(w, err)
 		return
+	}
+	// The verdict carries the rating, so the reviewer's answer is recorded before
+	// the status write resolves it. Without this an admin who disagreed with the
+	// proposal had to publish first and edit afterwards — a round that was rated
+	// for as long as the tab stayed open.
+	//
+	// A narrow write, not Update: the verdict body carries only status, note and
+	// maybe a rating, and a full settings round-trip here would save the round as
+	// it was read a moment ago, overwriting whatever an author changed meanwhile.
+	if req.IsRated != nil {
+		if err := h.store.SetProposedRated(r.Context(), c.ID, *req.IsRated); err != nil {
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
 	}
 	if err := h.store.SetReviewState(r.Context(), c.ID, req.Status, req.Note, claims.UserID); err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)

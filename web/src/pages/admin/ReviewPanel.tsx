@@ -10,8 +10,9 @@ import { useToast } from '../../components/Toast'
  *
  * Before this, a setter published straight to the archive and announced rated
  * contests with no review at all. This panel is the only place either becomes
- * public, so it is deliberately one screen: what is waiting, and the two
- * decisions that matter.
+ * public, so it is deliberately one screen: what is waiting, and the decisions
+ * that matter — including whether a round counts for ratings, which is the
+ * author's proposal until an admin settles it here.
  */
 export default function ReviewPanel() {
     const confirm = useConfirm()
@@ -45,10 +46,10 @@ export default function ReviewPanel() {
         }
     }
 
-    const decideContest = async (id: string, status: string, label: string) => {
+    const decideContest = async (id: string, status: string, label: string, isRated?: boolean) => {
         if (!(await confirm({ message: `${label} this contest?`, variant: status === 'rejected' ? 'danger' : 'default' }))) return
         try {
-            await api.admin.contestReview.review(id, status)
+            await api.admin.contestReview.review(id, status, '', isRated)
             toast.success(`Contest ${status}`)
             load()
         } catch (e) {
@@ -131,7 +132,7 @@ export default function ReviewPanel() {
                                 <tr>
                                     <th className="px-4 py-3 text-left">Contest</th>
                                     <th className="px-4 py-3 text-left">Starts</th>
-                                    <th className="px-4 py-3 text-left">Rated</th>
+                                    <th className="px-4 py-3 text-left">Rating</th>
                                     <th className="px-4 py-3 text-right">Actions</th>
                                 </tr>
                             </thead>
@@ -146,7 +147,16 @@ export default function ReviewPanel() {
                                         <td className="px-4 py-3 text-xs text-muted">
                                             {c.start_time ? new Date(c.start_time).toLocaleString() : '—'}
                                         </td>
-                                        <td className="px-4 py-3 text-xs text-muted">{c.is_rated ? 'Rated' : 'Unrated'}</td>
+                                        <td className="px-4 py-3 text-xs text-muted">
+                                            {/* The proposal, not the current value: is_rated is
+                                                what the last verdict left behind, and showing it
+                                                here would tell the reviewer a round is rated when
+                                                the author asked for the opposite. */}
+                                            {c.proposed_rated === false ? 'Unrated' : 'Rated'}
+                                            <div className="text-muted-soft">
+                                                proposed by author
+                                            </div>
+                                        </td>
                                         <td className="px-4 py-3 text-right whitespace-nowrap">
                                             <button
                                                 type="button"
@@ -154,6 +164,17 @@ export default function ReviewPanel() {
                                                 className="px-3 py-1.5 bg-ok/12 text-ok rounded-lg text-xs font-semibold hover:bg-ok/20"
                                             >
                                                 Publish
+                                            </button>
+                                            {/* Publish as unrated is its own button rather than a
+                                                toggle, because the common verdict accepts the
+                                                proposal and a checkbox would have to be read before
+                                                every click to be trusted. */}
+                                            <button
+                                                type="button"
+                                                onClick={() => decideContest(c.id, 'published', 'Publish as unrated', false)}
+                                                className="ml-2 px-3 py-1.5 bg-surface-3 text-muted rounded-lg text-xs font-semibold hover:bg-surface-2"
+                                            >
+                                                Publish unrated
                                             </button>
                                             <button
                                                 type="button"

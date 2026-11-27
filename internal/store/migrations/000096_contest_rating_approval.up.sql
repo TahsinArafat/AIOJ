@@ -1,0 +1,26 @@
+-- Whether a round is rated is an admin's verdict, not its author's.
+--
+-- is_rated decides whether a round moves every entrant's rating on the global
+-- leaderboard. Until now it was an ordinary settings field: Create and Update
+-- both wrote it straight from the request, so a setter could announce a rated
+-- round — or withdraw one whose ratings had already been paid out — with no
+-- review. Publishing a round was already gated (000081: a setter proposes, an
+-- admin publishes); rating was the half that was missed, and it is the half with
+-- a leaderboard attached.
+--
+-- So the author now records a PROPOSAL and the reviewer decides. proposed_rated
+-- is what the author asked for; is_rated is what the system believes and stays
+-- whatever the last admin verdict made it. They differ for exactly as long as a
+-- proposal is pending, which is why this cannot be one column.
+--
+-- DEFAULT TRUE mirrors is_rated's own default and 000093's reasoning: every round
+-- that exists was rated, so true restores the meaning those rows had a moment ago
+-- and no backfill is needed. A round mid-proposal keeps the is_rated it already
+-- had, which is the conservative answer — nothing changes rating without an admin
+-- touching it.
+--
+-- NOT NULL, like is_rated: "not proposed yet" is not a third state, it is a
+-- proposal whose answer happens to match the default, and a NULL would push that
+-- into every reader.
+ALTER TABLE contests
+    ADD COLUMN proposed_rated BOOLEAN NOT NULL DEFAULT true;

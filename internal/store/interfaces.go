@@ -376,8 +376,13 @@ type ContestWriter interface {
 	Update(ctx context.Context, c *model.Contest) error
 	Delete(ctx context.Context, id string) error
 	// SetReviewState applies an admin verdict and derives visible from it, so a
-	// proposal cannot publish itself.
+	// proposal cannot publish itself. Publishing is also what resolves
+	// proposed_rated into is_rated, the only path that decides whether a round
+	// counts for ratings.
 	SetReviewState(ctx context.Context, id, status, note, reviewerID string) error
+	// SetProposedRated records what the author asked for, or what the reviewer
+	// decided instead. It never writes is_rated.
+	SetProposedRated(ctx context.Context, id string, rated bool) error
 }
 
 // ContestProblemStore is the roster of problems attached to a round, and the

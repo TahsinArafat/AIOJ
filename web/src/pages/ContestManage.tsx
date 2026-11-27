@@ -1718,7 +1718,13 @@ function SettingsTab({ contestId }: { contestId: string }) {
                 {/* Rating. is_rated has been in the schema since migration
                     000003 but no screen ever offered it, so every contest was
                     silently rated. An unrated round is a real choice — a
-                    practice or onsite round must not move anyone's rating. */}
+                    practice or onsite round must not move anyone's rating.
+
+                    The author proposes; an admin decides. What this form writes is
+                    the proposal, and what the round currently IS may differ — a
+                    published round keeps the rating its approval settled until an
+                    admin changes it. The hint says which of the two is on screen
+                    rather than implying the checkbox is already in force. */}
                 <div>
                     <label className="block text-sm font-medium text-ink-soft mb-2">Rating</label>
                     <label className="flex items-start gap-2 cursor-pointer p-2 rounded-lg hover:bg-surface-2 border border-hairline">
@@ -1728,9 +1734,13 @@ function SettingsTab({ contestId }: { contestId: string }) {
                         <span className="text-sm">
                             Rated contest
                             <span className="block text-xs text-muted mt-0.5">
-                                {form.is_rated
-                                    ? 'Rating changes are calculated when the round ends.'
-                                    : 'The round will not change anyone’s rating.'}
+                                {isAdmin
+                                    ? (form.is_rated
+                                        ? 'Rating changes are calculated when the round ends.'
+                                        : 'The round will not change anyone’s rating.')
+                                    : (form.is_rated
+                                        ? 'Proposed. An admin confirms this when approving the round.'
+                                        : 'Proposed unrated. An admin confirms this when approving the round.')}
                             </span>
                         </span>
                     </label>

@@ -351,8 +351,13 @@ export interface Contest {
     status?: string
     review_note?: string
     /** is_rated existed in the schema since migration 000003 but was absent from
-     * every Go struct and from this type, so a contest could not be unrated. */
+     * every Go struct and from this type, so a contest could not be unrated.
+     *
+     * Whether a round is rated is an admin's verdict, not its author's: it decides
+     * whether the round moves the leaderboard. An author's declaration is
+     * `proposed_rated`, and publishing is what resolves one into the other. */
     is_rated?: boolean
+    proposed_rated?: boolean
     rated_for_min?: number
     rated_for_max?: number
 }
