@@ -12,7 +12,7 @@ import { useDocumentTitle } from '../lib/documentTitle'
 import { loginHref } from '../lib/authRedirect'
 import { lazy } from 'react'
 const CodeEditor = lazy(() => import('../components/CodeEditor'))
-import { ClipboardList, BarChart3, FileText } from 'lucide-react'
+import { BarChart3, FileText } from 'lucide-react'
 import { useToast } from '../components/Toast'
 import { SubmissionStatusPanel } from '../components/SubmissionStatusPanel'
 import { errorMessage } from '../lib/errors'
@@ -634,19 +634,6 @@ export default function ContestProblem() {
                         <p className="text-warn font-medium text-sm">Upsolving is disabled</p>
                         <p className="text-warn text-sm mt-1">
                             You can view the problem but cannot submit new solutions.
-                        </p>
-                    </div>
-                </div>
-            )}
-
-            {statementHidden && (
-                <div className="mb-6 shrink-0 p-4 bg-brand-soft border border-brand/40 rounded-lg flex items-start gap-3">
-                    <span className="text-brand mt-0.5"><ClipboardList className="w-5 h-5" /></span>
-                    <div>
-                        <p className="text-brand font-medium text-sm">Problem statement is hidden</p>
-                        <p className="text-brand text-sm mt-1">
-                            The full problem statement is only available in printed form. Please refer to your printed problem set.
-                            Sample cases are shown below for reference.
                         </p>
                     </div>
                 </div>

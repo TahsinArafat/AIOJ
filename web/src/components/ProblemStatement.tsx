@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Check, Copy, Download } from 'lucide-react'
+import { Check, ClipboardList, Copy, Download } from 'lucide-react'
 import { StatementBody, StatementSection } from './StatementSection'
 
 /**
@@ -180,12 +180,23 @@ export function ProblemStatement({
 
     return (
         <div className="space-y-6">
-            {showStatement && (
+            {showStatement ? (
                 isPdfUrl(problem.description) ? (
                     <PdfStatement url={problem.description as string} />
                 ) : (
                     <StatementBody body={problem.description} />
                 )
+            ) : (
+                <div className="flex items-start gap-3 rounded-lg border border-brand/40 bg-brand-soft p-4">
+                    <span className="mt-0.5 text-brand"><ClipboardList className="h-5 w-5" /></span>
+                    <div>
+                        <p className="text-sm font-medium text-brand">Problem statement is hidden</p>
+                        <p className="mt-1 text-sm text-brand">
+                            The full problem statement is only available in printed form. Please refer to your printed
+                            problem set. Sample cases are shown below for reference.
+                        </p>
+                    </div>
+                </div>
             )}
             {showStatement && problem.input_format && (
                 <StatementSection title="Input format" body={problem.input_format} />

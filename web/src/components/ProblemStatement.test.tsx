@@ -55,6 +55,7 @@ test('can hide the prose but keep the samples', () => {
     render(<ProblemStatement problem={liveContestProblem} showStatement={false} />)
 
     expect(screen.queryByText('Find the number of inversions.')).not.toBeInTheDocument()
+    expect(screen.getByText('Problem statement is hidden')).toBeInTheDocument()
     expect(screen.getByText('Sample 1')).toBeInTheDocument()
 })
 
