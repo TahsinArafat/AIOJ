@@ -1631,9 +1631,15 @@ export interface ContestDetailResponse {
 export interface ProblemCell {
     solved: boolean
     attempts: number
+    /** Penalty minutes for this problem, not the solve clock: solve minutes plus
+     * the wrong-attempt penalty. See `first_ac_at`. */
     time: number
     score: number
     pending: number
+    /** Instant of the accepted submission — the only field that orders two solves
+     * of the same problem. Absent for an unsolved cell and for the score formats
+     * (ioi, oi), which have no single accepting verdict. */
+    first_ac_at?: string | null
 }
 export interface ScoreboardEntry {
     rank: number

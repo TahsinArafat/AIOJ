@@ -239,9 +239,16 @@ func BuildBoard(in BoardInput) (*Board, error) {
 			problems[pr.ProblemIndex] = model.ProblemResult{
 				Solved:   pr.Solved,
 				Attempts: pr.Attempts,
-				Time:     pr.Penalty,
-				Score:    int(pr.Score),
-				Pending:  pending[userLetterKey{UserID: rank.Score.UserID, Letter: pr.ProblemIndex}],
+				// Time is the penalty, not the solve clock — see the field's comment
+				// on model.ProblemResult. FirstACAt is what orders two solves, and it
+				// is passed through because the format implementations already know
+				// it: dropping it here left the board with no way to say which of two
+				// solvers was first except by comparing penalties, which is a
+				// different question and answers it wrongly.
+				Time:      pr.Penalty,
+				Score:     int(pr.Score),
+				Pending:   pending[userLetterKey{UserID: rank.Score.UserID, Letter: pr.ProblemIndex}],
+				FirstACAt: pr.FirstACTime,
 			}
 		}
 		var adj *model.AdjustmentTotals

@@ -318,10 +318,80 @@ func TestEntryWireShape(t *testing.T) {
 	if !ok {
 		t.Fatalf("no cell for problem A: %s", got["problems"])
 	}
-	for _, key := range []string{"solved", "attempts", "time", "score", "pending"} {
+	for _, key := range []string{"solved", "attempts", "time", "score", "pending", "first_ac_at"} {
 		if _, ok := cell[key]; !ok {
 			t.Errorf("cell JSON has no %q key: %s", key, got["problems"])
 		}
+	}
+}
+
+// A solved cell's `time` is the penalty, so it cannot say who solved the problem
+// first. `first_ac_at` is the instant of the accepted submission, and it is the
+// only field that can.
+//
+// Reported from a live round: the earlier solve carried a wrong attempt, so its
+// penalty (1 + 20 = 21) was larger than the later, clean one (2), and the board
+// highlighted the later solve. Dropping FirstACTime here left the frontend with
+// nothing to order by except the penalty.
+func TestSolvedCellCarriesTheAcceptedInstant(t *testing.T) {
+	early := t0.Add(time.Minute)
+	late := t0.Add(2 * time.Minute)
+
+	in := boardInput()
+	in.Rows = []model.ScoreboardRow{
+		// alice solves A one minute in, after one wrong attempt.
+		{UserID: "u1", ProblemID: "p1", Status: "wa", Score: 0, CreatedAt: t0.Add(30 * time.Second)},
+		{UserID: "u1", ProblemID: "p1", Status: "ac", Score: 1, CreatedAt: early},
+		// bob solves A clean, one minute later.
+		{UserID: "u2", ProblemID: "p1", Status: "ac", Score: 1, CreatedAt: late},
+	}
+
+	board, err := format.BuildBoard(in)
+	if err != nil {
+		t.Fatalf("BuildBoard: %v", err)
+	}
+
+	cellOf := func(userID string) model.ProblemResult {
+		t.Helper()
+		for _, e := range board.Entries {
+			if e.UserID == userID {
+				return e.Problems["A"]
+			}
+		}
+		t.Fatalf("no entry for %s", userID)
+		return model.ProblemResult{}
+	}
+
+	alice, bob := cellOf("u1"), cellOf("u2")
+
+	// The premise: on the penalty, bob looks like the first solver.
+	if alice.Time <= bob.Time {
+		t.Fatalf("alice Time = %d, bob Time = %d: the fixture no longer reproduces the bug",
+			alice.Time, bob.Time)
+	}
+
+	// The fix: on the accepted instant, alice plainly precedes bob.
+	if alice.FirstACAt == nil || !alice.FirstACAt.Equal(early) {
+		t.Errorf("alice FirstACAt = %v, want %v", alice.FirstACAt, early)
+	}
+	if bob.FirstACAt == nil || !bob.FirstACAt.Equal(late) {
+		t.Errorf("bob FirstACAt = %v, want %v", bob.FirstACAt, late)
+	}
+	if !alice.FirstACAt.Before(*bob.FirstACAt) {
+		t.Errorf("alice FirstACAt %v is not before bob's %v", alice.FirstACAt, bob.FirstACAt)
+	}
+
+	// And it reaches the wire, or the frontend cannot see it.
+	raw, err := json.Marshal(alice)
+	if err != nil {
+		t.Fatalf("marshal cell: %v", err)
+	}
+	var got map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatalf("unmarshal cell: %v", err)
+	}
+	if _, ok := got["first_ac_at"]; !ok {
+		t.Errorf("cell JSON has no first_ac_at: %s", raw)
 	}
 }
 

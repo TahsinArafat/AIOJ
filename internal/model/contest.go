@@ -414,9 +414,19 @@ type ContestProblemProgress struct {
 type ProblemResult struct {
 	Solved   bool `json:"solved"`
 	Attempts int  `json:"attempts"`
-	Time     int  `json:"time"`
-	Score    int  `json:"score"`
-	Pending  int  `json:"pending"`
+	// Time is this cell's contribution to the penalty total, NOT the clock at
+	// which the problem was solved: on an ACM board it is minutes-from-start plus
+	// 20 per wrong attempt. Ordered as a time it puts a clean 2-minute solve ahead
+	// of a 1-minute solve that took a wrong attempt (1+20=21), so a standings
+	// reader that wants "who solved it first" must read FirstACAt instead.
+	Time    int `json:"time"`
+	Score   int `json:"score"`
+	Pending int `json:"pending"`
+	// FirstACAt is the instant of the accepted submission, and the only field that
+	// can order two solves of the same problem. Absent for an unsolved cell and for
+	// a format that pays out a score without a single accepting verdict (ioi, oi),
+	// so a reader must fall back to Time rather than read absence as "first".
+	FirstACAt *time.Time `json:"first_ac_at,omitempty"`
 }
 
 type ContestRankEntry struct {

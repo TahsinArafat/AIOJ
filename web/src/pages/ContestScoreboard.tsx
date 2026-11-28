@@ -7,15 +7,19 @@ import RatingBadge from '../components/RatingBadge';
 import { AlertTriangle, Eye, EyeOff, ChevronLeft, ChevronRight } from 'lucide-react';
 import { EmptyState } from '../components/EmptyState';
 import { formatPenaltyMinutes } from '../lib/contestTime';
+import { firstSolveKeys } from '../lib/contestFirstSolve';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
 interface ProblemCell {
   solved: boolean;
   attempts: number;
-  time: number;       // minutes from start
+  /** Penalty minutes for this problem (solve minutes + wrong-attempt penalty), not the solve clock. */
+  time: number;
   score: number;
   pending: number;
+  /** Instant of the accepted submission; the only field that orders two solves. */
+  first_ac_at?: string | null;
 }
 
 interface ScoreboardEntry {
@@ -194,25 +198,14 @@ export default function ContestScoreboard() {
     return () => clearInterval(interval);
   }, [data?.contest?.end_time, fetchScoreboard, viewMode, currentPage]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Determine first-solve problem indices
-  const firstSolves = useMemo(() => {
-    if (!data) return new Set<string>();
-    const solved: Record<string, { time: number; user_id: string }> = {};
-    for (const entry of data.entries) {
-      for (const [idx, cell] of Object.entries(entry.problems)) {
-        if (cell.solved && cell.attempts > 0) {
-          if (!solved[idx] || cell.time < solved[idx].time) {
-            solved[idx] = { time: cell.time, user_id: entry.user_id };
-          }
-        }
-      }
-    }
-    const set = new Set<string>();
-    for (const idx of Object.keys(solved)) {
-      set.add(`${solved[idx].user_id}::${idx}`);
-    }
-    return set;
-  }, [data]);
+  // First solver per problem: whoever's submission was accepted first.
+  //
+  // This used to compare `cell.time`, which is the problem's contribution to the
+  // penalty total — solve minutes PLUS the wrong-attempt penalty — so a clean
+  // solve two minutes in beat a solve one minute in that took a wrong attempt.
+  // See lib/contestFirstSolve. Note that `entries` is one page of the board, so
+  // this highlights the first solve among the rows on screen.
+  const firstSolves = useMemo(() => firstSolveKeys(data?.entries ?? []), [data]);
 
   // ── Render ───────────────────────────────────────────────────────────────
 
