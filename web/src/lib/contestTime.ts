@@ -83,3 +83,78 @@ export function clockUrgency(remainingMs: number): ClockUrgency {
     if (remainingMs <= WARN_MS) return 'warn'
     return 'calm'
 }
+
+export type ContestStatus = 'upcoming' | 'running' | 'frozen' | 'ended'
+
+/** Everything a clock on screen is made of, derived from one instant. */
+export interface ContestClock {
+    now: number
+    status: ContestStatus
+    startMs: number
+    endMs: number
+    totalMs: number
+    elapsedMs: number
+    remainingMs: number
+    /** 0–100. Zero when the round has no length to divide by. */
+    progress: number
+    urgency: ClockUrgency
+}
+
+/**
+ * Where the round stands at `now`.
+ *
+ * `frozen` is the scoreboard freeze, not the contest: the round is still
+ * running and submittable, the standings are just held back.
+ */
+export function contestStatus(
+    startMs: number, endMs: number, freezeMs: number | null, now: number,
+): ContestStatus {
+    if (now < startMs) return 'upcoming'
+    if (now > endMs) return 'ended'
+    if (freezeMs !== null && now >= freezeMs) return 'frozen'
+    return 'running'
+}
+
+/**
+ * The clock at one instant, with no state of its own.
+ *
+ * Both contest pages used to read `Date.now()` once at render and derive the
+ * round's phase from it while a separate timer moved the digits, so the number
+ * counted down inside a page that still believed the round had not started: a
+ * contest that began while you were reading never switched to the running clock
+ * and never re-enabled submitting. One derivation, fed the tick, keeps the
+ * digits and the phase in agreement.
+ *
+ * An unparseable date reads as ended with nothing left, which is the same
+ * answer the pages gave when the contest had not loaded yet.
+ */
+export function contestClockAt(
+    start: string | null | undefined, end: string | null | undefined,
+    freeze: string | null | undefined, now: number,
+): ContestClock {
+    const startMs = start ? new Date(start).getTime() : NaN
+    const endMs = end ? new Date(end).getTime() : NaN
+    if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) {
+        return {
+            now, status: 'ended', startMs: 0, endMs: 0, totalMs: 0,
+            elapsedMs: 0, remainingMs: 0, progress: 0, urgency: 'danger',
+        }
+    }
+
+    const totalMs = Math.max(0, endMs - startMs)
+    const elapsedMs = Math.min(totalMs, Math.max(0, now - startMs))
+    const remainingMs = Math.max(0, endMs - now)
+    const freezeMs = freeze ? new Date(freeze).getTime() : NaN
+
+    return {
+        now,
+        status: contestStatus(startMs, endMs, Number.isFinite(freezeMs) ? freezeMs : null, now),
+        startMs,
+        endMs,
+        totalMs,
+        elapsedMs,
+        remainingMs,
+        progress: totalMs > 0 ? (elapsedMs / totalMs) * 100 : 0,
+        urgency: clockUrgency(remainingMs),
+    }
+}

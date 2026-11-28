@@ -20,6 +20,7 @@ import { isRemotePlatform } from '../lib/platforms'
 import { useContestAnnouncements } from '../hooks/useContestAnnouncements'
 import { ContestAnnouncementPopup } from '../components/ContestAnnouncementPopup'
 import { ContestCountdown, ContestRunningClock } from '../components/ContestClock'
+import { useContestClock } from '../lib/useContestClock'
 import { useClarifications } from '../hooks/useClarifications'
 import { ClarificationsPanel, AskClarificationForm } from '../components/ClarificationsPanel'
 import { runStatus } from '../components/ui/verdict'
@@ -83,19 +84,6 @@ const STATUS_COLORS: Record<string, string> = {
     judging: 'bg-brand-soft text-brand border-brand/40',
     se: 'bg-surface-3/30 text-ink border-hairline-strong',
     SE: 'bg-surface-3/30 text-ink border-hairline-strong',
-}
-
-type ContestStatus = 'upcoming' | 'running' | 'frozen' | 'ended'
-
-function getStatus(start: string, end: string, freeze?: string): ContestStatus {
-    const now = Date.now()
-    const s = new Date(start).getTime()
-    const e = new Date(end).getTime()
-    const f = freeze ? new Date(freeze).getTime() : null
-    if (now < s) return 'upcoming'
-    if (now > e) return 'ended'
-    if (f && now >= f) return 'frozen'
-    return 'running'
 }
 
 /**
@@ -363,14 +351,16 @@ export default function ContestProblem() {
     }, [dragging, splitPos])
 
     const isLoggedIn = !!getAccessToken()
-    const status = contest ? getStatus(contest.start_time, contest.end_time, contest.freeze_time ?? undefined) : 'ended'
+    // The page's only clock: the digits and the round's phase come from the same
+    // tick, so a round that starts or ends while the page is open moves on by
+    // itself instead of holding the status it had at load.
+    const clock = useContestClock(contest?.start_time, contest?.end_time, contest?.freeze_time)
+    const status = clock.status
     // The API says when a problem's difficulty metadata is withheld, but the
     // contest's own clock is enough to know it: nothing is spoiled before the
     // round ends. Both are OR'd so the page stays honest even if the flag is
     // missing, and still covers a problem reused by a later contest.
     const hideSpoilers = spoilersHidden || status !== 'ended'
-    const isUpcoming = status === 'upcoming'
-    const isRunning = status === 'running' || status === 'frozen'
     const showSubmit = isLoggedIn && canSubmit && !upsolvingDisabled
 
     useEffect(() => {
@@ -612,20 +602,6 @@ export default function ContestProblem() {
         // percentage height, which against an indefinite parent is what collapsed
         // to `auto` and let the document scroll in the first place.
         <div className="flex flex-col lg:min-h-0 lg:flex-1">
-            {/* Anything above the panes is `shrink-0`: in the bounded column flex
-                would otherwise squeeze these notices to fit the panes and clip
-                their text. */}
-            {isUpcoming && contest?.start_time && (
-                <div className="mb-6 shrink-0">
-                    <ContestCountdown target={contest.start_time} label="Starts in" />
-                </div>
-            )}
-            {isRunning && contest?.start_time && contest?.end_time && (
-                <div className="mb-6 shrink-0">
-                    <ContestRunningClock start={contest.start_time} end={contest.end_time} />
-                </div>
-            )}
-
             {/* Notices */}
             {upsolvingDisabled && (
                 <div className="mb-6 shrink-0 p-4 bg-warn/10 border border-warn/40 rounded-lg flex items-start gap-3">
@@ -719,6 +695,12 @@ export default function ContestProblem() {
                             {problem.scoring_mode === 'partial' && <Badge tone="brand">Partial scoring</Badge>}
                         </div>
                     )}
+                    {/* The clock belongs to the statement beside it, not to the
+                        whole page: full width above the panes it cost a band of
+                        vertical space and pushed both of them down. Each of
+                        these renders nothing outside its own phase. */}
+                    <ContestCountdown clock={clock} label="Starts in" />
+                    <ContestRunningClock clock={clock} />
                     {/* Tabs */}
                     <div className="flex border-b border-hairline mb-6">
                         <button

@@ -17,6 +17,7 @@ import {
 import { useConfirm } from '../components/ConfirmDialog'
 import { useToast } from '../components/Toast'
 import { ContestCountdown, ContestRunningClock } from '../components/ContestClock'
+import { useContestClock } from '../lib/useContestClock'
 import { formatDuration } from '../lib/contestTime'
 import { problemLetter } from '../lib/contestProblems'
 import { useContestAnnouncements } from '../hooks/useContestAnnouncements'
@@ -63,19 +64,6 @@ function timeAgo(dateStr: string): string {
 }
 
 // ─── Status Badge ──────────────────────────────────────────────────────────────
-
-type ContestStatus = 'upcoming' | 'running' | 'frozen' | 'ended'
-
-function getStatus(start: string, end: string, freeze?: string): ContestStatus {
-    const now = Date.now()
-    const s = new Date(start).getTime()
-    const e = new Date(end).getTime()
-    const f = freeze ? new Date(freeze).getTime() : null
-    if (now < s) return 'upcoming'
-    if (now > e) return 'ended'
-    if (f && now >= f) return 'frozen'
-    return 'running'
-}
 
 // ─── SidebarBox ────────────────────────────────────────────────────────────────
 
@@ -176,6 +164,11 @@ export default function ContestDetail() {
     // The route map only knows it is a contest; the real title arrives with
     // the fetch and replaces "Contest" in the tab.
     useDocumentTitle(contest?.title)
+    // The page's only clock. The status badge, the tab contents and the clock
+    // card all read this one tick, so a round that starts, freezes or ends while
+    // the page is open moves on by itself instead of holding the phase it had at
+    // load — which is what the render-time `getStatus` this replaced did.
+    const clock = useContestClock(contest?.start_time, contest?.end_time, contest?.freeze_time)
     const [problems, setProblems] = useState<ProblemRow[]>([])
     const [loading, setLoading] = useState(true)
     const [activeTab, setActiveTab] = useState<Tab>(() => {
@@ -458,11 +451,11 @@ export default function ContestDetail() {
         )
     }
 
-    const status = getStatus(contest.start_time, contest.end_time, contest.freeze_time ?? undefined)
+    const status = clock.status
     const isUpcoming = status === 'upcoming'
     const isRunning = status === 'running' || status === 'frozen'
     const isEnded = status === 'ended'
-    const totalDuration = new Date(contest.end_time).getTime() - new Date(contest.start_time).getTime()
+    const totalDuration = clock.totalMs
 
     return (
         <div>
@@ -482,12 +475,12 @@ export default function ContestDetail() {
             {/* ── Clock ────────────────────────────────────────────────────── */}
             {isUpcoming && (
                 <div className="mb-6">
-                    <ContestCountdown target={contest.start_time} label="Starts in" />
+                    <ContestCountdown clock={clock} label="Starts in" />
                 </div>
             )}
             {isRunning && (
                 <div className="mb-6">
-                    <ContestRunningClock start={contest.start_time} end={contest.end_time} />
+                    <ContestRunningClock clock={clock} />
                 </div>
             )}
 

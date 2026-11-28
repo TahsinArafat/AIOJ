@@ -1,39 +1,37 @@
-import { act, render, screen } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { render, screen } from '@testing-library/react'
+import { describe, expect, it } from 'vitest'
 import { ContestCountdown, ContestRunningClock } from './ContestClock'
+import { contestClockAt } from '../lib/contestTime'
 
 /**
- * The contest clock.
+ * The contest clock's rendering.
  *
- * The old rendering was a full-width saturated gradient (`from-emerald-600 to
+ * The old version was a full-width saturated gradient (`from-emerald-600 to
  * teal-600`, `text-white`, `text-3xl`, pulsing dot) that ignored the design
  * tokens entirely, so it was the one surface on the page that was wrong in dark
  * mode. It also had no urgency state: a round two minutes from ending looked
  * identical to one with three hours left.
  *
- * These tests pin the behaviour that matters: the urgency class changes, the
- * clock disappears when it has nothing left to say, and the markup carries the
- * tokens rather than a hardcoded gradient.
+ * These components no longer own a timer — the page hands them a `ContestClock`
+ * from `useContestClock`, so the digits and the phase are the same instant (see
+ * useContestClock.test.ts for the ticking). Here they are pure: given a clock,
+ * do they render the right thing?
  */
 
 const HOUR = 3_600_000
+const NOW = new Date('2026-06-01T12:00:00Z').getTime()
 
 function at(offsetMs: number): string {
-    return new Date(Date.now() + offsetMs).toISOString()
+    return new Date(NOW + offsetMs).toISOString()
 }
 
-beforeEach(() => {
-    vi.useFakeTimers()
-    vi.setSystemTime(new Date('2026-06-01T12:00:00Z'))
-})
-
-afterEach(() => {
-    vi.useRealTimers()
-})
+function clockFor(startOffset: number, endOffset: number) {
+    return contestClockAt(at(startOffset), at(endOffset), null, NOW)
+}
 
 describe('ContestCountdown', () => {
     it('renders the time remaining until the round starts', () => {
-        render(<ContestCountdown target={at(2 * HOUR)} label="Starts in" />)
+        render(<ContestCountdown clock={clockFor(2 * HOUR, 5 * HOUR)} label="Starts in" />)
 
         expect(screen.getByText('Starts in')).toBeInTheDocument()
         expect(screen.getByText(/^02:00:00$/)).toBeInTheDocument()
@@ -42,23 +40,23 @@ describe('ContestCountdown', () => {
     it('renders nothing once the round has started', () => {
         // The running clock takes over; a zeroed countdown beside a live contest
         // says nothing useful.
-        const { container } = render(<ContestCountdown target={at(-1000)} />)
+        const { container } = render(<ContestCountdown clock={clockFor(-1000, 2 * HOUR)} />)
         expect(container).toBeEmptyDOMElement()
     })
 
     it('turns urgent as the start approaches', () => {
-        const { container, rerender } = render(<ContestCountdown target={at(2 * HOUR)} />)
+        const { container, rerender } = render(<ContestCountdown clock={clockFor(2 * HOUR, 5 * HOUR)} />)
         expect(container.innerHTML).not.toContain('border-warn')
 
-        rerender(<ContestCountdown target={at(10 * 60_000)} />)
+        rerender(<ContestCountdown clock={clockFor(10 * 60_000, 5 * HOUR)} />)
         expect(container.innerHTML).toContain('border-warn')
 
-        rerender(<ContestCountdown target={at(2 * 60_000)} />)
+        rerender(<ContestCountdown clock={clockFor(2 * 60_000, 5 * HOUR)} />)
         expect(container.innerHTML).toContain('border-bad')
     })
 
     it('uses design tokens rather than a hardcoded gradient', () => {
-        const { container } = render(<ContestCountdown target={at(2 * HOUR)} />)
+        const { container } = render(<ContestCountdown clock={clockFor(2 * HOUR, 5 * HOUR)} />)
         const html = container.innerHTML
         // The old version was bg-gradient-to-r from-blue-600 to-indigo-600 with
         // text-white, which does not adapt to the theme.
@@ -70,48 +68,47 @@ describe('ContestCountdown', () => {
 
 describe('ContestRunningClock', () => {
     it('shows the time left and how far through the round it is', () => {
-        render(<ContestRunningClock start={at(-HOUR)} end={at(HOUR)} />)
+        render(<ContestRunningClock clock={clockFor(-HOUR, HOUR)} />)
 
         expect(screen.getByText('Running')).toBeInTheDocument()
-        expect(screen.getByText(/00:59:59|01:00:00/)).toBeInTheDocument()
-        expect(screen.getByText('Elapsed 1h 0m')).toBeInTheDocument()
-        // Halfway through a two-hour round.
-        expect(screen.getByText('50%')).toBeInTheDocument()
+        expect(screen.getByText(/^01:00:00/)).toBeInTheDocument()
+        // Halfway through a two-hour round. The elapsed span and the percentage
+        // are on the bar's title rather than in a third row.
         expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '50')
+        expect(screen.getByRole('progressbar')).toHaveAttribute('title', '50% elapsed')
     })
 
     it('renders nothing once the round has ended', () => {
-        const { container } = render(<ContestRunningClock start={at(-2 * HOUR)} end={at(-1000)} />)
+        const { container } = render(<ContestRunningClock clock={clockFor(-2 * HOUR, -1000)} />)
         expect(container).toBeEmptyDOMElement()
     })
 
+    it('stays up while the scoreboard is frozen', () => {
+        // The freeze holds the standings back; the round is still running and
+        // still submittable, so the clock keeps counting.
+        const clock = contestClockAt(at(-HOUR), at(HOUR), at(-10 * 60_000), NOW)
+        render(<ContestRunningClock clock={clock} />)
+
+        expect(clock.status).toBe('frozen')
+        expect(screen.getByText('Running')).toBeInTheDocument()
+    })
+
     it('turns urgent inside the last 5 minutes', () => {
-        const { container, rerender } = render(<ContestRunningClock start={at(-HOUR)} end={at(HOUR)} />)
+        const { container, rerender } = render(<ContestRunningClock clock={clockFor(-HOUR, HOUR)} />)
         expect(container.innerHTML).not.toContain('border-bad')
 
-        rerender(<ContestRunningClock start={at(-119 * 60_000)} end={at(60_000)} />)
+        rerender(<ContestRunningClock clock={clockFor(-119 * 60_000, 60_000)} />)
         const html = container.innerHTML
         expect(html).toContain('border-bad')
         expect(html).toContain('bg-bad')
     })
 
     it('uses design tokens rather than a hardcoded gradient', () => {
-        const { container } = render(<ContestRunningClock start={at(-HOUR)} end={at(HOUR)} />)
+        const { container } = render(<ContestRunningClock clock={clockFor(-HOUR, HOUR)} />)
         const html = container.innerHTML
         // The old version was a saturated emerald gradient that ignored the theme.
         expect(html).not.toContain('from-emerald-600')
         expect(html).not.toContain('to-teal-600')
         expect(html).toContain('bg-surface')
-    })
-
-    it('ticks down once a second', async () => {
-        render(<ContestRunningClock start={at(-HOUR)} end={at(HOUR)} />)
-        // The deferred resync lands before the first interval tick.
-        await act(async () => { await Promise.resolve() })
-        expect(screen.getByText(/^01:00:00/)).toBeInTheDocument()
-
-        // Two seconds on, exactly two seconds gone — not a jump, not a stall.
-        act(() => { vi.advanceTimersByTime(2000) })
-        expect(screen.getByText(/^00:59:58/)).toBeInTheDocument()
     })
 })

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clockUrgency, formatCountdown, formatDuration, formatPenaltyMinutes } from './contestTime'
+import { clockUrgency, contestClockAt, contestStatus, formatCountdown, formatDuration, formatPenaltyMinutes } from './contestTime'
 
 /**
  * The contest clock's strings.
@@ -106,5 +106,62 @@ describe('clockUrgency', () => {
     it('treats an expired clock as urgent rather than calm', () => {
         expect(clockUrgency(0)).toBe('danger')
         expect(clockUrgency(-1)).toBe('danger')
+    })
+})
+
+describe('contestStatus', () => {
+    const HOUR = 3_600_000
+    const NOW = new Date('2026-06-01T12:00:00Z').getTime()
+
+    it('names the phase from the instant it is given', () => {
+        expect(contestStatus(NOW + HOUR, NOW + 2 * HOUR, null, NOW)).toBe('upcoming')
+        expect(contestStatus(NOW - HOUR, NOW + HOUR, null, NOW)).toBe('running')
+        expect(contestStatus(NOW - 2 * HOUR, NOW - HOUR, null, NOW)).toBe('ended')
+    })
+
+    it('is frozen once the scoreboard freeze passes, not before', () => {
+        // The freeze holds the standings back; the round itself is still on.
+        expect(contestStatus(NOW - HOUR, NOW + HOUR, NOW + 60_000, NOW)).toBe('running')
+        expect(contestStatus(NOW - HOUR, NOW + HOUR, NOW - 60_000, NOW)).toBe('frozen')
+    })
+})
+
+describe('contestClockAt', () => {
+    const HOUR = 3_600_000
+    const NOW = new Date('2026-06-01T12:00:00Z').getTime()
+    const at = (offsetMs: number) => new Date(NOW + offsetMs).toISOString()
+
+    it('derives remaining, elapsed and progress from one instant', () => {
+        const clock = contestClockAt(at(-HOUR), at(HOUR), null, NOW)
+
+        expect(clock.status).toBe('running')
+        expect(clock.totalMs).toBe(2 * HOUR)
+        expect(clock.elapsedMs).toBe(HOUR)
+        expect(clock.remainingMs).toBe(HOUR)
+        expect(clock.progress).toBe(50)
+        expect(clock.urgency).toBe('calm')
+    })
+
+    it('clamps a round that has run past its end', () => {
+        const clock = contestClockAt(at(-2 * HOUR), at(-HOUR), null, NOW)
+
+        // The round was an hour long, so an hour is all the elapsed time it has.
+        expect(clock.elapsedMs).toBe(HOUR)
+        expect(clock.remainingMs).toBe(0)
+        expect(clock.progress).toBe(100)
+    })
+
+    it('reads an unloaded or unparseable contest as ended with nothing left', () => {
+        // The pages call this before the fetch resolves, and a clock that has
+        // nothing to say must not claim the round is live.
+        for (const clock of [
+            contestClockAt(undefined, undefined, null, NOW),
+            contestClockAt('not-a-date', 'not-a-date', null, NOW),
+        ]) {
+            expect(clock.status).toBe('ended')
+            expect(clock.totalMs).toBe(0)
+            expect(clock.progress).toBe(0)
+            expect(clock.remainingMs).toBe(0)
+        }
     })
 })
